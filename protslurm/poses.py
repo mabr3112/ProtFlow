@@ -1,10 +1,12 @@
 '''
-poses is a module that handles proteins and their associated data 
+poses is a module that handles proteins and their associated df 
 in various representations as a Pandas DataFrame. 
 '''
 import os
 from glob import glob
 from typing import Union
+import shutil
+import logging
 
 # dependencies
 import pandas as pd
@@ -23,7 +25,7 @@ FORMAT_STORAGE_DICT = {
 }
 
 class Poses:
-    '''Class that stores and handles protein data. '''
+    '''Class that stores and handles protein df. '''
     ############################################# SETUP METHODS #########################################
     def __init__(self, poses:list=None, work_dir:str=None, storage_format:str="json", glob_suffix:str=None, jobstarter:JobStarter=jobstarters.SbatchArrayJobstarter()):
         # setup
@@ -113,9 +115,20 @@ class Poses:
         if (save_method_name := FORMAT_STORAGE_DICT.get(out_format.lower())):
             getattr(self.df, save_method_name)(out_path)
 
-    def save_poses(self, out_path:str) -> None:
-        '''Saves current "poses" from poses.df at out_path'''
-        return None
+    def save_poses(self, out_path:str, poses_col:str="poses_description", overwrite=True) -> None:
+        '''Saves current "poses" from poses.df at out_path. Overwrites poses by default.'''
+        poses = self.df[poses_col].to_list()
+        if not os.path.isdir(out_path): os.makedirs(out_path, exist_ok=True)
+
+        # check if poses are already at out_path, skip if overwrite is set to False
+        if all([os.path.isfile(pose) for pose in poses]) and not overwrite:
+            return
+
+        # save poses
+        print(f"Storing poses at {out_path}")
+        for pose in poses:
+            shutil.copy(pose, f"{out_path}/{pose.rsplit("/", maxsplit=1)[-1]}")
+
 
     ########################################### Runners ##################################################
 
@@ -125,6 +138,8 @@ class Poses:
         
         Runners can be any arbitrary scripts. They must send back pandas DataFrames.
         '''
+        #TODO check for column <prefix>_description in self.df
+
         # safety
         if not self.dir: raise AttributeError(f"Attribute 'dir' is not set. Poses.run() requires a working directory. Run Poses.set_work_dir('/path/to/work_dir/')")
         output_dir = f"{self.dir}/{prefix}"
@@ -136,14 +151,32 @@ class Poses:
 
         # merge RunnerOutput into Poses
         if isinstance(runner_out, RunnerOutput):
-            self.add_runner_output(runner_output=runner_out, remove_index_layers=runner_out.index_layers)
+            self.add_runner_output(runner_output=runner_out, prefix=prefix, remove_index_layers=runner_out.index_layers)
         else:
             raise ValueError(f"Output of runner {runner} (type: {type(runner_out)} is not of type RunnerOutput. Invalid runner!")
-    
-    def add_runner_output(self, runner_output:RunnerOutput, remove_index_layers:int) -> None:
-        '''Adds Output of a Runner class formatted in RunnerOutput into Poses.df'''
 
+    def add_runner_output(self, runner_output:RunnerOutput, prefix:str, remove_index_layers:int, sep:str="_") -> None:
+        '''Adds Output of a Runner class formatted in RunnerOutput into Poses.df'''    
+        startlen = len(runner_output.df)
+        
+        # add prefix before merging
+        runner_output.df = runner_output.df.add_prefix(prefix + "_")
 
+        # Remove layers if option is set
+        if remove_index_layers: runner_output.df.df["select_col"] = runner_output.df[f"{prefix}_description"].str.split(sep).str[:-1*remove_index_layers].str.join(sep)
+        else: runner_output.df["select_col"] = runner_output.df[f"{prefix}_description"]
+
+        # merge DataFrames
+        if any([x in list(self.df.columns) for x in list(runner_output.df.columns)]): print(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
+        self.df = runner_output.df.merge(self.df, left_on="select_col", right_on="poses_description")
+        self.df.drop(columns="select_col", inplace=True).reset_index(inplace=True)
+
+        # check if merger was successful:
+        if len(self.df) == 0: raise ValueError(f"Merging DataFrames failed. This means there was no overlap found between self.df['poses_description'] and runner_output.df[new_df_col]")
+        if len(self.df) < startlen: raise ValueError(f"Merging DataFrames failed. Some rows in runner_output.df[new_df_col] were not found in self.df['poses_description']")
+
+        # reset poses and poses_description column
+        self.df["poses"] = self.df[f"{prefix}_location"]
+        self.df["poses_description"] = self.df[f"{prefix}_description"]
 
     ########################################## Operations ###############################################
-    

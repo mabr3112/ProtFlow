@@ -5,12 +5,12 @@ from protslurm.jobstarters import JobStarter
 class RunnerOutput:
     '''RunnerOutput class handles how protein data is passed between Runners and Poses classes.'''
     def __init__(self, data:pd.DataFrame=None, index_layers:int=0):
-        self.set_data(data=data)
+        self.set_df(data=data)
         self.index_layers = index_layers # how many index layers were added to the description of the poses as a result of the Runner?
 
-    def set_data(self, data: pd.DataFrame) -> None:
+    def set_df(self, data: pd.DataFrame) -> None:
         '''Method to set data to RunnerOutput retrospectively (for whatever reason)'''
-        self.data = data
+        self.df = data
         if data is None: return
 
         # check formatting:
@@ -26,7 +26,7 @@ class Runner:
     def run(self, prefix:str, jobstarter:JobStarter, output_dir:str, options:str=None, pose_options:str=None) -> RunnerOutput:
         '''method that interacts with Poses to run jobs and send Poses the scores.'''
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
-    
+
     def check_output(self) -> None:
         '''Method to check if runner has ran already. If so it should just read in the output and skip running.'''
         raise NotImplementedError(f"Runner Method check_output was not overwritten yet!")
