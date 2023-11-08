@@ -1,13 +1,39 @@
-'''
-Jobstarters contains various jobstarter objects for SLURM or other systems
-that are used by runners to start jobs.
-'''
+"""
+This module, `jobstarters`, provides a set of classes and methods to facilitate the
+submission and management of computing jobs on various job scheduling systems, primarily
+focusing on SLURM. It defines a base `JobStarter` class with methods that need to be
+implemented by subclasses to start jobs and wait for their completion.
+
+The module includes implementations such as `SbatchArrayJobstarter`, which specifically
+manages the submission of job arrays to a SLURM cluster, handling tasks like generating
+command files and waiting for job completion.
+
+Classes:
+    JobStarter: An abstract base class that defines the interface for all jobstarters.
+    SbatchArrayJobstarter: A concrete implementation of `JobStarter` for managing SLURM job arrays.
+
+JobStarter Methods:
+    start: Submits a list of commands as jobs to the scheduling system.
+    wait_for_job: Waits for a job to complete before proceeding.
+
+Usage:
+    To use a jobstarter, instantiate an appropriate subclass (e.g., `SbatchArrayJobstarter`)
+    and call its `start` method with the desired commands and options. Use the `wait_for_job`
+    method if you need to wait for job completion.
+
+Note:
+    This module is designed to be extended with additional jobstarters for different
+    scheduling systems as needed.
+"""
 import time
 import subprocess
 import itertools
 
 class JobStarter:
     '''JobStarter class is a class that defines how jobstarters have to look.'''
+    def __init__(self, max_cores:int=None):
+        self.max_cores = max_cores
+
     def start(self, cmds:list, options:str, jobname:str, wait:bool) -> None:
         '''Method to start jobs'''
         raise NotImplementedError("Jobstarter 'start' function was not overwritten!")
@@ -16,9 +42,14 @@ class JobStarter:
         '''Method for waiting for started jobs'''
         raise NotImplementedError("Jobstarter 'wait_for_job' function was not overwritten!")
 
+    def set_max_cores(self, cores:int) -> None:
+        '''sets max_cores attribute'''
+        self.max_cores = cores
+
 class SbatchArrayJobstarter(JobStarter):
     '''Jobstarter that starts Job arrays on slurm clusters.'''
     def __init__(self, max_array_size:int=100, remove_cmdfile:bool=True):
+        super().__init__() # runs init-function of parent class (JobStarter)
         self.max_array_size = max_array_size
         self.remove_cmdfile = remove_cmdfile
 
