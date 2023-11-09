@@ -19,14 +19,38 @@ class RunnerOutput:
 
 class Runner:
     '''Abstract Runner baseclass handling interface between Runners and Poses.'''
-    def __init__(self):
-        runner=""
-        print(runner)
+    def __str__(self):
+        raise NotImplementedError(f"Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
 
-    def run(self, prefix:str, jobstarter:JobStarter, output_dir:str, options:str=None, pose_options:str=None) -> RunnerOutput:
+    def run(self, poses:list, jobstarter:JobStarter, output_dir:str, options:str=None, pose_options:str=None) -> RunnerOutput:
         '''method that interacts with Poses to run jobs and send Poses the scores.'''
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
 
-    def check_output(self) -> None:
-        '''Method to check if runner has ran already. If so it should just read in the output and skip running.'''
-        raise NotImplementedError(f"Runner Method check_output was not overwritten yet!")
+def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[dict,list]:
+    '''Parses options and pose_options together into options (dict {arg: val, ...}) and flags (list: [val, ...])'''
+    def tmp_parse_options_flags(options_str: str, sep:str="--") -> tuple[dict, list]:
+        '''parses split options '''
+        if not options_str: return {}, []
+        # split along separator
+        firstsplit = [x.strip() for x in options.split(sep) if x]
+
+        # parse into options and flags:
+        opts = dict()
+        flags = list()
+        for item in firstsplit:
+            if len((x := item.split())) > 1:
+                opts[x[0]] = " ".join(x[1:])
+            else:
+                flags.append(x[0])
+
+        return opts, flags
+
+    # parse into options and flags:
+    opts, flags = tmp_parse_options_flags(options, sep=sep)
+    pose_opts, pose_flags = tmp_parse_options_flags(pose_options, sep=sep)
+
+    # merge options and pose_options (pose_opts overwrite opts), same for flags
+    opts.update(pose_opts)
+    flags = list(set(flags) | set(pose_flags))
+
+    return opts, flags

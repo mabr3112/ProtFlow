@@ -48,9 +48,9 @@ class JobStarter:
 
 class SbatchArrayJobstarter(JobStarter):
     '''Jobstarter that starts Job arrays on slurm clusters.'''
-    def __init__(self, max_array_size:int=100, remove_cmdfile:bool=True):
+    def __init__(self, max_cores:int=100, remove_cmdfile:bool=True):
         super().__init__() # runs init-function of parent class (JobStarter)
-        self.max_array_size = max_array_size
+        self.max_cores = max_cores
         self.remove_cmdfile = remove_cmdfile
 
         # static attribute, can be changed depending on slurm settings:
@@ -74,13 +74,21 @@ class SbatchArrayJobstarter(JobStarter):
             f.write("\n".join(cmds))
 
         # write sbatch command and run
-        sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_array_size)} -J {jobname} -vvv {" ".join(options)} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
+        options = self.parse_options(options)
+        sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} -vvv {options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
         subprocess.run(sbatch_cmd, shell=True, stdout=True, stderr=True, check=True)
 
         # wait for job and clean up
         if wait: self.wait_for_job(jobname)
         if self.remove_cmdfile: subprocess.run(f"rm {cmdfile}", shell=True, stdout=True, stderr=True, check=True)
         return None
+
+    def parse_options(self, options) -> str:
+        '''parses sbatch options'''
+        # parse options
+        if isinstance(options, list): return " ".join(options)
+        if isinstance(options, str): return options
+        raise TypeError(f"Unsupported type for argument options: {type(options)}. Supported types: [str, list]")
 
     def wait_for_job(self, jobname:str, interval:float=5) -> None:
         '''

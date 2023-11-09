@@ -45,7 +45,7 @@ class Poses:
         '''sets up working_directory for poses. Just creates new work_dir and stores the first instance of Poses DataFrame in there.'''
         if not os.path.isdir(work_dir):
             os.makedirs(work_dir, exist_ok=True)
-            print(f"Creating directory {work_dir}")
+            logging.info(f"Creating directory {work_dir}")
         self.dir = work_dir
         return None
 
@@ -125,7 +125,7 @@ class Poses:
             return
 
         # save poses
-        print(f"Storing poses at {out_path}")
+        logging.info(f"Storing poses at {out_path}")
         for pose in poses:
             shutil.copy(pose, f"{out_path}/{pose.rsplit("/", maxsplit=1)[-1]}")
 
@@ -138,15 +138,17 @@ class Poses:
         
         Runners can be any arbitrary scripts. They must send back pandas DataFrames.
         '''
-        #TODO check for column <prefix>_description in self.df
+        #check for column <prefix>_description in self.df
+        self.check_prefix(prefix=f"{prefix}_description")
 
         # safety
         if not self.dir: raise AttributeError(f"Attribute 'dir' is not set. Poses.run() requires a working directory. Run Poses.set_work_dir('/path/to/work_dir/')")
         output_dir = f"{self.dir}/{prefix}"
 
         # start runner
+        logging.info(f"Starting Runner {Runner} on {len(self.df)} poses.")
         jobstarter = jobstarter or self.default_jobstarter
-        jobstarter.set_max_cores = max_cores
+        jobstarter.set_max_cores(max_cores)
         runner_out = runner.run(prefix=prefix, jobstarter=jobstarter, output_dir=output_dir, options=options, pose_options=pose_options)
 
         # merge RunnerOutput into Poses
@@ -158,7 +160,7 @@ class Poses:
     def add_runner_output(self, runner_output:RunnerOutput, prefix:str, remove_index_layers:int, sep:str="_") -> None:
         '''Adds Output of a Runner class formatted in RunnerOutput into Poses.df'''    
         startlen = len(runner_output.df)
-        
+
         # add prefix before merging
         runner_output.df = runner_output.df.add_prefix(prefix + "_")
 
@@ -167,8 +169,8 @@ class Poses:
         else: runner_output.df["select_col"] = runner_output.df[f"{prefix}_description"]
 
         # merge DataFrames
-        if any([x in list(self.df.columns) for x in list(runner_output.df.columns)]): print(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
-        self.df = runner_output.df.merge(self.df, left_on="select_col", right_on="poses_description")
+        if any(x in list(self.df.columns) for x in list(runner_output.df.columns)): logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
+        self.df = runner_output.df.merge(self.df, left_on="select_col", right_on="poses_description") # pylint: disable=W0201
         self.df.drop(columns="select_col", inplace=True).reset_index(inplace=True)
 
         # check if merger was successful:
