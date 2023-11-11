@@ -1,7 +1,34 @@
-'''
-poses is a module that handles proteins and their associated df 
-in various representations as a Pandas DataFrame. 
-'''
+"""
+The 'poses' module in the ProtSLURM package is designed for running protein design tools, managing and manipulating protein data. 
+
+It primarily focuses on handling proteins and their associated data represented as Pandas DataFrames. 
+This module provides functionalities to parse, store, and manipulate protein data in various file formats, aiding in the management of complex protein study workflows. 
+
+Key Features:
+- Parsing protein data from different sources and formats.
+- Storing and retrieving protein data in multiple file formats like JSON, CSV, Pickle, Feather, and Parquet.
+- Integration with the ProtSLURM package for managing SLURM jobs, facilitating the handling of protein data in distributed computing environments.
+- Advanced data manipulation capabilities, including merging and prefixing data from various sources.
+
+Classes:
+- Poses: A central class for storing and handling protein data frames. It supports various operations like setting up work directories, parsing protein data, and integrating outputs from different runners.
+
+Dependencies:
+- pandas: Used for DataFrame operations.
+- protslurm: Required for job management and integrating with SLURM job runners.
+
+Note:
+This module is part of the ProtSLURM package and is designed to work in tandem with other components of the package, especially those related to job management in SLURM environments.
+
+Example Usage:
+To use the Poses class for managing protein data:
+    from poses import Poses
+    poses_instance = Poses(poses=my_protein_data, work_dir='path/to/work_dir')
+    # Further operations using poses_instance
+
+Author: Markus Braun
+Version: 0.1.0
+"""
 import os
 from glob import glob
 from typing import Union

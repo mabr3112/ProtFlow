@@ -112,4 +112,3 @@ class ProteinGenerator(Runner):
             "inpaint_seq": [trb["inpaint_seq"].numpy().tolist()]
         }
         return pd.DataFrame(data_dict)
-
