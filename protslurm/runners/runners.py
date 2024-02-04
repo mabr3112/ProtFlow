@@ -2,6 +2,8 @@
 import pandas as pd
 from protslurm.jobstarters import JobStarter
 
+
+
 class RunnerOutput:
     '''RunnerOutput class handles how protein data is passed between Runners and Poses classes.'''
     def __init__(self, data:pd.DataFrame=None, index_layers:int=0):
@@ -15,14 +17,14 @@ class RunnerOutput:
 
         # check formatting:
         mandatory_cols = ["description", "location"]
-        if mandatory_cols not in data.columns: raise ValueError(f"Input Data to RunnerOutput class MUST contain columns 'description' and 'location'.\nDescription should carry the name of the poses, while 'location' should contain the path (+ filename and suffix).")
+        if any(col not in data.columns for col in mandatory_cols): raise ValueError(f"Input Data to RunnerOutput class MUST contain columns 'description' and 'location'.\nDescription should carry the name of the poses, while 'location' should contain the path (+ filename and suffix).")
 
 class Runner:
     '''Abstract Runner baseclass handling interface between Runners and Poses.'''
     def __str__(self):
         raise NotImplementedError(f"Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
 
-    def run(self, poses:list, jobstarter:JobStarter, output_dir:str, options:str=None, pose_options:str=None) -> RunnerOutput:
+    def run(self, poses, jobstarter:JobStarter, output_dir:str, options:str=None, pose_options:str=None) -> RunnerOutput:
         '''method that interacts with Poses to run jobs and send Poses the scores.'''
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
 

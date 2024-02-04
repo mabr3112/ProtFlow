@@ -5,6 +5,7 @@ import logging
 # customs
 from protslurm.poses import Poses
 from protslurm.runners.protein_generator import ProteinGenerator
+from protslurm.runners.ligandmpnn import LigandMPNN
 
 def main(args):
     '''.'''
@@ -15,6 +16,15 @@ def main(args):
         work_dir=args.output_dir,
         storage_format="feather"
     )
+
+    # start ligand_mpnn
+    proteins.run(
+            #poses=proteins.df['poses'].to_list(),
+            runner=LigandMPNN(),
+            prefix="ligandmpnn",
+    )
+
+    print(proteins.df)
 
     # start protein_generator
     proteins.run(

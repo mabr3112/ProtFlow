@@ -18,7 +18,7 @@ from .runners import RunnerOutput
 
 class ProteinGenerator(Runner):
     '''Class to run protein_generator and collect it's outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.PROTIEN_GENERATOR_SCRIPT_PATH, sbatch_options:str=None) -> None:
+    def __init__(self, script_path:str=protslurm.config.PROTEIN_GENERATOR_SCRIPT_PATH, sbatch_options:str=None) -> None:
         '''sbatch_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under PROTEIN_GENERATOR_SCRIPT_PATH.")
         self.script_path = script_path
