@@ -6,24 +6,25 @@ import logging
 from protslurm.poses import Poses
 from protslurm.runners.protein_generator import ProteinGenerator
 from protslurm.runners.ligandmpnn import LigandMPNN
+from protslurm.runners.rosettascripts import RosettaScripts
+
 
 def main(args):
     '''.'''
     # instantiate Poses class and fill it with input_dir
     proteins = Poses(
-        poses=args.input_dir,
+        poses="input_pdbs/rosettascripts/",
         glob_suffix="*.pdb",
         work_dir=args.output_dir,
         storage_format="feather"
     )
 
+    proteins = RosettaScripts().run(poses=proteins, output_dir='scripts', prefix="rosettatest", nstruct=1, xml_path="empty.xml", options="-beta", overwrite=True)
+    print(proteins.df)
+    proteins.df['fixed_residues'] = ['A3,B3,C3,D3']
     # start ligand_mpnn
-    proteins.run(
-            #poses=proteins.df['poses'].to_list(),
-            runner=LigandMPNN(),
-            prefix="ligandmpnn",
-    )
 
+    proteins = LigandMPNN().run(poses=proteins, output_dir='ligandmpnn', prefix="test", model="ligand_mpnn", nseq=5, fixed_res_column='fixed_residues')
     print(proteins.df)
 
     # start protein_generator
@@ -32,6 +33,7 @@ def main(args):
         prefix="protein_generator",
         options="--seq XXXXXXXXXXXMYXXXSEQVENCEXXXXXXXXXXXXXXX"
     )
+
 
 if __name__ == "__main__":
     import argparse

@@ -1,12 +1,9 @@
-'''Module to handle LigandMPNN within ProtSLURM'''
+'''Module to handle AttnPacker within ProtSLURM'''
 # general imports
-from multiprocessing import Value
-from operator import pos
 import os
 import logging
 from glob import glob
 import shutil
-from tabnanny import check
 
 # dependencies
 import pandas as pd
@@ -21,22 +18,21 @@ from .runners import Runner
 from .runners import RunnerOutput
 
 
-class LigandMPNN(Runner):
-    '''Class to run LigandMPNN and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.LIGANDMPNN_SCRIPT_PATH, python_path:str=protslurm.config.LIGANDMPNN_PYTHON_PATH, jobstarter_options:str=None) -> None:
-        '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
+class AttnPacker(Runner):
+    '''Class to run AttnPacker and collect its outputs into a DataFrame'''
+    def __init__(self, script_path:str=protslurm.config.ATTNPACKER_SCRIPT_PATH, python_path:str=protslurm.config.ATTNPACKER_PYTHON_PATH, sbatch_options:str=None) -> None:
+        '''sbatch_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under LIGANDMPNN_SCRIPT_PATH.")
         if not python_path: raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under LIGANDMPNN_PYTHON_PATH.")
         self.script_path = script_path
         self.python_path = python_path
         self.name = "ligandmpnn.py"
-        self.index_layers = 1
-        self.jobstarter_options = jobstarter_options
+        self.sbatch_options = sbatch_options
 
     def __str__(self):
         return "ligandmpnn.py"
 
-    def run(self, poses:protslurm.poses.Poses, output_dir:str, prefix:str, nseq:int=1, model:str="ligand_mpnn", options:str=None, pose_options:list or str=None, fixed_res_column:str=None, design_res_column:str=None, return_seq_threaded_pdbs_as_pose:bool=False, preserve_original_output:bool=True, overwrite:bool=False, jobstarter:protslurm.jobstarters.JobStarter=None) -> RunnerOutput:
+    def run(self, poses:list, jobstarter:protslurm.jobstarters.JobStarter, output_dir:str, options:str=None, pose_options:str=None) -> RunnerOutput:
         '''Runs ligandmpnn.py on acluster'''
 
         available_models = ["protein_mpnn", "ligand_mpnn", "soluble_mpnn", "global_label_membrane_mpnn", "per_residue_label_membrane_mpnn"]
@@ -48,66 +44,40 @@ class LigandMPNN(Runner):
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip LigandMPNN.
         scorefile = "ligandmpnn_scores.json"
-        if overwrite == False and os.path.isfile(scorefilepath := os.path.join(work_dir, scorefile)):
-            return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
+        if os.path.isfile((scorefilepath := f"{work_dir}/{scorefile}")):
+            return RunnerOutput(pd.read_json(scorefilepath))
 
         # parse_options and pose_options:
-        pose_options = self.create_pose_options(poses.df, pose_options, nseq, fixed_res_column, design_res_column)
+        pose_options = self.safecheck_pose_options(pose_options, poses)
 
-        # write ligandmpnn cmds:
-        cmds = [self.write_cmd(pose, output_dir=work_dir, model=model, nseq=nseq, options=options, pose_options=pose_opts) for pose, pose_opts in zip(poses.df['poses'].to_list(), pose_options)]
+        # write protein generator cmds:
+        cmds = [self.write_cmd(pose, output_dir=work_dir, model=model, options=options, pose_options=pose_opts) for pose, pose_opts in zip(poses, pose_options)]
 
         # run
-        jobstarter = jobstarter or poses.default_jobstarter
-        jobstarter_options = self.jobstarter_options or f"--gpus-per-node 1 -c1 -e {work_dir}/ligandmpnn_err.log -o {work_dir}/ligandmpnn_out.log"
+        sbatch_options = self.sbatch_options or f"--gpus-per-node 1 -c1 -e {work_dir}/ligandmpnn_err.log -o {work_dir}/ligandmpnn_out.log"
         jobstarter.start(cmds=cmds,
-                         options=jobstarter_options,
+                         options=sbatch_options,
                          jobname="ligandmpnn",
                          wait=True,
                          cmdfile_dir=f"{output_dir}/"
         )
 
         # collect scores
-        scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, return_seq_threaded_pdbs_as_pose=return_seq_threaded_pdbs_as_pose, preserve_original_output=preserve_original_output)
-        
-        return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+        return RunnerOutput(self.collect_scores(work_dir=work_dir, scorefile=scorefile, return_seq_threaded_pdbs_as_pose=return_seq_threaded_pdbs_as_pose, preserve_original_output=preserve_original_output))
 
-    def create_pose_options(self, df:pd.DataFrame, pose_options:list or str=None, nseq:int=1, fixed_res_column:str=None, design_res_column:str=None) -> list:
-        '''Checks if pose_options are of the same length as poses, if pose_options are provided, '''
-
-        def check_if_column_in_poses_df(df:pd.DataFrame, column:str):
-            if not column in [col for col in df.columns]: raise ValueError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
-            return
-        def parse_residues(df:pd.DataFrame, column:str) -> list:
-            check_if_column_in_poses_df(df, column)
-            return [' '.join([res for res in series[column].split(',')]) for _, series in df.iterrows()]
-
-        poses = df['poses'].to_list()
-
-
-        if isinstance(pose_options, str):
-            check_if_column_in_poses_df(df, pose_options)
-            pose_options = df[pose_options].to_list()
+    def safecheck_pose_options(self, pose_options: list, poses:list) -> list:
+        '''Checks if pose_options are of the same length as poses, if now pose_options are provided, '''
         # safety check (pose_options must have the same length as poses)
-        if fixed_res_column and design_res_column:
-            raise ValueError(f"Cannot define both <fixed_res_column> and <design_res_column>!")
-        if fixed_res_column:
-            fixed_residues = parse_residues(df, fixed_res_column)
-            if pose_options: pose_options = [" ".join([pose_opt, f"fixed_residues '{res}'"]) for pose_opt, res in zip(pose_options, fixed_residues)]
-            else: pose_options = [f"fixed_residues='{res}'" for res in fixed_residues]
-        if design_res_column:
-            design_residues = parse_residues(df, design_res_column)
-            if pose_options: pose_options = [' '.join([pose_opt, f"redesigned_residues '{res}'"]) for pose_opt, res in zip(pose_options, design_residues)]
-            else: pose_options = [f"redesigned_residues='{res}'" for res in fixed_residues]
+        if isinstance(pose_options, list):
+            if len(poses) != len(pose_options):
+                raise ValueError(f"Arguments <poses> and <pose_options> for LigandMPNN must be of the same length. There might be an error with your pose_options argument!\nlen(poses) = {poses}\nlen(pose_options) = {len(pose_options)}")
+            return pose_options
         if pose_options is None:
             # make sure an empty list is passed as pose_options!
-            pose_options = ["" for x in poses]
+            return ["" for x in poses]
+        raise TypeError(f"Unsupported type for pose_options: {type(pose_options)}. pose_options must be of type [list, None]")
 
-        if len(poses) != len(pose_options):
-            raise ValueError(f"Arguments <poses> and <pose_options> for LigandMPNN must be of the same length. There might be an error with your pose_options argument!\nlen(poses) = {poses}\nlen(pose_options) = {len(pose_options)}")
-        return pose_options
-
-    def write_cmd(self, pose_path:str, output_dir:str, model:str, nseq:int, options:str, pose_options:str):
+    def write_cmd(self, pose_path:str, output_dir:str, model:str, options:str, pose_options:str):
         '''Writes Command to run ligandmpnn.py'''
 
         # parse options
@@ -115,10 +85,9 @@ class LigandMPNN(Runner):
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 
-        return f"{self.python_path} {self.script_path} --model_type {model} --number_of_batches={nseq} --out_folder {output_dir} --pdb_path {pose_path} {opts} {flags}"
+        return f"{self.python_path} {self.script_path} --model_type {model} --out_folder {output_dir} --pdb_path {pose_path} {opts} {flags}"
 
-
-    def collect_scores(self, work_dir:str, scorefile:str, return_seq_threaded_pdbs_as_pose:bool, preserve_original_output:bool=True) -> pd.DataFrame:
+    def collect_scores(self, work_dir: str, scorefile: str, return_seq_threaded_pdbs_as_pose:bool, preserve_original_output:bool=True) -> pd.DataFrame:
         '''collects scores from ligandmpnn output'''
 
         def mpnn_fastaparser(fasta_path):
@@ -181,8 +150,8 @@ class LigandMPNN(Runner):
         # read .pdb files
         seq_dir = os.path.join(work_dir, 'seqs')
         pdb_dir = os.path.join(work_dir, 'backbones')
-        fl = glob(f"{seq_dir}/*.fa")
-        pl = glob(f"{pdb_dir}/*.pdb")
+        fl = glob(seq_dir)
+        pl = glob(pdb_dir)
         if not fl: raise FileNotFoundError(f"No .fa files were found in the output directory of LigandMPNN {seq_dir}. LigandMPNN might have crashed (check output log), or path might be wrong!")
         if not pl: raise FileNotFoundError(f"No .pdb files were found in the output directory of LigandMPNN {pdb_dir}. LigandMPNN might have crashed (check output log), or path might be wrong!")
 
@@ -202,6 +171,8 @@ class LigandMPNN(Runner):
 
         # Write new .fa files by iterating through "description" and "sequence" keys of the seqs_dict
         logging.info(f"Writing new fastafiles at original location {seq_dir}.")
+
+        #write mpnn fasta files to output directory
         scores = write_mpnn_fastas(seqs_dict)
 
         if return_seq_threaded_pdbs_as_pose == True:
@@ -209,7 +180,6 @@ class LigandMPNN(Runner):
             scores['location'] = [os.path.join(pdb_dir, f"{os.path.splitext(os.path.basename(series['location']))[0]}.pdb") for _, series in scores.iterrows()]
 
         logging.info(f"Saving scores of {self} at {scorefile}")
-        
         scores.to_json(scorefile)
 
         if preserve_original_output == False:
@@ -221,3 +191,4 @@ class LigandMPNN(Runner):
                 shutil.rmtree(original_pdbs_dir)
 
         return scores
+

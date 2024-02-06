@@ -1,0 +1,12 @@
+>A0-B0-C0-D14, T=0.1, seed=45819, num_res=37, num_ligand_res=6, use_ligand_context=True, ligand_cutoff_distance=8.0, batch_size=1, number_of_batches=5, model_path=/home/tripp/LigandMPNN/model_params/ligandmpnn_v_32_010_25.pt
+AAWAA:AAHAA:AAWAA:AARAA:GGGSSSAAAHHHMMMYYYWWW
+>A0-B0-C0-D14, id=1, T=0.1, seed=45819, overall_confidence=0.6168, ligand_confidence=0.6012, seq_rec=0.0000
+FKWIL:FKHIL:FKWWL:FKRWL:EREVKKLQLLKKKLKLKKLLL
+>A0-B0-C0-D14, id=2, T=0.1, seed=45819, overall_confidence=0.6415, ligand_confidence=0.7307, seq_rec=0.0000
+FKWIL:FKHIL:FKWWL:FKRWL:EREIVKLKKKQQQLKQKLRLL
+>A0-B0-C0-D14, id=3, T=0.1, seed=45819, overall_confidence=0.6433, ligand_confidence=0.7064, seq_rec=0.0270
+KKWIL:FKHIL:FKWWL:FKRWL:FREVVKLKKLKQKKKKLLWRL
+>A0-B0-C0-D14, id=4, T=0.1, seed=45819, overall_confidence=0.5867, ligand_confidence=0.5497, seq_rec=0.0000
+FKWIL:FKHIL:FKWWL:FKRWL:EREVKKKKLLKQKLKLLKLRL
+>A0-B0-C0-D14, id=5, T=0.1, seed=45819, overall_confidence=0.6471, ligand_confidence=0.6757, seq_rec=0.0000
+FKWIL:FKHIL:FKWWL:WKRWL:FREIVKKQKLKQLLQQKKRLL

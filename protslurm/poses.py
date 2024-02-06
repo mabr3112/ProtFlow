@@ -197,7 +197,6 @@ class Poses:
         # merge DataFrames
         if any(x in list(self.df.columns) for x in list(runner_output.df.columns)): logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
         self.df = runner_output.df.merge(self.df, left_on="select_col", right_on="poses_description") # pylint: disable=W0201
-        print(self.df)
         self.df.drop(columns="select_col", inplace=True)
         self.df.reset_index(inplace=True)
 
