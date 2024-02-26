@@ -40,7 +40,6 @@ import pandas as pd
 
 # customs
 from protslurm import jobstarters
-from protslurm.runners.runners import Runner, RunnerOutput
 from protslurm.jobstarters import JobStarter
 
 FORMAT_STORAGE_DICT = {
@@ -155,57 +154,5 @@ class Poses:
         logging.info(f"Storing poses at {out_path}")
         for pose in poses:
             shutil.copy(pose, f"{out_path}/{pose.rsplit('/', maxsplit=1)[-1]}")
-
-
-    ########################################### Runners ##################################################
-
-    def run(self, runner: Runner, prefix:str, options:str=None, pose_options:list=None, jobstarter:JobStarter=None, max_cores:int=10) -> None:
-        '''
-        Method that runs runners from runners.py
-        
-        Runners can be any arbitrary scripts. They must send back pandas DataFrames.
-        '''
-        #check for column <prefix>_description in self.df
-        self.check_prefix(prefix=f"{prefix}_description")
-
-        # safety
-        if not self.dir: raise AttributeError(f"Attribute 'dir' is not set. Poses.run() requires a working directory. Run Poses.set_work_dir('/path/to/work_dir/')")
-        output_dir = f"{self.dir}/{prefix}"
-
-        # start runner
-        logging.info(f"Starting Runner {Runner} on {len(self.df)} poses.")
-        jobstarter = jobstarter or self.default_jobstarter
-        jobstarter.set_max_cores(max_cores)
-        runner_out = runner.run(poses=self, prefix=prefix, jobstarter=jobstarter, output_dir=output_dir, options=options, pose_options=pose_options)
-
-        # merge RunnerOutput into Poses
-        if isinstance(runner_out, RunnerOutput):
-            self.add_runner_output(runner_output=runner_out, prefix=prefix, remove_index_layers=runner.index_layers)
-        else:
-            raise ValueError(f"Output of runner {runner} (type: {type(runner_out)} is not of type RunnerOutput. Invalid runner!")
-
-    def add_runner_output(self, runner_output:RunnerOutput, prefix:str, remove_index_layers:int, sep:str="_") -> None:
-        '''Adds Output of a Runner class formatted in RunnerOutput into Poses.df'''    
-        startlen = len(runner_output.df)
-
-        # add prefix before merging
-        runner_output.df = runner_output.df.add_prefix(prefix + "_")
-        
-        # Remove layers if option is set
-        if remove_index_layers: runner_output.df["select_col"] = runner_output.df[f"{prefix}_description"].str.split(sep).str[:-1*remove_index_layers].str.join(sep)
-        else: runner_output.df["select_col"] = runner_output.df[f"{prefix}_description"]
-        # merge DataFrames
-        if any(x in list(self.df.columns) for x in list(runner_output.df.columns)): logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
-        self.df = runner_output.df.merge(self.df, left_on="select_col", right_on="poses_description") # pylint: disable=W0201
-        self.df.drop(columns="select_col", inplace=True)
-        self.df.reset_index(inplace=True)
-
-        # check if merger was successful:
-        if len(self.df) == 0: raise ValueError(f"Merging DataFrames failed. This means there was no overlap found between self.df['poses_description'] and runner_output.df[new_df_col]")
-        if len(self.df) < startlen: raise ValueError(f"Merging DataFrames failed. Some rows in runner_output.df[new_df_col] were not found in self.df['poses_description']")
-
-        # reset poses and poses_description column
-        self.df["poses"] = self.df[f"{prefix}_location"]
-        self.df["poses_description"] = self.df[f"{prefix}_description"]
 
     ########################################## Operations ###############################################

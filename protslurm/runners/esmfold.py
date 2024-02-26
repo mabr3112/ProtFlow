@@ -24,8 +24,8 @@ class ESMFold(Runner):
     '''Class to run ESMFold and collect its outputs into a DataFrame'''
     def __init__(self, script_path:str=protslurm.config.ESMFOLD_SCRIPT_PATH, python_path:str=protslurm.config.ESMFOLD_PYTHON_PATH, jobstarter_options:str=None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
-        if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under ESMFold_SCRIPT_PATH.")
-        if not python_path: raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under ESMFold_PYTHON_PATH.")
+        if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under ESMFOLD_SCRIPT_PATH.")
+        if not python_path: raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under ESMFOLD_PYTHON_PATH.")
         self.script_path = script_path
         self.python_path = python_path
         self.name = "esmfold.py"
@@ -80,13 +80,13 @@ class ESMFold(Runner):
             <fasta_dir>         Directory to which the new fastas should be written into
             <max_filenum>          Maximum number of *.fa files that should be written
         '''
-        def mergefastas(files: list, path: str, replace=None) -> str: 
+        def mergefastas(files: list, path: str, replace=None) -> str:
             '''
             Merges Fastas located in <files> into one single fasta-file called <path>
             '''
             fastas = list()
-            for f in files:
-                with open(f, 'r') as f:
+            for fp in files:
+                with open(fp, 'r', encoding="UTF-8") as f:
                     fastas.append(f.read().strip())
 
             if replace: fastas = [x.replace(replace[0], replace[1]) for x in fastas]
@@ -95,14 +95,14 @@ class ESMFold(Runner):
                 f.write("\n".join(fastas))
 
             return path
-        
+
         # determine how to split the poses into <max_gpus> fasta files:
         splitnum = len(poses) if len(poses) < max_filenum else max_filenum
         poses_split = [list(x) for x in np.array_split(poses, int(splitnum))]
 
         # Write fasta files according to the fasta_split determined above and then return:
         return [mergefastas(files=poses, path=f"{fasta_dir}/fasta_{str(i+1).zfill(4)}.fa", replace=("/",":")) for i, poses in enumerate(poses_split)]
-    
+
 
     def write_cmd(self, pose_path:str, output_dir:str, options:str):
         '''Writes Command to run ESMFold.py'''
@@ -113,7 +113,6 @@ class ESMFold(Runner):
         flags = " --".join(flags)
 
         return f"{self.python_path} {protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {opts} {flags}"
-
 
     def collect_scores(self, work_dir:str, scorefile:str) -> pd.DataFrame:
         '''collects scores from ESMFold output'''
