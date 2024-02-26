@@ -69,7 +69,7 @@ class RFdiffusion(Runner):
                          options=jobstarter_options,
                          jobname="rfdiffusion",
                          wait=True,
-                         cmdfile_dir=f"{work_dir}/"
+                         output_path=f"{work_dir}/"
         )
 
         scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, rename_pdbs=True)

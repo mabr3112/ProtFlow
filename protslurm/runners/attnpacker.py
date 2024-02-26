@@ -61,7 +61,7 @@ class AttnPacker(Runner):
                          options=jobstarter_options,
                          jobname="attnpacker",
                          wait=True,
-                         cmdfile_dir=f"{output_dir}/"
+                         output_path=f"{output_dir}/"
         )
 
         scores = pd.read_csv(scorefilepath)

@@ -64,7 +64,7 @@ class ESMFold(Runner):
                          options=jobstarter_options,
                          jobname="ESMFold",
                          wait=True,
-                         cmdfile_dir=f"{work_dir}/"
+                         output_path=f"{work_dir}/"
         )
 
         # collect scores

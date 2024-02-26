@@ -51,7 +51,7 @@ class ProteinGenerator(Runner):
                          options=sbatch_options,
                          jobname="protein_generator",
                          wait=True,
-                         cmdfile_dir=f"{output_dir}/"
+                         output_path=f"{output_dir}/"
         )
 
         # collect scores

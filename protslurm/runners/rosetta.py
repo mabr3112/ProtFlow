@@ -63,7 +63,7 @@ class Rosetta(Runner):
                          options=jobstarter_options,
                          jobname="rosetta",
                          wait=True,
-                         cmdfile_dir=f"{output_dir}/"
+                         output_path=f"{output_dir}/"
         )
 
         # collect scores and rename pdbs.

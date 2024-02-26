@@ -64,7 +64,7 @@ class LigandMPNN(Runner):
                          options=jobstarter_options,
                          jobname="ligandmpnn",
                          wait=True,
-                         cmdfile_dir=f"{output_dir}/"
+                         output_path=f"{output_dir}/"
         )
 
         # collect scores

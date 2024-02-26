@@ -34,7 +34,7 @@ class JobStarter:
     def __init__(self, max_cores:int=None):
         self.max_cores = max_cores
 
-    def start(self, cmds:list, options:str, jobname:str, wait:bool) -> None:
+    def start(self, cmds:list, options:str, jobname:str, wait:bool, output_path:str) -> None:
         '''Method to start jobs'''
         raise NotImplementedError("Jobstarter 'start' function was not overwritten!")
 
@@ -56,7 +56,7 @@ class SbatchArrayJobstarter(JobStarter):
         # static attribute, can be changed depending on slurm settings:
         self.slurm_max_arrayjobs = 1000
 
-    def start(self, cmds:list, options:str, jobname:str, wait:bool=True, cmdfile_dir:str="./") -> None:
+    def start(self, cmds:list, options:str, jobname:str, wait:bool=True, output_path:str="./") -> None:
         '''
         Writes [cmds] into a cmd_file that contains each cmd in a separate line.
         Then starts an sbatch job running down the cmd-file.
@@ -65,12 +65,12 @@ class SbatchArrayJobstarter(JobStarter):
         if len(cmds) > self.slurm_max_arrayjobs:
             print(f"The commands-list you supplied is longer than self.slurm_max_arrayjobs. Your job will be subdivided into multiple arrays.")
             for sublist in split_list(cmds, self.slurm_max_arrayjobs):
-                self.start(cmds=sublist, options=options, jobname=jobname, wait=wait, cmdfile_dir=cmdfile_dir)
+                self.start(cmds=sublist, options=options, jobname=jobname, wait=wait, output_path=output_path)
             return None
 
         # write cmd-file
         jobname = add_timestamp(jobname)
-        with open((cmdfile := f"{cmdfile_dir}/{jobname}_cmds"), 'w', encoding="UTF-8") as f:
+        with open((cmdfile := f"{output_path}/{jobname}_cmds"), 'w', encoding="UTF-8") as f:
             f.write("\n".join(cmds))
 
         # write sbatch command and run
@@ -88,6 +88,7 @@ class SbatchArrayJobstarter(JobStarter):
         # parse options
         if isinstance(options, list): return " ".join(options)
         if isinstance(options, str): return options
+        if options is None: return ""
         raise TypeError(f"Unsupported type for argument options: {type(options)}. Supported types: [str, list]")
 
     def wait_for_job(self, jobname:str, interval:float=5) -> None:
@@ -100,6 +101,70 @@ class SbatchArrayJobstarter(JobStarter):
         print(f"Job {jobname} completed.\n")
         time.sleep(10)
         return None
+
+class LocalJobStarter(JobStarter):
+    '''Jobstarter supposed to run jobs locally based on subprocess.run().'''
+    def __init__(self, max_cores:int=1):
+        super().__init__()
+        self.max_cores = max_cores
+
+    def start(self, cmds:list, options:str, jobname:str, wait:bool=True, output_path:str=None) -> None:
+        '''Method to start jobs on a local pc'''
+        def start_process(command, output_file):
+            # Open the file to capture output and error
+            with open(output_file, 'wb') as file:
+                # Start the process
+                process = subprocess.Popen(command, stdout=file, stderr=subprocess.STDOUT)
+            return process
+
+        def update_active_processes(active_processes: list) -> list:
+            '''checks how many of the processes are active.
+            wait: wait for process to be finished when removing.'''
+            for process in active_processes: # [:] if copy is required
+                if process.poll() is not None: # process finished
+                    process.wait()
+                    active_processes.remove(process)
+            return active_processes
+
+        # write cmds to file:
+        with open(output_path, 'w', encoding='UTF-8') as f:
+            f.write("\n".join(cmds)+"\n")
+
+        # invert cmds to start from the top with .pop()
+        cmds = cmds[::-1]
+
+        # initialize job loop
+        active_processes = []
+        i = 0
+
+        while True:
+            # first check if any processes need to be removed
+            while len(active_processes) >= self.max_cores:
+                update_active_processes(active_processes)
+                time.sleep(1) # avoid busy waiting
+
+            # setup process:
+            cmd = cmds.pop()
+            i += 1
+            output_file = f"{output_path}/process_{str(i)}.log"
+
+            # start
+            active_processes.append(start_process(cmd, output_file))
+
+            if len(cmds) == 0:
+                break
+
+        while len(active_processes) != 0:
+            update_active_processes(active_processes)
+
+        return None
+
+    def wait_for_job(self, jobname:str, interval:float) -> None:
+        '''Method for waiting for started jobs'''
+        raise NotImplementedError("Jobstarter 'wait_for_job' function was not overwritten!")    
+
+def check_for_jobs_running(jobs):
+    raise NotImplementedError
 
 def add_timestamp(x: str) -> str:
     '''
