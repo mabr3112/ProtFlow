@@ -117,7 +117,7 @@ class Poses:
 
     def parse_descriptions(self, poses:list=None) -> list:
         '''parses descriptions (names) of poses from a list of pose_paths. Works on already parsed poses'''
-        return [pose.strip("/").rstrip("/", maxsplit=1)[-1].lsplit(".", maxsplit=1)[0]for pose in poses]
+        return [pose.strip("/").rsplit("/", maxsplit=1)[-1].split(".", maxsplit=1)[0]for pose in poses]
 
     def set_poses(self, poses:list=None, glob_suffix:str=None) -> None:
         '''Sets up poses from either a list, or a string.'''
@@ -154,12 +154,12 @@ class Poses:
         # save poses
         logging.info(f"Storing poses at {out_path}")
         for pose in poses:
-            shutil.copy(pose, f"{out_path}/{pose.rsplit("/", maxsplit=1)[-1]}")
+            shutil.copy(pose, f"{out_path}/{pose.rsplit('/', maxsplit=1)[-1]}")
 
 
     ########################################### Runners ##################################################
 
-    def run(self, runner: Runner, prefix:str, options:str, pose_options:list=None, jobstarter:JobStarter=None, max_cores:int=10) -> None:
+    def run(self, runner: Runner, prefix:str, options:str=None, pose_options:list=None, jobstarter:JobStarter=None, max_cores:int=10) -> None:
         '''
         Method that runs runners from runners.py
         
@@ -176,11 +176,11 @@ class Poses:
         logging.info(f"Starting Runner {Runner} on {len(self.df)} poses.")
         jobstarter = jobstarter or self.default_jobstarter
         jobstarter.set_max_cores(max_cores)
-        runner_out = runner.run(prefix=prefix, jobstarter=jobstarter, output_dir=output_dir, options=options, pose_options=pose_options)
+        runner_out = runner.run(poses=self, prefix=prefix, jobstarter=jobstarter, output_dir=output_dir, options=options, pose_options=pose_options)
 
         # merge RunnerOutput into Poses
         if isinstance(runner_out, RunnerOutput):
-            self.add_runner_output(runner_output=runner_out, prefix=prefix, remove_index_layers=runner_out.index_layers)
+            self.add_runner_output(runner_output=runner_out, prefix=prefix, remove_index_layers=runner.index_layers)
         else:
             raise ValueError(f"Output of runner {runner} (type: {type(runner_out)} is not of type RunnerOutput. Invalid runner!")
 
@@ -190,15 +190,15 @@ class Poses:
 
         # add prefix before merging
         runner_output.df = runner_output.df.add_prefix(prefix + "_")
-
+        
         # Remove layers if option is set
-        if remove_index_layers: runner_output.df.df["select_col"] = runner_output.df[f"{prefix}_description"].str.split(sep).str[:-1*remove_index_layers].str.join(sep)
+        if remove_index_layers: runner_output.df["select_col"] = runner_output.df[f"{prefix}_description"].str.split(sep).str[:-1*remove_index_layers].str.join(sep)
         else: runner_output.df["select_col"] = runner_output.df[f"{prefix}_description"]
-
         # merge DataFrames
         if any(x in list(self.df.columns) for x in list(runner_output.df.columns)): logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
         self.df = runner_output.df.merge(self.df, left_on="select_col", right_on="poses_description") # pylint: disable=W0201
-        self.df.drop(columns="select_col", inplace=True).reset_index(inplace=True)
+        self.df.drop(columns="select_col", inplace=True)
+        self.df.reset_index(inplace=True)
 
         # check if merger was successful:
         if len(self.df) == 0: raise ValueError(f"Merging DataFrames failed. This means there was no overlap found between self.df['poses_description'] and runner_output.df[new_df_col]")
