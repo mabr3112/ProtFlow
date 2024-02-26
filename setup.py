@@ -3,6 +3,7 @@ Setup of ProtSLURM package.
 Dependencies are:
     - pandas
     - numpy
+    - Biopython
 '''
 
 from setuptools import setup, find_packages
@@ -13,7 +14,8 @@ setup(
     packages=find_packages(),
     install_requires=[
         'pandas',
-        'numpy'
+        'numpy',
+        'Bio'
     ],
     # Other metadata
 )

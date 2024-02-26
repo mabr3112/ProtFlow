@@ -39,7 +39,7 @@ def main(args):
     mutations = metrics.get_mutation_indeces(wt_seq, var_seq)
 
     # configure output path and variant/reference pdb paths:
-    out_path = args.output_path or f"{args.variant_pdb.rsplit("/", maxsplit=1)[-1].replace(".pdb","")}_mutations.pml"
+    out_path = args.output_path or f"{args.variant_pdb.rsplit('/', maxsplit=1)[-1].replace('.pdb','')}_mutations.pml"
     reference_pdb = os.path.abspath(args.reference_pdb) if use_absolute_path else args.reference_pdb.rsplit("/", maxsplit=1)[-1]
     variant_pdb = os.path.abspath(args.variant_pdb) if use_absolute_path else args.variant_pdb.rsplit("/", maxsplit=1)[-1]
 
