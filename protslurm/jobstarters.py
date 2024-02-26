@@ -48,7 +48,7 @@ class JobStarter:
 
 class SbatchArrayJobstarter(JobStarter):
     '''Jobstarter that starts Job arrays on slurm clusters.'''
-    def __init__(self, max_cores:int=100, remove_cmdfile:bool=True):
+    def __init__(self, max_cores:int=100, remove_cmdfile:bool=False):
         super().__init__() # runs init-function of parent class (JobStarter)
         self.max_cores = max_cores
         self.remove_cmdfile = remove_cmdfile

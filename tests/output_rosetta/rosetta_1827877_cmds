@@ -1,0 +1,1 @@
+/home/florian_wieser/Rosetta_10-2022/main/source/bin/rosetta_scripts.linuxgccrelease -out:path:all /home/tripp/ProtSLURM/tests/output_rosetta -in:file:s input_files/rosettascripts/noligand_1.pdb -out:prefix r0001_ -out:file:scorefile /home/tripp/ProtSLURM/tests/output_rosetta/rosetta_scores.sc --parser:protocol input_files/rosettascripts/empty.xml -beta  -overwrite

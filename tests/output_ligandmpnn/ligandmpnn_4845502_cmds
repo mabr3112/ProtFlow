@@ -1,0 +1,1 @@
+/home/tripp/anaconda3/envs/ligandmpnn/bin/python3 /home/tripp/LigandMPNN/run.py --model_type ligand_mpnn --number_of_batches=5 --out_folder /home/tripp/ProtSLURM/tests/output_ligandmpnn --pdb_path input_files/ligandmpnn/ligandmpnn.pdb --fixed_residues='A3 B3 C3 D3' 

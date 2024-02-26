@@ -1,0 +1,9 @@
+- diffuser.T=50
+- potentials.guide_scale=5
+- contigmap.contigs=[Q1-21/0 20/A1-5/10-50/B1-5/10-50/C1-5/10-50/D1-5/20]
+- contigmap.length=200-200
+- contigmap.inpaint_seq=[A1/A2/A4/A5/B1/B2/B4/B5/C1/C2/C4/C5/D1/D2/D4/D5]
+- potentials.substrate=LIG
+- inference.output_prefix=/home/tripp/ProtSLURM/tests/output_rfdiffusion/output_pdbs/rfdiffusion
+- inference.input_pdb=input_files/rfdiffusion/rfdiffusion.pdb
+- inference.num_designs=1
