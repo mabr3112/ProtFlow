@@ -69,7 +69,6 @@ class ESMFold(Runner):
 
         # collect scores
         scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath)
-        scores.to_json(scorefilepath)
         
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
     
