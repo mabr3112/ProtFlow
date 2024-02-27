@@ -41,6 +41,7 @@ import pandas as pd
 # customs
 from protslurm import jobstarters
 from protslurm.jobstarters import JobStarter
+from protslurm.utils.utils import parse_fasta_to_dict
 
 FORMAT_STORAGE_DICT = {
     "json": "to_json",
@@ -56,8 +57,7 @@ class Poses:
     def __init__(self, poses:list=None, work_dir:str=None, storage_format:str="json", glob_suffix:str=None, jobstarter:JobStarter=jobstarters.SbatchArrayJobstarter()):
         # set_poses sets up self.df!
         self.set_poses(poses, glob_suffix=glob_suffix)
-        if work_dir:
-            self.set_work_dir(work_dir)
+        self.work_dir = work_dir
 
         # setup scorefile for storage
         self.storage_format = storage_format
@@ -72,7 +72,7 @@ class Poses:
         if not os.path.isdir(work_dir):
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {work_dir}")
-        self.dir = work_dir
+        self.work_dir = work_dir
 
     def parse_poses(self, poses:Union[list,str]=None, glob_suffix:str=None) -> list:
         """
@@ -126,7 +126,13 @@ class Poses:
         # if Poses are initialized freshly (with input poses as strings:)
         poses = self.parse_poses(poses, glob_suffix=glob_suffix)
 
-        #TODO: handle multiline .fa inputs for poses!
+        # handle multiline .fa inputs for poses!
+        for pose in poses:
+            if not pose.endswith(".fa"):
+                continue
+            if len(parse_fasta_to_dict(pose)) > 1:
+                poses.remove(pose)
+                poses += self.split_multiline_fasta(pose)
 
         self.df = pd.DataFrame({"input_poses": poses, "poses": poses, "poses_description": self.parse_descriptions(poses)})
         return None
@@ -143,14 +149,42 @@ class Poses:
             if col not in df.columns:
                 raise KeyError(f"Corrupted Format: DataFrame does not contain mandatory Poses column {col}")
         return df
-    
-    def split_multiline_fasta(self, path: str):
+
+    def split_multiline_fasta(self, path: str, encoding:str="UTF-8") -> list[str]:
         '''Splits multiline fasta input files.'''
         logging.warning(f"Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/")
         if not hasattr(self, "work_dir"):
             raise AttributeError(f"Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
 
+        # read multilie-fasta file and split into individual poses
+        fasta_dict = parse_fasta_to_dict(path, encoding=encoding)
 
+        # setup fasta directory self.work_dir/input_fastas_split/
+        output_dir = f"{self.work_dir}/input_fastas_split/"
+        if not os.path.isdir(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+
+        # write individual poses in fasta directory:
+        out_poses = []
+        for description, seq in fasta_dict.items():
+            fp = f"{output_dir}/{description}.fa"
+            try:
+                # check if files are already there. If contents do not match, write the new fasta-file
+                subfasta_dict = parse_fasta_to_dict(path, encoding=encoding)
+                x_desc = list(subfasta_dict.keys())[0]
+                x_seq = list(subfasta_dict.values())[0]
+                if description != x_desc or seq != x_seq:
+                    raise FileNotFoundError
+
+            except FileNotFoundError:
+                with open(fp, 'w', encoding=encoding) as f:
+                    f.write(f">{description}\n{seq}")
+
+            # add fasta path to out_poses:
+            out_poses.append(fp)
+
+        # return list containing paths to .fa files as poses.
+        return out_poses
 
     ############################################ Input Methods ######################################
     def load_poses(self, poses_path: str) -> "Poses":

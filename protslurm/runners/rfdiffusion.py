@@ -33,7 +33,7 @@ class RFdiffusion(Runner):
         return "rfdiffusion.py"
 
     def run(self, poses:protslurm.poses.Poses, output_dir:str, prefix:str, num_diffusions:int=1, options:str=None, pose_options:list or str=None, overwrite:bool=False, jobstarter:protslurm.jobstarters.JobStarter=None) -> RunnerOutput:
-        '''Runs rfdiffusion.py on acluster'''
+        '''running function for RFDiffusion given poses and a jobstarter object.'''
 
         # setup directory
         work_dir = os.path.abspath(output_dir)
