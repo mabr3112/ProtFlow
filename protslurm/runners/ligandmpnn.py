@@ -48,7 +48,8 @@ class LigandMPNN(Runner):
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip LigandMPNN.
         scorefile = "ligandmpnn_scores.json"
-        if overwrite == False and os.path.isfile(scorefilepath := os.path.join(work_dir, scorefile)):
+        scorefilepath = os.path.join(work_dir, scorefile)
+        if overwrite == False and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
 
         # parse_options and pose_options:
