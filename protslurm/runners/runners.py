@@ -43,7 +43,7 @@ class RunnerOutput:
         if any(x in list(self.poses.df.columns) for x in list(self.results.columns)): logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
         merged_df = self.poses.df.merge(self.results, left_on="poses_description", right_on=f"{self.prefix}_select_col") # pylint: disable=W0201
         merged_df.drop(f"{self.prefix}_select_col", axis=1, inplace=True)
-        merged_df.reset_index(inplace=True)
+        merged_df.reset_index(inplace=True, drop=True)
 
         # check if merger was successful:
         if len(merged_df) == 0: raise ValueError(f"Merging DataFrames failed. This means there was no overlap found between poses.df['poses_description'] and results[new_df_col]")
