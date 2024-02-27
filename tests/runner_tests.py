@@ -11,8 +11,9 @@ from protslurm.runners.rfdiffusion import RFdiffusion
 from protslurm.runners.attnpacker import AttnPacker
 from protslurm.runners.esmfold import ESMFold
 
-
-
+#TODO: Automatically execute tests only for runners that are set up in the config.py file!
+#TODO: Print Test output: Which Runners are Implemented, Which runners succeeded (all if the test runs through).
+#TODO: Write Tutorials as Jupyter Notebooks in 'examples' Folder!
 
 def main():
     '''.'''
