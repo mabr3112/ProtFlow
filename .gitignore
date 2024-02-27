@@ -161,3 +161,4 @@ cython_debug/
 protslurm/dev_testing.ipynb
 
 docs/
+protslurm/config.py
