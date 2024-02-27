@@ -54,7 +54,7 @@ class Poses:
     '''Class that stores and handles protein df. '''
     ############################################# SETUP METHODS #########################################
     def __init__(self, poses:list=None, work_dir:str=None, storage_format:str="json", glob_suffix:str=None, jobstarter:JobStarter=jobstarters.SbatchArrayJobstarter()):
-        # setup
+        # set_poses sets up self.df!
         self.set_poses(poses, glob_suffix=glob_suffix)
         if work_dir:
             self.set_work_dir(work_dir)
@@ -73,7 +73,6 @@ class Poses:
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {work_dir}")
         self.dir = work_dir
-        return None
 
     def parse_poses(self, poses:Union[list,str]=None, glob_suffix:str=None) -> list:
         """
@@ -103,16 +102,15 @@ class Poses:
             parsed_poses = glob(f"{poses}/{glob_suffix}")
             if not parsed_poses: raise FileNotFoundError(f"No {glob_suffix} files were found in {poses}. Did you mean to glob? Was the path correct?")
             return parsed_poses
-        elif isinstance(poses, str) and not glob_suffix:
+        if isinstance(poses, str) and not glob_suffix:
             if not os.path.isfile(poses): raise FileNotFoundError(f"File {poses} not found!")
             return [poses]
-        elif isinstance(poses, list):
-            if not all([os.path.isfile(path) for path in poses]): raise FileNotFoundError(f"Not all files listed in poses were found.")
+        if isinstance(poses, list):
+            if not all((os.path.isfile(path) for path in poses)): raise FileNotFoundError(f"Not all files listed in poses were found.")
             return poses
-        elif poses is None:
+        if poses is None:
             return []
-        else:
-            raise TypeError(f"Unrecognized input type {type(poses)} for function parse_poses(). Allowed types: [list, str]")
+        raise TypeError(f"Unrecognized input type {type(poses)} for function parse_poses(). Allowed types: [list, str]")
 
     def parse_descriptions(self, poses:list=None) -> list:
         '''parses descriptions (names) of poses from a list of pose_paths. Works on already parsed poses'''
@@ -120,14 +118,51 @@ class Poses:
 
     def set_poses(self, poses:list=None, glob_suffix:str=None) -> None:
         '''Sets up poses from either a list, or a string.'''
+        # if DataFrame is passed, load directly.
+        if isinstance(poses, pd.DataFrame):
+            self.df = self.check_poses_df_integrity(poses)
+            return None
+
+        # if Poses are initialized freshly (with input poses as strings:)
         poses = self.parse_poses(poses, glob_suffix=glob_suffix)
+
+        #TODO: handle multiline .fa inputs for poses!
+
         self.df = pd.DataFrame({"input_poses": poses, "poses": poses, "poses_description": self.parse_descriptions(poses)})
+        return None
 
     def check_prefix(self, prefix:str) -> None:
         '''checks if prefix is available in poses.df'''
-        if prefix in self.df.columns: raise KeyError(f"Prefix {prefix} is already taken in poses.df")
+        if prefix in self.df.columns:
+            raise KeyError(f"Prefix {prefix} is already taken in poses.df")
 
-    ############################################ Input Output Methods ######################################
+    def check_poses_df_integrity(self, df: pd.DataFrame) -> pd.DataFrame:
+        '''checks if mandatory columns are in poses.df'''
+        cols = ["input_poses", "poses", "poses_description"]
+        for col in cols:
+            if col not in df.columns:
+                raise KeyError(f"Corrupted Format: DataFrame does not contain mandatory Poses column {col}")
+        return df
+    
+    def split_multiline_fasta(self, path: str):
+        '''Splits multiline fasta input files.'''
+        logging.warning(f"Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/")
+        if not hasattr(self, "work_dir"):
+            raise AttributeError(f"Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
+
+
+
+    ############################################ Input Methods ######################################
+    def load_poses(self, poses_path: str) -> "Poses":
+        '''Loads Poses class from a stored dataframe.'''
+        # read format
+        load_function = get_format(poses_path)
+
+        # load df from file:
+        self.set_poses(poses=load_function(poses_path))
+        return self
+
+    ############################################ Output Methods ######################################
     def save_scores(self, out_path:str=None, out_format=None) -> None:
         '''Saves Poses DataFrame as scorefile.'''
         # setup defaults
@@ -156,3 +191,14 @@ class Poses:
             shutil.copy(pose, f"{out_path}/{pose.rsplit('/', maxsplit=1)[-1]}")
 
     ########################################## Operations ###############################################
+
+def get_format(path: str):
+    '''reads in path as str and returns a pandas loading function.'''
+    loading_function_dict = {
+        "json": pd.read_json,
+        "csv": pd.read_csv,
+        "pickle": pd.read_pickle,
+        "feather": pd.read_feather,
+        "parquet": pd.read_parquet
+    }
+    return loading_function_dict[path.split(".")[-1]]

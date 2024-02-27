@@ -125,7 +125,7 @@ class RosettaScripts(Runner):
 
             # if any line has a different number of scores than the header (columns), that line will be removed.
             scores_cleaned = [line for line in scores if len(line) == len(scores[0])]
-            logging.WARNING(f"WARNING: {len(scores) - len(scores_cleaned)} scores were removed from Rosetta scorefile at {path_to_file}")
+            logging.warning(f"WARNING: {len(scores) - len(scores_cleaned)} scores were removed from Rosetta scorefile at {path_to_file}")
 
             # write cleaned scores to file:
             with open(out_path, 'w', encoding="UTF-8") as f:
@@ -135,7 +135,7 @@ class RosettaScripts(Runner):
         try:
             scores = pd.read_csv(rosettascore_path, delim_whitespace=True, header=[1], na_filter=True)
         except pd.errors.ParserError:
-            logging.WARNING(f"WARNING: Error reading Rosetta Scorefile. Removing faulty scorelines. This means that a few calculations will be lost.")
+            logging.warning(f"WARNING: Error reading Rosetta Scorefile. Removing faulty scorelines. This means that a few calculations will be lost.")
             scores = pd.read_csv(clean_rosetta_scorefile(rosettascore_path, os.path.join(work_dir, "clean_rosetta_scores.sc")))
 
         # remove rows from df that do not contain scores and remove "description" duplicates, because that's what happens in Rosetta...

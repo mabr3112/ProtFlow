@@ -1,6 +1,5 @@
 '''Module to handle RFdiffusion within ProtSLURM'''
 # general imports
-from multiprocessing import Value
 import os
 import logging
 from glob import glob
@@ -46,15 +45,15 @@ class RFdiffusion(Runner):
         scorefile="rfdiffusion_scores.json"
         scorefilepath = os.path.join(work_dir, scorefile)
 
-        if overwrite == False and os.path.isfile(scorefilepath):
+        if overwrite is False and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
-        elif overwrite == True or not os.path.isfile(scorefilepath):
+        elif overwrite is True or not os.path.isfile(scorefilepath):
             if os.path.isfile(scorefilepath): os.remove(scorefilepath)
             for pdb in glob(f"{pdb_dir}/*pdb"):
-                 if os.path.isfile(trb := pdb.replace(".pdb", ".trb")):
-                     os.remove(trb)
-                     os.remove(pdb)
-        
+                if os.path.isfile(trb := pdb.replace(".pdb", ".trb")):
+                    os.remove(trb)
+                    os.remove(pdb)
+
 
         # parse options and pose_options:
         pose_options = self.create_pose_options(poses.df, pose_options)
@@ -152,13 +151,13 @@ class RFdiffusion(Runner):
             sd["input_pdb"] = data_dict["config"]["inference"]["input_pdb"]
 
             return pd.DataFrame(sd)
-        
+
         # collect scores from .trb-files into one pandas DataFrame:
         pdb_dir = os.path.join(work_dir, "output_pdbs")
         pl = glob(f"{pdb_dir}/*.pdb")
         if not pl: raise FileNotFoundError(f"No .pdb files were found in the diffusion output direcotry {pdb_dir}. RFDiffusion might have crashed (check inpainting error-log), or the path might be wrong!")
 
-        # collect hallucination scores into a DataFrame:
+        # collect rfdiffusion scores into a DataFrame:
         scores = []
         for pdb in pl:
             if os.path.isfile(trb := pdb.replace(".pdb", ".trb")):
@@ -166,7 +165,7 @@ class RFdiffusion(Runner):
         scores = pd.concat(scores)
 
         # rename pdbs if option is set:
-        if rename_pdbs == True:
+        if rename_pdbs is True:
             scores.loc[:, "new_description"] = ["_".join(desc.split("_")[:-1]) + "_" + str(int(desc.split("_")[-1]) + 1).zfill(4) for desc in scores["description"]]
             scores.loc[:, "new_loc"] = [loc.replace(old_desc, new_desc) for loc, old_desc, new_desc in zip(list(scores["location"]), list(scores["description"]), list(scores["new_description"]))]
 
@@ -176,7 +175,7 @@ class RFdiffusion(Runner):
             # Collect information of path to .pdb files into DataFrame under 'location' column
             scores = scores.drop(columns=["location"]).rename(columns={"new_loc": "location"})
             scores = scores.drop(columns=["description"]).rename(columns={"new_description": "description"})
-        
+
         scores.reset_index(drop=True)
 
         logging.info(f"Saving scores of {self} at {scorefile}")

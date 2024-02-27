@@ -137,7 +137,7 @@ class LocalJobStarter(JobStarter):
         active_processes = []
         i = 0
 
-        while True:
+        while len(cmds) >= 0 or len(active_processes) != 0:
             # first check if any processes need to be removed
             while len(active_processes) >= self.max_cores:
                 update_active_processes(active_processes)
@@ -150,21 +150,11 @@ class LocalJobStarter(JobStarter):
 
             # start
             active_processes.append(start_process(cmd, output_file))
-
-            if len(cmds) == 0:
-                break
-
-        while len(active_processes) != 0:
-            update_active_processes(active_processes)
-
         return None
 
     def wait_for_job(self, jobname:str, interval:float) -> None:
         '''Method for waiting for started jobs'''
-        raise NotImplementedError("Jobstarter 'wait_for_job' function was not overwritten!")    
-
-def check_for_jobs_running(jobs):
-    raise NotImplementedError
+        return None
 
 def add_timestamp(x: str) -> str:
     '''
