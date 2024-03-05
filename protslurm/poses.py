@@ -37,11 +37,13 @@ import logging
 
 # dependencies
 import pandas as pd
+import Bio.PDB
 
 # customs
 from protslurm import jobstarters
 from protslurm.jobstarters import JobStarter
 from protslurm.utils.utils import parse_fasta_to_dict
+from protslurm.utils.biopython_tools import load_structure_from_pdbfile
 
 FORMAT_STORAGE_DICT = {
     "json": "to_json",
@@ -234,6 +236,11 @@ class Poses:
         return self.df["poses"].to_list()
 
     ########################################## Operations ###############################################
+    def get_pose(self, pose_description: str) -> Bio.PDB.Structure.Structure:
+        '''Loads a singular pose from DataFrame. pose_description has to be current description of pose (stored in poses.df["poses_description"] column)'''
+        if not pose_description in self.df["poses_description"]:
+            raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
+        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
 
 def get_format(path: str):
     '''reads in path as str and returns a pandas loading function.'''
@@ -245,3 +252,7 @@ def get_format(path: str):
         "parquet": pd.read_parquet
     }
     return loading_function_dict[path.split(".")[-1]]
+
+def load_poses(poses_path: str) -> Poses:
+    '''Loads Poses class from a stored dataframe.'''
+    return Poses().load_poses(poses_path)
