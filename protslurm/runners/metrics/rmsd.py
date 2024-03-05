@@ -44,6 +44,7 @@ class BackboneRMSD(Runner):
     def set_jobstarter_options(self, options: str) -> None:
         '''Sets Options for Jobstarter.'''
         self.jobstarter_options = options
+
     ########################## Calculations ################################################
     def calc_rmsd(self, poses:Poses, prefix:str, ref_col:str, jobstarter: JobStarter) -> None:
         '''Calculates RMSD as specified.'''
@@ -115,8 +116,14 @@ class BackboneRMSD(Runner):
         return output.return_poses()
 
     def calc_all_atom_rmsd(self) -> None:
+        '''Method to calculate all-atom RMSD between poses'''
         raise NotImplementedError
 
 class MotifRMSD(Runner):
     '''Class handling'''
-    raise NotImplementedError
+    def __str__(self):
+        "motif_rmsd calculator"
+
+    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter):
+        '''Method to run Motif_rmsd calculation.'''
+        raise NotImplementedError

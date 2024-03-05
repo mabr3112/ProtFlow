@@ -34,7 +34,7 @@ class JobStarter:
     def __init__(self, max_cores:int=None):
         self.max_cores = max_cores
 
-    def start(self, cmds:list, options:str, jobname:str, wait:bool, output_path:str) -> None:
+    def start(self, cmds:list, jobname:str, wait:bool, output_path:str) -> None:
         '''Method to start jobs'''
         raise NotImplementedError("Jobstarter 'start' function was not overwritten!")
 
@@ -48,15 +48,17 @@ class JobStarter:
 
 class SbatchArrayJobstarter(JobStarter):
     '''Jobstarter that starts Job arrays on slurm clusters.'''
-    def __init__(self, max_cores:int=100, remove_cmdfile:bool=False):
+    def __init__(self, max_cores:int=100, remove_cmdfile:bool=False, options:str=None, gpus:bool=False):
+        '''Note: options parameter has to be set with Jobstarter Creation, not when executing the .start function!'''
         super().__init__() # runs init-function of parent class (JobStarter)
         self.max_cores = max_cores
         self.remove_cmdfile = remove_cmdfile
+        self.set_options(options, gpus=gpus)
 
         # static attribute, can be changed depending on slurm settings:
         self.slurm_max_arrayjobs = 1000
 
-    def start(self, cmds:list, options:str, jobname:str, wait:bool=True, output_path:str="./") -> None:
+    def start(self, cmds:list, jobname:str, wait:bool=True, output_path:str="./") -> None:
         '''
         Writes [cmds] into a cmd_file that contains each cmd in a separate line.
         Then starts an sbatch job running down the cmd-file.
@@ -65,7 +67,7 @@ class SbatchArrayJobstarter(JobStarter):
         if len(cmds) > self.slurm_max_arrayjobs:
             print(f"The commands-list you supplied is longer than self.slurm_max_arrayjobs. Your job will be subdivided into multiple arrays.")
             for sublist in split_list(cmds, self.slurm_max_arrayjobs):
-                self.start(cmds=sublist, options=options, jobname=jobname, wait=wait, output_path=output_path)
+                self.start(cmds=sublist, jobname=jobname, wait=wait, output_path=output_path)
             return None
 
         # write cmd-file
@@ -74,8 +76,8 @@ class SbatchArrayJobstarter(JobStarter):
             f.write("\n".join(cmds))
 
         # write sbatch command and run
-        options = self.parse_options(options)
-        sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} -vvv {options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
+        self.options += f"-vvv -e {output_path}/{jobname}_slurm.err -o {output_path}/{jobname}_slurm.out"
+        sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {self.options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
         subprocess.run(sbatch_cmd, shell=True, stdout=True, stderr=True, check=True)
 
         # wait for job and clean up
@@ -83,13 +85,19 @@ class SbatchArrayJobstarter(JobStarter):
         if self.remove_cmdfile: subprocess.run(f"rm {cmdfile}", shell=True, stdout=True, stderr=True, check=True)
         return None
 
-    def parse_options(self, options) -> str:
+    def parse_options(self, options:object) -> str:
         '''parses sbatch options'''
         # parse options
         if isinstance(options, list): return " ".join(options)
         if isinstance(options, str): return options
         if options is None: return ""
         raise TypeError(f"Unsupported type for argument options: {type(options)}. Supported types: [str, list]")
+
+    def set_options(self, options:object, gpus:int) -> None:
+        '''Sets up attribute 'jobstarter_options' of SbatchArrayJobstarter Class.'''
+        self.options = self.parse_options(options)
+        if gpus:
+            self.options += "--gpus-per-node {gpus}"
 
     def wait_for_job(self, jobname:str, interval:float=5) -> None:
         '''
@@ -108,7 +116,7 @@ class LocalJobStarter(JobStarter):
         super().__init__()
         self.max_cores = max_cores
 
-    def start(self, cmds:list, options:str, jobname:str, wait:bool=True, output_path:str=None) -> None:
+    def start(self, cmds:list, jobname:str, wait:bool=True, output_path:str=None) -> None:
         '''Method to start jobs on a local pc'''
         def start_process(command, output_file):
             # Open the file to capture output and error

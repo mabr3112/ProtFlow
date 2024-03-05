@@ -14,9 +14,13 @@ class RunnerOutput:
     '''RunnerOutput class handles how protein data is passed between Runners and Poses classes.'''
     def __init__(self, poses: Poses, results:pd.DataFrame, prefix:str, index_layers:int=0, index_sep:str="_"):
         self.results = self.check_data_formatting(results)
+
         # Remove layers if option is set
-        if index_layers: self.results["select_col"] = self.results["description"].str.split(index_sep).str[:-1*index_layers].str.join(index_sep)
-        else: self.results["select_col"] = self.results["description"]
+        if index_layers: 
+            self.results["select_col"] = self.results["description"].str.split(index_sep).str[:-1*index_layers].str.join(index_sep)
+        else: 
+            self.results["select_col"] = self.results["description"]
+
         self.results = self.results.add_prefix(f"{prefix}_")
         self.poses = poses
         self.prefix = prefix
@@ -36,7 +40,7 @@ class RunnerOutput:
     def return_poses(self):
         '''
         This method is intended to be used to integrate the output of a runner into a Poses class.
-        Adds Output of a Runner class formatted in RunnerOutput into Poses.df. Returns Poses class.'''    
+        Adds Output of a Runner class formatted in RunnerOutput into Poses.df. Returns Poses class.'''
         startlen = len(self.results.index)
 
         # merge DataFrames
@@ -62,10 +66,39 @@ class Runner:
     def __str__(self):
         raise NotImplementedError(f"Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
 
-    def run(self, poses:Poses, jobstarter:JobStarter, output_dir:str, options:str=None, pose_options:str=None) -> RunnerOutput:
+    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter) -> RunnerOutput:
         '''method that interacts with Poses to run jobs and send Poses the scores.'''
         #TODO: jobstarter options need to be removed have to be set in the jobstarter, not in the Runner!!!
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
+
+    def check_for_prefix(self, prefix: str, poses: "Poses") -> None:
+        '''Checks if a column already exists in the poses DataFrame.'''
+        if prefix in poses.df.columns:
+            raise KeyError(f"Column {prefix} found in Poses DataFrame! Pick different Prefix!")
+
+    def prep_pose_options(self, poses:Poses, pose_options:list[str]=None) -> list:
+        '''Checks if pose_options are of the same length as poses, if pose_options are provided, '''
+
+        def check_if_column_in_poses_df(df:pd.DataFrame, column:str):
+            if not column in df.columns:
+                raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
+
+        # if poses are empty, make sure to send back empty list:
+        if len(poses) == 0:
+            return []
+
+        poses = poses.poses_list()
+        if isinstance(pose_options, str):
+            check_if_column_in_poses_df(poses.df, pose_options)
+            pose_options = poses.df[pose_options].poses_list()
+        if pose_options is None:
+            # make sure an empty list is passed as pose_options!
+            pose_options = ["" for _ in poses]
+
+        if len(poses) != len(pose_options):
+            raise ValueError(f"Arguments <poses> and <pose_options> for RFdiffusion must be of the same length. There might be an error with your pose_options argument!\nlen(poses) = {poses}\nlen(pose_options) = {len(pose_options)}")
+
+        return pose_options
 
 def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[dict,list]:
     """

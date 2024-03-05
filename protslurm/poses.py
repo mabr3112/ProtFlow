@@ -55,7 +55,7 @@ FORMAT_STORAGE_DICT = {
 
 class Poses:
     '''Class that stores and handles protein df. '''
-    ############################################# SETUP METHODS #########################################
+    ############################################# SETUP #########################################
     def __init__(self, poses:list=None, work_dir:str=None, storage_format:str="json", glob_suffix:str=None, jobstarter:JobStarter=jobstarters.SbatchArrayJobstarter()):
         # set_poses sets up self.df!
         self.df = None
@@ -74,6 +74,10 @@ class Poses:
         for _, row in self.df.iterrows():
             yield row
 
+    def __len__(self):
+        return len(self.df)
+
+    ############################################# SETUP #########################################
     def set_work_dir(self, work_dir:str) -> None:
         '''sets up working_directory for poses. Just creates new work_dir and stores the first instance of Poses DataFrame in there.'''
         if not os.path.isdir(work_dir):
@@ -241,6 +245,40 @@ class Poses:
         if not pose_description in self.df["poses_description"]:
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
         return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
+
+    def duplicate_poses(self, output_dir:str, n_duplicates:int) -> None:
+        '''Creates Pose duplicates with added index layers.
+        This Function is intended to be used when multiple processing units are needed with distinct inputs.
+        '''
+        def insert_index_layer(pose, n, sep:str="_") -> str:
+            '''inserts index layer.'''
+            filepath, filename = pose.rsplit("/", maxsplit=1)
+            description, ext = filename.rsplit(".", maxsplit=1)
+            return f"{filepath}/{description}{sep}{str(n).zfill(4)}.{ext}"
+
+        # define outputs:
+        output_files = [f'{output_dir}/{insert_index_layer(pose, n, "_")}' for pose in self.poses_list() for n in range(n_duplicates)]
+        output_dict = {
+            "temp_dp_select_col": [file_path.rsplit("/", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0] for file_path in output_files],
+            "temp_dp_description": [file_path.rsplit("/", maxsplit=1)[-1].rsplit(".", maxsplit=1)[0] for file_path in output_files],
+            "temp_dp_location": output_files
+        }
+
+        # merge DataFrames:
+        self.df.merge(pd.DataFrame(output_dict), left_on="poses_description", right_on="temp_dp_select_col")
+
+        # drop select_col and reset index:
+        self.df.drop("temp_dp_select_col", inplace=True, axis=1)
+        self.df.reset_index(inplace=True, drop=True)
+
+        # check if outputs exist:
+        for pose in self:
+            if not os.path.isfile(pose["temp_dp_location"]):
+                shutil.copy(pose["pose"], pose["temp_dp_location"])
+
+        # reset poses and poses_description columns
+        self.df["poses"] = self.df["temp_dp_location"]
+        self.df["poses_description"] = self.df["description"]
 
 def get_format(path: str):
     '''reads in path as str and returns a pandas loading function.'''
