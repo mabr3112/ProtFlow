@@ -1,6 +1,9 @@
 '''
 This module contains all paths to tools integrated in ProtSLURM.
 '''
+# protslurm environment python
+PROTSLURM_PYTHON = ""
+
 #auxiliary runners directory path
 AUXILIARY_RUNNER_SCRIPTS_DIR = ""
 

@@ -64,6 +64,7 @@ class Runner:
 
     def run(self, poses:Poses, jobstarter:JobStarter, output_dir:str, options:str=None, pose_options:str=None) -> RunnerOutput:
         '''method that interacts with Poses to run jobs and send Poses the scores.'''
+        #TODO: jobstarter options need to be removed have to be set in the jobstarter, not in the Runner!!!
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
 
 def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[dict,list]:

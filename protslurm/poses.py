@@ -56,6 +56,7 @@ class Poses:
     ############################################# SETUP METHODS #########################################
     def __init__(self, poses:list=None, work_dir:str=None, storage_format:str="json", glob_suffix:str=None, jobstarter:JobStarter=jobstarters.SbatchArrayJobstarter()):
         # set_poses sets up self.df!
+        self.df = None
         self.set_poses(poses, glob_suffix=glob_suffix)
         self.work_dir = work_dir
 
@@ -66,6 +67,10 @@ class Poses:
 
         # setup jobstarter
         self.default_jobstarter = jobstarter
+
+    def __iter__(self):
+        for _, row in self.df.iterrows():
+            yield row
 
     def set_work_dir(self, work_dir:str) -> None:
         '''sets up working_directory for poses. Just creates new work_dir and stores the first instance of Poses DataFrame in there.'''
@@ -223,6 +228,10 @@ class Poses:
         logging.info(f"Storing poses at {out_path}")
         for pose in poses:
             shutil.copy(pose, f"{out_path}/{pose.rsplit('/', maxsplit=1)[-1]}")
+
+    def poses_list(self):
+        '''Simple method to return current poses from DataFrame as a list.'''
+        return self.df["poses"].to_list()
 
     ########################################## Operations ###############################################
 
