@@ -12,9 +12,8 @@ import pandas as pd
 import protslurm.config
 import protslurm.jobstarters
 import protslurm.tools
-from .runners import Runner
-from .runners import RunnerOutput
-
+from protslurm.runners import Runner
+from protslurm.runners import RunnerOutput
 
 class ProteinGenerator(Runner):
     '''Class to run protein_generator and collect it's outputs into a DataFrame'''
