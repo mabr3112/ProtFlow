@@ -163,3 +163,4 @@ protslurm/dev_testing.ipynb
 docs/
 protslurm/config.py
 dev_stuff/
+examples/rfdiffusion_mpnn_esm_output/
