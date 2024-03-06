@@ -1,7 +1,5 @@
 '''Module to handle Rosetta Scripts within ProtSLURM'''
 # general imports
-from multiprocessing import Value
-from operator import pos
 import os
 import time
 import logging
@@ -15,8 +13,8 @@ import pandas as pd
 import protslurm.config
 import protslurm.jobstarters
 import protslurm.tools
-from .runners import Runner
-from .runners import RunnerOutput
+from protslurm.runners import Runner
+from protslurm.runners import RunnerOutput
 
 
 class RosettaScripts(Runner):
@@ -41,9 +39,9 @@ class RosettaScripts(Runner):
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip RosettaScripts.
         scorefilepath = os.path.join(work_dir, "rosettascripts_scores.json")
-        if overwrite == False and os.path.isfile(scorefilepath):
+        if not overwrite and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
-        elif overwrite == True and os.path.isdir(work_dir):
+        elif overwrite and os.path.isdir(work_dir):
             if os.path.isfile(scorefilepath): os.remove(scorefilepath)
             if os.path.isfile(rosettascore_path): os.remove(rosettascore_path)
             
@@ -101,7 +99,7 @@ class RosettaScripts(Runner):
         '''Writes Command to run rosettascripts.py'''
 
         # parse options
-        opts, flags = protslurm.tools.parse_generic_options(options, pose_options)
+        opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
         opts = " ".join([f"-{key} {value}" for key, value in opts.items()])
         flags = " -".join(flags)
         run_string = f"{self.script_path} -parser:protocol {xml_path} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"

@@ -13,8 +13,8 @@ import pandas as pd
 import protslurm.config
 import protslurm.jobstarters
 import protslurm.tools
-from .runners import Runner
-from .runners import RunnerOutput
+from protslurm.runners import Runner
+from protslurm.runners import RunnerOutput
 
 
 #TODO: write script that only requires path to esmfold dir, not the path to Markus' esmfold_inference.py
@@ -45,7 +45,7 @@ class ESMFold(Runner):
         # Look for output-file in pdb-dir. If output is present and correct, then skip ESMFold.
         scorefile = "ESMFold_scores.json"
         scorefilepath = os.path.join(work_dir, scorefile)
-        if overwrite == False and os.path.isfile(scorefilepath):
+        if not overwrite and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
     
         os.makedirs((fasta_dir := f"{work_dir}/input_fastas"), exist_ok=True)
@@ -107,7 +107,7 @@ class ESMFold(Runner):
         '''Writes Command to run ESMFold.py'''
 
         # parse options
-        opts, flags = protslurm.tools.parse_generic_options(options, "")
+        opts, flags = protslurm.runners.parse_generic_options(options, "")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 

@@ -36,7 +36,7 @@ class ProteinGenerator(Runner):
         # Look for output-file in pdb-dir. If output is present and correct, then skip protein_generator.
         scorefile = "protein_generator_scores.json"
         if os.path.isfile((scorefilepath := f"{work_dir}/{scorefile}")):
-            return RunnerOutput(pd.read_json(scorefilepath))
+            return RunnerOutput(pd.read_json(scorefilepath)).return_poses()
 
         # parse_options and pose_options:
         pose_options = self.safecheck_pose_options(pose_options, poses)

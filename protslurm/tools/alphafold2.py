@@ -113,7 +113,7 @@ class Alphafold2(Runner):
         '''Writes Command to run Alphafold2.py'''
 
         # parse options
-        opts, flags = protslurm.tools.parse_generic_options(options, "")
+        opts, flags = protslurm.runners.parse_generic_options(options, "")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 

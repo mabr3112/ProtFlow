@@ -1,12 +1,9 @@
 '''Module to handle LigandMPNN within ProtSLURM'''
 # general imports
-from multiprocessing import Value
-from operator import pos
 import os
 import logging
 from glob import glob
 import shutil
-from tabnanny import check
 
 # dependencies
 import pandas as pd
@@ -17,8 +14,8 @@ from Bio import SeqIO
 import protslurm.config
 import protslurm.jobstarters
 import protslurm.tools
-from .runners import Runner
-from .runners import RunnerOutput
+from protslurm.runners import Runner
+from protslurm.runners import RunnerOutput
 
 
 class LigandMPNN(Runner):
@@ -38,6 +35,7 @@ class LigandMPNN(Runner):
 
     def run(self, poses:protslurm.poses.Poses, output_dir:str, prefix:str, nseq:int=1, model:str="ligand_mpnn", options:str=None, pose_options:list or str=None, fixed_res_column:str=None, design_res_column:str=None, return_seq_threaded_pdbs_as_pose:bool=False, preserve_original_output:bool=True, overwrite:bool=False, jobstarter:protslurm.jobstarters.JobStarter=None) -> RunnerOutput:
         '''Runs ligandmpnn.py on acluster'''
+        #TODO: reorder .run() arguments according to Runner.run() abstract mehtod in base class.
 
         available_models = ["protein_mpnn", "ligand_mpnn", "soluble_mpnn", "global_label_membrane_mpnn", "per_residue_label_membrane_mpnn"]
         if not model in available_models: raise ValueError(f"{model} must be one of {available_models}!")
@@ -112,7 +110,7 @@ class LigandMPNN(Runner):
         '''Writes Command to run ligandmpnn.py'''
 
         # parse options
-        opts, flags = protslurm.tools.parse_generic_options(options, pose_options)
+        opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 

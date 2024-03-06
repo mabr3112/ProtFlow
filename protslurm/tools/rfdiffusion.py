@@ -43,7 +43,7 @@ class RFdiffusion(Runner):
         jobstarter = jobstarter or default_jobstarter
         if not jobstarter:
             raise ValueError(f"No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
-        
+
         # setup directory
         work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
         if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)

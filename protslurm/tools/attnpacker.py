@@ -14,8 +14,8 @@ from Bio import SeqIO
 import protslurm.config
 import protslurm.jobstarters
 import protslurm.tools
-from .runners import Runner
-from .runners import RunnerOutput
+from protslurm.runners import Runner
+from protslurm.runners import RunnerOutput
 
 
 class AttnPacker(Runner):
@@ -96,7 +96,7 @@ class AttnPacker(Runner):
         pdb_dir = os.path.join(output_dir, "output_pdbs")
 
         # parse options
-        opts, flags = protslurm.tools.parse_generic_options(options, pose_options)
+        opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 
