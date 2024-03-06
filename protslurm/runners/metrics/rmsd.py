@@ -18,7 +18,7 @@ class BackboneRMSD(Runner):
     '''Class handling the calculation of Full-atom RMSDs as a runner.
     By default calculates only CA backbone RMSD.
     Uses BioPython for RMSD calculation'''
-    def __init__(self, atoms:list=["CA"], chains:list[str]=None, overwrite:bool=False, jobstarter_options:str=None):
+    def __init__(self, atoms:list=["CA"], chains:list[str]=None, overwrite:bool=False, jobstarter_options:str=None): # pylint: disable=W0102
         self.set_atoms(atoms)
         self.set_chains(chains)
         self.set_jobstarter_options(jobstarter_options)

@@ -19,7 +19,7 @@ from .runners import RunnerOutput
 
 class RFdiffusion(Runner):
     '''Class to run RFdiffusion and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.RFDIFFUSION_SCRIPT_PATH, python_path:str=protslurm.config.RFDIFFUSION_PYTHON_PATH, jobstarter_options:str=None) -> None:
+    def __init__(self, script_path:str=protslurm.config.RFDIFFUSION_SCRIPT_PATH, python_path:str=protslurm.config.RFDIFFUSION_PYTHON_PATH, jobstarter:None=JobStarter, jobstarter_options:str=None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under RFDIFFUSION_SCRIPT_PATH.")
         if not python_path: raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under RFDIFFUSION_PYTHON_PATH.")
@@ -28,15 +28,22 @@ class RFdiffusion(Runner):
         self.name = "rfdiffusion.py"
         self.index_layers = 1
         self.jobstarter_options = jobstarter_options
+        self.jobstarter = jobstarter
 
     def __str__(self):
         return "rfdiffusion.py"
 
-    def run(self, poses:protslurm.poses.Poses, prefix:str, jobstarter:JobStarter=None, num_diffusions:int=1, options:str=None, pose_options:list[str]=None, overwrite:bool=False) -> RunnerOutput:
+    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, num_diffusions:int=1, options:str=None, pose_options:list[str]=None, overwrite:bool=False, multiplex_poses:int=None) -> RunnerOutput:
         '''running function for RFDiffusion given poses and a jobstarter object.'''
         # check for prefix
         self.check_for_prefix(prefix, poses)
 
+        # setup jobstarter
+        default_jobstarter = self.jobstarter or poses.default_jobstarter
+        jobstarter = jobstarter or default_jobstarter
+        if not jobstarter:
+            raise ValueError(f"No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
+        
         # setup directory
         work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
         if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)
@@ -48,7 +55,7 @@ class RFdiffusion(Runner):
         scorefilepath = os.path.join(work_dir, scorefile)
         if overwrite is False and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
-        
+
         # in case overwrite is set, overwrite previous results.
         elif overwrite is True or not os.path.isfile(scorefilepath):
             if os.path.isfile(scorefilepath): os.remove(scorefilepath)
@@ -61,18 +68,22 @@ class RFdiffusion(Runner):
         pose_options = self.prep_pose_options(poses, pose_options)
 
         # handling of empty poses DataFrame.
-        if len(poses) == 0:
-            cmds = [self.write_cmd(pose=None, options=options, pose_options=pose_options, output_dir=pdb_dir, num_rfdiffusions)]
-        elif len(poses) < jobstarter.max_cores:
-            # fully utilize available cores for number of diffusions requested:
-            #TODO: self.adjust_poses_to_cores(poses, work_dir)
+        if len(poses) == 0 and pose_options:
+            cmds = [self.write_cmd(pose=None, options=options, pose_opts=pose_option, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose_option in pose_options]
+        elif len(poses) == 0 and not pose_options:
+            cmds = [self.write_cmd(pose=None, options=options, pose_opts=f"inference.output_prefix=diff_{str(i+1).zfill(4)}", output_dir=pdb_dir, num_diffusions=num_diffusions) for i in range(jobstarter.max_cores)]
+        elif multiplex_poses:
+            # create multiple copies (specified by multiplex variable) of poses to fully utilize parallel computing:
+            poses.duplicate_poses(f"{poses.work_dir}/{prefix}_input_pdbs/", jobstarter.max_cores)
+            self.index_layers += 1
             cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses, pose_options)]
         else:
             # write rfdiffusion cmds
             cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses, pose_options)]
 
-        # run diffusion
-        jobstarter = jobstarter or poses.default_jobstarter
+        print(cmds) #TODO remove
+
+        # diffuse
         jobstarter.start(
             cmds=cmds,
             jobname="rfdiffusion",
@@ -89,14 +100,18 @@ class RFdiffusion(Runner):
     def write_cmd(self, pose: str, options: str, pose_opts: str, output_dir: str, num_diffusions: int=1) -> str:
         '''AAA'''
         # parse description:
-        desc = os.path.splitext(os.path.basename(pose))[0]
+        if pose:
+            desc = os.path.splitext(os.path.basename(pose))[0]
 
         # parse options:
         start_opts = self.parse_rfdiffusion_opts(options, pose_opts)
 
-        if not "inference.output_prefix" in start_opts: start_opts["inference.output_prefix"] = os.path.join(output_dir, desc)
-        if not "inference.input_pdb" in start_opts: start_opts["inference.input_pdb"] = pose
-        if not "inference.num_designs" in start_opts: start_opts["inference.num_designs"] = num_diffusions
+        if "inference.input_pdb" not in start_opts and pose is not None: # if no pose present, ignore input_pdb
+            start_opts["inference.input_pdb"] = pose
+        if "inference.num_designs" not in start_opts:
+            start_opts["inference.num_designs"] = num_diffusions
+        if "inference.output_prefix" not in start_opts:
+            start_opts["inference.output_prefix"] = os.path.join(output_dir, desc)
 
         opts_str = " ".join([f"{k}={v}" for k, v in start_opts.items()])
 
@@ -106,9 +121,11 @@ class RFdiffusion(Runner):
     def parse_rfdiffusion_opts(self, options: str, pose_options: str) -> dict:
         '''AAA'''
         def re_split_rfdiffusion_opts(command) -> list:
+            if command is None:
+                return []
             return re.split(r"\s+(?=(?:[^']*'[^']*')*[^']*$)", command)
 
-        splitstr = [x for x in re_split_rfdiffusion_opts(options) + re_split_rfdiffusion_opts(pose_options) if x]# adding pose_opts after options makes sure that pose_opts overwrites options!
+        splitstr = [x for x in re_split_rfdiffusion_opts(options) + re_split_rfdiffusion_opts(pose_options) if x] # adding pose_opts after options makes sure that pose_opts overwrites options!
         return {x.split("=")[0]: "=".join(x.split("=")[1:]) for x in splitstr}
 
     def collect_scores(self, work_dir:str, scorefile:str, rename_pdbs:bool=True) -> pd.DataFrame:

@@ -1,0 +1,1 @@
+/home/markus/anaconda3/envs/SE3nv/bin/python3 /home/markus/RFdiffusion/scripts/run_inference.py 'contigmap.contigs=[50-50]' inference.output_prefix=diff_0001 inference.num_designs=3

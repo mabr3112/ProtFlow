@@ -1,0 +1,3 @@
+- contigmap.contigs=[50-50]
+- inference.output_prefix=diff_0001
+- inference.num_designs=3

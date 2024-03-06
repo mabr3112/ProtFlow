@@ -25,9 +25,11 @@ Note:
     This module is designed to be extended with additional jobstarters for different
     scheduling systems as needed.
 """
+from multiprocessing import ProcessError
 import time
 import subprocess
 import itertools
+import os
 
 class JobStarter:
     '''JobStarter class is a class that defines how jobstarters have to look.'''
@@ -120,9 +122,10 @@ class LocalJobStarter(JobStarter):
         '''Method to start jobs on a local pc'''
         def start_process(command, output_file):
             # Open the file to capture output and error
-            with open(output_file, 'wb') as file:
+            print(command, output_file) # TODO remove
+            with open(output_file, 'w', encoding="UTF-8") as file:
                 # Start the process
-                process = subprocess.Popen(command, stdout=file, stderr=subprocess.STDOUT)
+                process = subprocess.Popen(command, env=env, shell=True, stdout=file, stderr=subprocess.STDOUT)
             return process
 
         def update_active_processes(active_processes: list) -> list:
@@ -130,12 +133,18 @@ class LocalJobStarter(JobStarter):
             wait: wait for process to be finished when removing.'''
             for process in active_processes: # [:] if copy is required
                 if process.poll() is not None: # process finished
-                    process.wait()
+                    returncode = process.wait()
+                    if returncode != 0:
+                        raise ProcessError(f"Subprocess Crashed. Check last output log of Subprocess!")
                     active_processes.remove(process)
             return active_processes
 
+        # collect environment context
+        env = os.environ.copy()
+
         # write cmds to file:
-        with open(output_path, 'w', encoding='UTF-8') as f:
+        cmdfile_path = f"{output_path}/{jobname}_cmds.txt"
+        with open(cmdfile_path, 'w', encoding='UTF-8') as f:
             f.write("\n".join(cmds)+"\n")
 
         # invert cmds to start from the top with .pop()
@@ -152,6 +161,7 @@ class LocalJobStarter(JobStarter):
                 time.sleep(1) # avoid busy waiting
 
             # setup process:
+            print(cmds) #TODO: remove print
             cmd = cmds.pop()
             i += 1
             output_file = f"{output_path}/process_{str(i)}.log"

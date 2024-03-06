@@ -16,9 +16,9 @@ class RunnerOutput:
         self.results = self.check_data_formatting(results)
 
         # Remove layers if option is set
-        if index_layers: 
+        if index_layers:
             self.results["select_col"] = self.results["description"].str.split(index_sep).str[:-1*index_layers].str.join(index_sep)
-        else: 
+        else:
             self.results["select_col"] = self.results["description"]
 
         self.results = self.results.add_prefix(f"{prefix}_")
@@ -68,7 +68,6 @@ class Runner:
 
     def run(self, poses:Poses, prefix:str, jobstarter:JobStarter) -> RunnerOutput:
         '''method that interacts with Poses to run jobs and send Poses the scores.'''
-        #TODO: jobstarter options need to be removed have to be set in the jobstarter, not in the Runner!!!
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
 
     def check_for_prefix(self, prefix: str, poses: "Poses") -> None:
