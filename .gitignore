@@ -165,3 +165,4 @@ protslurm/config.py
 dev_stuff/
 examples/outputs/
 examples/rfdiffusion_mpnn_esm_output/
+protslurm/config.py

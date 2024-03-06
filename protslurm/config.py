@@ -2,7 +2,7 @@
 This module contains all paths to tools integrated in ProtSLURM.
 '''
 # protslurm environment python
-PROTSLURM_PYTHON = ""
+PROTSLURM_PYTHON = "/home/markus/anaconda3/envs/protslurm/bin/python3"
 
 #auxiliary runners directory path
 AUXILIARY_RUNNER_SCRIPTS_DIR = ""
@@ -11,8 +11,8 @@ AUXILIARY_RUNNER_SCRIPTS_DIR = ""
 PROTEIN_GENERATOR_SCRIPT_PATH = ""
 
 #ligandmpnn.py
-LIGANDMPNN_SCRIPT_PATH = ""
-LIGANDMPNN_PYTHON_PATH = ""
+LIGANDMPNN_SCRIPT_PATH = "/home/markus/LigandMPNN/run.py"
+LIGANDMPNN_PYTHON_PATH = PROTSLURM_PYTHON
 
 #rosettascripts.py
 ROSETTA_SCRIPTS_PATH = ""
