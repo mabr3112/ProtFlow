@@ -43,22 +43,37 @@ class RunnerOutput:
         Adds Output of a Runner class formatted in RunnerOutput into Poses.df. Returns Poses class.'''
         startlen = len(self.results.index)
 
-        # merge DataFrames
-        if any(x in list(self.poses.df.columns) for x in list(self.results.columns)): logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
-        merged_df = self.poses.df.merge(self.results, left_on="poses_description", right_on=f"{self.prefix}_select_col") # pylint: disable=W0201
+        # check for duplicate columns
+        if any(x in list(self.poses.df.columns) for x in list(self.results.columns)):
+            logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
+
+        # if poses are empty, concatenate DataFrames:
+        print(len(self.poses.poses_list()))# TODO remove
+        
+        if len(self.poses.poses_list()) == 0:
+            logging.info(f"Poses.df is empty. This means the existing poses.df will be merged with the new results of {self.prefix}")
+            merged_df = pd.concat([self.poses.df, self.results])
+
+        # if poses.df contains scores, merge DataFrames based on poses_description to keep scores continous
+        else:
+            merged_df = self.poses.df.merge(self.results, left_on="poses_description", right_on=f"{self.prefix}_select_col") # pylint: disable=W0201
+        
+        # cleanup after merger
         merged_df.drop(f"{self.prefix}_select_col", axis=1, inplace=True)
         merged_df.reset_index(inplace=True, drop=True)
 
         # check if merger was successful:
-        if len(merged_df) == 0: raise ValueError(f"Merging DataFrames failed. This means there was no overlap found between poses.df['poses_description'] and results[new_df_col]")
-        if len(merged_df) < startlen: raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']")
+        if len(merged_df) == 0:
+            raise ValueError(f"Merging DataFrames failed. This means there was no overlap found between poses.df['poses_description'] and results[new_df_col]")
+        if len(merged_df) < startlen:
+            raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']")
 
         # reset poses and poses_description column
         merged_df["poses"] = merged_df[f"{self.prefix}_location"]
         merged_df["poses_description"] = merged_df[f"{self.prefix}_description"]
 
+        # integrate new results into Poses object
         self.poses.df = merged_df
-
         return self.poses
 
 class Runner:

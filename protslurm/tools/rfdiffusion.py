@@ -69,9 +69,11 @@ class RFdiffusion(Runner):
 
         # handling of empty poses DataFrame.
         if len(poses) == 0 and pose_options:
+            # if no poses are set, but pose_options are provided, create as many jobs as pose_options. output_pdbs must be specified in pose options!
             cmds = [self.write_cmd(pose=None, options=options, pose_opts=pose_option, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose_option in pose_options]
         elif len(poses) == 0 and not pose_options:
-            cmds = [self.write_cmd(pose=None, options=options, pose_opts=f"inference.output_prefix=diff_{str(i+1).zfill(4)}", output_dir=pdb_dir, num_diffusions=num_diffusions) for i in range(jobstarter.max_cores)]
+            # if neither poses nor pose_options exist: write n=max_cores commands with generic output name.
+            cmds = [self.write_cmd(pose=None, options=options, pose_opts="inference.output_prefix=" + os.path.join(pdb_dir, f"diff_{str(i+1).zfill(4)}"), output_dir=pdb_dir, num_diffusions=num_diffusions) for i in range(jobstarter.max_cores)]
         elif multiplex_poses:
             # create multiple copies (specified by multiplex variable) of poses to fully utilize parallel computing:
             poses.duplicate_poses(f"{poses.work_dir}/{prefix}_input_pdbs/", jobstarter.max_cores)
@@ -80,8 +82,6 @@ class RFdiffusion(Runner):
         else:
             # write rfdiffusion cmds
             cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses, pose_options)]
-
-        print(cmds) #TODO remove
 
         # diffuse
         jobstarter.start(
@@ -92,7 +92,7 @@ class RFdiffusion(Runner):
         )
 
         # collect RFdiffusion outputs
-        scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, rename_pdbs=True)
+        scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, rename_pdbs=True).reset_index(drop=True)
 
         # Reintegrate into poses and return
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
@@ -154,7 +154,7 @@ class RFdiffusion(Runner):
             scores = scores.drop(columns=["location"]).rename(columns={"new_loc": "location"})
             scores = scores.drop(columns=["description"]).rename(columns={"new_description": "description"})
 
-        scores.reset_index(drop=True)
+        scores.reset_index(drop=True, inplace=True)
 
         logging.info(f"Saving scores of {self} at {scorefile}")
         scores.to_json(scorefile)

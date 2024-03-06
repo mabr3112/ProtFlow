@@ -1,6 +1,7 @@
 '''Script to test various runners
 '''
 import logging
+from protslurm.jobstarters import SbatchArrayJobstarter
 
 # customs
 from protslurm.poses import Poses
@@ -14,11 +15,19 @@ from protslurm.tools.esmfold import ESMFold
 #TODO: Automatically execute tests only for runners that are set up in the config.py file!
 #TODO: Print Test output: Which Runners are Implemented, Which runners succeeded (all if the test runs through).
 #TODO: Write Tutorials as Jupyter Notebooks in 'examples' Folder!
+#TODO: add arguments
 
 def main():
     '''.'''
+    slurm_gpu_jobstarter = SbatchArrayJobstarter(
+        max_cores=10,
+        gpus=1,
+        options="-c1"
+    )
+    
 ####################### ESMFold #######################
-
+    
+    
     out_dir = "output_esmfold"
 
     proteins = Poses(
@@ -28,9 +37,8 @@ def main():
         storage_format="json"
     )
 
-    proteins = ESMFold().run(poses=proteins, output_dir=out_dir, prefix="test", overwrite=True)
-
-
+    esm_runner = ESMFold(jobstarter=slurm_gpu_jobstarter)
+    proteins = esm_runner.run(poses=proteins, output_dir=out_dir, prefix="test", overwrite=True)
 
 ####################### AttnPacker #######################
 

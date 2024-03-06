@@ -99,7 +99,7 @@ class SbatchArrayJobstarter(JobStarter):
         '''Sets up attribute 'jobstarter_options' of SbatchArrayJobstarter Class.'''
         self.options = self.parse_options(options)
         if gpus:
-            self.options += "--gpus-per-node {gpus}"
+            self.options += f"--gpus-per-node {gpus}"
 
     def wait_for_job(self, jobname:str, interval:float=5) -> None:
         '''
@@ -122,7 +122,6 @@ class LocalJobStarter(JobStarter):
         '''Method to start jobs on a local pc'''
         def start_process(command, output_file):
             # Open the file to capture output and error
-            print(command, output_file) # TODO remove
             with open(output_file, 'w', encoding="UTF-8") as file:
                 # Start the process
                 process = subprocess.Popen(command, env=env, shell=True, stdout=file, stderr=subprocess.STDOUT)
@@ -154,20 +153,24 @@ class LocalJobStarter(JobStarter):
         active_processes = []
         i = 0
 
-        while len(cmds) >= 0 or len(active_processes) != 0:
+        while len(cmds) >= 1:
             # first check if any processes need to be removed
             while len(active_processes) >= self.max_cores:
                 update_active_processes(active_processes)
                 time.sleep(1) # avoid busy waiting
 
             # setup process:
-            print(cmds) #TODO: remove print
             cmd = cmds.pop()
             i += 1
             output_file = f"{output_path}/process_{str(i)}.log"
 
             # start
             active_processes.append(start_process(cmd, output_file))
+
+        # wait for completion loop
+        while len(active_processes) != 0:
+            update_active_processes(active_processes)
+            time.sleep(1)
         return None
 
     def wait_for_job(self, jobname:str, interval:float) -> None:

@@ -1,1 +1,1 @@
-/home/markus/anaconda3/envs/SE3nv/bin/python3 /home/markus/RFdiffusion/scripts/run_inference.py 'contigmap.contigs=[50-50]' inference.output_prefix=diff_0001 inference.num_designs=3
+/home/markus/anaconda3/envs/SE3nv/bin/python3 /home/markus/RFdiffusion/scripts/run_inference.py 'contigmap.contigs=[30-30]' inference.output_prefix=/home/markus/projects/ProtSLURM/examples/rfdiffusion_mpnn_esm_output/diffusion/output_pdbs/diff_0001 inference.num_designs=2
