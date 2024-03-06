@@ -13,9 +13,9 @@ import pandas as pd
 # custom
 import protslurm.config
 import protslurm.jobstarters
-import protslurm.runners
-from .runners import Runner
-from .runners import RunnerOutput
+import protslurm.tools
+from protslurm.runners import Runner
+from protslurm.runners import RunnerOutput
 
 
 
@@ -113,7 +113,7 @@ class Alphafold2(Runner):
         '''Writes Command to run Alphafold2.py'''
 
         # parse options
-        opts, flags = protslurm.runners.parse_generic_options(options, "")
+        opts, flags = protslurm.tools.parse_generic_options(options, "")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 
