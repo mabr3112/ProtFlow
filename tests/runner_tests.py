@@ -5,11 +5,11 @@ import logging
 # customs
 from protslurm.poses import Poses
 #from protslurm.runners.protein_generator import ProteinGenerator
-from protslurm.runners.ligandmpnn import LigandMPNN
-from protslurm.runners.rosetta import Rosetta
-from protslurm.runners.rfdiffusion import RFdiffusion
-from protslurm.runners.attnpacker import AttnPacker
-from protslurm.runners.esmfold import ESMFold
+from protslurm.tools.ligandmpnn import LigandMPNN
+from protslurm.tools.rosetta import Rosetta
+from protslurm.tools.rfdiffusion import RFdiffusion
+from protslurm.tools.attnpacker import AttnPacker
+from protslurm.tools.esmfold import ESMFold
 
 #TODO: Automatically execute tests only for runners that are set up in the config.py file!
 #TODO: Print Test output: Which Runners are Implemented, Which runners succeeded (all if the test runs through).

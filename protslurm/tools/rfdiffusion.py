@@ -13,8 +13,6 @@ import pandas as pd
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 import protslurm.config
-import protslurm.tools
-import protslurm.residues
 from protslurm.runners import Runner
 from protslurm.runners import RunnerOutput
 

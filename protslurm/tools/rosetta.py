@@ -12,7 +12,7 @@ import pandas as pd
 # custom
 import protslurm.config
 import protslurm.jobstarters
-import protslurm.runners
+import protslurm.tools
 from .runners import Runner
 from .runners import RunnerOutput
 
@@ -99,7 +99,7 @@ class Rosetta(Runner):
         '''Writes Command to run ligandmpnn.py'''
 
         # parse options
-        opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
+        opts, flags = protslurm.tools.parse_generic_options(options, pose_options)
         opts = " ".join([f"-{key} {value}" for key, value in opts.items()])
         flags = " -".join(flags)
         run_string = f"{os.path.join(self.script_path, rosetta_application)} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"

@@ -12,7 +12,7 @@ import pandas as pd
 # custom
 import protslurm.config
 import protslurm.jobstarters
-import protslurm.runners
+import protslurm.tools
 from .runners import Runner
 from .runners import RunnerOutput
 
@@ -107,7 +107,7 @@ class ESMFold(Runner):
         '''Writes Command to run ESMFold.py'''
 
         # parse options
-        opts, flags = protslurm.runners.parse_generic_options(options, "")
+        opts, flags = protslurm.tools.parse_generic_options(options, "")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 
