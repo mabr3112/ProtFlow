@@ -31,6 +31,8 @@ import subprocess
 import itertools
 import os
 
+import numpy as np
+
 class JobStarter:
     '''JobStarter class is a class that defines how jobstarters have to look.'''
     def __init__(self, max_cores:int=None):
@@ -184,8 +186,19 @@ def add_timestamp(x: str) -> str:
     '''
     return "_".join([x, f"{str(time.time()).rsplit('.', maxsplit=1)[-1]}"])
 
-def split_list(input_list: list, element_length: int) -> list:
+def split_list(input_list: list, element_length:int=None, n_sublists:int=None) -> list:
     '''Splits 'input_list' into nested list of sublists with maximum length of 'element_length' '''
+    # safety
+    if element_length and n_sublists:
+        raise ValueError(f"Only either element_length or n_sublists can be specified, but not both!")
+    if not element_length and not n_sublists:
+        raise ValueError(f"At least one of arguments 'element_length or n_sublists has to be given!")
+
+    # handling n_sublists
+    if n_sublists:
+        return [list(x) for x in np.array_split(input_list, int(n_sublists))]
+
+    # handling element_length
     result = []
     iterator = iter(input_list)
     while True:

@@ -1,5 +1,6 @@
 '''Module to handle LigandMPNN within ProtSLURM'''
 # general imports
+import json
 import os
 import logging
 from glob import glob
@@ -11,11 +12,12 @@ import Bio
 
 # custom
 import protslurm.config
+from protslurm.residues import ResidueSelection
 import protslurm.tools
+import protslurm.runners
+from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
-from protslurm.runners import Runner
-from protslurm.runners import RunnerOutput
-
+from protslurm.runners import Runner, RunnerOutput, expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string
 
 class LigandMPNN(Runner):
     '''Class to run LigandMPNN and collect its outputs into a DataFrame'''
@@ -32,22 +34,18 @@ class LigandMPNN(Runner):
     def __str__(self):
         return "ligandmpnn.py"
 
-    def run(self, poses:protslurm.poses.Poses, prefix:str, jobstarter:JobStarter=None, nseq:int=1, model_type:str="ligand_mpnn", options:str=None, pose_options:object=None, fixed_res_column:str=None, design_res_column:str=None, return_seq_threaded_pdbs_as_pose:bool=False, preserve_original_output:bool=True, overwrite:bool=False) -> RunnerOutput:
-        '''Runs ligandmpnn.py on acluster'''
-        #TODO: reorder .run() arguments according to Runner.run() abstract mehtod in base class.
-        available_models = ["protein_mpnn", "ligand_mpnn", "soluble_mpnn", "global_label_membrane_mpnn", "per_residue_label_membrane_mpnn"]
-        if model_type not in available_models:
-            raise ValueError(f"{model_type} must be one of {available_models}!")
+    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, nseq:int=None, model_type:str=None, options:str=None, pose_options:object=None, fixed_res_col:str=None, design_res_col:str=None, pose_opt_cols:dict=None, return_seq_threaded_pdbs_as_pose:bool=False, preserve_original_output:bool=True, overwrite:bool=False) -> RunnerOutput:
+        '''Runs ligandmpnn.py on acluster.
+        Default model_type is ligand_mpnn.'''
+        # run in batch mode if pose_options are not set:
+        run_batch = self.check_for_batch_run(pose_options, pose_opt_cols)
 
-        # setup output_dir
-        work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
-        if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)
-
-        # setup jobstarter
-        default_jobstarter = self.jobstarter or poses.default_jobstarter
-        jobstarter = jobstarter or default_jobstarter
-        if not jobstarter:
-            raise ValueError(f"No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
+        # setup runner
+        work_dir = self.generic_run_setup(
+            poses=poses,
+            prefix=prefix,
+            jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
+        )
 
         # Look for output-file in pdb-dir. If output is present and correct, skip LigandMPNN.
         scorefile = "ligandmpnn_scores.json"
@@ -55,69 +53,163 @@ class LigandMPNN(Runner):
         if overwrite is False and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
 
-        # parse_options and pose_options:
-        pose_options = self.create_pose_options(poses.df, pose_options, fixed_res_column, design_res_column)
+        # integrate redesigned and fixed residue parameters into pose_opt_cols:
+        pose_opt_cols["fixed_residues"] = fixed_res_col
+        pose_opt_cols["redesigned_residues"] = design_res_col
+
+        # parse pose_opt_cols into pose_options format.
+        pose_opt_cols_options = self.parse_pose_opt_cols(pose_opt_cols, output_dir=work_dir)
+
+        # parse pose_options
+        pose_options = self.prep_pose_options(poses=poses, pose_options=pose_options)
+
+        # combine pose_options and pose_opt_cols_options (priority goes to pose_opt_cols_options):
+        pose_options = [options_flags_to_string(*parse_generic_options(pose_opt, pose_opt_cols_opt, sep="--"), sep="--") for pose_opt, pose_opt_cols_opt in zip(pose_options, pose_opt_cols_options)]
 
         # write ligandmpnn cmds:
         cmds = [self.write_cmd(pose, output_dir=work_dir, model=model_type, nseq=nseq, options=options, pose_options=pose_opts) for pose, pose_opts in zip(poses.df['poses'].to_list(), pose_options)]
 
+        # batch_run setup:
+        if run_batch:
+            cmds = self.setup_batch_run(cmds, num_batches=jobstarter.max_cores, output_dir=work_dir)
+
         # run
-        jobstarter.start(cmds=cmds,
-                         jobname="ligandmpnn",
-                         wait=True,
-                         output_path=f"{work_dir}/"
+        jobstarter.start(
+            cmds=cmds,
+            jobname="ligandmpnn",
+            wait=True,
+            output_path=f"{work_dir}/"
         )
 
         # collect scores
-        scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, return_seq_threaded_pdbs_as_pose=return_seq_threaded_pdbs_as_pose, preserve_original_output=preserve_original_output)
+        scores = self.collect_scores(
+            work_dir=work_dir,
+            scorefile=scorefilepath,
+            return_seq_threaded_pdbs_as_pose=return_seq_threaded_pdbs_as_pose,
+            preserve_original_output=preserve_original_output
+        )
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
-    def create_pose_options(self, df:pd.DataFrame, pose_options:list[str]=None, fixed_res_column:str=None, design_res_column:str=None) -> list:
-        '''Checks if pose_options are of the same length as poses, if pose_options are provided, '''
+    def check_for_batch_run(self, pose_options: str, pose_opt_cols):
+        '''Checks if ligandmpnn can be run in batch mode'''
+        return pose_options is None and self.multi_cols_only(pose_opt_cols)
 
-        def check_if_column_in_poses_df(df:pd.DataFrame, column:str):
-            if not column in [col for col in df.columns]:
-                raise ValueError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
+    def multi_cols_only(self, pose_opt_cols:dict) -> bool:
+        '''checks if only multi_res cols are in pose_opt_cols dict. Only _multi arguments can be used for ligandmpnn_batch runs.'''
+        multi_cols = ["omit_AA_per_residue", "bias_AA_per_residue", "redesigned_residues", "fixed_residues"]
+        return all((col in multi_cols for col in pose_opt_cols))
 
-        def parse_residues(df:pd.DataFrame, column:str) -> list:
-            check_if_column_in_poses_df(df, column)
-            return [' '.join([res for res in series[column].split(',')]) for _, series in df.iterrows()]
+    def setup_batch_run(self, cmds:list[str], num_batches:int, output_dir:str) -> list[str]:
+        '''Concatenates cmds for MPNN into batches so that MPNN does not have to be loaded individually for each pdb file.'''
+        multi_cols = {
+            "omit_AA_per_residue": "omit_AA_per_residue_multi",
+            "bias_AA_per_residue": "bias_AA_per_residue_multi", 
+            "redesigned_residues": "redesigned_residues_multi",
+            "fixed_residues": "fixed_residues_multi", 
+            "pdb_path": "pdb_path_multi"
+        }
+        # setup json directory
+        json_dir = f"{output_dir}/input_json_files/"
+        if not os.path.isdir(json_dir):
+            os.makedirs(json_dir, exist_ok=True)
 
-        poses = df['poses'].to_list()
+        # split cmds list into n=num_batches sublists
+        cmd_sublists = protslurm.jobstarters.split_list(cmds, n_sublists=num_batches)
 
+        # concatenate cmds: parse _multi arguments into .json files and keep all other arguments in options.
+        batch_cmds = []
+        for i, cmd_list in enumerate(cmd_sublists, start=1):
+            full_cmd_list = [cmd.split(" ") for cmd in cmd_list]
+            opts_flags_list = [expand_options_flags(cmd_split[2:]) for cmd_split in full_cmd_list]
+            opts_list = [x[0] for x in opts_flags_list] # expand_options_flags() returns (options, flags)
 
-        if isinstance(pose_options, str):
-            check_if_column_in_poses_df(df, pose_options)
-            pose_options = df[pose_options].to_list()
-        # safety check (pose_options must have the same length as poses)
-        if fixed_res_column and design_res_column:
+            # take first cmd for general options and flags
+            full_opts_flags = opts_flags_list[0]
+            cmd_start = " ".join(full_cmd_list[0][:2]) # keep /path/to/python3 /path/to/run.py
+
+            # extract lists for _multi options
+            for col, multi_col in multi_cols.items():
+                col_dict = {opts["pdb_path"]: opts[col] for opts in opts_list}
+
+                # write col_dict to json
+                col_json_path = f"{json_dir}/{col}_{i}.json"
+                with open(col_json_path, 'w', encoding="UTF-8") as f:
+                    json.dump(col_dict, f)
+
+                # remove single option from full_opts_flags and set cmd_json file as _multi option:
+                full_opts_flags[0].remove(col)
+                full_opts_flags[0][multi_col] = col_json_path
+
+            # reassemble command and put into batch_cmds
+            batch_cmd = f"{cmd_start} {options_flags_to_string(*full_opts_flags, sep='--')}"
+            batch_cmds.append(batch_cmd)
+
+        return batch_cmds
+
+    def parse_pose_opt_cols(self, poses:Poses, output_dir:str, pose_opt_cols:dict=None) -> list[dict]:
+        '''Parses pose_opt_cols into pose_options formatted strings to later combine with pose_options.'''
+        # return list of empty strings if pose_opts_col is None.
+        if pose_opt_cols is None:
+            return ["" for _ in poses]
+
+        # setup output_dir for .json files
+        if any([key in ["bias_AA_per_residue", "omit_AA_per_residue"] for key in pose_opt_cols]):
+            json_dir = f"{output_dir}/input_json_files/"
+            if not os.path.isdir(json_dir):
+                os.makedirs(json_dir, exist_ok=True)
+
+        # check if fixed_residues and redesigned_residues were set properly (gets checked in LigandMPNN too, so maybe this is redundant.)
+        if "fixed_residues" in pose_opt_cols and "redesigned_residues" in pose_opt_cols:
             raise ValueError(f"Cannot define both <fixed_res_column> and <design_res_column>!")
-        if fixed_res_column:
-            fixed_residues = parse_residues(df, fixed_res_column)
-            if pose_options: pose_options = [" ".join([pose_opt, f"fixed_residues '{res}'"]) for pose_opt, res in zip(pose_options, fixed_residues)]
-            else: pose_options = [f"fixed_residues='{res}'" for res in fixed_residues]
-        if design_res_column:
-            design_residues = parse_residues(df, design_res_column)
-            if pose_options: pose_options = [' '.join([pose_opt, f"redesigned_residues '{res}'"]) for pose_opt, res in zip(pose_options, design_residues)]
-            else: pose_options = [f"redesigned_residues='{res}'" for res in fixed_residues]
-        if pose_options is None:
-            # make sure an empty list is passed as pose_options!
-            pose_options = ["" for x in poses]
 
-        if len(poses) != len(pose_options):
-            raise ValueError(f"Arguments <poses> and <pose_options> for LigandMPNN must be of the same length. There might be an error with your pose_options argument!\nlen(poses) = {poses}\nlen(pose_options) = {len(pose_options)}")
+        # check if all specified columns exist in poses.df:
+        for col in list(pose_opt_cols.values()):
+            col_in_df(poses.df, col)
+
+        # parse pose_options
+        pose_options = []
+        for pose in poses:
+            opts = []
+            for mpnn_arg, mpnn_arg_col in pose_opt_cols.values():
+                # arguments that must be written into .json files:
+                if mpnn_arg in ["bias_AA_per_residue", "omit_AA_per_residue"]:
+                    output_path = f"{json_dir}/{mpnn_arg}_{pose['poses_description']}.json"
+                    opts.append(f"--{mpnn_arg}={write_to_json(pose[mpnn_arg_col], output_path)}")
+
+                # arguments that can be parsed as residues (from ResidueSelection objects):
+                elif mpnn_arg in ["redesigned_residues", "fixed_residues", "transmembrane_buried", "transmembrane_interface"]:
+                    opts.append(f"--{mpnn_arg}={parse_residues(pose[mpnn_arg_col])}")
+
+                # all other arguments:
+                else:
+                    opts.append(f"--{mpnn_arg}={pose[mpnn_arg_col]}")
+            pose_options.append(" ".join(opts))
         return pose_options
 
     def write_cmd(self, pose_path:str, output_dir:str, model:str, nseq:int, options:str, pose_options:str):
-        '''Writes Command to run ligandmpnn.py'''
+        '''Writes Command to run ligandmpnn.py
+        default model: ligand_mpnn
+        default number of sequences: 1'''
+        # check if specified model is correct.
+        available_models = ["protein_mpnn", "ligand_mpnn", "soluble_mpnn", "global_label_membrane_mpnn", "per_residue_label_membrane_mpnn"]
+        if model not in available_models:
+            raise ValueError(f"{model} must be one of {available_models}!")
 
         # parse options
-        opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
-        opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
-        flags = " --".join(flags)
+        opts, flags = parse_generic_options(options, pose_options)
 
-        return f"{self.python_path} {self.script_path} --model_type {model} --number_of_batches={nseq} --out_folder {output_dir} --pdb_path {pose_path} {opts} {flags}"
+        # safetychecks:
+        if "model_type" not in opts:
+            opts["model_type"] = model or "ligand_mpnn"
+        if "number_of_batches" not in opts:
+            opts["number_of_batches"] = nseq or "1"
+
+        # convert to string
+        options = options_flags_to_string(opts, flags, sep="--")
+
+        # write command and return.
+        return f"{self.python_path} {self.script_path} --out_folder {output_dir}/ --pdb_path {pose_path} {options}"
 
 
     def collect_scores(self, work_dir:str, scorefile:str, return_seq_threaded_pdbs_as_pose:bool, preserve_original_output:bool=True) -> pd.DataFrame:
@@ -223,3 +315,26 @@ class LigandMPNN(Runner):
                 shutil.rmtree(original_pdbs_dir)
 
         return scores
+
+def parse_residues(residues:object) -> str:
+    '''parses residues from either ResidueSelection object or list or mpnn_formatted string into mpnn_formatted string.'''
+    # ResidueSelection should have to_mpnn function.
+    if isinstance(residues, ResidueSelection):
+        return residues.to_string(delim=" ")
+
+    # strings:
+    if isinstance(residues, str):
+        if len(residues.split(",")) > 1:
+            return " ".join(residues.split(","))
+        return residues
+    raise ValueError(f"Residues must be of type str or ResidueSelection. Type: {type(residues)}")
+
+def return_raw(arg):
+    '''Simplest of simple functions that just returns what it was given.'''
+    return arg
+
+def write_to_json(input_dict: dict, output_path:str) -> str:
+    '''Writes json serializable :input_dict: into file and returns path to file.'''
+    with open(output_path, 'w', encoding="UTF-8") as f:
+        json.dump(input_dict, f)
+    return output_path

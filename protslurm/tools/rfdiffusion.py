@@ -35,20 +35,17 @@ class RFdiffusion(Runner):
 
     def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, num_diffusions:int=1, options:str=None, pose_options:list[str]=None, overwrite:bool=False, multiplex_poses:int=None) -> RunnerOutput:
         '''running function for RFDiffusion given poses and a jobstarter object.'''
-        # check for prefix
-        self.check_for_prefix(prefix, poses)
+        # setup runner
+        work_dir = self.generic_run_setup(
+            poses=poses,
+            prefix=prefix,
+            jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
+        )
 
-        # setup jobstarter
-        default_jobstarter = self.jobstarter or poses.default_jobstarter
-        jobstarter = jobstarter or default_jobstarter
-        if not jobstarter:
-            raise ValueError(f"No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
-
-        # setup directory
-        work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
-        if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)
+        # setup runner-specific directories
         pdb_dir = os.path.join(work_dir, "output_pdbs")
-        if not os.path.isdir(pdb_dir): os.makedirs(pdb_dir, exist_ok=True)
+        if not os.path.isdir(pdb_dir):
+            os.makedirs(pdb_dir, exist_ok=True)
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip diffusion step.
         scorefile="rfdiffusion_scores.json"

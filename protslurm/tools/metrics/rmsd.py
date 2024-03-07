@@ -10,7 +10,7 @@ import protslurm
 # import customs
 from protslurm.config import PROTSLURM_PYTHON as protslurm_python
 from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
-from protslurm.runners.runners import Runner, RunnerOutput
+from protslurm.runners import Runner, RunnerOutput
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 

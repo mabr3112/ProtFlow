@@ -48,8 +48,6 @@ class RunnerOutput:
             logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
 
         # if poses are empty, concatenate DataFrames:
-        print(len(self.poses.poses_list()))# TODO remove
-        
         if len(self.poses.poses_list()) == 0:
             logging.info(f"Poses.df is empty. This means the existing poses.df will be merged with the new results of {self.prefix}")
             merged_df = pd.concat([self.poses.df, self.results])
@@ -57,7 +55,7 @@ class RunnerOutput:
         # if poses.df contains scores, merge DataFrames based on poses_description to keep scores continous
         else:
             merged_df = self.poses.df.merge(self.results, left_on="poses_description", right_on=f"{self.prefix}_select_col") # pylint: disable=W0201
-        
+
         # cleanup after merger
         merged_df.drop(f"{self.prefix}_select_col", axis=1, inplace=True)
         merged_df.reset_index(inplace=True, drop=True)
@@ -92,27 +90,43 @@ class Runner:
 
     def prep_pose_options(self, poses:Poses, pose_options:list[str]=None) -> list:
         '''Checks if pose_options are of the same length as poses, if pose_options are provided, '''
-
-        def check_if_column_in_poses_df(df:pd.DataFrame, column:str):
-            if not column in df.columns:
-                raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
-
-        # if poses are empty, make sure to send back empty list:
-        if len(poses) == 0:
-            return []
-
-        poses = poses.poses_list()
+        # if pose_options is str, look up pose_options from poses.df
         if isinstance(pose_options, str):
-            check_if_column_in_poses_df(poses.df, pose_options)
+            col_in_df(poses.df, pose_options)
             pose_options = poses.df[pose_options].poses_list()
+
+        # if pose_options is None (not set) return list with empty dicts.
         if pose_options is None:
             # make sure an empty list is passed as pose_options!
-            pose_options = ["" for _ in poses]
+            pose_options = [None for _ in poses]
 
-        if len(poses) != len(pose_options):
+        if len(poses) != len(pose_options) and len(poses) is not 0:
             raise ValueError(f"Arguments <poses> and <pose_options> for RFdiffusion must be of the same length. There might be an error with your pose_options argument!\nlen(poses) = {poses}\nlen(pose_options) = {len(pose_options)}")
 
+        # if pose_options is list and as long as poses, just return list. Has to be list of dicts.
         return pose_options
+
+    def generic_run_setup(self, poses: Poses, prefix:str, jobstarters: list[JobStarter]) -> str:
+        '''Generic setup method to prepare for a .run() method.
+        Checks if prefix exists in poses.df, sets up a jobstarter and creates the working_directory.
+        Returns path to work_dir.
+
+        Order of jobstarters in :jobstarter: parameter is:
+            [Runner.run(jobstarter), Runner.jobstarter, poses.default_jobstarter]'''
+        # check for prefix
+        self.check_for_prefix(prefix, poses)
+
+        # setup jobstarter
+        run_jobstarter, runner_jobstarter, poses_jobstarter = jobstarters
+        jobstarter = run_jobstarter or (runner_jobstarter or poses_jobstarter) # select jobstarter, priorities: Runner.run(jobstarter) > Runner.jobstarter > poses.jobstarter
+        if not jobstarter:
+            raise ValueError(f"No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
+
+        # setup directory
+        work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
+        if not os.path.isdir(work_dir):
+            os.makedirs(work_dir, exist_ok=True)
+        return work_dir
 
 def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[dict,list]:
     """
@@ -135,33 +149,42 @@ def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[di
     >>> parse_generic_options("--width 800 --height 600", "--color blue --verbose")
     ({'width': '800', 'height': '600', 'color': 'blue'}, ['verbose'])
 
-    This function internally utilizes a helper function `tmp_parse_options_flags` to process each input string separately before
+    This function internally utilizes a helper function `expand_options_flags` to process each input string separately before
     merging the results, ensuring that pose-specific options and flags are appropriately prioritized and duplicates are removed.
     """
-    def tmp_parse_options_flags(options_str: str, sep:str="--") -> tuple[dict, list]:
-        '''parses split options '''
-        if not options_str: return {}, []
-        # split along separator
-        firstsplit = [x.strip() for x in options_str.split(sep) if x]
-
-        # parse into options and flags:
-        opts = {}
-        flags = []
-        for item in firstsplit:
-            if len((x := item.split())) > 1:
-                opts[x[0]] = " ".join(x[1:])
-            elif len((x := item.split("="))) > 1:
-                opts[x[0]] = "=".join(x[1:])
-            else:
-                flags.append(x[0])
-
-        return opts, flags
-
     # parse into options and flags:
-    opts, flags = tmp_parse_options_flags(options, sep=sep)
-    pose_opts, pose_flags = tmp_parse_options_flags(pose_options, sep=sep)
+    opts, flags = expand_options_flags(options, sep=sep)
+    pose_opts, pose_flags = expand_options_flags(pose_options, sep=sep)
 
     # merge options and pose_options (pose_opts overwrite opts), same for flags
     opts.update(pose_opts)
-    flags = list(set(flags) | set(pose_flags))
+    flags = list(flags | pose_flags)
     return opts, flags
+
+def col_in_df(df:pd.DataFrame, column:str):
+    '''Checks if column exists in DataFrame and returns KeyError if not.'''
+    if not column in df.columns:
+        raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
+
+def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
+    '''parses split options '''
+    if not options_str: return {}, []
+    # split along separator
+    firstsplit = [x.strip() for x in options_str.split(sep) if x]
+
+    # parse into options and flags:
+    opts = {}
+    flags = []
+    for item in firstsplit:
+        if len((x := item.split())) > 1:
+            opts[x[0]] = " ".join(x[1:])
+        elif len((x := item.split("="))) > 1:
+            opts[x[0]] = "=".join(x[1:])
+        else:
+            flags.append(x[0])
+
+    return opts, set(flags)
+
+def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
+    '''Converts options dict and flags list into one string'''
+    return " ".join([f"{sep}{key}={value}" for key, value in options.items()]) + f" {sep}".join(flags)
