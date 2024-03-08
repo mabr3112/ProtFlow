@@ -9,6 +9,7 @@ import shutil
 # dependencies
 import pandas as pd
 import Bio
+import Bio.SeqIO
 
 # custom
 import protslurm.config
@@ -18,6 +19,18 @@ import protslurm.runners
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 from protslurm.runners import Runner, RunnerOutput, expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string
+
+if not protslurm.config.LIGANDMPNN_SCRIPT_PATH:
+    raise ValueError(f"No path is set for ligandmpnn run.py. Set the path in the config.py file under LIGANDMPNN_SCRIPT_PATH")
+
+LIGANDMPNN_DIR = protslurm.config.LIGANDMPNN_SCRIPT_PATH.rsplit("/", maxsplit=1)[0]
+LIGANDMPNN_CHECKPOINT_DICT = {
+    "protein_mpnn": f"{LIGANDMPNN_DIR}/model_params/proteinmpnn_v_48_020.pt",
+    "ligand_mpnn": f"{LIGANDMPNN_DIR}/model_params/ligandmpnn_v_32_010_25.pt",
+    "per_residue_label_membrane_mpnn": f"{LIGANDMPNN_DIR}/model_params/per_residue_label_membrane_mpnn_v_48_020.pt",
+    "global_label_membrane_mpnn": f"{LIGANDMPNN_DIR}/model_params/global_label_membrane_mpnn_v_48_020.pt",
+    "soluble_mpnn": f"{LIGANDMPNN_DIR}/model_params/solublempnn_v_48_020.pt"
+}
 
 class LigandMPNN(Runner):
     '''Class to run LigandMPNN and collect its outputs into a DataFrame'''
@@ -38,10 +51,13 @@ class LigandMPNN(Runner):
         '''Runs ligandmpnn.py on acluster.
         Default model_type is ligand_mpnn.'''
         # run in batch mode if pose_options are not set:
+        pose_opt_cols = pose_opt_cols or {}
         run_batch = self.check_for_batch_run(pose_options, pose_opt_cols)
+        if run_batch:
+            logging.info(f"Setting up ligandmpnn for batched design.")
 
         # setup runner
-        work_dir = self.generic_run_setup(
+        work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
@@ -98,7 +114,7 @@ class LigandMPNN(Runner):
     def multi_cols_only(self, pose_opt_cols:dict) -> bool:
         '''checks if only multi_res cols are in pose_opt_cols dict. Only _multi arguments can be used for ligandmpnn_batch runs.'''
         multi_cols = ["omit_AA_per_residue", "bias_AA_per_residue", "redesigned_residues", "fixed_residues"]
-        return all((col in multi_cols for col in pose_opt_cols))
+        return True if pose_opt_cols is None else all((col in multi_cols for col in pose_opt_cols))
 
     def setup_batch_run(self, cmds:list[str], num_batches:int, output_dir:str) -> list[str]:
         '''Concatenates cmds for MPNN into batches so that MPNN does not have to be loaded individually for each pdb file.'''
@@ -116,12 +132,13 @@ class LigandMPNN(Runner):
 
         # split cmds list into n=num_batches sublists
         cmd_sublists = protslurm.jobstarters.split_list(cmds, n_sublists=num_batches)
+        print(cmd_sublists)
 
         # concatenate cmds: parse _multi arguments into .json files and keep all other arguments in options.
         batch_cmds = []
         for i, cmd_list in enumerate(cmd_sublists, start=1):
             full_cmd_list = [cmd.split(" ") for cmd in cmd_list]
-            opts_flags_list = [expand_options_flags(cmd_split[2:]) for cmd_split in full_cmd_list]
+            opts_flags_list = [expand_options_flags(" ".join(cmd_split[2:])) for cmd_split in full_cmd_list]
             opts_list = [x[0] for x in opts_flags_list] # expand_options_flags() returns (options, flags)
 
             # take first cmd for general options and flags
@@ -130,6 +147,11 @@ class LigandMPNN(Runner):
 
             # extract lists for _multi options
             for col, multi_col in multi_cols.items():
+                # if col does not exist in options, skip:
+                if col not in opts_list[0]:
+                    continue
+
+                # extract pdb-file to argument mapping as dictionary:
                 col_dict = {opts["pdb_path"]: opts[col] for opts in opts_list}
 
                 # write col_dict to json
@@ -138,7 +160,7 @@ class LigandMPNN(Runner):
                     json.dump(col_dict, f)
 
                 # remove single option from full_opts_flags and set cmd_json file as _multi option:
-                full_opts_flags[0].remove(col)
+                del full_opts_flags[0][col]
                 full_opts_flags[0][multi_col] = col_json_path
 
             # reassemble command and put into batch_cmds
@@ -204,13 +226,22 @@ class LigandMPNN(Runner):
             opts["model_type"] = model or "ligand_mpnn"
         if "number_of_batches" not in opts:
             opts["number_of_batches"] = nseq or "1"
+        # define model_checkpoint option:
+        if f"checkpoint_{model}" not in opts:
+            model_checkpoint_options = f"--checkpoint_{model}={LIGANDMPNN_CHECKPOINT_DICT[model]}"
+
+        # safety
+        logging.info(f"Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
+        if "parse_atoms_with_zero_occupancy" not in opts:
+            opts["parse_atoms_with_zero_occupancy"] = "1"
+        elif opts["parse_atoms_with_zero_occupancy"] != "1":
+            opts["parse_atoms_with_zero_occupancy"] = "1"
 
         # convert to string
         options = options_flags_to_string(opts, flags, sep="--")
 
         # write command and return.
-        return f"{self.python_path} {self.script_path} --out_folder {output_dir}/ --pdb_path {pose_path} {options}"
-
+        return f"{self.python_path} {self.script_path} {model_checkpoint_options} --out_folder {output_dir}/ --pdb_path {pose_path} {options}"
 
     def collect_scores(self, work_dir:str, scorefile:str, return_seq_threaded_pdbs_as_pose:bool, preserve_original_output:bool=True) -> pd.DataFrame:
         '''collects scores from ligandmpnn output'''
@@ -328,10 +359,6 @@ def parse_residues(residues:object) -> str:
             return " ".join(residues.split(","))
         return residues
     raise ValueError(f"Residues must be of type str or ResidueSelection. Type: {type(residues)}")
-
-def return_raw(arg):
-    '''Simplest of simple functions that just returns what it was given.'''
-    return arg
 
 def write_to_json(input_dict: dict, output_path:str) -> str:
     '''Writes json serializable :input_dict: into file and returns path to file.'''

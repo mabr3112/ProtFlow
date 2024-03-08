@@ -196,7 +196,9 @@ def split_list(input_list: list, element_length:int=None, n_sublists:int=None) -
 
     # handling n_sublists
     if n_sublists:
-        return [list(x) for x in np.array_split(input_list, int(n_sublists))]
+        # if initial list is shorter than n_sublists, take minimum value
+        split_n = min([n_sublists, len(input_list)])
+        return [list(x) for x in np.array_split(input_list, int(split_n))]
 
     # handling element_length
     result = []

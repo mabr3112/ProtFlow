@@ -106,7 +106,7 @@ class Runner:
         # if pose_options is list and as long as poses, just return list. Has to be list of dicts.
         return pose_options
 
-    def generic_run_setup(self, poses: Poses, prefix:str, jobstarters: list[JobStarter]) -> str:
+    def generic_run_setup(self, poses: Poses, prefix:str, jobstarters: list[JobStarter]) -> tuple[str, JobStarter]:
         '''Generic setup method to prepare for a .run() method.
         Checks if prefix exists in poses.df, sets up a jobstarter and creates the working_directory.
         Returns path to work_dir.
@@ -126,7 +126,7 @@ class Runner:
         work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
         if not os.path.isdir(work_dir):
             os.makedirs(work_dir, exist_ok=True)
-        return work_dir
+        return work_dir, jobstarter
 
 def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[dict,list]:
     """
@@ -158,7 +158,7 @@ def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[di
 
     # merge options and pose_options (pose_opts overwrite opts), same for flags
     opts.update(pose_opts)
-    flags = list(flags | pose_flags)
+    flags = list(set(flags) | set(pose_flags))
     return opts, flags
 
 def col_in_df(df:pd.DataFrame, column:str):
@@ -168,7 +168,9 @@ def col_in_df(df:pd.DataFrame, column:str):
 
 def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
     '''parses split options '''
-    if not options_str: return {}, []
+    if not options_str:
+        return {}, []
+
     # split along separator
     firstsplit = [x.strip() for x in options_str.split(sep) if x]
 

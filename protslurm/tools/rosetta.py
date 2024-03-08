@@ -13,42 +13,47 @@ import pandas as pd
 import protslurm.config
 import protslurm.jobstarters
 import protslurm.tools
-from protslurm.runners import Runner
-from protslurm.runners import RunnerOutput
-
+from protslurm.runners import Runner, RunnerOutput
+from protslurm.poses import Poses
+from protslurm.jobstarters import JobStarter
 
 class Rosetta(Runner):
     '''Class to run general Rosetta applications and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.ROSETTA_BIN_PATH, jobstarter_options:str=None) -> None:
-        '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
-        if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under ROSETTA_BIN_PATH.")
+    def __init__(self, script_path:str=protslurm.config.ROSETTA_BIN_PATH, jobstarter:str=None) -> None:
+        '''Runner to handle Rosetta within ProtFLOW'''
+        if not script_path:
+            raise ValueError(f"No path is set for {self}. Either supply when setting up runner, or set the path in the config.py file under ROSETTA_BIN_PATH.")
         self.script_path = script_path
         self.name = "rosetta.py"
         self.index_layers = 1
-        self.jobstarter_options = jobstarter_options
+        self.jobstarter = jobstarter
 
     def __str__(self):
         return "rosetta.py"
 
-    def run(self, poses:protslurm.poses.Poses, rosetta_application:str, output_dir:str, prefix:str, nstruct:int=1, options:str=None, pose_options:list or str=None, overwrite:bool=False, jobstarter:protslurm.jobstarters.JobStarter=None) -> RunnerOutput:
+    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter, rosetta_application:str=None, nstruct:int=1, options:str=None, pose_options:list=None, overwrite:bool=False) -> Poses:
         '''Runs rosetta applications'''
-
-        # setup output_dir
-        work_dir = os.path.abspath(output_dir)
-        rosettascore_path = os.path.join(work_dir, 'rosetta_scores.sc')
-
+        # setup runner:
+        work_dir, jobstarter = self.generic_run_setup(
+            poses=poses,
+            prefix=prefix,
+            jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
+        )
+        
         # Look for output-file in pdb-dir. If output is present and correct, then skip RosettaScripts.
         scorefilepath = os.path.join(work_dir, "rosetta_scores.json")
-        if overwrite == False and os.path.isfile(scorefilepath):
+        if not overwrite and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
-        elif overwrite == True and os.path.isdir(work_dir):
-            if os.path.isfile(scorefilepath): os.remove(scorefilepath)
-            if os.path.isfile(rosettascore_path): os.remove(rosettascore_path)
+        elif overwrite and os.path.isdir(work_dir):
+            if os.path.isfile(scorefilepath):
+                os.remove(scorefilepath)
+            if os.path.isfile(scorefilepath):
+                os.remove(scorefilepath)
             
-        if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)
 
         # parse_options and pose_options:
-        pose_options = self.create_pose_options(poses.df, pose_options)
+        if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)
+        pose_options = self.prep_pose_options(poses, pose_options)
 
         # write rosettascripts cmds:
         cmds = []
@@ -57,43 +62,20 @@ class Rosetta(Runner):
                 cmds.append(self.write_cmd(pose_path=pose, rosetta_application=rosetta_application, output_dir=work_dir, i=i, rosettascore_path=rosettascore_path, overwrite=overwrite, options=options, pose_options=pose_opts))
 
         # run
-        jobstarter = jobstarter or poses.default_jobstarter
-        jobstarter_options = self.jobstarter_options or f"-c1 -e {work_dir}/rosetta_err.log -o {work_dir}/rosetta_out.log"
-        jobstarter.start(cmds=cmds,
-                         options=jobstarter_options,
-                         jobname="rosetta",
-                         wait=True,
-                         output_path=f"{output_dir}/"
+        jobstarter.start(
+            cmds=cmds,
+            jobname="rosetta",
+            wait=True,
+            output_path=f"{work_dir}/"
         )
 
         # collect scores and rename pdbs.
         time.sleep(10) # Rosetta does not have time to write the last score into the scorefile otherwise?
 
         # collect scores
-        scores = self.collect_scores(work_dir=work_dir, rosettascore_path=rosettascore_path, scorefilepath=scorefilepath)
+        scores = self.collect_scores(work_dir=work_dir, rosettascore_path=scorefilepath, scorefilepath=scorefilepath)
         
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
-
-    def create_pose_options(self, df:pd.DataFrame, pose_options:list or str=None) -> list:
-        '''Checks if pose_options are of the same length as poses, if pose_options are provided, '''
-
-        def check_if_column_in_poses_df(df:pd.DataFrame, column:str):
-            if not column in [col for col in df.columns]: raise ValueError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
-            return
-
-        poses = df['poses'].to_list()
-
-        if isinstance(pose_options, str):
-            check_if_column_in_poses_df(df, pose_options)
-            pose_options = df[pose_options].to_list()
-        # safety check (pose_options must have the same length as poses)
-        if pose_options is None:
-            # make sure an empty list is passed as pose_options!
-            pose_options = ["" for x in poses]
-
-        if len(poses) != len(pose_options):
-            raise ValueError(f"Arguments <poses> and <pose_options> for RosettaScripts must be of the same length. There might be an error with your pose_options argument!\nlen(poses) = {poses}\nlen(pose_options) = {len(pose_options)}")
-        return pose_options
 
     def write_cmd(self, rosetta_application:str, pose_path:str, output_dir:str, i:int, rosettascore_path:str, overwrite:bool=False, options:str=None, pose_options:str=None):
         '''Writes Command to run ligandmpnn.py'''

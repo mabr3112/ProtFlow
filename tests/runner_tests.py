@@ -12,10 +12,11 @@ from protslurm.tools.rfdiffusion import RFdiffusion
 from protslurm.tools.attnpacker import AttnPacker
 from protslurm.tools.esmfold import ESMFold
 
-#TODO: Automatically execute tests only for runners that are set up in the config.py file!
+#TODO: @Adrian: Automatically execute tests only for runners that are set up in the config.py file!
 #TODO: Print Test output: Which Runners are Implemented, Which runners succeeded (all if the test runs through).
-#TODO: Write Tutorials as Jupyter Notebooks in 'examples' Folder!
-#TODO: add arguments
+#TODO: @Adrian: For Attnpacker, ligandmpnn and AF please write Tutorials as Jupyter Notebooks in 'examples' Folder.
+#TODO: @Adrian: please add commandline arguments to specify JobStarter (Local, or SbatchArray)
+#TODO: @Adrian: Please write tests for LigandMPNN running +10 sequences with/ and without pose_options (to test non_batch and batch run)
 
 def main():
     '''.'''
@@ -84,7 +85,7 @@ def main():
     #set fixed residues
     proteins.df['fixed_residues'] = ['A3,B3,C3,D3']
     # start ligand_mpnn
-    proteins = LigandMPNN().run(poses=proteins, output_dir=out_dir, prefix="test", model="ligand_mpnn", nseq=5, fixed_res_column='fixed_residues')
+    proteins = LigandMPNN().run(poses=proteins, prefix="test", model_type="ligand_mpnn", nseq=5, fixed_res_col='fixed_residues')
 
 
 
@@ -100,7 +101,7 @@ def main():
     )
 
     options = "diffuser.T=50 potentials.guide_scale=5 'contigmap.contigs=[Q1-21/0 20/A1-5/10-50/B1-5/10-50/C1-5/10-50/D1-5/20]' contigmap.length=200-200 'contigmap.inpaint_seq=[A1/A2/A4/A5/B1/B2/B4/B5/C1/C2/C4/C5/D1/D2/D4/D5]' potentials.substrate=LIG"
-    proteins = RFdiffusion().run(poses=proteins, output_dir=out_dir, prefix="test", num_diffusions=1, options=options, overwrite=True)
+    proteins = RFdiffusion().run(poses=proteins, prefix="test", num_diffusions=1, options=options, overwrite=True)
 
 
 
