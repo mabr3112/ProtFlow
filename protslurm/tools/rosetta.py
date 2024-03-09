@@ -17,6 +17,8 @@ from protslurm.runners import Runner, RunnerOutput
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 
+# TODO: @Adrian: Setup output of Rosetta scores as .csv instead of default
+
 class Rosetta(Runner):
     '''Class to run general Rosetta applications and collect its outputs into a DataFrame'''
     def __init__(self, script_path:str=protslurm.config.ROSETTA_BIN_PATH, jobstarter:str=None) -> None:
@@ -31,6 +33,28 @@ class Rosetta(Runner):
     def __str__(self):
         return "rosetta.py"
 
+    def setup_executable(self, script_path: str, rosetta_application: str) -> str:
+        '''Sets up Rosetta executable.'''
+        # if rosetta_application is not provided, check if script_path is executable:
+        if not rosetta_application:
+            if os.path.isfile(script_path) and os.access(script_path, os.X_OK):
+                return script_path
+            raise ValueError(f"Rosetta Executable not setup properly. Either provide executable through Runner.script_path or give directly to run(rosetta_application)")
+
+        # if rosetta_application is provided, check if it is executable:
+        if os.path.isfile(rosetta_application) and os.access(rosetta_application, os.X_OK):
+            return rosetta_application
+
+        # if rosetta_application is not executable, find it at script_dir/rosetta_executable and check if this is executable:
+        if os.path.isdir(script_path):
+            combined_path = os.path.join(script_path, rosetta_application)
+            if os.path.isfile(combined_path) and os.access(combined_path, os.X_OK):
+                return combined_path
+            raise ValueError(f"Provided rosetta_applicatiaon is not executable: {combined_path}")
+
+        # otherwise raise error for not properly setting up the rosetta script paths.
+        raise ValueError(f"No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
+
     def run(self, poses:Poses, prefix:str, jobstarter:JobStarter, rosetta_application:str=None, nstruct:int=1, options:str=None, pose_options:list=None, overwrite:bool=False) -> Poses:
         '''Runs rosetta applications'''
         # setup runner:
@@ -39,8 +63,12 @@ class Rosetta(Runner):
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
-        
+
+        # check if script_path / rosetta_application have an executable.
+        rosetta_exec = self.setup_executable(self.script_path, rosetta_application)
+
         # Look for output-file in pdb-dir. If output is present and correct, then skip RosettaScripts.
+        rosettascore_path = os.path.join(work_dir, 'rosetta_scores.sc')
         scorefilepath = os.path.join(work_dir, "rosetta_scores.json")
         if not overwrite and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
@@ -49,7 +77,6 @@ class Rosetta(Runner):
                 os.remove(scorefilepath)
             if os.path.isfile(scorefilepath):
                 os.remove(scorefilepath)
-            
 
         # parse_options and pose_options:
         if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)
@@ -59,7 +86,7 @@ class Rosetta(Runner):
         cmds = []
         for pose, pose_opts in zip(poses.df['poses'].to_list(), pose_options):
             for i in range(1, nstruct+1):
-                cmds.append(self.write_cmd(pose_path=pose, rosetta_application=rosetta_application, output_dir=work_dir, i=i, rosettascore_path=rosettascore_path, overwrite=overwrite, options=options, pose_options=pose_opts))
+                cmds.append(self.write_cmd(pose_path=pose, rosetta_application=rosetta_exec, output_dir=work_dir, i=i, rosettascore_path=rosettascore_path, overwrite=overwrite, options=options, pose_options=pose_opts))
 
         # run
         jobstarter.start(
@@ -73,8 +100,8 @@ class Rosetta(Runner):
         time.sleep(10) # Rosetta does not have time to write the last score into the scorefile otherwise?
 
         # collect scores
-        scores = self.collect_scores(work_dir=work_dir, rosettascore_path=scorefilepath, scorefilepath=scorefilepath)
-        
+        scores = self.collect_scores(work_dir=work_dir, rosettascore_path=rosettascore_path, scorefilepath=scorefilepath)
+
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
     def write_cmd(self, rosetta_application:str, pose_path:str, output_dir:str, i:int, rosettascore_path:str, overwrite:bool=False, options:str=None, pose_options:str=None):
@@ -84,7 +111,7 @@ class Rosetta(Runner):
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
         opts = " ".join([f"-{key} {value}" for key, value in opts.items()])
         flags = " -".join(flags)
-        run_string = f"{os.path.join(self.script_path, rosetta_application)} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"
+        run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"
         if overwrite is True:
             run_string = run_string + " -overwrite"
         return run_string
@@ -125,7 +152,7 @@ class Rosetta(Runner):
         scores.loc[:, "description"] = scores["raw_description"].str.split("_").str[1:-1].str.join("_") + "_" + scores["raw_description"].str.split("_").str[0].str.replace("r", "")
 
         # wait for all Rosetta output files to appear in the output directory (for some reason, they are sometimes not there after the runs completed.)
-        while len((fl := glob(f"{work_dir}/r*.pdb"))) < len(scores):
+        while len(glob(f"{work_dir}/r*.pdb")) < len(scores):
             time.sleep(1)
 
         # rename .pdb files in work_dir to the reindexed names.

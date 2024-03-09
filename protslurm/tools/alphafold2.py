@@ -158,17 +158,17 @@ class Alphafold2(Runner):
                 df[f"top_{col}"] = df[col].max()
             return df
 
-        def summarize_af2_json(input_json:str, input_pdb:str) -> pd.DataFrame:
+        def summarize_af2_json(json_path:str, input_pdb:str) -> pd.DataFrame:
             '''
             Takes raw AF2_scores.json file and calculates mean pLDDT over the entire structure, also puts perresidue pLDDTs and paes in list.
             
             Returns pd.DataFrame
             '''
-            df:pd.DataFrame = pd.read_json(input_json)
-            means = df.mean(numeric_only=True).to_frame().T
+            df = pd.read_json(json_path)
+            means = df.mean(numeric_only=True).to_frame().T # pylint: disable=E1101
             means["plddt_list"] = [df["plddt"]]
             means["pae_list"] = [df["pae"]]
-            means["json_file"] = input_json
+            means["json_file"] = json_path
             means["pdb_file"] = input_pdb
             return means
 

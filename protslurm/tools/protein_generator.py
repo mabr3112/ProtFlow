@@ -41,7 +41,7 @@ class ProteinGenerator(Runner):
         )
         
         # setup protein_generator specific directories:
-        if not os.path.isdir((pdb_dir := f"{work_dir}/output_pdbs/")): 
+        if not os.path.isdir((pdb_dir := f"{work_dir}/output_pdbs/")):
             os.makedirs(pdb_dir, exist_ok=True)
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip protein_generator.
@@ -58,7 +58,6 @@ class ProteinGenerator(Runner):
         cmds = [self.write_cmd(pose, output_dir=pdb_dir, options=options, pose_options=pose_opts) for pose, pose_opts in zip(poses, pose_options)]
 
         # run
-        sbatch_options = self.sbatch_options or f"--gpus-per-node 1 -c1 -e {work_dir}/protein_generator_err.log -o {work_dir}/protein_generator_out.log"
         jobstarter.start(
             cmds=cmds,
             jobname="protein_generator",

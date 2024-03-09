@@ -12,43 +12,47 @@ import pandas as pd
 # custom
 import protslurm.config
 import protslurm.jobstarters
+from protslurm.poses import Poses
 import protslurm.tools
-from protslurm.runners import Runner
-from protslurm.runners import RunnerOutput
+from protslurm.runners import Runner, RunnerOutput
+from protslurm.jobstarters import JobStarter
 
 
 class RosettaScripts(Runner):
     '''Class to run Rosetta Scripts and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.ROSETTA_SCRIPTS_PATH, jobstarter_options:str=None) -> None:
+    def __init__(self, script_path:str=protslurm.config.ROSETTA_SCRIPTS_PATH, jobstarter:JobStarter=None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under ROSETTA_SCRIPTS_PATH.")
         self.script_path = script_path
         self.name = "rosetta_scripts.py"
         self.index_layers = 1
-        self.jobstarter_options = jobstarter_options
+        self.jobstarter = jobstarter
 
     def __str__(self):
         return "rosettascripts.py"
 
-    def run(self, poses:protslurm.poses.Poses, output_dir:str, prefix:str, xml_path:str, nstruct:int=1, params_path:str=None, options:str=None, pose_options:list or str=None, overwrite:bool=False, jobstarter:protslurm.jobstarters.JobStarter=None) -> RunnerOutput:
+    def run(self, poses:Poses, prefix:str, xml_path:str, jobstarter:JobStarter=None, nstruct:int=1, params_path:str=None, options:str=None, pose_options:list[str]=None, overwrite:bool=False) -> RunnerOutput: # pylint: disable=W0237
         '''Runs rosettascripts.py'''
-
-        # setup output_dir
-        work_dir = os.path.abspath(output_dir)
-        rosettascore_path = os.path.join(work_dir, 'rosettascripts_scores.sc')
+        # setup runner
+        work_dir, jobstarter = self.generic_run_setup(
+            poses=poses,
+            prefix=prefix,
+            jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
+        )
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip RosettaScripts.
+        rosettascore_path = os.path.join(work_dir, 'rosettascripts_scores.sc')
         scorefilepath = os.path.join(work_dir, "rosettascripts_scores.json")
         if not overwrite and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
         elif overwrite and os.path.isdir(work_dir):
-            if os.path.isfile(scorefilepath): os.remove(scorefilepath)
-            if os.path.isfile(rosettascore_path): os.remove(rosettascore_path)
-            
-        if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)
-        
+            if os.path.isfile(scorefilepath):
+                os.remove(scorefilepath)
+            if os.path.isfile(rosettascore_path):
+                os.remove(rosettascore_path)
+
         # parse_options and pose_options:
-        pose_options = self.create_pose_options(poses.df, pose_options)
+        pose_options = self.prep_pose_options(poses, pose_options)
 
         # write rosettascripts cmds:
         cmds = []
@@ -57,13 +61,11 @@ class RosettaScripts(Runner):
                 cmds.append(self.write_cmd(pose, output_dir=work_dir, xml_path=xml_path, i=i, rosettascore_path=rosettascore_path, params_path=params_path, overwrite=overwrite, options=options, pose_options=pose_opts))
 
         # run
-        jobstarter = jobstarter or poses.default_jobstarter
-        jobstarter_options = self.jobstarter_options or f"-c1 -e {work_dir}/rosettascripts_err.log -o {work_dir}/rosettascripts_out.log"
-        jobstarter.start(cmds=cmds,
-                         options=jobstarter_options,
-                         jobname="rosettascripts",
-                         wait=True,
-                         output_path=f"{output_dir}/"
+        jobstarter.start(
+            cmds=cmds,
+            jobname="rosettascripts",
+            wait=True,
+            output_path=f"{work_dir}/"
         )
 
         # collect scores and rename pdbs.
@@ -71,10 +73,10 @@ class RosettaScripts(Runner):
 
         # collect scores
         scores = self.collect_scores(work_dir=work_dir, rosettascore_path=rosettascore_path, scorefilepath=scorefilepath)
-        
+
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
-    def create_pose_options(self, df:pd.DataFrame, pose_options:list or str=None) -> list:
+    def create_pose_options(self, df:pd.DataFrame, pose_options:list[str]=None) -> list:
         '''Checks if pose_options are of the same length as poses, if pose_options are provided, '''
 
         def check_if_column_in_poses_df(df:pd.DataFrame, column:str):
@@ -100,12 +102,14 @@ class RosettaScripts(Runner):
 
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
+
+        # check for xml_path:
         opts = " ".join([f"-{key} {value}" for key, value in opts.items()])
         flags = " -".join(flags)
         run_string = f"{self.script_path} -parser:protocol {xml_path} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"
         if params_path:
             run_string = run_string + f" -extra_res_fa {params_path}"
-        if overwrite == True:
+        if overwrite:
             run_string = run_string + f" -overwrite"
         return run_string
 
