@@ -85,6 +85,36 @@ class Poses:
             logging.info(f"Creating directory {work_dir}")
         self.work_dir = work_dir
 
+    def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
+        '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
+        # define new poses:
+        new_poses = [os.path.join(poses_dir, pose.rsplit("/", maxsplit=1)[-1]) for pose in self.poses_list()]
+
+        # exchange with check if work_dir is a directory and the poses exist
+        if not copy:
+            # just change the name of the directory in the poses_df, don't copy the poses anywhere
+            if not os.path.isdir(poses_dir):
+                raise ValueError(f":work_dir: has to be existing directory!")
+            if not all((os.path.isfile(pose) for pose in new_poses)):
+                raise ValueError(f"Poses do not exist at specified directory. If you want to copy the poses there, set the parameter :copy: to True!")
+
+        else:
+            # actually copy the poses to a new directory (for whatever reason)
+            if not os.path.isdir(poses_dir):
+                os.makedirs(poses_dir)
+            if overwrite:
+                for old_path, new_path in zip(self.poses_list(), new_poses):
+                    shutil.copy(old_path, new_path)
+            else:
+                # if overwrite is False, check if the file exists first. This should save read/write speed.
+                for old_path, new_path in zip(self.poses_list(), new_poses):
+                    if not os.path.isfile(new_path):
+                        shutil.copy(old_path, new_path)
+
+        # change path in self.df["poses"] column
+        self.df["poses"] = new_poses
+        return self
+
     def parse_poses(self, poses:Union[list,str]=None, glob_suffix:str=None) -> list:
         """
         Parses the input 'poses' which can be a directory path, a file path, or a list of file paths.

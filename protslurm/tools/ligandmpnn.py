@@ -36,10 +36,8 @@ class LigandMPNN(Runner):
     '''Class to run LigandMPNN and collect its outputs into a DataFrame'''
     def __init__(self, script_path:str=protslurm.config.LIGANDMPNN_SCRIPT_PATH, python_path:str=protslurm.config.LIGANDMPNN_PYTHON_PATH, jobstarter:JobStarter=None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
-        if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under LIGANDMPNN_SCRIPT_PATH.")
-        if not python_path: raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under LIGANDMPNN_PYTHON_PATH.")
-        self.script_path = script_path
-        self.python_path = python_path
+        self.script_path = self.search_path(script_path, "LIGANDMPNN_SCRIPT_PATH")
+        self.python_path = self.search_path(python_path, "LIGANDMPNN_PYTHON_PATH")
         self.name = "ligandmpnn.py"
         self.index_layers = 1
         self.jobstarter = jobstarter

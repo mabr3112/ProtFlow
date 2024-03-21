@@ -79,9 +79,17 @@ class Runner:
     def __str__(self):
         raise NotImplementedError(f"Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -> RunnerOutput:
         '''method that interacts with Poses to run jobs and send Poses the scores.'''
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
+
+    def search_path(self, input_path: str, path_name: str) -> str:
+        '''Checks if a given path exists (is not None) and if it exists on the local filesystem. If so, returns path, otherwise raises Error.'''
+        if not input_path:
+            raise ValueError(f"Path for {path_name} not set: {input_path}. Set the path uner {path_name} in protflow's config.py file.")
+        if not os.path.isfile(input_path):
+            raise ValueError(f"Path set for {path_name} does not exist at {input_path}. Check correct filepath!")
+        return input_path
 
     def check_for_prefix(self, prefix: str, poses: "Poses") -> None:
         '''Checks if a column already exists in the poses DataFrame.'''

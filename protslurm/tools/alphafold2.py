@@ -19,6 +19,7 @@ from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 
 # TODO @Adrian: Please write AF2 run_singular() method that does not batch fastas together, but predicts each fasta individually. We need this to supply pose_options to af2 prediction runs (e.g. custom-templates that are unique for each pose.)
+# TODO @Adrian: Should we rename this runner into colabfold.py? This is essentially the runner for the colabfold implementation of AlphaFold2.
 class Alphafold2(Runner):
     '''Class to run Alphafold2 and collect its outputs into a DataFrame'''
     def __init__(self, script_path:str=protslurm.config.AF2_DIR_PATH, python_path:str=protslurm.config.AF2_PYTHON_PATH, jobstarter:str=None) -> None:

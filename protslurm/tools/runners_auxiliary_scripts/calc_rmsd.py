@@ -7,34 +7,7 @@ import Bio.PDB
 import pandas as pd
 
 # customs
-from protslurm.utils.biopython_tools import load_structure_from_pdbfile
-
-def get_atoms(structure: Bio.PDB.Structure, atoms:list[str], chains:list[str]=None) -> list:
-    '''
-    Extract specified atoms from specified chains in a given structure.
-    
-    Parameters:
-    - structure (Bio.PDB.Structure): The structure from which atoms are to be extracted.
-    - atoms (list of str): A list of atom names to extract.
-    - chains (list of str, optional): A list of chain identifiers from which atoms will be extracted.
-      If None, atoms will be extracted from all chains in the structure.
-    
-    Returns:
-    - list: A list of Bio.PDB.Atom objects corresponding to the specified atoms.
-    '''
-    # Gather all chains from the structure
-    chains = [structure[chain] for chain in chains] if chains else [chain for chain in structure]
-
-    # loop over chains and residues and gather all atoms.
-    atms_list = []
-    for chain in chains:
-        # Only select amino acids in each chain:
-        residues = [res for res in chain if res.id[0] == " "]
-        for residue in residues:
-            for atom in atoms:
-                atms_list.append(residue[atom])
-
-    return atms_list
+from protslurm.utils.biopython_tools import load_structure_from_pdbfile, get_atoms
 
 def calc_rmsd(target: Bio.PDB.Structure.Structure, reference: Bio.PDB.Structure.Structure, atoms:list[str], chains:list[str]) -> float:
     '''Superimposes and calculates RMSD between target and reference for specified atoms and chains.'''
