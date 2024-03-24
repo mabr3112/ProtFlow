@@ -60,7 +60,7 @@ class Poses:
         # set_poses sets up self.df!
         self.df = None
         self.set_poses(poses, glob_suffix=glob_suffix)
-        self.work_dir = work_dir
+        self.set_work_dir(work_dir)
 
         # setup scorefile for storage
         self.storage_format = storage_format
@@ -80,10 +80,20 @@ class Poses:
     ############################################# SETUP #########################################
     def set_work_dir(self, work_dir:str) -> None:
         '''sets up working_directory for poses. Just creates new work_dir and stores the first instance of Poses DataFrame in there.'''
-        if not os.path.isdir(work_dir):
+        if work_dir is not None and not os.path.isdir(work_dir):
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {work_dir}")
         self.work_dir = work_dir
+
+        # setup scores dir
+        if work_dir is None:
+            self.scores_dir = None
+        else:
+            # setup path
+            scores_dir = os.path.join(work_dir, "scores")
+            if not os.path.isdir(scores_dir):
+                os.makedirs(scores_dir, exist_ok=True)
+            self.scores_dir = scores_dir
 
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
         '''Changes the location of current poses. (works only if name of poses did not change!!!)'''

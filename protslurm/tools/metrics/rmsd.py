@@ -2,6 +2,7 @@
 # import general
 import json
 import os
+from typing import Any
 
 # import dependencies
 import pandas as pd
@@ -10,18 +11,19 @@ import protslurm
 # import customs
 from protslurm.config import PROTSLURM_PYTHON as protslurm_python
 from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
+from protslurm.residues import ResidueSelection
 from protslurm.runners import Runner, RunnerOutput
 from protslurm.poses import Poses
-from protslurm.jobstarters import JobStarter
+from protslurm.jobstarters import JobStarter, split_list
 
 class BackboneRMSD(Runner):
     '''Class handling the calculation of Full-atom RMSDs as a runner.
     By default calculates only CA backbone RMSD.
     Uses BioPython for RMSD calculation'''
-    def __init__(self, atoms:list=["CA"], chains:list[str]=None, overwrite:bool=False, jobstarter_options:str=None): # pylint: disable=W0102
+    def __init__(self, atoms:list=["CA"], chains:list[str]=None, overwrite:bool=False, jobstarter: str =None): # pylint: disable=W0102
         self.set_atoms(atoms)
         self.set_chains(chains)
-        self.set_jobstarter_options(jobstarter_options)
+        self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
 
     ########################## Input ################################################
@@ -41,9 +43,9 @@ class BackboneRMSD(Runner):
             raise TypeError(f"Chains needs to be a list, chain names (list elements) must be string.")
         self.chains = chains
 
-    def set_jobstarter_options(self, options: str) -> None:
-        '''Sets Options for Jobstarter.'''
-        self.jobstarter_options = options
+    def set_jobstarter(self, jobstarter: str) -> None:
+        '''Sets Jobstarter for BackboneRMSD runner.'''
+        self.jobstarter = jobstarter
 
     ########################## Calculations ################################################
     def calc_rmsd(self, poses:Poses, prefix:str, ref_col:str, jobstarter: JobStarter) -> None:
@@ -121,9 +123,125 @@ class BackboneRMSD(Runner):
 
 class MotifRMSD(Runner):
     '''Class handling'''
-    def __str__(self):
-        "motif_rmsd calculator"
+    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, jobstarter: JobStarter = None):
+        self.set_jobstarter(jobstarter)
+        self.set_ref_col(ref_col)
+        self.set_target_motif(target_motif)
+        self.set_ref_motif(ref_motif)
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter):
-        '''Method to run Motif_rmsd calculation.'''
+    def __str__(self):
+        return "Heavyatom motif rmsd calculator"
+
+    def set_ref_col(self, col: str) -> None:
+        '''Sets reference col for .cal_rmsd() method.'''
+        self.ref_col = col
+
+    def set_target_motif(self, motif: str) -> None:
+        '''Method to set target motif. :motif: has to be string and should be a column name in poses.df that will be passed to the .run() function'''
+        self.target_motif = motif
+
+    def set_ref_motif(self, motif: str) -> None:
+        '''Method to set reference motif. :motif: has to be string and should be a column name in poses.df that will be passed to the .run() function'''
+        self.ref_motif = motif
+
+    def set_jobstarter(self, jobstarter: str) -> None:
+        '''Sets Jobstarter for MotifRMSD runner.'''
+        self.jobstarter = jobstarter
+
+    ################################################# Calcs ################################################
+
+    def run(self, poses, prefix, jobstarter):
         raise NotImplementedError
+
+    def calc_rmsd(self, poses: Poses, prefix: str, jobstarter: JobStarter, ref_col: str, ref_motif: Any, target_motif: Any, overwrite: bool = False):
+        '''Method to run Motif_rmsd calculation.'''
+        # setup runner
+        script_path = f"{script_dir}/calc_heavyatom_rmsd_batch.py"
+        work_dir, jobstarter = self.generic_run_setup(
+            poses = poses,
+            prefix = prefix,
+            jobstarters = [jobstarter, self.jobstarter, poses.default_jobstarter]
+        )
+
+        # check if outputs are present
+        scorefile = f"{work_dir}/{prefix}_rmsds.json"
+        if os.path.isfile(scorefile) and not overwrite:
+            outputs = RunnerOutput(
+                poses = poses,
+                results = pd.read_json(scorefile),
+                prefix = prefix
+            )
+            return outputs.return_poses()
+
+        # setup full input dict, batch later
+        input_dict = self.setup_input_dict(
+            poses = poses,
+            ref_col = ref_col,
+            ref_motif = ref_motif,
+            target_motif = target_motif
+        )
+
+        # split input_dict into subdicts
+        split_sublists = split_list(list(input_dict.keys()), n_sublists=jobstarter.max_cores)
+        subdicts = [{target: input_dict[target] for target in sublist} for sublist in split_sublists]
+
+        # write n=max_cores input_json files for add_chains_batch.py
+        json_files = []
+        output_files = []
+        for i, subdict in enumerate(subdicts, start=1):
+            # setup input_json file for every batch
+            opts_json_p = f"{work_dir}/rmsd_input_{str(i).zfill(4)}.json"
+            with open(opts_json_p, 'w', encoding="UTF-8") as f:
+                json.dump(subdict, f)
+            json_files.append(opts_json_p)
+            output_files.append(f"{work_dir}/rmsd_output_{str(i).zfill(4)}.json")
+
+        # start add_chains_batch.py
+        cmds = [f"{protslurm_python} {script_path} --input_json {json_f} --output_path {output_path}" for json_f, output_path in zip(json_files, output_files)]
+        jobstarter.start(
+            cmds = cmds,
+            jobname = f"heavyatom_rmsd_{prefix}",
+            wait = True,
+            output_path = work_dir
+        )
+
+        # collect outputs
+        rmsd_df = pd.concat([pd.read_json(output_path) for output_path in output_files])
+        rmsd_df.to_json(scorefile)
+
+        outputs = RunnerOutput(
+            poses = poses,
+            results = rmsd_df,
+            prefix = prefix
+        )
+
+        return outputs.return_poses()
+
+    def setup_input_dict(self, poses: Poses, ref_col: str, ref_motif: Any = None, target_motif: Any = None) -> dict:
+        '''Sets up dictionary that can be written down as .json file and used as an input to 'calc_heavyatom_rmsd_batch.py' '''
+        def setup_ref_col(ref_col: Any, poses: Poses) -> list:
+            self.check_for_prefix(ref_col, poses)
+            return poses[ref_col].to_list()
+
+        def setup_motif(motif: Any, poses: Poses) -> list:
+            if isinstance(motif, str):
+                # if motif points to column in DataFrame, get residues.
+                self.check_for_prefix(motif, poses)
+                return [residue_selection.to_string() if isinstance(residue_selection, ResidueSelection) else residue_selection for residue_selection in poses[motif].to_list()]
+            elif isinstance(motif, ResidueSelection):
+                return [motif for _ in poses]
+            raise TypeError(f"Unsupportet parameter type for motif: {type(motif)}. Either provide a string that points to a column in poses.df containing the motifs, or pass a ResidueSelection object.")
+
+        # use class default if parameters were not set and setup parameters:
+        ref_l = setup_ref_col(ref_col or self.ref_col, poses)
+        ref_motif_l = setup_motif(ref_motif or self.ref_motif, poses)
+        target_motif_l = setup_motif(target_motif or self.target_motif, poses)
+
+        # construct rmsd_input_dict:
+        rmsd_input_dict = {}
+        for pose, ref, ref_motif_, target_motif_ in zip(poses.poses_list(), ref_l, ref_motif_l, target_motif_l):
+            rmsd_input_dict[pose]["reference_pdb"] = ref
+            rmsd_input_dict[pose]["target_motif"] = target_motif_
+            rmsd_input_dict[pose]["reference_motif"] = ref_motif_
+
+        return rmsd_input_dict

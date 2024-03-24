@@ -81,7 +81,7 @@ class ChainAdder(Runner):
         # write n=max_cores input_json files for add_chains_batch.py
         json_files = []
         for i, subdict in enumerate(subdicts, start=1):
-            opts_json_p = f"{work_dir}/{prefix}/add_chain_input_{str(i).zfill(4)}.json"
+            opts_json_p = f"{work_dir}/add_chain_input_{str(i).zfill(4)}.json"
             with open(opts_json_p, 'w', encoding="UTF-8") as f:
                 json.dump(subdict, f)
             json_files.append(opts_json_p)

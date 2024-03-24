@@ -114,7 +114,7 @@ class Runner:
         # if pose_options is list and as long as poses, just return list. Has to be list of dicts.
         return pose_options
 
-    def generic_run_setup(self, poses: Poses, prefix:str, jobstarters: list[JobStarter]) -> tuple[str, JobStarter]:
+    def generic_run_setup(self, poses: Poses, prefix:str, jobstarters: list[JobStarter], make_work_dir: bool = True) -> tuple[str, JobStarter]:
         '''Generic setup method to prepare for a .run() method.
         Checks if prefix exists in poses.df, sets up a jobstarter and creates the working_directory.
         Returns path to work_dir.
@@ -132,7 +132,7 @@ class Runner:
 
         # setup directory
         work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
-        if not os.path.isdir(work_dir):
+        if not os.path.isdir(work_dir) and make_work_dir:
             os.makedirs(work_dir, exist_ok=True)
         return work_dir, jobstarter
 
