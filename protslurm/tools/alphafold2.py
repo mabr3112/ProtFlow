@@ -38,7 +38,7 @@ class Alphafold2(Runner):
     def __str__(self):
         return "alphafold2.py"
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter, options:str=None, overwrite:bool=False, num_batches:int=None, return_top_n_poses:int=1) -> RunnerOutput:
+    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, options:str=None, overwrite:bool=False, num_batches:int=None, return_top_n_poses:int=1) -> RunnerOutput:
         '''Runs alphafold2.py on acluster'''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
