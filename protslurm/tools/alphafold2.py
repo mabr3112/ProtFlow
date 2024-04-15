@@ -129,7 +129,7 @@ class Alphafold2(Runner):
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 
-        return f"{self.python_path} {self.script_path}/colabfold_batch {opts} {flags} {pose_path} {output_dir} "
+        return f"{self.python_path} {self.script_path} {opts} {flags} {pose_path} {output_dir} "
 
     def collect_scores(self, work_dir:str, scorefile:str, num_return_poses:int=1) -> pd.DataFrame:
         '''collects scores from Alphafold2 output'''
