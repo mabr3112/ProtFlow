@@ -22,7 +22,7 @@ from protslurm.jobstarters import JobStarter
 # TODO @Adrian: Should we rename this runner into colabfold.py? This is essentially the runner for the colabfold implementation of AlphaFold2.
 class Alphafold2(Runner):
     '''Class to run Alphafold2 and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.AF2_DIR_PATH, python_path:str=protslurm.config.AF2_PYTHON_PATH, jobstarter:str=None) -> None:
+    def __init__(self, script_path:str=protslurm.config.AF2_SCRIPT_PATH, python_path:str=protslurm.config.AF2_PYTHON_PATH, jobstarter:str=None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path:
             raise ValueError(f"No path is set for {self}. Set the path in the config.py file under Alphafold2_SCRIPT_PATH.")
