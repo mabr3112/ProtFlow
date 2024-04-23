@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
     # required options
     argparser.add_argument("--input", type=str, required=True, help=".pdb or .fa file for which to predict the cleavage variants from.")
-    argparser.add_argument("--cleavage_sites", tpye=str, required=True, help="Comma-separated list of cleavage sites. has to contain chain info as well. Example: --cleavage_sites=A13,A144,B15,B123")
+    argparser.add_argument("--cleavage_sites", type=str, required=True, help="Comma-separated list of cleavage sites. has to contain chain info as well. Example: --cleavage_sites=A13,A144,A123")
     argparser.add_argument("--output_dir", type=str, required=True, help="Path to output directory.")
 
     # optional

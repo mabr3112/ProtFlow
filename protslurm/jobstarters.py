@@ -80,7 +80,7 @@ class SbatchArrayJobstarter(JobStarter):
             f.write("\n".join(cmds))
 
         # write sbatch command and run
-        self.options += f"-vvv -e {output_path}/{jobname}_slurm.err -o {output_path}/{jobname}_slurm.out"
+        self.options += f" -vvv -e {output_path}/{jobname}_slurm.err -o {output_path}/{jobname}_slurm.out"
         sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {self.options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
         subprocess.run(sbatch_cmd, shell=True, stdout=True, stderr=True, check=True)
 
@@ -101,7 +101,7 @@ class SbatchArrayJobstarter(JobStarter):
         '''Sets up attribute 'jobstarter_options' of SbatchArrayJobstarter Class.'''
         self.options = self.parse_options(options)
         if gpus:
-            self.options += f"--gpus-per-node {gpus}"
+            self.options += f"--gpus-per-node {gpus} -c2"
 
     def wait_for_job(self, jobname:str, interval:float=5) -> None:
         '''
