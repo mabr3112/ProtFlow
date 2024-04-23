@@ -132,7 +132,7 @@ def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None) 
 
     return atms_list
 
-def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str] = None, excluded_atoms: list[str] = None) -> list:
+def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str] = None, excluded_atoms: list[str] = None, exclude_hydrogens: bool = True) -> list:
     '''Selects atoms from a pose based on a provided motif.'''
     # setup params
     if motif is None:
@@ -150,11 +150,13 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
 
         # filter out forbidden atoms
         res_atoms = [atom for atom in res_atoms if atom.name not in excluded_atoms]
+        if exclude_hydrogens:
+            res_atoms = [atom for atom in res_atoms if atom.element != "H"]
 
         # add atoms into aggregation list:
         for atom in res_atoms:
             out_atoms.append(atom)
-    return atoms
+    return out_atoms
 
 def add_chain(target: Structure, reference: Structure, copy_chain: str, overwrite: bool = True) -> Structure:
     '''Adds chain :copy_chain: from :reference: into :target:'''
