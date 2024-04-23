@@ -151,13 +151,16 @@ class Poses:
         """
         if isinstance(poses, str) and glob_suffix:
             parsed_poses = glob(f"{poses}/{glob_suffix}")
-            if not parsed_poses: raise FileNotFoundError(f"No {glob_suffix} files were found in {poses}. Did you mean to glob? Was the path correct?")
+            if not parsed_poses: 
+                raise FileNotFoundError(f"No {glob_suffix} files were found in {poses}. Did you mean to glob? Was the path correct?")
             return parsed_poses
         if isinstance(poses, str) and not glob_suffix:
-            if not os.path.isfile(poses): raise FileNotFoundError(f"File {poses} not found!")
+            if not os.path.isfile(poses): 
+                raise FileNotFoundError(f"File {poses} not found!")
             return [poses]
         if isinstance(poses, list):
-            if not all((os.path.isfile(path) for path in poses)): raise FileNotFoundError(f"Not all files listed in poses were found.")
+            if not all((os.path.isfile(path) for path in poses)): 
+                raise FileNotFoundError(f"Not all files listed in poses were found.")
             return poses
         if poses is None:
             return []

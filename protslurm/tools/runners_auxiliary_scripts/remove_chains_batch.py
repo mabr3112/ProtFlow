@@ -14,6 +14,9 @@ def remove_chain_from_pdb(pdb_path: str, chains: list[str]) -> Structure:
     pose = load_structure_from_pdbfile(pdb_path)
 
     # remove chains and return
+    if isinstance(chains, str):
+        chains = [chains]
+
     for chain in chains:
         pose.detach_child(chain)
 

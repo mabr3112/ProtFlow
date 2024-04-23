@@ -12,7 +12,7 @@ import protslurm
 from protslurm.config import PROTSLURM_PYTHON as protslurm_python
 from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 from protslurm.residues import ResidueSelection
-from protslurm.runners import Runner, RunnerOutput
+from protslurm.runners import Runner, RunnerOutput, col_in_df
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter, split_list
 
@@ -107,7 +107,8 @@ class BackboneRMSD(Runner):
         )
 
         # collect individual DataFrames into one
-        output_df = pd.concat([pd.read_json(sf) for sf in scorefiles], ignore_index=True)
+        output_df = pd.concat([pd.read_json(sf) for sf in scorefiles], ignore_index=True).reset_index()
+        output_df.to_json(scorefile)
 
         # create standardised output for poses class:
         output = RunnerOutput(
@@ -163,6 +164,10 @@ class MotifRMSD(Runner):
             jobstarters = [jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
+        # check if script exists
+        if not os.path.isfile(script_path):
+            raise ValueError(f"Cannot find script 'calc_heavyatom_rmsd_batch.py' at specified directory: '{script_dir}'. Set path to '/PATH/protslurm/tools/runners_auxiliary_scripts/' for variable AUXILIARY_RUNNER_SCRIPTS_DIR in config.py file.")
+
         # check if outputs are present
         scorefile = f"{work_dir}/{prefix}_rmsds.json"
         if os.path.isfile(scorefile) and not overwrite:
@@ -206,7 +211,7 @@ class MotifRMSD(Runner):
         )
 
         # collect outputs
-        rmsd_df = pd.concat([pd.read_json(output_path) for output_path in output_files])
+        rmsd_df = pd.concat([pd.read_json(output_path) for output_path in output_files]).reset_index()
         rmsd_df.to_json(scorefile)
 
         outputs = RunnerOutput(
@@ -220,14 +225,14 @@ class MotifRMSD(Runner):
     def setup_input_dict(self, poses: Poses, ref_col: str, ref_motif: Any = None, target_motif: Any = None) -> dict:
         '''Sets up dictionary that can be written down as .json file and used as an input to 'calc_heavyatom_rmsd_batch.py' '''
         def setup_ref_col(ref_col: Any, poses: Poses) -> list:
-            self.check_for_prefix(ref_col, poses)
-            return poses[ref_col].to_list()
+            col_in_df(poses.df, ref_col)
+            return poses.df[ref_col].to_list()
 
         def setup_motif(motif: Any, poses: Poses) -> list:
             if isinstance(motif, str):
                 # if motif points to column in DataFrame, get residues.
-                self.check_for_prefix(motif, poses)
-                return [residue_selection.to_string() if isinstance(residue_selection, ResidueSelection) else residue_selection for residue_selection in poses[motif].to_list()]
+                col_in_df(poses.df, motif)
+                return [residue_selection.to_string() if isinstance(residue_selection, ResidueSelection) else residue_selection for residue_selection in poses.df[motif].to_list()]
             elif isinstance(motif, ResidueSelection):
                 return [motif for _ in poses]
             raise TypeError(f"Unsupportet parameter type for motif: {type(motif)}. Either provide a string that points to a column in poses.df containing the motifs, or pass a ResidueSelection object.")
@@ -238,9 +243,9 @@ class MotifRMSD(Runner):
         target_motif_l = setup_motif(target_motif or self.target_motif, poses)
 
         # construct rmsd_input_dict:
-        rmsd_input_dict = {}
+        rmsd_input_dict = {pose: {} for pose in poses.poses_list()}
         for pose, ref, ref_motif_, target_motif_ in zip(poses.poses_list(), ref_l, ref_motif_l, target_motif_l):
-            rmsd_input_dict[pose]["reference_pdb"] = ref
+            rmsd_input_dict[pose]["ref_pdb"] = ref
             rmsd_input_dict[pose]["target_motif"] = target_motif_
             rmsd_input_dict[pose]["reference_motif"] = ref_motif_
 

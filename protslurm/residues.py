@@ -2,7 +2,7 @@
 
 class ResidueSelection:
     '''Class to represent selections of Residues.
-    Selection of Residues is represented as a tuple with the hierarchy ((chain: residue_idx), ...)
+    Selection of Residues is represented as a tuple with the hierarchy ((chain, residue_idx), ...)
 
     '''
     def __init__(self, selection: list, delim: str = ","):
