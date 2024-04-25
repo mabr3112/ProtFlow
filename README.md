@@ -18,6 +18,7 @@ Then, install in development mode (Package currently under development and chang
 Install in the protslurm environment to limit interference with other systems.
 
 ```
+cd ProtSLURM
 conda activate protslurm
 pip install -e .
 ```
