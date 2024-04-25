@@ -4,6 +4,7 @@ import os
 import logging
 from glob import glob
 import re
+from typing import Any
 import numpy as np
 
 # dependencies
@@ -13,13 +14,14 @@ import pandas as pd
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 import protslurm.config
-from protslurm.runners import Runner
+from protslurm.residues import ResidueSelection
+from protslurm.runners import Runner, col_in_df
 from protslurm.runners import RunnerOutput
 
 
 class RFdiffusion(Runner):
     '''Class to run RFdiffusion and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.RFDIFFUSION_SCRIPT_PATH, python_path:str=protslurm.config.RFDIFFUSION_PYTHON_PATH, jobstarter:None=JobStarter, jobstarter_options:str=None) -> None:
+    def __init__(self, script_path: str = protslurm.config.RFDIFFUSION_SCRIPT_PATH, python_path: str = protslurm.config.RFDIFFUSION_PYTHON_PATH, jobstarter: None = JobStarter, jobstarter_options: str = None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path: raise ValueError(f"No path is set for {self}. Set the path in the config.py file under RFDIFFUSION_SCRIPT_PATH.")
         if not python_path: raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under RFDIFFUSION_PYTHON_PATH.")
@@ -33,7 +35,7 @@ class RFdiffusion(Runner):
     def __str__(self):
         return "rfdiffusion.py"
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, num_diffusions:int=1, options:str=None, pose_options:list[str]=None, overwrite:bool=False, multiplex_poses:int=None) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: int = None, update_motifs: list[str] = None) -> RunnerOutput:
         '''running function for RFDiffusion given poses and a jobstarter object.'''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
@@ -91,6 +93,12 @@ class RFdiffusion(Runner):
         # collect RFdiffusion outputs
         scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, rename_pdbs=True).reset_index(drop=True)
 
+        # update residue mappings for stored motifs
+        if update_motifs:
+            motifs = prep_motif_input(update_motifs, poses.df)
+            for motif_col in motifs:
+                poses.df[motif_col] = update_motif_res_mapping(poses.df[motif_col].to_list(), poses.df[f"{prefix}_con_ref_pdb_idx"].to_list(), poses.df[f"{prefix}_con_hal_idx"])
+
         # Reintegrate into poses and return
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
@@ -125,7 +133,7 @@ class RFdiffusion(Runner):
         splitstr = [x for x in re_split_rfdiffusion_opts(options) + re_split_rfdiffusion_opts(pose_options) if x] # adding pose_opts after options makes sure that pose_opts overwrites options!
         return {x.split("=")[0]: "=".join(x.split("=")[1:]) for x in splitstr}
 
-    def collect_scores(self, work_dir:str, scorefile:str, rename_pdbs:bool=True) -> pd.DataFrame:
+    def collect_scores(self, work_dir: str, scorefile: str, rename_pdbs: bool = True) -> pd.DataFrame:
         '''collects scores from RFdiffusion output'''
         # collect scores from .trb-files into one pandas DataFrame:
         pdb_dir = os.path.join(work_dir, "output_pdbs")
@@ -181,3 +189,34 @@ def parse_diffusion_trbfile(path: str) -> pd.DataFrame:
     sd["input_pdb"] = data_dict["config"]["inference"]["input_pdb"]
 
     return pd.DataFrame(sd)
+
+def prep_motif_input(motif: Any, df: pd.DataFrame) -> list[str]:
+    '''Makes sure motif is list (even when string given) and that motifs are present in df.'''
+    # ambivalence to singular or multiple motif cols
+    motifs = [motif] if isinstance(motif, str) else motif
+
+    # clear
+    for m in motifs:
+        col_in_df(df, m)
+
+    return motifs
+
+def update_motif_res_mapping(motif_l: list[ResidueSelection], con_ref_idx: list, con_hal_idx: list) -> list:
+    '''Updates motifs in motif_l based on con_ref_idx and con_hal_idx'''
+    output_motif_l = []
+    for motif, ref_idx, hal_idx in zip(motif_l, con_ref_idx, con_hal_idx):
+        # error handling
+        if not isinstance(motif, ResidueSelection):
+            raise TypeError(f"Individual motifs must be of type ResidueSelection. Create ResidueSelection objects out of your motifs.")
+
+        # setup mapping from rfdiffusion outputs:
+        exchange_dict = get_residue_mapping(ref_idx, hal_idx)
+
+        # exchange and return
+        exchanged_motif = ResidueSelection([exchange_dict[residue] for residue in motif.residues])
+        output_motif_l.append(exchanged_motif)
+    return output_motif_l
+
+def get_residue_mapping(con_ref_idx: list, con_hal_idx: list) -> dict:
+    '''Creates a residue mapping dictionary {old: new} from rfdiffusion outputs.'''
+    return {(chain, int(res_id)): hal for (chain, res_id), hal in zip(con_ref_idx, con_hal_idx)}

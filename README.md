@@ -5,7 +5,7 @@ A Python package for running protein design tools on SLURM clusters.
 First, clone the repository
 
 ```
-git clone git@github.com:mabr3112/ProtSLURM.git
+git clone https://github.com/mabr3112/ProtSLURM.git
 ```
 
 Create a conda environment for ProtSLURM:

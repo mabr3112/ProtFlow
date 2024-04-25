@@ -3,6 +3,7 @@ Module to provide utilities revolving around BioPython
 '''
 
 # Imports
+import copy
 import os
 
 # dependencies
@@ -193,3 +194,47 @@ def get_sequence_from_pose(pose: Structure, chain_sep:str=":") -> str:
 
     # collect sequence
     return chain_sep.join([str(x.get_sequence()) for x in ppb.build_peptides(pose)])
+
+def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_pdb_path: str = None, keep_chain: str = "") -> str:
+    '''Renumbers PDB file by a resdidue mapping: {(chain, res_id): (chain, res_id), ...}. ordering is {old: new, ...}.
+    Stores pdb either at out_pdb_path if provided, or otherwise overwrites pose_path'''
+    # change numbering
+    pose = load_structure_from_pdbfile(pose_path)
+    pose = renumber_pose_by_residue_mapping(pose=pose, residue_mapping=residue_mapping, keep_chain=keep_chain)
+    
+    # save pose
+    path_to_output_structure = out_pdb_path or pose_path
+    save_structure_to_pdbfile(pose, path_to_output_structure)
+    return path_to_output_structure
+
+def renumber_pose_by_residue_mapping(pose: Bio.PDB.Structure.Structure, residue_mapping: dict, keep_chain:str="") -> Bio.PDB.Structure.Structure:
+    '''Renumbers a Biopython Structure object based on a residue mapping. {(chain, res_id): (chain, res_id), ...}. ordering is {old: new, ...}'''
+    # deepcopy pose and detach all residues from chains
+    out_pose = copy.deepcopy(pose)
+    ch = [chain.id for chain in out_pose.get_chains() if chain.id != keep_chain]
+
+    # remove all residues from old chains:
+    for chain in ch:
+        residues = [res.id for res in out_pose[chain].get_residues()]
+        for resi in residues:
+            out_pose[chain].detach_child(resi)
+
+    # collect residues with renumbered ids and chains into one list:
+    for (old_chain, old_id), (new_chain, new_id) in residue_mapping.items():
+        # remove old residue from original pose
+        res = pose[old_chain][(" ", old_id, " ")]
+        pose[old_chain].detach_child((" ", old_id, " "))
+        res.detach_parent()
+
+        # set new residue ID
+        res.id = (" ", new_id, " ")
+
+        # add to appropriate chain (residue mapping) in out_pose
+        out_pose[new_chain].add(res)
+
+    # remove chains from pose that are empty:
+    chain_ids = [x.id for x in out_pose] # for some reason, iterating over chains in struct directly does not work here...
+    for chain_id in chain_ids:
+        if not out_pose[chain_id].__dict__["child_dict"]: out_pose.detach_child(chain_id)
+
+    return out_pose

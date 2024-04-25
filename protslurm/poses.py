@@ -40,8 +40,10 @@ import pandas as pd
 import Bio.PDB
 
 # customs
+from protslurm.residues import ResidueSelection
 from protslurm import jobstarters
 from protslurm.jobstarters import JobStarter
+from protslurm.runners import col_in_df
 from protslurm.utils.utils import parse_fasta_to_dict
 from protslurm.utils.biopython_tools import load_structure_from_pdbfile
 
@@ -322,6 +324,18 @@ class Poses:
         # reset poses and poses_description columns
         self.df["poses"] = self.df["temp_dp_location"]
         self.df["poses_description"] = self.df["description"]
+
+    def set_motif(self, motif_col: str) -> None:
+        '''Sets a motif attribute. This will be accessed by some runners, for example, RFdiffusion, to automatically update residue mappings from contigs to diffused structures.'''
+        # check if motif_col exists. check if all entries in motif col are ResidueSelection objects.
+        col_in_df(self.df, motif_col)
+        if not all([isinstance(motif, ResidueSelection) for motif in self.df[motif_col].to_list()]):
+            raise TypeError(f"Setting a motif requires the objects in 'motif_col' to be of type ResidueSelection. Check documentation of protslurm.residues module for how to create the object (it's simple).")
+
+        # set motif
+        if not hasattr(self, "motifs"):
+            self.motifs = []
+        self.motifs.append(motif_col)
 
 def get_format(path: str):
     '''reads in path as str and returns a pandas loading function.'''

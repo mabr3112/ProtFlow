@@ -20,13 +20,18 @@ class BackboneRMSD(Runner):
     '''Class handling the calculation of Full-atom RMSDs as a runner.
     By default calculates only CA backbone RMSD.
     Uses BioPython for RMSD calculation'''
-    def __init__(self, atoms:list=["CA"], chains:list[str]=None, overwrite:bool=False, jobstarter: str =None): # pylint: disable=W0102
+    def __init__(self, ref_col: str = None, atoms: list = ["CA"], chains: list[str] = None, overwrite: bool = False, jobstarter: str =None): # pylint: disable=W0102
+        self.set_ref_col(ref_col)
         self.set_atoms(atoms)
         self.set_chains(chains)
         self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
 
     ########################## Input ################################################
+    def set_ref_col(self, ref_col: str) -> None:
+        '''Sets default ref_col for calc_rmsd() method.'''
+        self.ref_col = ref_col
+
     def set_atoms(self, atoms:list[str]) -> None:
         '''Method to set the backbone atoms (list of atom names) to calculate RMSD over.'''
         if atoms == "all":
@@ -48,12 +53,17 @@ class BackboneRMSD(Runner):
         self.jobstarter = jobstarter
 
     ########################## Calculations ################################################
-    def calc_rmsd(self, poses:Poses, prefix:str, ref_col:str, jobstarter: JobStarter) -> None:
+    def calc_rmsd(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None) -> None:
         '''Calculates RMSD as specified.'''
         # if self.atoms is all, calculate Allatom RMSD.
 
         # prep variables
-        work_dir = f"{poses.work_dir}/{prefix}_rmsd/"
+        work_dir, jobstarter = self.generic_run_setup(
+            poses=poses,
+            prefix=prefix,
+            jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
+        )
+        ref_col = ref_col or self.ref_col
         scorefile = f"{poses.work_dir}/{work_dir}/{prefix}_rmsd.json"
 
         # check if RMSD was calculated if overwrite was not set.
@@ -154,8 +164,13 @@ class MotifRMSD(Runner):
     def run(self, poses, prefix, jobstarter):
         raise NotImplementedError
 
-    def calc_rmsd(self, poses: Poses, prefix: str, jobstarter: JobStarter, ref_col: str, ref_motif: Any, target_motif: Any, overwrite: bool = False):
+    def calc_rmsd(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, overwrite: bool = False):
         '''Method to run Motif_rmsd calculation.'''
+        # prep inputs
+        ref_col = ref_col or self.ref_col
+        ref_motif = ref_motif or self.ref_motif
+        target_motif = target_motif or self.target_motif
+
         # setup runner
         script_path = f"{script_dir}/calc_heavyatom_rmsd_batch.py"
         work_dir, jobstarter = self.generic_run_setup(
