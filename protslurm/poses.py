@@ -40,10 +40,9 @@ import pandas as pd
 import Bio.PDB
 
 # customs
-from protslurm.residues import ResidueSelection
 from protslurm import jobstarters
 from protslurm.jobstarters import JobStarter
-from protslurm.runners import col_in_df
+from protslurm.residues import ResidueSelection
 from protslurm.utils.utils import parse_fasta_to_dict
 from protslurm.utils.biopython_tools import load_structure_from_pdbfile
 
@@ -351,3 +350,8 @@ def get_format(path: str):
 def load_poses(poses_path: str) -> Poses:
     '''Loads Poses class from a stored dataframe.'''
     return Poses().load_poses(poses_path)
+
+def col_in_df(df:pd.DataFrame, column:str):
+    '''Checks if column exists in DataFrame and returns KeyError if not.'''
+    if not column in df.columns:
+        raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
