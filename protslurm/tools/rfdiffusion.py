@@ -77,10 +77,10 @@ class RFdiffusion(Runner):
             # create multiple copies (specified by multiplex variable) of poses to fully utilize parallel computing:
             poses.duplicate_poses(f"{poses.work_dir}/{prefix}_input_pdbs/", jobstarter.max_cores)
             self.index_layers += 1
-            cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses, pose_options)]
+            cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses.poses_list(), pose_options)]
         else:
             # write rfdiffusion cmds
-            cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses, pose_options)]
+            cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses.poses_list(), pose_options)]
 
         # diffuse
         jobstarter.start(
