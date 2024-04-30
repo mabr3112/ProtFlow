@@ -16,17 +16,18 @@ import protslurm.jobstarters
 import protslurm.tools
 from protslurm.runners import Runner, RunnerOutput
 from protslurm.jobstarters import JobStarter
+from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 
 class ESMFold(Runner):
     '''Class to run ESMFold and collect its outputs into a DataFrame'''
     def __init__(self, script_path:str=protslurm.config.ESMFOLD_SCRIPT_PATH, python_path:str=protslurm.config.ESMFOLD_PYTHON_PATH, jobstarter:JobStarter=None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
-        if not script_path:
+        if not script_dir:
             raise ValueError(f"No path is set for {self}. Set the path in the config.py file under ESMFOLD_SCRIPT_PATH.")
         if not python_path:
             raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under ESMFOLD_PYTHON_PATH.")
 
-        self.script_path = script_path
+        self.script_path = f"{script_dir}/esmfold_inference.py"
         self.python_path = python_path
         self.name = "esmfold.py"
         self.index_layers = 0
