@@ -20,7 +20,7 @@ from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 
 class ESMFold(Runner):
     '''Class to run ESMFold and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.ESMFOLD_SCRIPT_PATH, python_path:str=protslurm.config.ESMFOLD_PYTHON_PATH, jobstarter:JobStarter=None) -> None:
+    def __init__(self, python_path: str = protslurm.config.ESMFOLD_PYTHON_PATH, jobstarter: JobStarter = None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_dir:
             raise ValueError(f"No path is set for {self}. Set the path in the config.py file under ESMFOLD_SCRIPT_PATH.")
@@ -36,7 +36,7 @@ class ESMFold(Runner):
     def __str__(self):
         return "esmfold.py"
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, options:str=None, overwrite:bool=False, num_batches:int=None) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, overwrite: bool = False, num_batches: int = None) -> Poses:
         '''Runs ESMFold.py on acluster'''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(

@@ -45,7 +45,7 @@ class LigandMPNN(Runner):
     def __str__(self):
         return "ligandmpnn.py"
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, nseq:int=None, model_type:str=None, options:str=None, pose_options:object=None, fixed_res_col:str=None, design_res_col:str=None, pose_opt_cols:dict=None, return_seq_threaded_pdbs_as_pose:bool=False, preserve_original_output:bool=True, overwrite:bool=False) -> RunnerOutput:
+    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, nseq:int=None, model_type:str=None, options:str=None, pose_options:object=None, fixed_res_col:str=None, design_res_col:str=None, pose_opt_cols:dict=None, return_seq_threaded_pdbs_as_pose:bool=False, preserve_original_output:bool=True, overwrite:bool=False) -> Poses:
         '''Runs ligandmpnn.py on acluster.
         Default model_type is ligand_mpnn.'''
         # run in batch mode if pose_options are not set:
