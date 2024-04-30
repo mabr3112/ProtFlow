@@ -21,7 +21,7 @@ from protslurm.jobstarters import JobStarter
 
 class Rosetta(Runner):
     '''Class to run general Rosetta applications and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.ROSETTA_BIN_PATH, jobstarter:str=None) -> None:
+    def __init__(self, script_path: str = protslurm.config.ROSETTA_BIN_PATH, jobstarter: str = None) -> None:
         '''Runner to handle Rosetta within ProtFLOW'''
         if not script_path:
             raise ValueError(f"No path is set for {self}. Either supply when setting up runner, or set the path in the config.py file under ROSETTA_BIN_PATH.")
@@ -55,7 +55,7 @@ class Rosetta(Runner):
         # otherwise raise error for not properly setting up the rosetta script paths.
         raise ValueError(f"No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter, rosetta_application:str=None, nstruct:int=1, options:str=None, pose_options:list=None, overwrite:bool=False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list = None, overwrite: bool = False) -> Poses:
         '''Runs rosetta applications'''
         # setup runner:
         work_dir, jobstarter = self.generic_run_setup(
@@ -104,7 +104,7 @@ class Rosetta(Runner):
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
-    def write_cmd(self, rosetta_application:str, pose_path:str, output_dir:str, i:int, rosettascore_path:str, overwrite:bool=False, options:str=None, pose_options:str=None):
+    def write_cmd(self, rosetta_application: str, pose_path: str, output_dir: str, i: int, rosettascore_path: str, overwrite: bool = False, options: str = None, pose_options: str = None):
         '''Writes Command to run ligandmpnn.py'''
 
         # parse options
@@ -117,7 +117,7 @@ class Rosetta(Runner):
         return run_string
 
 
-    def collect_scores(self, work_dir:str, rosettascore_path:str, scorefilepath:str) -> pd.DataFrame:
+    def collect_scores(self, work_dir: str, rosettascore_path: str, scorefilepath: str) -> pd.DataFrame:
         '''
         Collects scores and reindexes .pdb files. Stores scores as .json file.
         '''

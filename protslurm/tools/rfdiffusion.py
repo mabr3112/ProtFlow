@@ -220,3 +220,4 @@ def update_motif_res_mapping(motif_l: list[ResidueSelection], con_ref_idx: list,
 def get_residue_mapping(con_ref_idx: list, con_hal_idx: list) -> dict:
     '''Creates a residue mapping dictionary {old: new} from rfdiffusion outputs.'''
     return {(chain, int(res_id)): hal for (chain, res_id), hal in zip(con_ref_idx, con_hal_idx)}
+

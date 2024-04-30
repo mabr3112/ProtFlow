@@ -1,0 +1,43 @@
+<ROSETTASCRIPTS>
+	<SCOREFXNS>
+		<ScoreFunction name="beta" weights="beta"/>
+		<ScoreFunction name="beta_cst" weights="beta_cst" />
+	</SCOREFXNS>
+	<RESIDUE_SELECTORS>
+		<Layer name="surface" select_surface="true" />
+		<True name="prot" />
+	</RESIDUE_SELECTORS>
+	<TASKOPERATIONS>
+	</TASKOPERATIONS>
+	<MOVE_MAP_FACTORIES>
+	</MOVE_MAP_FACTORIES>
+	<SIMPLE_METRICS>
+		<SapScoreMetric name="sapscore" />
+		<SelectedResidueCountMetric name="core_res_count" custom_type="core" residue_selector="NOT surface" />
+		<SelectedResidueCountMetric name="total_res_count" custom_type="all" residue_selector="prot" />
+		<TotalEnergyMetric name="core_interaction_fa_atr" residue_selector="NOT surface" scoretype="fa_atr" scorefxn="beta" /> core stability as recommended by Ben Minen
+	</SIMPLE_METRICS>
+	<FILTERS>
+		<AtomicContactCount name="contacts" confidence="0"/> atomic density (c-c contacts) from fleishman paper
+	</FILTERS>
+	<MOVERS>
+		<PyMOLMover name="pmm" keep_history="1" />
+		<RunSimpleMetrics name="calc_proteinscores" metrics="sapscore,core_interaction_fa_atr,core_res_count,total_res_count" />
+		<VirtualRoot name="set_virtual_root" />
+		<AddConstraints name="add_bb_ca_cst" >
+                        <CoordinateConstraintGenerator name="set_bb_ca_constraint" native="false" ca_only="true" />
+		</AddConstraints>
+		<RemoveConstraints name="rm_bb_ca_cst" constraint_generators="set_bb_ca_constraint" />
+		<FastRelax name="fastrelax" scorefxn="beta_cst" />
+	</MOVERS>
+	<PROTOCOLS>
+		<Add mover_name="set_virtual_root" />
+		Add mover_name="pmm" />
+		<Add mover_name="add_bb_ca_cst" />
+		<Add mover_name="fastrelax" />
+		<Add mover_name="calc_proteinscores" />
+		Add mover_name="pmm" />
+		<Add filter="contacts" />
+	</PROTOCOLS>
+	<OUTPUT scorefxn="beta" />
+</ROSETTASCRIPTS>

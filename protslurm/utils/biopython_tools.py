@@ -201,7 +201,7 @@ def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_p
     # change numbering
     pose = load_structure_from_pdbfile(pose_path)
     pose = renumber_pose_by_residue_mapping(pose=pose, residue_mapping=residue_mapping, keep_chain=keep_chain)
-    
+
     # save pose
     path_to_output_structure = out_pdb_path or pose_path
     save_structure_to_pdbfile(pose, path_to_output_structure)
@@ -235,6 +235,7 @@ def renumber_pose_by_residue_mapping(pose: Bio.PDB.Structure.Structure, residue_
     # remove chains from pose that are empty:
     chain_ids = [x.id for x in out_pose] # for some reason, iterating over chains in struct directly does not work here...
     for chain_id in chain_ids:
-        if not out_pose[chain_id].__dict__["child_dict"]: out_pose.detach_child(chain_id)
+        if not out_pose[chain_id].__dict__["child_dict"]:
+            out_pose.detach_child(chain_id)
 
     return out_pose

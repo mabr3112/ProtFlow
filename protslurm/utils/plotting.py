@@ -1,18 +1,17 @@
-##################################### PLOTTING ###########################################################
+'''
+Module for creating standardized plots (violins mostyl)
+'''
+
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import rc
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
-if __file__.startswith("/home/mabr3112"):
-    matplotlib.use('Agg')
-else:
-    print("Using Matplotlib without 'Agg' backend.")
 
 import numpy as np
 
 class PlottingTrajectory():
-    def __init__(self, y_label: str, location: str, title:str="Refinement Trajectory", dims=None):
+    def __init__(self, y_label: str, location: str, title: str = "Refinement Trajectory", dims = None):
         '''AAA'''
         self.title = title
         self.y_label = y_label
@@ -20,7 +19,7 @@ class PlottingTrajectory():
         self.dims = dims
         self.data = list()
         self.colormap="tab20"
-        
+
     def set_dims(self, dims):
         '''AAA'''
         self.dims = dims
@@ -38,14 +37,14 @@ class PlottingTrajectory():
     def set_colormap(self, colormap: str) -> None:
         self.colormap = colormap
         return None
-    
+
     def add(self, data_list: list, label: str) -> None:
         '''AAA'''
         if not type(data_list) == list:
             data_list = list(data_list)
         self.data.append((label, data_list))
         return None
-    
+
     def violin_plot(self, out_path:str=None):
         '''AAA'''
         out_path = out_path or self.location
@@ -85,43 +84,43 @@ class PlottingTrajectory():
         if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
         else: fig.show()
         return None
-        
+
     def add_and_plot(self, data_list, label):
         ''''''
         self.add(data_list, label)
         self.violin_plot()
         return None
-        
-def singular_violinplot(data: list, y_label: str, title: str, out_path:str=None,) -> None:
+
+def singular_violinplot(data: list, y_label: str, title: str, out_path: str = None,) -> None:
     '''AAA'''
     fig, ax = plt.subplots(figsize=(2,5))
 
-    parts = ax.violinplot(distances, widths=0.5)
+    parts = ax.violinplot(data, widths=0.5)
     ax.set_title(title, fontsize=18)
     ax.set_ylabel(y_label, size=13) # "\u00C5" is Unicode for Angstrom
     ax.set_xticks([])
-    
-    quartile1, median, quartile3 = np.percentile(distances, [25, 50, 75]) #axis=1 if multiple violinplots.
-    
+
+    quartile1, median, quartile3 = np.percentile(data, [25, 50, 75]) #axis=1 if multiple violinplots.
+
     for pc in parts['bodies']:
         pc.set_facecolor('cornflowerblue')
         pc.set_edgecolor('black')
         pc.set_alpha(1)
-    
+
     parts["cmins"].set_edgecolor("black")
     parts["cmaxes"].set_edgecolor("black")
     print([x for x in parts["bodies"]])
-        
+
     ax.scatter(1, median, marker='o', color="white", s=40, zorder=3)
     ax.vlines(1, quartile1, quartile3, color="k", linestyle="-", lw=10)
-    ax.vlines(1, np.min(distances), np.max(distances), color="k", linestyle="-", lw=2)
-    
+    ax.vlines(1, np.min(data), np.max(data), color="k", linestyle="-", lw=2)
+
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
     else: fig.show()
     return None
 
 def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=None, out_path=None, colormap="tab20") -> None:
-    ''''''
+    '''Creates a violinplot of multiple columns from multiple Pandas DataFrames. Ideal for comparing stuff.'''
     def set_violinstyle(axes_subplot_parts, colors="cornflowerblue") -> None:
         '''
         '''
@@ -132,7 +131,7 @@ def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=Non
         axes_subplot_parts["cmins"].set_edgecolor("black")
         axes_subplot_parts["cmaxes"].set_edgecolor("black")
         return None
-    
+
     # get colors from colormap
     colors = [mcolors.to_hex(color) for color in plt.get_cmap(colormap).colors]
     fig, ax_list = plt.subplots(1, len(cols), figsize=(3*len(cols)+0.8*(len(dfs)), 5))
