@@ -11,7 +11,7 @@ from protslurm import jobstarters
 from protslurm.jobstarters import JobStarter
 from protslurm.poses import Poses
 from protslurm.residues import ResidueSelection
-from protslurm.runners import Runner
+from protslurm.runners import Runner, col_in_df
 from protslurm.config import PROTSLURM_PYTHON
 from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR
 
@@ -105,7 +105,7 @@ class ChainAdder(Runner):
             raise ValueError(f"Either motif or chains can be specified for superimposition, but not both!")
 
         # setup copy_chain and reference_pdb in output:
-        self.check_for_prefix(ref_col, poses)
+        col_in_df(poses.df, ref_col)
         copy_chain_l = setup_chain_list(copy_chain, poses)
         out_dict = {pose["poses"]: {"copy_chain": chain, "reference_pdb": pose[ref_col]} for pose, chain in zip(poses, copy_chain_l)}
         #out_dict = {'target_motif': None, 'reference_motif': None, 'target_chains': None, 'reference_chains': None}

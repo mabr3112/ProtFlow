@@ -64,7 +64,7 @@ class BackboneRMSD(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
         ref_col = ref_col or self.ref_col
-        scorefile = f"{poses.work_dir}/{work_dir}/{prefix}_rmsd.json"
+        scorefile = f"{work_dir}/{prefix}_rmsd.json"
 
         # check if RMSD was calculated if overwrite was not set.
         if os.path.isdir(work_dir): # check if dir exists

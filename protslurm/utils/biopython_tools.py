@@ -97,12 +97,12 @@ def superimpose(mobile: Structure, target: Structure, mobile_atoms: list = None,
     # superimpose on protein Backbones if no atoms are provided
     atom_list = ["N", "CA", "O"]
     if (mobile_atoms is None and target_atoms is None):
-        mobile_atms = get_atoms(mobile, atoms=atom_list)
-        target_atms = get_atoms(target, atoms=atom_list)
+        mobile_atoms = get_atoms(mobile, atoms=atom_list)
+        target_atoms = get_atoms(target, atoms=atom_list)
 
     # superimpose and return
     super_imposer = Bio.PDB.Superimposer()
-    super_imposer.set_atoms(target_atms, mobile_atms)
+    super_imposer.set_atoms(target_atoms, mobile_atoms)
     super_imposer.apply(mobile)
     return mobile
 
