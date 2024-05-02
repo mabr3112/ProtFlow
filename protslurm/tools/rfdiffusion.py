@@ -220,7 +220,8 @@ def update_motif_res_mapping(motif_l: list[ResidueSelection], con_ref_idx: list,
         exchange_dict = get_residue_mapping(ref_idx, hal_idx)
 
         # exchange and return
-        exchanged_motif = print([exchange_dict[residue] for residue in motif.residues])
+        exchanged_motif = [exchange_dict[residue] for residue in motif.residues]
+        print(exchanged_motif)
         output_motif_l.append(ResidueSelection(exchanged_motif))
     return output_motif_l
 

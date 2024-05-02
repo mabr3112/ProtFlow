@@ -41,8 +41,9 @@ def main(args) -> None:
         poses_dict = {args.input_pdb, args.reference_pdb}
 
     # parse atoms and chains:
-    atoms = [atom.strip() for atom in args.atoms.split(",") if atom]
-    chains = [chain.strip() for chain in args.chains.split(",") if chain]
+    atoms = [atom.strip() for atom in args.atoms.split(",") if atom] if args.atoms else None
+    print(atoms)
+    chains = [chain.strip() for chain in args.chains.split(",") if chain] if args.chains else None
 
     # calculate rmsds for every pose in poses_dict.
     out_df_dict = {"description": [], "location": [], "rmsd": []}
