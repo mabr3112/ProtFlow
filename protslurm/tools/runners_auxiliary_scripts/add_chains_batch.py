@@ -28,10 +28,15 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
     if (target_motif or reference_motif) and (target_chains or reference_chains):
         raise ValueError(f"Both motif and chain are specified for superimposition. Only specify either chain or motif, but not both!")
 
-    # if nothing is specified, select backbone atoms:
+    # if nothing is specified, do not superimpose!
     if all((spec is None for spec in [target_motif, reference_motif, target_chains, reference_chains])):
-        target_atoms = get_atoms(target, atoms=atom_list)
-        reference_atoms = get_atoms(reference, atoms=atom_list)
+        target_atoms = None
+        reference_atoms = None
+
+    # all_atoms is specified, superimpose on all atoms!
+    #if all((spec is None for spec in [target_motif, reference_motif, target_chains, reference_chains])):
+    #    target_atoms = get_atoms(target, atoms=atom_list)
+    #    reference_atoms = get_atoms(reference, atoms=atom_list)
 
     # parsing motifs
     if (target_motif or reference_motif):
@@ -48,19 +53,20 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
 
     return target_atoms, reference_atoms
 
-def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: str, target_atoms: list, reference_atoms: list) -> Structure:
+def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: str, target_atoms: list = None, reference_atoms: list = None) -> Structure:
     '''Superimposes :copy_chain: from :reference: onto :target: '''
-    # superimpose
-    ref_superimposed = superimpose(
-        mobile = reference,
-        target = target,
-        mobile_atoms = reference_atoms,
-        target_atoms = target_atoms
-    )
+    # if atoms specified, superimpose:
+    if reference_atoms and target_atoms:
+        reference = superimpose(
+            mobile = reference,
+            target = target,
+            mobile_atoms = reference_atoms,
+            target_atoms = target_atoms
+        )
 
     # copy chain.
     target_with_chain = add_chain(
-        reference = ref_superimposed,
+        reference = reference,
         target = target,
         copy_chain = copy_chain,
     )
