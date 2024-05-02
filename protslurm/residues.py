@@ -40,10 +40,14 @@ class ResidueSelection:
 
 def parse_selection(input_selection, delim: str = ",") -> tuple[tuple[str,int]]:
     '''Parses selction into ResidueSelection formatted selection.'''
+    #TODO: This implementation is safe from bugs, but not very efficient.
     if isinstance(input_selection, str):
         return tuple(parse_residue(residue.strip()) for residue in input_selection.split(delim))
-    if isinstance(input_selection, list):
-        return tuple(parse_residue(residue) for residue in input_selection)
+    if isinstance(input_selection, list) or isinstance(input_selection, tuple):
+        if all(isinstance(residue, str) for residue in input_selection):
+            return tuple(parse_residue(residue) for residue in input_selection)
+        elif all(isinstance(residue, list) or isinstance(residue, tuple) for residue in input_selection):
+            return tuple(parse_residue("".join(residue)) for residue in input_selection)
     raise TypeError(f"Unsupported Input type for parameter 'input_selection' {type(input_selection)}. Only str and list allowed.")
 
 def parse_residue(residue_identifier: str) -> tuple[str,int]:
