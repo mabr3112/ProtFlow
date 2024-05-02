@@ -97,7 +97,7 @@ class RFdiffusion(Runner):
         if update_motifs:
             motifs = prep_motif_input(update_motifs, poses.df)
             for motif_col in motifs:
-                poses.df[motif_col] = update_motif_res_mapping(poses.df[motif_col].to_list(), scores["con_ref_pdb_idx"].to_list(), scores["con_hal_idx"].to_list())
+                poses.df[motif_col] = update_motif_res_mapping(poses.df[motif_col].to_list(), scores["con_ref_pdb_idx"].to_list(), scores["con_hal_pdb_idx"].to_list())
 
         # Reintegrate into poses and return
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()

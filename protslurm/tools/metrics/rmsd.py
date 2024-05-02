@@ -44,7 +44,7 @@ class BackboneRMSD(Runner):
         '''Method to set the chains (list of chain names) to calculate RMSD over.'''
         if chains is None:
             self.chains = None
-        if not isinstance(chains, list) or not all((isinstance(chain, str) for chain in chains)):
+        elif not isinstance(chains, list) or not all((isinstance(chain, str) for chain in chains)):
             raise TypeError(f"Chains needs to be a list, chain names (list elements) must be string.")
         self.chains = chains
 
@@ -77,7 +77,7 @@ class BackboneRMSD(Runner):
                 return output.return_poses()
 
             # if no outputs present, setup work_dir:
-            os.makedirs(work_dir)
+            os.makedirs(work_dir, exist_ok=True)
 
         # split poses into number of max_cores lists
         num_json_files = jobstarter.max_cores
