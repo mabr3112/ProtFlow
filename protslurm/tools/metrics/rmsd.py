@@ -100,7 +100,7 @@ class BackboneRMSD(Runner):
 
             # write scorefile and cmd
             scorefiles.append((sf := f"{work_dir}/rmsd_input_{str(i)}_scores.json"))
-            cmds.append(f"{protslurm_python} {script_dir}/calc_rmsd.py --input_json {json_file} --out_path --output_path {sf}")
+            cmds.append(f"{protslurm_python} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
 
         # add options to cmds:
         if self.atoms:
