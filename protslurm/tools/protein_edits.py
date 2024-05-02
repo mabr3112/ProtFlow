@@ -206,7 +206,7 @@ class ChainRemover(Runner):
         # write cmds
         json_files = []
         for i, subdict in enumerate(subdicts, start=1):
-            opts_json_p = f"{work_dir}/{prefix}/remove_chain_input_{str(i).zfill(4)}.json"
+            opts_json_p = f"{work_dir}/remove_chain_input_{str(i).zfill(4)}.json"
             with open(opts_json_p, 'w', encoding="UTF-8") as f:
                 json.dump(subdict, f)
             json_files.append(opts_json_p)

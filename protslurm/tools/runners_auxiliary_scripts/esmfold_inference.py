@@ -199,7 +199,8 @@ if __name__ == "__main__":
         for header, seq, pdb_string, mean_plddt, ptm, plddt in zip(
             headers, sequences, pdbs, output["mean_plddt"], output["ptm"], output["plddt"]
         ):
-            with open((output_file := f"{args.output_dir}/{header}.pdb"), 'w') as f:
+            output_file = f"{args.output_dir}/{header}.pdb"
+            with open(output_file, 'w', encoding="UTF-8") as f:
                 f.write(pdb_string)
             num_completed += 1
             logger.info(
