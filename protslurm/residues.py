@@ -66,3 +66,7 @@ def parse_residue(residue_identifier: str) -> tuple[str,int]:
 def residue_selection(input_selection, delim: str = ",") -> ResidueSelection:
     '''Creates residue selection from selection of residues.'''
     return ResidueSelection(input_selection, delim=delim)
+
+def from_dict(input_dict: dict) -> ResidueSelection:
+    '''Creates ResidueSelection object from dictionary. The dictionary specifies a motif in this way: {chain: [residues], ...}'''
+    return ResidueSelection([f"{chain}{resi}" for chain, res_l in input_dict.items() for resi in res_l])

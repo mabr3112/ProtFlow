@@ -36,7 +36,8 @@ class RFdiffusion(Runner):
         return "rfdiffusion.py"
 
     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: int = None, update_motifs: list[str] = None) -> RunnerOutput:
-        '''running function for RFDiffusion given poses and a jobstarter object.'''
+        '''running function for RFDiffusion given poses and a jobstarter object.
+        update_motifs: str or list[str] of motifs to update.'''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
