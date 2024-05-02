@@ -47,20 +47,16 @@ def parse_selection(input_selection, delim: str = ",") -> tuple[tuple[str,int]]:
     raise TypeError(f"Unsupported Input type for parameter 'input_selection' {type(input_selection)}. Only str and list allowed.")
 
 def parse_residue(residue_identifier: str) -> tuple[str,int]:
-    '''parses singular residue identifier into a tuple (chain, residue_index)'''
+    '''parses singular residue identifier into a tuple (chain, residue_index).
+    Currently only supports single letter chain identifiers!'''
     chain_first = False if residue_identifier[0].isdigit() else True
-    index_transition = None
-    for i, char in enumerate(residue_identifier):
-        # search for transition point between letter and number
-        if char.isdigit() != residue_identifier[max(0, i-1)].isdigit():
-            index_transition = i
-            break
 
     # assemble residue tuple
-    chain = residue_identifier[:index_transition] if chain_first else residue_identifier[index_transition:]
-    residue_index = residue_identifier[index_transition:] if chain_first else residue_identifier[:index_transition]
+    chain = residue_identifier[0] if chain_first else residue_identifier[-1]
+    residue_index = residue_identifier[1:] if chain_first else residue_identifier[:-1]
 
     # Convert residue_index to int for accurate typing
+    print(residue_index)
     return (chain, int(residue_index))
 
 def residue_selection(input_selection, delim: str = ",") -> ResidueSelection:

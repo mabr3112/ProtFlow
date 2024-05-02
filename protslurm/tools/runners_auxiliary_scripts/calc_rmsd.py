@@ -67,7 +67,7 @@ if __name__ == "__main__":
     argparser.add_argument("--input_json", type=str, help=".json formatted file that contains a dictionary pointing to target and reference pdbs in the following way: {'target': 'reference'}")
 
     # setup optional specifications
-    argparser.add_argument("--atoms", tpye=str, default="CA", help="List of atoms to calculate RMSD over. Only Backbone Atoms are recommended. E.g. --atoms='CA,CO,N'")
+    argparser.add_argument("--atoms", type=str, default="CA", help="List of atoms to calculate RMSD over. Only Backbone Atoms are recommended. E.g. --atoms='CA,CO,N'")
     argparser.add_argument("--chains", type=str, default=None, help="Specify which chains to calculate RMSD over. If not specified, RMSD will be calculated over all chains.")
 
     # output
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     # check arguments (either input_json or input_pdb + reference_pdb)
     if arguments.input_json and (arguments.input_pdb or arguments.reference_pdb):
         raise ValueError(f"If --input_json is specified, input_pdb and reference_pdb are not allowed!")
-    elif not (arguments.input_pdb or arguments.reference_pdb):
+    if not (arguments.input_json or arguments.input_pdb or arguments.reference_pdb):
         raise ValueError(f"Both --input_pdb and --reference_pdb MUST be specified for RMSD calculation if --input_json is not given!")
 
     main(arguments)
