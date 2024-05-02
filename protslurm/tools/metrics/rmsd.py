@@ -111,7 +111,6 @@ class BackboneRMSD(Runner):
         # run commands
         jobstarter.start(
             cmds = cmds,
-            options = None,
             jobname = "backbone_rmsd",
             output_path = work_dir
         )

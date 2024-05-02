@@ -35,24 +35,24 @@ import numpy as np
 
 class JobStarter:
     '''JobStarter class is a class that defines how jobstarters have to look.'''
-    def __init__(self, max_cores:int=None):
+    def __init__(self, max_cores: int = None):
         self.max_cores = max_cores
 
-    def start(self, cmds:list, jobname:str, wait:bool, output_path:str) -> None:
+    def start(self, cmds: list, jobname: str, wait: bool, output_path: str) -> None:
         '''Method to start jobs'''
         raise NotImplementedError("Jobstarter 'start' function was not overwritten!")
 
-    def wait_for_job(self, jobname:str, interval:float) -> None:
+    def wait_for_job(self, jobname: str, interval: float) -> None:
         '''Method for waiting for started jobs'''
         raise NotImplementedError("Jobstarter 'wait_for_job' function was not overwritten!")
 
-    def set_max_cores(self, cores:int) -> None:
+    def set_max_cores(self, cores: int) -> None:
         '''sets max_cores attribute'''
         self.max_cores = cores
 
 class SbatchArrayJobstarter(JobStarter):
     '''Jobstarter that starts Job arrays on slurm clusters.'''
-    def __init__(self, max_cores:int=100, remove_cmdfile:bool=False, options:str=None, gpus:bool=False):
+    def __init__(self, max_cores: int = 100, remove_cmdfile: bool = False, options: str = None, gpus: bool = False):
         '''Note: options parameter has to be set with Jobstarter Creation, not when executing the .start function!'''
         super().__init__() # runs init-function of parent class (JobStarter)
         self.max_cores = max_cores
@@ -62,7 +62,7 @@ class SbatchArrayJobstarter(JobStarter):
         # static attribute, can be changed depending on slurm settings:
         self.slurm_max_arrayjobs = 1000
 
-    def start(self, cmds:list, jobname:str, wait:bool=True, output_path:str="./") -> None:
+    def start(self, cmds: list, jobname: str, wait: bool = True, output_path: str = "./") -> None:
         '''
         Writes [cmds] into a cmd_file that contains each cmd in a separate line.
         Then starts an sbatch job running down the cmd-file.
@@ -85,11 +85,13 @@ class SbatchArrayJobstarter(JobStarter):
         subprocess.run(sbatch_cmd, shell=True, stdout=True, stderr=True, check=True)
 
         # wait for job and clean up
-        if wait: self.wait_for_job(jobname)
-        if self.remove_cmdfile: subprocess.run(f"rm {cmdfile}", shell=True, stdout=True, stderr=True, check=True)
+        if wait:
+            self.wait_for_job(jobname)
+        if self.remove_cmdfile:
+            subprocess.run(f"rm {cmdfile}", shell=True, stdout=True, stderr=True, check=True)
         return None
 
-    def parse_options(self, options:object) -> str:
+    def parse_options(self, options: object) -> str:
         '''parses sbatch options'''
         # parse options
         if isinstance(options, list): return " ".join(options)
@@ -97,13 +99,13 @@ class SbatchArrayJobstarter(JobStarter):
         if options is None: return ""
         raise TypeError(f"Unsupported type for argument options: {type(options)}. Supported types: [str, list]")
 
-    def set_options(self, options:object, gpus:int) -> None:
+    def set_options(self, options: object, gpus: int) -> None:
         '''Sets up attribute 'jobstarter_options' of SbatchArrayJobstarter Class.'''
         self.options = self.parse_options(options)
         if gpus:
             self.options += f"--gpus-per-node {gpus} -c2"
 
-    def wait_for_job(self, jobname:str, interval:float=5) -> None:
+    def wait_for_job(self, jobname: str, interval: float = 5) -> None:
         '''
         Waits for slurm jobs to be finished.
         '''
@@ -120,7 +122,7 @@ class LocalJobStarter(JobStarter):
         super().__init__()
         self.max_cores = max_cores
 
-    def start(self, cmds:list, jobname:str, wait:bool=True, output_path:str=None) -> None:
+    def start(self, cmds: list, jobname: str, wait: bool = True, output_path: str = None) -> None:
         '''Method to start jobs on a local pc'''
         def start_process(command, output_file):
             # Open the file to capture output and error
@@ -186,7 +188,7 @@ def add_timestamp(x: str) -> str:
     '''
     return "_".join([x, f"{str(time.time()).rsplit('.', maxsplit=1)[-1]}"])
 
-def split_list(input_list: list, element_length:int=None, n_sublists:int=None) -> list:
+def split_list(input_list: list, element_length: int = None, n_sublists: int = None) -> list:
     '''Splits 'input_list' into nested list of sublists with maximum length of 'element_length' '''
     # safety
     if element_length and n_sublists:
