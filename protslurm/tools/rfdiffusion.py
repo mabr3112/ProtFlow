@@ -54,7 +54,13 @@ class RFdiffusion(Runner):
         scorefile="rfdiffusion_scores.json"
         scorefilepath = os.path.join(work_dir, scorefile)
         if overwrite is False and os.path.isfile(scorefilepath):
-            return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
+            scores = pd.read_json(scorefilepath)
+            if update_motifs:
+                motifs = prep_motif_input(update_motifs, poses.df)
+                for motif_col in motifs:
+                    poses.df[motif_col] = update_motif_res_mapping(poses.df[motif_col].to_list(), scores["con_ref_pdb_idx"].to_list(), scores["con_hal_pdb_idx"].to_list())
+
+            return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
         # in case overwrite is set, overwrite previous results.
         elif overwrite is True or not os.path.isfile(scorefilepath):
