@@ -104,9 +104,9 @@ class BackboneRMSD(Runner):
 
         # add options to cmds:
         if self.atoms:
-            cmds = [cmd + f" --atoms {self.atoms}" for cmd in cmds]
+            cmds = [cmd + f" --atoms='{','.join(self.atoms)}'" for cmd in cmds]
         if self.chains:
-            cmds = [cmd + f" --chains {self.chains}" for cmd in cmds]
+            cmds = [cmd + f" --chains='{','.join(self.chains)}'" for cmd in cmds]
 
         # run commands
         jobstarter.start(
