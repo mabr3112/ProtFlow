@@ -18,6 +18,8 @@ def remove_chain_from_pdb(pdb_path: str, chains: list[str]) -> Structure:
         chains = [chains]
 
     for chain in chains:
+        if chain not in list(pose.get_chains()):
+            raise KeyError(f"Chain {chain} not found in pose. Available Chains: {list(pose.get_chains())}")
         pose.detach_child(chain)
 
     return pose
