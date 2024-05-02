@@ -84,6 +84,7 @@ class Poses:
         if work_dir is not None and not os.path.isdir(work_dir):
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {work_dir}")
+            work_dir = os.path.abspath(work_dir)
         self.work_dir = work_dir
 
         # setup scores dir
@@ -183,6 +184,7 @@ class Poses:
 
         # handle multiline .fa inputs for poses!
         for pose in poses:
+            pose = os.path.abspath(pose)
             if not pose.endswith(".fa"):
                 continue
             if len(parse_fasta_to_dict(pose)) > 1:
