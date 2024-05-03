@@ -63,6 +63,7 @@ class BackboneRMSD(Runner):
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
+
         ref_col = ref_col or self.ref_col
         scorefile = f"{work_dir}/{prefix}_rmsd.json"
 
