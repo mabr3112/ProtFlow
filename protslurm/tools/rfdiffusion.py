@@ -59,6 +59,7 @@ class RFdiffusion(Runner):
                 motifs = prep_motif_input(update_motifs, poses.df)
                 for motif_col in motifs:
                     poses.df[motif_col] = update_motif_res_mapping(poses.df[motif_col].to_list(), scores["con_ref_pdb_idx"].to_list(), scores["con_hal_pdb_idx"].to_list())
+                    print(poses.df[motif_col])
 
             return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
@@ -221,7 +222,6 @@ def update_motif_res_mapping(motif_l: list[ResidueSelection], con_ref_idx: list,
 
         # exchange and return
         exchanged_motif = [exchange_dict[residue] for residue in motif.residues]
-        print(exchanged_motif)
         output_motif_l.append(ResidueSelection(exchanged_motif))
     return output_motif_l
 

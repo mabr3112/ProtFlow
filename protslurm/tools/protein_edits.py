@@ -107,7 +107,7 @@ class ChainAdder(Runner):
         # setup copy_chain and reference_pdb in output:
         col_in_df(poses.df, ref_col)
         copy_chain_l = setup_chain_list(copy_chain, poses)
-        out_dict = {pose["poses"]: {"copy_chain": chain, "reference_pdb": pose[ref_col]} for pose, chain in zip(poses, copy_chain_l)}
+        out_dict = {pose["poses"]: {"copy_chain": chain, "reference_pdb": os.path.abspath(pose[ref_col])} for pose, chain in zip(poses, copy_chain_l)}
         #out_dict = {'target_motif': None, 'reference_motif': None, 'target_chains': None, 'reference_chains': None}
 
         # if nothing is specified, return nothing.
@@ -134,7 +134,8 @@ class ChainAdder(Runner):
             return motif.to_string()
         if isinstance(motif, str):
             if motif in pose:
-                return pose[motif]
+                # assumes motif is a column in pose (row in poses.df) that points to a ResidueSelection object
+                return pose[motif].to_string()
             else:
                 raise ValueError(f"If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
         raise TypeError(f"Unsupportet parameter type for motif: {type(motif)} - Only ResidueSelection or str allowed!")

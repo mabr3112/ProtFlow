@@ -65,7 +65,7 @@ class Poses:
 
         # setup scorefile for storage
         self.storage_format = storage_format
-        scorefile_path = f"{work_dir}/{work_dir.strip('/').rsplit('/', maxsplit=1)[-1]}t" if work_dir else "./poses"
+        scorefile_path = f"{work_dir}/{work_dir.strip('/').rsplit('/', maxsplit=1)[-1]}" if work_dir else "./poses"
         self.scorefile = f"{scorefile_path}_scores.{self.storage_format}"
 
         # setup jobstarter
@@ -96,6 +96,10 @@ class Poses:
             if not os.path.isdir(scores_dir):
                 os.makedirs(scores_dir, exist_ok=True)
             self.scores_dir = scores_dir
+
+        # setup scorefilepath inside of work_dir!
+        scorefile_path = f"{work_dir}/{work_dir.strip('/').rsplit('/', maxsplit=1)[-1]}" if work_dir else "./poses"
+        self.scorefile = f"{scorefile_path}_scores.{self.storage_format}"
 
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
         '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
