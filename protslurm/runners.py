@@ -74,7 +74,6 @@ class RunnerOutput:
 
         # integrate new results into Poses object
         self.poses.df = merged_df
-        print(f"Writing poses.df to {self.poses.scorefile}")
         self.poses.df.to_json(self.poses.scorefile)
         return self.poses
 
