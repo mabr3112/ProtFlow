@@ -54,14 +54,14 @@ class RFdiffusion(Runner):
         scorefile="rfdiffusion_scores.json"
         scorefilepath = os.path.join(work_dir, scorefile)
         if overwrite is False and os.path.isfile(scorefilepath):
-            scores = pd.read_json(scorefilepath)
+            poses = RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
             if update_motifs:
-                motifs = prep_motif_input(update_motifs, poses.df)
-                for motif_col in motifs:
-                    poses.df[motif_col] = update_motif_res_mapping(poses.df[motif_col].to_list(), scores["con_ref_pdb_idx"].to_list(), scores["con_hal_pdb_idx"].to_list())
-                    print(poses.df[motif_col])
-
-            return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+                self.remap_motifs(
+                poses = poses,
+                motifs = update_motifs,
+                prefix = prefix
+            )
+            return poses
 
         # in case overwrite is set, overwrite previous results.
         elif overwrite is True or not os.path.isfile(scorefilepath):
@@ -102,13 +102,24 @@ class RFdiffusion(Runner):
         scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, rename_pdbs=True).reset_index(drop=True)
 
         # update residue mappings for stored motifs
+        poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
         if update_motifs:
-            motifs = prep_motif_input(update_motifs, poses.df)
-            for motif_col in motifs:
-                poses.df[motif_col] = update_motif_res_mapping(poses.df[motif_col].to_list(), scores["con_ref_pdb_idx"].to_list(), scores["con_hal_pdb_idx"].to_list())
-
-        # Reintegrate into poses and return
-        return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+            self.remap_motifs(
+                poses = poses,
+                motifs = update_motifs,
+                prefix = prefix
+            )
+        return poses
+    
+    def remap_motifs(self, poses: Poses, motifs: list, prefix: str) -> None:
+        '''Updates ResidueSelection type motifs in poses.df when given prefix of rfdiffusion run'''
+        motifs = prep_motif_input(motifs, poses.df)
+        for motif_col in motifs:
+            poses.df[motif_col] = update_motif_res_mapping(
+                poses.df[motif_col].to_list(),
+                poses.df[f"{prefix}_con_ref_pdb_idx"].to_list(),
+                poses.df[f"{prefix}_con_hal_pdb_idx"].to_list()
+            )
 
     def write_cmd(self, pose: str, options: str, pose_opts: str, output_dir: str, num_diffusions: int=1) -> str:
         '''AAA'''
