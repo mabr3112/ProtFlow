@@ -94,7 +94,7 @@ class BackboneRMSD(Runner):
             json_dict = {pose: pose_dict[pose] for pose in sublist}
 
             # write to file
-            json_file = f"rmsd_input_{str(i)}"
+            json_file = f"{work_dir}/rmsd_input_{str(i)}.json"
             with open(json_file, "w", encoding="UTF-8") as f:
                 json.dump(json_dict, f)
             json_files.append(json_file)
@@ -178,6 +178,7 @@ class MotifRMSD(Runner):
             prefix = prefix,
             jobstarters = [jobstarter, self.jobstarter, poses.default_jobstarter]
         )
+        print(work_dir)
 
         # check if script exists
         if not os.path.isfile(script_path):

@@ -60,11 +60,11 @@ class Poses:
     def __init__(self, poses:list=None, work_dir:str=None, storage_format:str="json", glob_suffix:str=None, jobstarter:JobStarter=jobstarters.SbatchArrayJobstarter()):
         # set_poses sets up self.df!
         self.df = None
+        self.storage_format = storage_format
         self.set_poses(poses, glob_suffix=glob_suffix)
         self.set_work_dir(work_dir)
 
         # setup scorefile for storage
-        self.storage_format = storage_format
         scorefile_path = f"{work_dir}/{work_dir.strip('/').rsplit('/', maxsplit=1)[-1]}" if work_dir else "./poses"
         self.scorefile = f"{scorefile_path}_scores.{self.storage_format}"
 
