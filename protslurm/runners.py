@@ -2,6 +2,8 @@
 # builtins
 import logging
 import os
+import re
+import shlex
 
 # dependencies
 import pandas as pd
@@ -109,7 +111,7 @@ class Runner:
             # make sure an empty list is passed as pose_options!
             pose_options = [None for _ in poses]
 
-        if len(poses) != len(pose_options) and len(poses) is not 0:
+        if len(poses) != len(pose_options) and len(poses) != 0:
             raise ValueError(f"Arguments <poses> and <pose_options> for RFdiffusion must be of the same length. There might be an error with your pose_options argument!\nlen(poses) = {poses}\nlen(pose_options) = {len(pose_options)}")
 
         # if pose_options is list and as long as poses, just return list. Has to be list of dicts.
@@ -162,8 +164,8 @@ def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[di
     merging the results, ensuring that pose-specific options and flags are appropriately prioritized and duplicates are removed.
     """
     # parse into options and flags:
-    opts, flags = expand_options_flags(options, sep=sep)
-    pose_opts, pose_flags = expand_options_flags(pose_options, sep=sep)
+    opts, flags = regex_expand_options_flags(options, sep=sep)
+    pose_opts, pose_flags = regex_expand_options_flags(pose_options, sep=sep)
 
     # merge options and pose_options (pose_opts overwrite opts), same for flags
     opts.update(pose_opts)
@@ -190,12 +192,57 @@ def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
         if len((x := item.split())) > 1:
             opts[x[0]] = " ".join(x[1:])
         elif len((x := item.split("="))) > 1:
-            opts[x[0]] = "=".join(x[1:])
+            opts[x[0]] = " ".join(x[1:])
         else:
             flags.append(x[0])
 
     return opts, set(flags)
 
+def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,set]:
+    '''Uses Regex to split stuff'''
+    # Split the command line using shlex to handle quotes properly
+    args = shlex.split(options_str) if options_str is not None else []
+
+    # Regex to match --key=value or --key value
+    pattern = sep + r'(\w+)(?:=(.*))?'
+
+    options = {}
+    flags = []
+
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        match = re.match(pattern, arg)
+        if match:
+            key, value = match.groups()
+            if value is None:
+                # Look ahead to see if the next arg is a value or another flag/option
+                if i + 1 < len(args) and not re.match(pattern, args[i + 1]):
+                    # The next argument is a value
+                    options[key] = args[i + 1]
+                    i += 1  # Skip the next argument since it's already used as a value
+                else:
+                    # No value is provided, treat as flag
+                    flags.append(key)
+            else:
+                # Value is directly attached to the key
+                options[key] = value
+        i += 1  # Increment the index
+
+    return options, set(flags)
+
 def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
     '''Converts options dict and flags list into one string'''
-    return " ".join([f"{sep}{key}={value}" for key, value in options.items()]) + f" {sep}".join(flags)
+    def value_in_quotes(value) -> str:
+        '''Makes sure that split commandline options are passed in quotes: --option='quoted list of args' '''
+        if len(str(value).split(" ")) > 1:
+            return f"'{value}'"
+        return value
+
+    # assemble options
+    out_str = " ".join([f"{sep}{key}={value_in_quotes(value)}" for key, value in options.items()])
+
+    # if flags are present, assemble those too and return
+    if flags:
+        out_str += f" {sep}" + f" {sep}".join(flags)
+    return out_str
