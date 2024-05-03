@@ -81,7 +81,7 @@ class BackboneRMSD(Runner):
 
         # split poses into number of max_cores lists
         num_json_files = jobstarter.max_cores
-        pose_dict = {row["poses"]: row[ref_col] for row in poses}
+        pose_dict = {os.path.abspath(row["poses"]): os.path.abspath(row[ref_col]) for row in poses}
         pose_sublists = protslurm.jobstarters.split_list(poses.poses_list(), num_json_files)
 
         # setup inputs to calc_rmsd.py
@@ -108,7 +108,7 @@ class BackboneRMSD(Runner):
         if self.chains:
             cmds = [cmd + f" --chains='{','.join(self.chains)}'" for cmd in cmds]
 
-        # run commands
+        # run command
         jobstarter.start(
             cmds = cmds,
             jobname = "backbone_rmsd",
@@ -259,7 +259,7 @@ class MotifRMSD(Runner):
         # construct rmsd_input_dict:
         rmsd_input_dict = {pose: {} for pose in poses.poses_list()}
         for pose, ref, ref_motif_, target_motif_ in zip(poses.poses_list(), ref_l, ref_motif_l, target_motif_l):
-            rmsd_input_dict[pose]["ref_pdb"] = ref
+            rmsd_input_dict[pose]["ref_pdb"] = os.path.abspath(ref)
             rmsd_input_dict[pose]["target_motif"] = target_motif_
             rmsd_input_dict[pose]["reference_motif"] = ref_motif_
 

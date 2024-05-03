@@ -42,7 +42,6 @@ def main(args) -> None:
 
     # parse atoms and chains:
     atoms = [atom.strip() for atom in args.atoms.split(",") if atom] if args.atoms else None
-    print(atoms)
     chains = [chain.strip() for chain in args.chains.split(",") if chain] if args.chains else None
 
     # calculate rmsds for every pose in poses_dict.

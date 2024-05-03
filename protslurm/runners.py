@@ -67,7 +67,7 @@ class RunnerOutput:
             raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']")
 
         # reset poses and poses_description column
-        merged_df["poses"] = merged_df[f"{self.prefix}_location"]
+        merged_df["poses"] = [os.path.abspath(pose) for pose in merged_df[f"{self.prefix}_location"].to_list()]
         merged_df["poses_description"] = merged_df[f"{self.prefix}_description"]
 
         # integrate new results into Poses object
