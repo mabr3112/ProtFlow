@@ -20,7 +20,7 @@ class BackboneRMSD(Runner):
     '''Class handling the calculation of Full-atom RMSDs as a runner.
     By default calculates only CA backbone RMSD.
     Uses BioPython for RMSD calculation'''
-    def __init__(self, ref_col: str = None, atoms: list = ["CA"], chains: list[str] = None, overwrite: bool = False, jobstarter: str =None): # pylint: disable=W0102
+    def __init__(self, ref_col: str = None, atoms: list = ["CA"], chains: list[str] = None, overwrite: bool = False, jobstarter: str = None): # pylint: disable=W0102
         self.set_ref_col(ref_col)
         self.set_atoms(atoms)
         self.set_chains(chains)
@@ -44,16 +44,19 @@ class BackboneRMSD(Runner):
         '''Method to set the chains (list of chain names) to calculate RMSD over.'''
         if chains is None:
             self.chains = None
+        elif isinstance(chains, str) and len(chains) == 1:
+            self.chains = [chains]
         elif not isinstance(chains, list) or not all((isinstance(chain, str) for chain in chains)):
             raise TypeError(f"Chains needs to be a list, chain names (list elements) must be string.")
-        self.chains = chains
+        else:
+            self.chains = chains
 
     def set_jobstarter(self, jobstarter: str) -> None:
         '''Sets Jobstarter for BackboneRMSD runner.'''
         self.jobstarter = jobstarter
 
     ########################## Calculations ################################################
-    def calc_rmsd(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None) -> None:
+    def calc_rmsd(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None) -> None:
         '''Calculates RMSD as specified.'''
         # if self.atoms is all, calculate Allatom RMSD.
 
@@ -104,10 +107,11 @@ class BackboneRMSD(Runner):
             cmds.append(f"{protslurm_python} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
 
         # add options to cmds:
+        chains = chains or self.chains
         if self.atoms:
             cmds = [cmd + f" --atoms='{','.join(self.atoms)}'" for cmd in cmds]
-        if self.chains:
-            cmds = [cmd + f" --chains='{','.join(self.chains)}'" for cmd in cmds]
+        if chains:
+            cmds = [cmd + f" --chains='{','.join(chains)}'" for cmd in cmds]
 
         # run command
         jobstarter.start(
@@ -134,11 +138,14 @@ class BackboneRMSD(Runner):
 
 class MotifRMSD(Runner):
     '''Class handling'''
-    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, jobstarter: JobStarter = None):
+    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, target_chains: list[str] = None, ref_chains: list[str] = None, jobstarter: JobStarter = None):
+        #TODO implement MotifRMSD calculation based on Chain input!
         self.set_jobstarter(jobstarter)
         self.set_ref_col(ref_col)
         self.set_target_motif(target_motif)
         self.set_ref_motif(ref_motif)
+        self.set_target_chains(target_chains)
+        self.set_ref_chains(ref_chains)
 
     def __str__(self):
         return "Heavyatom motif rmsd calculator"
@@ -158,6 +165,14 @@ class MotifRMSD(Runner):
     def set_jobstarter(self, jobstarter: str) -> None:
         '''Sets Jobstarter for MotifRMSD runner.'''
         self.jobstarter = jobstarter
+
+    def set_target_chains(self, chains: list[str]) -> None:
+        '''Sets target chains for MotifRMSD class.'''
+        self.target_chains = chains if isinstance(chains, list) else [chains]
+    
+    def set_ref_chains(self, chains: list[str]) -> None:
+        '''Sets reference chains for MotifRMSD class.'''
+        self.ref_chains = chains if isinstance(chains, list) else [chains]
 
     ################################################# Calcs ################################################
 
