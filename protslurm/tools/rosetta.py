@@ -17,7 +17,7 @@ from protslurm.runners import Runner, RunnerOutput
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 
-# TODO: @Adrian: Setup output of Rosetta scores as .csv instead of default
+# TODO: @Adrian: Please setup output of Rosetta scores as .csv instead of default
 
 class Rosetta(Runner):
     '''Class to run general Rosetta applications and collect its outputs into a DataFrame'''
@@ -108,12 +108,12 @@ class Rosetta(Runner):
         '''Writes Command to run ligandmpnn.py'''
 
         # parse options
-        opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
-        opts = " ".join([f"-{key} {value}" for key, value in opts.items()])
+        opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
+        opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
         flags = " -".join(flags)
         run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"
         if overwrite is True:
-            run_string = run_string + " -overwrite"
+            run_string += " -overwrite"
         return run_string
 
 
