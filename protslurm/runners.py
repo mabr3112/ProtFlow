@@ -202,9 +202,10 @@ def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,
     '''Uses Regex to split stuff'''
     # Split the command line using shlex to handle quotes properly
     args = shlex.split(options_str) if options_str is not None else []
+    print(args)
 
     # Regex to match --key=value or --key value
-    pattern = sep + r'(\w+)(?:=(.*))?'
+    pattern = rf'{sep}(\S+?)(?:=(.*))?'
 
     options = {}
     flags = []
@@ -229,6 +230,7 @@ def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,
                 options[key] = value
         i += 1  # Increment the index
 
+    print(options, flags)
     return options, set(flags)
 
 def options_flags_to_string(options: dict, flags: list, sep="--") -> str:

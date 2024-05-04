@@ -106,11 +106,11 @@ class Rosetta(Runner):
 
     def write_cmd(self, rosetta_application: str, pose_path: str, output_dir: str, i: int, rosettascore_path: str, overwrite: bool = False, options: str = None, pose_options: str = None):
         '''Writes Command to run ligandmpnn.py'''
-
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
         flags = " -".join(flags)
+
         run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"
         if overwrite is True:
             run_string += " -overwrite"
