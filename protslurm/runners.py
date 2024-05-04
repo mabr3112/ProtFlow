@@ -200,43 +200,33 @@ def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
 
 def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,set]:
     '''Uses Regex to split stuff'''
-    # Split the command line using shlex to handle quotes properly
-    args = shlex.split(options_str) if options_str is not None else []
+    # Regex to split the command line at the separator which is not inside quotes
+    split_pattern = rf"(?<!\S){sep}(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)(?=(?:[^\']*\'[^\']*\')*[^\']*$)"
+    parts = [x.strip() for x in re.split(split_pattern, options_str) if x]
 
-    # Regex to match --key=value or --key value
-    pattern = sep + r'(\w+)(?:=(.*))?'
-
-    options = {}
+    opts = {}
     flags = []
 
-    i = 0
-    while i < len(args):
-        arg = args[i]
-        match = re.match(pattern, arg)
-        if match:
-            key, value = match.groups()
-            if value is None:
-                # Look ahead to see if the next arg is a value or another flag/option
-                if i + 1 < len(args) and not re.match(pattern, args[i + 1]):
-                    # The next argument is a value
-                    options[key] = args[i + 1]
-                    i += 1  # Skip the next argument since it's already used as a value
-                else:
-                    # No value is provided, treat as flag
-                    flags.append(key)
-            else:
-                # Value is directly attached to the key
-                options[key] = value
-        i += 1  # Increment the index
+    # Setup part_pattern that splits individual parts at first occurrence of whitespace or equals sign.
+    part_pattern = r"\s+|\s*=\s*"
 
-    return options, set(flags)
+    for part in parts:
+        split = re.split(part_pattern, part, maxsplit=1)
+        if len(split) > 1:
+            opts[split[0]] = split[1]
+        else:
+            flags.append(split[0])
+    
+    return opts, set(flags)
+    
 
 def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
     '''Converts options dict and flags list into one string'''
     def value_in_quotes(value) -> str:
         '''Makes sure that split commandline options are passed in quotes: --option='quoted list of args' '''
         if len(str(value).split(" ")) > 1:
-            return f"'{value}'"
+            if not value.startswith("'") and value.endswith("'") or value.startswith('"') and value.endswith('"'):
+                return f"'{value}'"
         return value
 
     # assemble options
