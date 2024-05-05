@@ -11,7 +11,33 @@ Then install dependencies with pip as described in the repository:
 
 ```
 conda activate esmfold
-pip install "fair-esm[esmfold]"
-pip install 'dllogger @ git+https://github.com/NVIDIA/dllogger.git'
-pip install 'openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307'
+pip install "fair-esm[esmfold]" --no-cache-dir
+```
+
+Now ensure that the pip install in your esmfold environment did not overwrite your pytorch installation to the latest version.
+The pytorch version you should have installed should be 1.12. Here is how to check:
+
+```
+conda activate esmfold
+python
+>>> import torch
+>>> print(torch.__version__)
+```
+
+This should output version 1.12
+If the version differs (a later version) then you will have to manually uninstall pytorch from the esmfold environment and reinstall with the correct version specified.
+
+```
+conda activate esmfold
+conda remove pytorch
+conda clean --all
+conda install pytorch=1.12 cudatoolkit=11.3 -c pytorch
+```
+
+Now verify the pytorch version again as described above. This should yield pytorch version 1.12.
+Then continue with the remaining dependencies:
+
+```
+pip install 'dllogger @ git+https://github.com/NVIDIA/dllogger.git' --no-cache-dir
+pip install 'openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307' --no-cache-dir
 ```
