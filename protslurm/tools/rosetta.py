@@ -106,26 +106,24 @@ class Rosetta(Runner):
 
     def write_cmd(self, rosetta_application: str, pose_path: str, output_dir: str, i: int, rosettascore_path: str, overwrite: bool = False, options: str = None, pose_options: str = None):
         '''Writes Command to run ligandmpnn.py'''
+        # parse options
+        opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
+        opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
+        flags = " -" + " -".join(flags) if flags else ""
 
         # check if interfering options were set
-        forbidden_options = ['-out:path:all', '-in:file:s', '-out:prefix', '-nstruct', '-out:file:scorefile']
-        if (options and any(_ in options for _ in forbidden_options)) or (pose_options and any(_ in pose_options for _ in ['-out:path:all', '-in:file:s', '-out:prefix', '-nstruct', '-out:file:scorefile'])):
-            raise KeyError(f"Options and pose options must not contain '-out:path:all', '-in:file:s', '-out:prefix', '-nstruct' or '-out:file:scorefile'!")
+        forbidden_options = ['-out:path:all', '-in:file:s', '-out:prefix', '-out:file:scorefile']
+        if (options and any(opt in options for opt in forbidden_options)) or (pose_options and any(pose_opt in pose_options for pose_opt in forbidden_options)):
+            raise KeyError(f"options and pose_options must not contain '-out:path:all', '-in:file:s', '-out:prefix' or '-out:file:scorefile'!")
         
-        if options:
-            options = options + f" -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path}"
-        else:
-            options = f"-out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path}"
-        
-        if overwrite is True:
-            options = options + " -overwrite"
-
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
+        opts = " ".join([f"-{key}={value}" for key, value in opts.items()]) if opts else ""
+        flags = " -" + " -".join(flags) if flags else ""
+        overwrite = " -overwrite" if overwrite else ""
         
-
-        run_string = f"{rosetta_application} {protslurm.runners.options_flags_to_string(opts, flags, sep='-')}"
-        
+        # compile command
+        run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags} {overwrite}"
         return run_string
 
 
