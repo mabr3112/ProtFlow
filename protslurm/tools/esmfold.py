@@ -59,6 +59,11 @@ class ESMFold(Runner):
         num_batches = num_batches or jobstarter.max_cores
         pose_fastas = self.prep_fastas_for_prediction(poses=poses.df['poses'].to_list(), fasta_dir=fasta_dir, max_filenum=num_batches)
 
+        # check if interfering options were set
+        forbidden_options = ['--fasta', '--output_dir']
+        if options and any(opt in options for opt in forbidden_options) :
+            raise KeyError(f"Options must not contain '--fasta' or '--output_dir'!")
+
         # write ESMFold cmds:
         cmds = [self.write_cmd(pose, output_dir=esm_preds_dir, options=options) for pose in pose_fastas]
 
@@ -107,24 +112,12 @@ class ESMFold(Runner):
         # Write fasta files according to the fasta_split determined above and then return:
         return [mergefastas(files=poses, path=f"{fasta_dir}/fasta_{str(i+1).zfill(4)}.fa", replace=("/",":")) for i, poses in enumerate(poses_split)]
 
-
     def write_cmd(self, pose_path:str, output_dir:str, options:str):
         '''Writes Command to run ESMFold.py'''
-
-        # check if interfering options were set
-        forbidden_options = ['--fasta', '--output_dir']
-        if options and any(_ in options for _ in forbidden_options) :
-            raise KeyError(f"Options must not contain '--fasta' or '--output_dir'!")
-
-        if options:
-            options = options + f" --fasta {pose_path} --output_dir {output_dir}"
-        else:
-            options = f"--fasta {pose_path} --output_dir {output_dir}"
-        
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, None)
 
-        return f"{self.python_path} {protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py {protslurm.runners.options_flags_to_string(opts, flags, sep='--')}"
+        return f"{self.python_path} {protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {protslurm.runners.options_flags_to_string(opts, flags, sep='--')}"
 
     def collect_scores(self, work_dir:str, scorefile:str) -> pd.DataFrame:
         '''collects scores from ESMFold output'''

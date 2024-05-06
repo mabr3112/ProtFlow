@@ -218,9 +218,9 @@ def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,
             opts[split[0]] = split[1]
         else:
             flags.append(split[0])
-    
+
     return opts, set(flags)
-    
+
 def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
     '''Converts options dict and flags list into one string'''
     def value_in_quotes(value) -> str:
@@ -231,7 +231,7 @@ def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
         return value
 
     # assemble options
-    out_str = " ".join([f"{sep}{key}={value_in_quotes(value)}" for key, value in options.items()])
+    out_str = " " + " ".join([f"{sep}{key}={value_in_quotes(value)}" for key, value in options.items()]) if options else ""
 
     # if flags are present, assemble those too and return
     if flags:
