@@ -110,12 +110,21 @@ class ESMFold(Runner):
 
     def write_cmd(self, pose_path:str, output_dir:str, options:str):
         '''Writes Command to run ESMFold.py'''
-        # parse options
-        opts, flags = protslurm.runners.parse_generic_options(options, "")
-        opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
-        flags = " --".join(flags)
 
-        return f"{self.python_path} {protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {opts} {flags}"
+        # check if interfering options were set
+        forbidden_options = ['--fasta', '--output_dir']
+        if options and any(_ in options for _ in forbidden_options) :
+            raise KeyError(f"Options must not contain '--fasta' or '--output_dir'!")
+
+        if options:
+            options = options + f" --fasta {pose_path} --output_dir {output_dir}"
+        else:
+            options = f"--fasta {pose_path} --output_dir {output_dir}"
+        
+        # parse options
+        opts, flags = protslurm.runners.parse_generic_options(options, None)
+
+        return f"{self.python_path} {protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py {protslurm.runners.options_flags_to_string(opts, flags, sep='--')}"
 
     def collect_scores(self, work_dir:str, scorefile:str) -> pd.DataFrame:
         '''collects scores from ESMFold output'''
