@@ -142,7 +142,7 @@ def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=Non
     fig.subplots_adjust(wspace=1, hspace=0.8)
     if not dims: dims = [None for x in cols]
 
-    for ax, col, name, label, dim, length in zip(ax_list, cols, titles, y_labels, dims, [len(df.index) for df in dfs]):
+    for ax, col, name, label, dim in zip(ax_list, cols, titles, y_labels, dims):
         ax.set_title(name, size=15, y=1.05)
         ax.set_ylabel(label, size=15)
 
