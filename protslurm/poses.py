@@ -64,8 +64,9 @@ class Poses:
         self.set_work_dir(work_dir)
 
         # setup scorefile for storage
-        self.storage_format = storage_format
-        scorefile_path = f"{work_dir}/{work_dir.strip('/').rsplit('/', maxsplit=1)[-1]}t" if work_dir else "./poses"
+        if not storage_format.lower() in FORMAT_STORAGE_DICT: raise KeyError(f"Format {storage_format} not available. Format must be on of {[i for i in FORMAT_STORAGE_DICT]}")
+        self.storage_format = storage_format.lower()
+        scorefile_path = os.path.join(work_dir, os.path.basename(work_dir)) if work_dir else "./poses"
         self.scorefile = f"{scorefile_path}_scores.{self.storage_format}"
 
         # setup jobstarter
@@ -89,12 +90,19 @@ class Poses:
         # setup scores dir
         if work_dir is None:
             self.scores_dir = None
+            self.filter_dir = None
+            self.plots_dir = None
         else:
             # setup path
             scores_dir = os.path.join(work_dir, "scores")
-            if not os.path.isdir(scores_dir):
-                os.makedirs(scores_dir, exist_ok=True)
+            filter_dir = os.path.join(work_dir, "filter")
+            plots_dir = os.path.join(work_dir, "plots")
+            os.makedirs(scores_dir, exist_ok=True)
+            os.makedirs(filter_dir, exist_ok=True)
+            os.makedirs(plots_dir, exist_ok=True)
             self.scores_dir = scores_dir
+            self.filter_dir = filter_dir
+            self.plots_dir = plots_dir
 
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
         '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
@@ -336,6 +344,143 @@ class Poses:
             self.motifs = []
         self.motifs.append(motif_col)
 
+    ########################################## Filtering ###############################################
+
+
+
+    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers=None, layer_col="poses_description", sep="_", ascending=True, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> pd.DataFrame:
+        '''
+        Filters your current poses by a specified scoreterm down to either a fraction (of all poses) or a total number of poses,
+        depending on which value was given with <n>.
+        
+        Args:
+            <n>:                   Any positive number. Number between 0 and 1 are interpreted as a fraction to filter,
+                                   Numbers >1 are interpreted as absolute number of poses after filtering.
+            <score_col>:           Column name of the column that contains the scores by which the poses should be filtered.
+            <plot>:                (bool, str, list) Do you want to plot filtered stats? If True, it will plot filtered scoreterm. 
+                                   If str, it will look for the argument in self.df and use that scoreterm for plotting.
+                                   If list, it will try to plot all scoreterms in the list.
+            <ascending>:           Whether to filter ascending (True) or descending (False)
+            <prefix>:              Save filter output to <prefix>_filter in filter directory, if given
+            <format>:              Save filter output in this format, if None use default pose format
+        
+        To filter your DataFrame poses based on parent poses, add arguments: 
+            <remove_layers>        how many index layers must be removed to reach parent pose? If <remove_layers> = 0, groups 
+                                   <layer_col> and filters individual groups (useful e.g. if <layer_col> is not poses_description,
+                                   but a group identifier)
+            <layer_col>            column name that contains names of the poses, Default="poses_description"
+            <sep>                  index layer separator for pose names in layer_col (pose_0001_0003.pdb -> '_')
+            
+            
+            
+        Returns filtered DataFrame. Updates pose_df.
+        '''
+
+        # define filter output if <prefix> is provided, make sure output directory exists
+        if prefix:
+            if self.filter_dir == None:
+                raise AttributeError(f"Filter directory was not set! Did you set a working directory?")
+            os.makedirs(self.filter_dir, exist_ok=True)
+            # make sure output format is available
+            format = format.lower() or self.storage_format
+            if not format in FORMAT_STORAGE_DICT: raise KeyError(f"Format {format} not available. Format must be on of {[i for i in FORMAT_STORAGE_DICT]}")
+            # set filter output name
+            output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{format}")
+            # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
+            if overwrite == False and os.path.isfile(output_name):
+                filter_df = get_format(output_name)(output_name)
+                self.df = filter_df
+                return filter_df
+        
+        # Filter df down to the number of poses specified with <n>
+        orig_len = str(len(self.df))
+        filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
+        print(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
+
+        """
+        #TODO: plotting functionalities
+        
+        # create filter-plots if specified.
+        if plot:
+            columns = plots.parse_cols_for_plotting(plot, subst=score_col)
+            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
+                                               cols=columns, titles=columns, y_labels=columns, out_path=f"{self.plot_dir}/{output_name}.png")
+        """
+
+        # save filtered dataframe if prefix is provided
+        if prefix: 
+            save_method_name = FORMAT_STORAGE_DICT.get(format)
+            getattr(filter_df, save_method_name)(output_name)
+
+        # update object attributs [df]
+        self.df = filter_df
+
+        return filter_df
+    
+
+    def filter_poses_by_value(self, n: float, score_col: str, value, operator: str, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> pd.DataFrame:
+        '''
+        Filters your current poses by a specified <score_col> according to the provided <value> and <operator>.
+        
+        Args:
+            <n>:                   Any positive number. Number between 0 and 1 are interpreted as a fraction to filter,
+                                   Numbers >1 are interpreted as absolute number of poses after filtering.
+            <score_col>:           Column name of the column that contains the scores by which the poses should be filtered.
+            <plot>:                (bool, str, list) Do you want to plot filtered stats? If True, it will plot filtered scoreterm. 
+                                   If str, it will look for the argument in self.df and use that scoreterm for plotting.
+                                   If list, it will try to plot all scoreterms in the list.
+            <value>:               Value that is used for comparison.
+            <operator>             Type of comparison operator. Can be either '>','>=', '<', '<=', '=' or '!='.")
+            <prefix>:              Save filter output to <prefix>_filter.<format> in filter directory, if provided
+            <format>:              Save filter output in this format, if None use default pose format
+        
+            
+        Returns filtered DataFrame. Updates pose_df.
+        '''
+
+        # define filter output if <prefix> is provided, make sure output directory exists
+        if prefix:
+            if self.filter_dir == None:
+                raise AttributeError(f"Filter directory was not set! Did you set a working directory?")
+            os.makedirs(self.filter_dir, exist_ok=True)
+            # make sure output format is available
+            format = format.lower() or self.storage_format
+            if not format in FORMAT_STORAGE_DICT: raise KeyError(f"Format {format} not available. Format must be one of {[i for i in FORMAT_STORAGE_DICT]}")
+            # set filter output name
+            output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{format}")
+            # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
+            if overwrite == False and os.path.isfile(output_name):
+                filter_df = get_format(output_name)(output_name)
+                self.df = filter_df
+                return filter_df
+        
+        # Filter df down to the number of poses specified with <n>
+        orig_len = str(len(self.df))
+        filter_df = filter_dataframe_by_value(df=self.df, col=score_col, value=value, operator=operator).reset_index(drop=True)
+        print(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
+
+        """
+        #TODO: plotting functionalities
+        
+        # create filter-plots if specified.
+        if plot:
+            columns = plots.parse_cols_for_plotting(plot, subst=score_col)
+            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
+                                               cols=columns, titles=columns, y_labels=columns, out_path=f"{self.plot_dir}/{output_name}.png")
+        """
+
+        # save filtered dataframe if prefix is provided
+        if prefix: 
+            save_method_name = FORMAT_STORAGE_DICT.get(format)
+            getattr(filter_df, save_method_name)(output_name)
+
+        # update object attributs [df]
+        self.df = filter_df
+
+        return filter_df
+
+
+
 def get_format(path: str):
     '''reads in path as str and returns a pandas loading function.'''
     loading_function_dict = {
@@ -347,6 +492,8 @@ def get_format(path: str):
     }
     return loading_function_dict[path.split(".")[-1]]
 
+
+
 def load_poses(poses_path: str) -> Poses:
     '''Loads Poses class from a stored dataframe.'''
     return Poses().load_poses(poses_path)
@@ -355,3 +502,70 @@ def col_in_df(df:pd.DataFrame, column:str):
     '''Checks if column exists in DataFrame and returns KeyError if not.'''
     if not column in df.columns:
         raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
+    
+
+def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, layer_col="poses_description", sep="_", ascending=True) -> pd.DataFrame:
+    '''
+    remove_layers option allows to filter dataframe based on groupings after removing index layers.
+    If the option remove_layers is set (has to be type: int), then n determines how many c
+    if <remove_layers> = 0, dataframe will be grouped by values in <layer_col> and the grouped dfs will be filtered for top n rows
+    '''
+    # make sure <col> exists columns in <df>
+    col_in_df(df, col)
+
+    # if remove_layers is set, compile list of unique pose descriptions after removing one index layer:
+    if remove_layers:
+        if type(remove_layers) != int: raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
+
+        # make sure <layer_col> exists in df
+        col_in_df(df, layer_col)
+
+        # create temporary description column with removed index layers
+        df["tmp_layer_column"] = df[layer_col].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        
+        # group by temporary description column, filter top n rows per group
+        filtered = []
+        for group, group_df in df.groupby("tmp_layer_column", sort=False):
+            filtered.append(group_df.sort_values(by=col, ascending=ascending).head(determine_filter_n(group_df, n)))
+        filtered_df = pd.concat(filtered).reset_index(drop=True)
+
+        #drop temporary description column
+        filtered_df.drop("tmp_layer_column", axis=1, inplace=True)
+
+    else:
+        filtered_df = df.sort_values(by=col, ascending=ascending).head(determine_filter_n(df, n))
+
+    return filtered_df
+
+
+def determine_filter_n(df: pd.DataFrame, n: float) -> int:
+    '''
+    
+    '''
+    filter_n = float(n)
+    if filter_n < 1:
+        filter_n = round(len(df) * filter_n)
+    elif filter_n <= 0:
+        raise ValueError(f"ERROR: Argument <n> of filter functions cannot be smaller than 0. It has to be positive number. If n < 1, the top n fraction is taken from the DataFrame. if n > 1, the top n rows are taken from the DataFrame")
+
+    return int(filter_n)
+
+
+def filter_dataframe_by_value(df: pd.DataFrame, col: str, value, operator: str) -> pd.DataFrame:
+    '''
+    Filters dataframe based on a value and an operator.
+    '''
+    # make sure <col> exists columns in <df>
+    col_in_df(df, col)
+    
+    # Define the comparison based on the operator
+    if operator == '>': filtered_df = df[df[col] > value]
+    elif operator == '>=': filtered_df = df[df[col] >= value]
+    elif operator == '<': filtered_df = df[df[col] < value]
+    elif operator == '<=': filtered_df = df[df[col] <= value]
+    elif operator == '=': filtered_df = df[df[col] == value]
+    elif operator == '!=': filtered_df = df[df[col] != value]
+    else:
+        raise KeyError("Invalid operator. Supported operators are '>','>=', '<', '<=', '=', '!='.")
+
+    return filtered_df
