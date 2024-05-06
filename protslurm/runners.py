@@ -200,6 +200,8 @@ def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
 
 def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,set]:
     '''Uses Regex to split stuff'''
+    if options_str is None:
+        return dict(), set()
     # Regex to split the command line at the separator which is not inside quotes
     split_pattern = rf"(?<!\S){sep}(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)(?=(?:[^\']*\'[^\']*\')*[^\']*$)"
     parts = [x.strip() for x in re.split(split_pattern, options_str) if x]

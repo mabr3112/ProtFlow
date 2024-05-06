@@ -109,7 +109,7 @@ class Rosetta(Runner):
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
-        flags = " -".join(flags)
+        flags = " -" + " -".join(flags) if flags else ""
 
         run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"
         if overwrite is True:
