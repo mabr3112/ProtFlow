@@ -130,7 +130,7 @@ class Runner:
         # setup jobstarter
         run_jobstarter, runner_jobstarter, poses_jobstarter = jobstarters
         jobstarter = run_jobstarter or (runner_jobstarter or poses_jobstarter) # select jobstarter, priorities: Runner.run(jobstarter) > Runner.jobstarter > poses.jobstarter
-        if not jobstarter:
+        if not jobstarter or not isinstance(jobstarter, JobStarter):
             raise ValueError(f"No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
 
         # setup directory
