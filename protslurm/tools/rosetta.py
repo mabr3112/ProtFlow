@@ -17,7 +17,7 @@ from protslurm.runners import Runner, RunnerOutput
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 
-# TODO: @Adrian: Please setup output of Rosetta scores as .csv instead of default
+# TODO: @Adrian: Setup output of Rosetta scores as .csv instead of default
 
 class Rosetta(Runner):
     '''Class to run general Rosetta applications and collect its outputs into a DataFrame'''
@@ -55,7 +55,7 @@ class Rosetta(Runner):
         # otherwise raise error for not properly setting up the rosetta script paths.
         raise ValueError(f"No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list or str = None, overwrite: bool = False) -> Poses:
         '''Runs rosetta applications'''
         # setup runner:
         work_dir, jobstarter = self.generic_run_setup(
@@ -111,9 +111,19 @@ class Rosetta(Runner):
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
         flags = " -" + " -".join(flags) if flags else ""
 
-        run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags}"
-        if overwrite is True:
-            run_string += " -overwrite"
+        # check if interfering options were set
+        forbidden_options = ['-out:path:all', '-in:file:s', '-out:prefix', '-out:file:scorefile']
+        if (options and any(opt in options for opt in forbidden_options)) or (pose_options and any(pose_opt in pose_options for pose_opt in forbidden_options)):
+            raise KeyError(f"options and pose_options must not contain '-out:path:all', '-in:file:s', '-out:prefix' or '-out:file:scorefile'!")
+        
+        # parse options
+        opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
+        opts = " ".join([f"-{key}={value}" for key, value in opts.items()]) if opts else ""
+        flags = " -" + " -".join(flags) if flags else ""
+        overwrite = " -overwrite" if overwrite else ""
+        
+        # compile command
+        run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags} {overwrite}"
         return run_string
 
 
