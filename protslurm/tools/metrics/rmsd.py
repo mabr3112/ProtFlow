@@ -20,7 +20,7 @@ class BackboneRMSD(Runner):
     '''Class handling the calculation of Full-atom RMSDs as a runner.
     By default calculates only CA backbone RMSD.
     Uses BioPython for RMSD calculation'''
-    def __init__(self, ref_col: str = None, atoms: list = ["CA"], chains: list[str] = None, overwrite: bool = False, jobstarter: str =None): # pylint: disable=W0102
+    def __init__(self, ref_col: str = None, atoms: list = ["CA"], chains: list[str] = None, overwrite: bool = False, jobstarter: str = None): # pylint: disable=W0102
         self.set_ref_col(ref_col)
         self.set_atoms(atoms)
         self.set_chains(chains)
@@ -44,16 +44,19 @@ class BackboneRMSD(Runner):
         '''Method to set the chains (list of chain names) to calculate RMSD over.'''
         if chains is None:
             self.chains = None
-        if not isinstance(chains, list) or not all((isinstance(chain, str) for chain in chains)):
+        elif isinstance(chains, str) and len(chains) == 1:
+            self.chains = [chains]
+        elif not isinstance(chains, list) or not all((isinstance(chain, str) for chain in chains)):
             raise TypeError(f"Chains needs to be a list, chain names (list elements) must be string.")
-        self.chains = chains
+        else:
+            self.chains = chains
 
     def set_jobstarter(self, jobstarter: str) -> None:
         '''Sets Jobstarter for BackboneRMSD runner.'''
         self.jobstarter = jobstarter
 
     ########################## Calculations ################################################
-    def calc_rmsd(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None) -> None:
+    def calc_rmsd(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None) -> None:
         '''Calculates RMSD as specified.'''
         # if self.atoms is all, calculate Allatom RMSD.
 
@@ -63,8 +66,9 @@ class BackboneRMSD(Runner):
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
+
         ref_col = ref_col or self.ref_col
-        scorefile = f"{poses.work_dir}/{work_dir}/{prefix}_rmsd.json"
+        scorefile = f"{work_dir}/{prefix}_rmsd.json"
 
         # check if RMSD was calculated if overwrite was not set.
         if os.path.isdir(work_dir): # check if dir exists
@@ -77,11 +81,11 @@ class BackboneRMSD(Runner):
                 return output.return_poses()
 
             # if no outputs present, setup work_dir:
-            os.makedirs(work_dir)
+            os.makedirs(work_dir, exist_ok=True)
 
         # split poses into number of max_cores lists
         num_json_files = jobstarter.max_cores
-        pose_dict = {row["poses"]: row[ref_col] for row in poses}
+        pose_dict = {os.path.abspath(row["poses"]): os.path.abspath(row[ref_col]) for row in poses}
         pose_sublists = protslurm.jobstarters.split_list(poses.poses_list(), num_json_files)
 
         # setup inputs to calc_rmsd.py
@@ -93,25 +97,25 @@ class BackboneRMSD(Runner):
             json_dict = {pose: pose_dict[pose] for pose in sublist}
 
             # write to file
-            json_file = f"rmsd_input_{str(i)}"
+            json_file = f"{work_dir}/rmsd_input_{str(i)}.json"
             with open(json_file, "w", encoding="UTF-8") as f:
                 json.dump(json_dict, f)
             json_files.append(json_file)
 
             # write scorefile and cmd
             scorefiles.append((sf := f"{work_dir}/rmsd_input_{str(i)}_scores.json"))
-            cmds.append(f"{protslurm_python} {script_dir}/calc_rmsd.py --input_json {json_file} --out_path --output_path {sf}")
+            cmds.append(f"{protslurm_python} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
 
         # add options to cmds:
+        chains = chains or self.chains
         if self.atoms:
-            cmds = [cmd + f" --atoms {self.atoms}" for cmd in cmds]
-        if self.chains:
-            cmds = [cmd + f" --chains {self.chains}" for cmd in cmds]
+            cmds = [cmd + f" --atoms='{','.join(self.atoms)}'" for cmd in cmds]
+        if chains:
+            cmds = [cmd + f" --chains='{','.join(chains)}'" for cmd in cmds]
 
-        # run commands
+        # run command
         jobstarter.start(
             cmds = cmds,
-            options = None,
             jobname = "backbone_rmsd",
             output_path = work_dir
         )
@@ -134,11 +138,14 @@ class BackboneRMSD(Runner):
 
 class MotifRMSD(Runner):
     '''Class handling'''
-    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, jobstarter: JobStarter = None):
+    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, target_chains: list[str] = None, ref_chains: list[str] = None, jobstarter: JobStarter = None):
+        #TODO implement MotifRMSD calculation based on Chain input!
         self.set_jobstarter(jobstarter)
         self.set_ref_col(ref_col)
         self.set_target_motif(target_motif)
         self.set_ref_motif(ref_motif)
+        self.set_target_chains(target_chains)
+        self.set_ref_chains(ref_chains)
 
     def __str__(self):
         return "Heavyatom motif rmsd calculator"
@@ -159,6 +166,14 @@ class MotifRMSD(Runner):
         '''Sets Jobstarter for MotifRMSD runner.'''
         self.jobstarter = jobstarter
 
+    def set_target_chains(self, chains: list[str]) -> None:
+        '''Sets target chains for MotifRMSD class.'''
+        self.target_chains = chains if isinstance(chains, list) else [chains]
+    
+    def set_ref_chains(self, chains: list[str]) -> None:
+        '''Sets reference chains for MotifRMSD class.'''
+        self.ref_chains = chains if isinstance(chains, list) else [chains]
+
     ################################################# Calcs ################################################
 
     def run(self, poses, prefix, jobstarter):
@@ -178,6 +193,7 @@ class MotifRMSD(Runner):
             prefix = prefix,
             jobstarters = [jobstarter, self.jobstarter, poses.default_jobstarter]
         )
+        print(work_dir)
 
         # check if script exists
         if not os.path.isfile(script_path):
@@ -260,7 +276,7 @@ class MotifRMSD(Runner):
         # construct rmsd_input_dict:
         rmsd_input_dict = {pose: {} for pose in poses.poses_list()}
         for pose, ref, ref_motif_, target_motif_ in zip(poses.poses_list(), ref_l, ref_motif_l, target_motif_l):
-            rmsd_input_dict[pose]["ref_pdb"] = ref
+            rmsd_input_dict[pose]["ref_pdb"] = os.path.abspath(ref)
             rmsd_input_dict[pose]["target_motif"] = target_motif_
             rmsd_input_dict[pose]["reference_motif"] = ref_motif_
 

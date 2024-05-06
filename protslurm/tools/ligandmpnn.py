@@ -18,7 +18,7 @@ import protslurm.tools
 import protslurm.runners
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
-from protslurm.runners import Runner, RunnerOutput, expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string
+from protslurm.runners import Runner, RunnerOutput, regex_expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string
 
 if not protslurm.config.LIGANDMPNN_SCRIPT_PATH:
     raise ValueError(f"No path is set for ligandmpnn run.py. Set the path in the config.py file under LIGANDMPNN_SCRIPT_PATH")
@@ -45,7 +45,7 @@ class LigandMPNN(Runner):
     def __str__(self):
         return "ligandmpnn.py"
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, nseq:int=None, model_type:str=None, options:str=None, pose_options:object=None, fixed_res_col:str=None, design_res_col:str=None, pose_opt_cols:dict=None, return_seq_threaded_pdbs_as_pose:bool=False, preserve_original_output:bool=True, overwrite:bool=False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = None, model_type: str = None, options: str = None, pose_options: object = None, fixed_res_col: str = None, design_res_col: str = None, pose_opt_cols: dict = None, return_seq_threaded_pdbs_as_pose: bool = False, preserve_original_output: bool = True, overwrite: bool = False) -> Poses:
         '''Runs ligandmpnn.py on acluster.
         Default model_type is ligand_mpnn.'''
         # run in batch mode if pose_options are not set:
@@ -68,11 +68,13 @@ class LigandMPNN(Runner):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
 
         # integrate redesigned and fixed residue parameters into pose_opt_cols:
-        pose_opt_cols["fixed_residues"] = fixed_res_col
-        pose_opt_cols["redesigned_residues"] = design_res_col
+        if fixed_res_col is not None:
+            pose_opt_cols["fixed_residues"] = fixed_res_col
+        if design_res_col is not None:
+            pose_opt_cols["redesigned_residues"] = design_res_col
 
         # parse pose_opt_cols into pose_options format.
-        pose_opt_cols_options = self.parse_pose_opt_cols(pose_opt_cols, output_dir=work_dir)
+        pose_opt_cols_options = self.parse_pose_opt_cols(poses=poses, pose_opt_cols=pose_opt_cols, output_dir=work_dir)
 
         # parse pose_options
         pose_options = self.prep_pose_options(poses=poses, pose_options=pose_options)
@@ -130,14 +132,13 @@ class LigandMPNN(Runner):
 
         # split cmds list into n=num_batches sublists
         cmd_sublists = protslurm.jobstarters.split_list(cmds, n_sublists=num_batches)
-        print(cmd_sublists)
 
         # concatenate cmds: parse _multi arguments into .json files and keep all other arguments in options.
         batch_cmds = []
         for i, cmd_list in enumerate(cmd_sublists, start=1):
             full_cmd_list = [cmd.split(" ") for cmd in cmd_list]
-            opts_flags_list = [expand_options_flags(" ".join(cmd_split[2:])) for cmd_split in full_cmd_list]
-            opts_list = [x[0] for x in opts_flags_list] # expand_options_flags() returns (options, flags)
+            opts_flags_list = [regex_expand_options_flags(" ".join(cmd_split[2:])) for cmd_split in full_cmd_list]
+            opts_list = [x[0] for x in opts_flags_list] # regex_expand_options_flags() returns (options, flags)
 
             # take first cmd for general options and flags
             full_opts_flags = opts_flags_list[0]
@@ -167,7 +168,7 @@ class LigandMPNN(Runner):
 
         return batch_cmds
 
-    def parse_pose_opt_cols(self, poses:Poses, output_dir:str, pose_opt_cols:dict=None) -> list[dict]:
+    def parse_pose_opt_cols(self, poses: Poses, output_dir: str, pose_opt_cols: dict = None) -> list[dict]:
         '''Parses pose_opt_cols into pose_options formatted strings to later combine with pose_options.'''
         # return list of empty strings if pose_opts_col is None.
         if pose_opt_cols is None:
@@ -191,7 +192,7 @@ class LigandMPNN(Runner):
         pose_options = []
         for pose in poses:
             opts = []
-            for mpnn_arg, mpnn_arg_col in pose_opt_cols.values():
+            for mpnn_arg, mpnn_arg_col in pose_opt_cols.items():
                 # arguments that must be written into .json files:
                 if mpnn_arg in ["bias_AA_per_residue", "omit_AA_per_residue"]:
                     output_path = f"{json_dir}/{mpnn_arg}_{pose['poses_description']}.json"
@@ -199,7 +200,7 @@ class LigandMPNN(Runner):
 
                 # arguments that can be parsed as residues (from ResidueSelection objects):
                 elif mpnn_arg in ["redesigned_residues", "fixed_residues", "transmembrane_buried", "transmembrane_interface"]:
-                    opts.append(f"--{mpnn_arg}={parse_residues(pose[mpnn_arg_col])}")
+                    opts.append(f"--{mpnn_arg}='{parse_residues(pose[mpnn_arg_col])}'")
 
                 # all other arguments:
                 else:

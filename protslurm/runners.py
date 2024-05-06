@@ -2,6 +2,8 @@
 # builtins
 import logging
 import os
+import re
+import shlex
 
 # dependencies
 import pandas as pd
@@ -67,11 +69,12 @@ class RunnerOutput:
             raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']")
 
         # reset poses and poses_description column
-        merged_df["poses"] = merged_df[f"{self.prefix}_location"]
+        merged_df["poses"] = [os.path.abspath(pose) for pose in merged_df[f"{self.prefix}_location"].to_list()]
         merged_df["poses_description"] = merged_df[f"{self.prefix}_description"]
 
         # integrate new results into Poses object
         self.poses.df = merged_df
+        self.poses.df.to_json(self.poses.scorefile)
         return self.poses
 
 class Runner:
@@ -108,7 +111,7 @@ class Runner:
             # make sure an empty list is passed as pose_options!
             pose_options = [None for _ in poses]
 
-        if len(poses) != len(pose_options) and len(poses) is not 0:
+        if len(poses) != len(pose_options) and len(poses) != 0:
             raise ValueError(f"Arguments <poses> and <pose_options> for RFdiffusion must be of the same length. There might be an error with your pose_options argument!\nlen(poses) = {poses}\nlen(pose_options) = {len(pose_options)}")
 
         # if pose_options is list and as long as poses, just return list. Has to be list of dicts.
@@ -161,8 +164,8 @@ def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[di
     merging the results, ensuring that pose-specific options and flags are appropriately prioritized and duplicates are removed.
     """
     # parse into options and flags:
-    opts, flags = expand_options_flags(options, sep=sep)
-    pose_opts, pose_flags = expand_options_flags(pose_options, sep=sep)
+    opts, flags = regex_expand_options_flags(options, sep=sep)
+    pose_opts, pose_flags = regex_expand_options_flags(pose_options, sep=sep)
 
     # merge options and pose_options (pose_opts overwrite opts), same for flags
     opts.update(pose_opts)
@@ -189,12 +192,46 @@ def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
         if len((x := item.split())) > 1:
             opts[x[0]] = " ".join(x[1:])
         elif len((x := item.split("="))) > 1:
-            opts[x[0]] = "=".join(x[1:])
+            opts[x[0]] = " ".join(x[1:])
         else:
             flags.append(x[0])
 
     return opts, set(flags)
 
+def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,set]:
+    '''Uses Regex to split stuff'''
+    # Regex to split the command line at the separator which is not inside quotes
+    split_pattern = rf"(?<!\S){sep}(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)(?=(?:[^\']*\'[^\']*\')*[^\']*$)"
+    parts = [x.strip() for x in re.split(split_pattern, options_str) if x]
+
+    opts = {}
+    flags = []
+
+    # Setup part_pattern that splits individual parts at first occurrence of whitespace or equals sign.
+    part_pattern = r"\s+|\s*=\s*"
+
+    for part in parts:
+        split = re.split(part_pattern, part, maxsplit=1)
+        if len(split) > 1:
+            opts[split[0]] = split[1]
+        else:
+            flags.append(split[0])
+    
+    return opts, set(flags)
+    
 def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
     '''Converts options dict and flags list into one string'''
-    return " ".join([f"{sep}{key}={value}" for key, value in options.items()]) + f" {sep}".join(flags)
+    def value_in_quotes(value) -> str:
+        '''Makes sure that split commandline options are passed in quotes: --option='quoted list of args' '''
+        if len(str(value).split(" ")) > 1:
+            if not value.startswith("'") and value.endswith("'") or value.startswith('"') and value.endswith('"'):
+                return f"'{value}'"
+        return value
+
+    # assemble options
+    out_str = " ".join([f"{sep}{key}={value_in_quotes(value)}" for key, value in options.items()])
+
+    # if flags are present, assemble those too and return
+    if flags:
+        out_str += f" {sep}" + f" {sep}".join(flags)
+    return out_str

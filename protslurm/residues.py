@@ -40,25 +40,24 @@ class ResidueSelection:
 
 def parse_selection(input_selection, delim: str = ",") -> tuple[tuple[str,int]]:
     '''Parses selction into ResidueSelection formatted selection.'''
+    #TODO: This implementation is safe from bugs, but not very efficient.
     if isinstance(input_selection, str):
         return tuple(parse_residue(residue.strip()) for residue in input_selection.split(delim))
-    if isinstance(input_selection, list):
-        return tuple(parse_residue(residue) for residue in input_selection)
+    if isinstance(input_selection, list) or isinstance(input_selection, tuple):
+        if all(isinstance(residue, str) for residue in input_selection):
+            return tuple(parse_residue(residue) for residue in input_selection)
+        elif all(isinstance(residue, list) or isinstance(residue, tuple) for residue in input_selection):
+            return tuple(parse_residue("".join([str(r) for r in residue])) for residue in input_selection)
     raise TypeError(f"Unsupported Input type for parameter 'input_selection' {type(input_selection)}. Only str and list allowed.")
 
 def parse_residue(residue_identifier: str) -> tuple[str,int]:
-    '''parses singular residue identifier into a tuple (chain, residue_index)'''
+    '''parses singular residue identifier into a tuple (chain, residue_index).
+    Currently only supports single letter chain identifiers!'''
     chain_first = False if residue_identifier[0].isdigit() else True
-    index_transition = None
-    for i, char in enumerate(residue_identifier):
-        # search for transition point between letter and number
-        if char.isdigit() != residue_identifier[max(0, i-1)].isdigit():
-            index_transition = i
-            break
 
     # assemble residue tuple
-    chain = residue_identifier[:index_transition] if chain_first else residue_identifier[index_transition:]
-    residue_index = residue_identifier[index_transition:] if chain_first else residue_identifier[:index_transition]
+    chain = residue_identifier[0] if chain_first else residue_identifier[-1]
+    residue_index = residue_identifier[1:] if chain_first else residue_identifier[:-1]
 
     # Convert residue_index to int for accurate typing
     return (chain, int(residue_index))
@@ -66,3 +65,9 @@ def parse_residue(residue_identifier: str) -> tuple[str,int]:
 def residue_selection(input_selection, delim: str = ",") -> ResidueSelection:
     '''Creates residue selection from selection of residues.'''
     return ResidueSelection(input_selection, delim=delim)
+
+def from_dict(input_dict: dict) -> ResidueSelection:
+    '''Creates ResidueSelection object from dictionary. The dictionary specifies a motif in this way: {chain: [residues], ...}'''
+    return ResidueSelection([f"{chain}{resi}" for chain, res_l in input_dict.items() for resi in res_l])
+
+#TODO @Adrian please write a contig parser for ResidueSelection construction: ResidueSelection(contig="A1-6,A8,A10-120,B1-9")

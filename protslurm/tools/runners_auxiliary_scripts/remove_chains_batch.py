@@ -18,6 +18,8 @@ def remove_chain_from_pdb(pdb_path: str, chains: list[str]) -> Structure:
         chains = [chains]
 
     for chain in chains:
+        if chain not in [x.id for x in pose.get_chains()]:
+            raise KeyError(f"Chain {chain} not found in pose. Available Chains: {list(pose.get_chains())}")
         pose.detach_child(chain)
 
     return pose
@@ -40,7 +42,7 @@ def main(args):
         if args.inplace:
             new_path = pdb
         elif args.output_dir:
-            new_path = f"{args.output_dir}/{pdb.rsplit('/', maxsplit=1)}"
+            new_path = f"{args.output_dir}/{pdb.rsplit('/', maxsplit=1)[-1]}"
 
         save_structure_to_pdbfile(pose, save_path=new_path)
 

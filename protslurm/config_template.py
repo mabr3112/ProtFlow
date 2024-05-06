@@ -5,6 +5,7 @@ This module contains all paths to tools integrated in ProtSLURM.
 PROTSLURM_PYTHON = ""
 
 #auxiliary runners directory path
+#TODO: @Markus Implement checkup if AUXILIARY_RUNNER_SCRIPTS_DIR points to the correct directory (Think about pointing to protslurm directory)!
 AUXILIARY_RUNNER_SCRIPTS_DIR = ""
 
 #protein_generator.py
