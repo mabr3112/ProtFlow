@@ -45,6 +45,7 @@ from protslurm.jobstarters import JobStarter
 from protslurm.residues import ResidueSelection
 from protslurm.utils.utils import parse_fasta_to_dict
 from protslurm.utils.biopython_tools import load_structure_from_pdbfile
+import protslurm.utils.plotting as plots
 
 FORMAT_STORAGE_DICT = {
     "json": "to_json",
@@ -382,7 +383,7 @@ class Poses:
                 raise AttributeError(f"Filter directory was not set! Did you set a working directory?")
             os.makedirs(self.filter_dir, exist_ok=True)
             # make sure output format is available
-            format = format.lower() or self.storage_format
+            format = format.lower() if format else self.storage_format
             if not format in FORMAT_STORAGE_DICT: raise KeyError(f"Format {format} not available. Format must be on of {[i for i in FORMAT_STORAGE_DICT]}")
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{format}")
@@ -397,20 +398,22 @@ class Poses:
         filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
         print(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
 
-        """
-        #TODO: plotting functionalities
-        
-        # create filter-plots if specified.
-        if plot:
-            columns = plots.parse_cols_for_plotting(plot, subst=score_col)
-            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
-                                               cols=columns, titles=columns, y_labels=columns, out_path=f"{self.plot_dir}/{output_name}.png")
-        """
-
         # save filtered dataframe if prefix is provided
         if prefix: 
             save_method_name = FORMAT_STORAGE_DICT.get(format)
             getattr(filter_df, save_method_name)(output_name)
+
+        #TODO: plotting functionalities
+        
+        # create filter-plots if specified.
+        if plot:
+            if self.plots_dir == None:
+                raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
+            os.makedirs(self.plots_dir, exist_ok=True)
+            cols = [score_col]
+            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
+                                               cols=cols, titles=cols, y_labels=cols, out_path=os.path.join(self.plots_dir, f"{prefix}_filter.png"))
+    
 
         # update object attributs [df]
         self.df = filter_df
@@ -418,7 +421,7 @@ class Poses:
         return filter_df
     
 
-    def filter_poses_by_value(self, n: float, score_col: str, value, operator: str, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> pd.DataFrame:
+    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> pd.DataFrame:
         '''
         Filters your current poses by a specified <score_col> according to the provided <value> and <operator>.
         
@@ -444,7 +447,7 @@ class Poses:
                 raise AttributeError(f"Filter directory was not set! Did you set a working directory?")
             os.makedirs(self.filter_dir, exist_ok=True)
             # make sure output format is available
-            format = format.lower() or self.storage_format
+            format = format.lower() if format else self.storage_format
             if not format in FORMAT_STORAGE_DICT: raise KeyError(f"Format {format} not available. Format must be one of {[i for i in FORMAT_STORAGE_DICT]}")
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{format}")
@@ -459,15 +462,13 @@ class Poses:
         filter_df = filter_dataframe_by_value(df=self.df, col=score_col, value=value, operator=operator).reset_index(drop=True)
         print(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
 
-        """
-        #TODO: plotting functionalities
-        
-        # create filter-plots if specified.
         if plot:
-            columns = plots.parse_cols_for_plotting(plot, subst=score_col)
+            if self.plots_dir == None:
+                raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
+            os.makedirs(self.plots_dir, exist_ok=True)
+            cols = [score_col]
             plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
-                                               cols=columns, titles=columns, y_labels=columns, out_path=f"{self.plot_dir}/{output_name}.png")
-        """
+                                               cols=cols, titles=cols, y_labels=cols, out_path=os.path.join(self.plots_dir, f"{prefix}_filter.png"))
 
         # save filtered dataframe if prefix is provided
         if prefix: 

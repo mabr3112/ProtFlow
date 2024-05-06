@@ -135,12 +135,17 @@ def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=Non
     # get colors from colormap
     colors = [mcolors.to_hex(color) for color in plt.get_cmap(colormap).colors]
     fig, ax_list = plt.subplots(1, len(cols), figsize=(3*len(cols)+0.8*(len(dfs)), 5))
+    # TODO: plt.subplots returns a single, non-iterable axis object if len(cols) = 1, therefore we need to put it in a list to make it iterable. No idea why this was not the case in iterative refinement
+    if not isinstance(ax_list, np.ndarray):
+        ax_list = [ax_list]
+
     fig.subplots_adjust(wspace=1, hspace=0.8)
     if not dims: dims = [None for x in cols]
 
-    for ax, col, name, label, dim in zip(ax_list, cols, titles, y_labels, dims):
+    for ax, col, name, label, dim, length in zip(ax_list, cols, titles, y_labels, dims, [len(df.index) for df in dfs]):
         ax.set_title(name, size=15, y=1.05)
         ax.set_ylabel(label, size=15)
+
         ax.set_xticks([])
         data = [df[col].to_list() for df in dfs]
         parts = ax.violinplot([df[col].to_list() for df in dfs], widths=0.7)
@@ -153,7 +158,8 @@ def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=Non
             ax.vlines(i+1, quartile1, quartile3, color="k", linestyle="-", lw=5)
             ax.vlines(i+1, np.min(d), np.max(d), color="k", linestyle="-", lw=2)
 
-        handles = [mpatches.Patch(color=c, label=l) for c, l in zip(colors, df_names)]
+        labels = [f"{l} (n={len(df.index)})" for l, df in zip(df_names, dfs)]
+        handles = [mpatches.Patch(color=c, label=l) for c, l in zip(colors, labels)]
         fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 0.1),
                   fancybox=True, shadow=True, ncol=5, fontsize=13)
         
