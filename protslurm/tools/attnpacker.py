@@ -31,13 +31,14 @@ class AttnPacker(Runner):
     def __str__(self):
         return "attnpacker.py"
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter, options:str=None, pose_options:str=None, overwrite:bool=False) -> Poses:
+    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, options:str=None, pose_options:str=None, overwrite:bool=False) -> Poses:
         '''Runs attnpacker.py on acluster'''
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
+
 
         # setup attnpacker specific dirs:
         pdb_dir = os.path.join(work_dir, 'output_pdbs')
@@ -57,7 +58,7 @@ class AttnPacker(Runner):
         cmds = [self.write_cmd(pose, output_dir=work_dir, options=options, pose_options=pose_opts) for pose, pose_opts in zip(poses.df["poses"].to_list(), pose_options)]
 
         # run:
-        logging.info(f"Starting attnpacker.py on {len(poses)} poses with {len(jobstarter.max_cores)} cores.")
+        logging.info(f"Starting attnpacker.py on {len(poses)} poses with {jobstarter.max_cores} cores.")
         jobstarter.start(
             cmds=cmds,
             jobname="attnpacker",
@@ -71,11 +72,19 @@ class AttnPacker(Runner):
 
     def write_cmd(self, pose_path:str, output_dir:str, options:str, pose_options:str):
         '''Writes Command to run ligandmpnn.py'''
+
+        # check if interfering options were set
+        forbidden_options = ['--attnpacker_dir', '--output_dir', '--input_pdb', '--scorefile']
+        if (options and any(_ in options for _ in forbidden_options)) or (pose_options and any(_ in pose_options for _ in forbidden_options)):
+            raise KeyError(f"Options and pose_options must not contain '--attnpacker_dir', '--output_dir', '--input_pdb' or '--scorefile'!")
+
         pdb_dir = os.path.join(output_dir, "output_pdbs")
+        if options:
+            options = options + f" --attnpacker_dir {self.script_path} --output_dir {pdb_dir} --input_pdb {pose_path} --scorefile {output_dir}/attnpacker_scores.csv"
+        else:
+            options = f"--attnpacker_dir {self.script_path} --output_dir {pdb_dir} --input_pdb {pose_path} --scorefile {output_dir}/attnpacker_scores.csv"
 
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
-        opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
-        flags = " --".join(flags)
 
-        return f"{self.python_path} {protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/run_attnpacker.py --attnpacker_dir {self.script_path} --output_dir {pdb_dir} --input_pdb {pose_path} --scorefile {output_dir}/attnpacker_scores.csv {opts} {flags}"
+        return f"{self.python_path} {protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/run_attnpacker.py {protslurm.runners.options_flags_to_string(opts, flags, sep='--')}"
