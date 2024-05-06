@@ -55,7 +55,7 @@ class Rosetta(Runner):
         # otherwise raise error for not properly setting up the rosetta script paths.
         raise ValueError(f"No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list or str = None, overwrite: bool = False) -> Poses:
         '''Runs rosetta applications'''
         # setup runner:
         work_dir, jobstarter = self.generic_run_setup(
@@ -107,6 +107,11 @@ class Rosetta(Runner):
     def write_cmd(self, rosetta_application: str, pose_path: str, output_dir: str, i: int, rosettascore_path: str, overwrite: bool = False, options: str = None, pose_options: str = None):
         '''Writes Command to run ligandmpnn.py'''
 
+        # check if interfering options were set
+        forbidden_options = ['-out:path:all', '-in:file:s', '-out:prefix', '-nstruct', '-out:file:scorefile']
+        if (options and any(_ in options for _ in forbidden_options)) or (pose_options and any(_ in pose_options for _ in ['-out:path:all', '-in:file:s', '-out:prefix', '-nstruct', '-out:file:scorefile'])):
+            raise KeyError(f"Options and pose options must not contain '-out:path:all', '-in:file:s', '-out:prefix', '-nstruct' or '-out:file:scorefile'!")
+        
         if options:
             options = options + f" -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path}"
         else:
