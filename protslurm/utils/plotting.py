@@ -198,6 +198,8 @@ def violinplot_multiple_cols(df, cols, titles, y_labels, dims=None, out_path=Non
         ax.vlines(1, quartile1, quartile3, color="k", linestyle="-", lw=10)
         ax.vlines(1, np.min(data), np.max(data), color="k", linestyle="-", lw=2)
 
+    plt.figtext(0.5, 0.05, f'n = {len(df.index)}', ha='center', fontsize=12)
+    
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
     else: fig.show()
     return None
