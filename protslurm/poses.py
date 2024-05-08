@@ -249,6 +249,28 @@ class Poses:
 
         # return list containing paths to .fa files as poses.
         return out_poses
+    
+    def determine_pose_type(self):
+        '''checks the file extension of poses, returns the extension or a list of extensions'''
+
+        def extract_extension(file_path):
+            _, ext = os.path.splitext(file_path)
+            return ext
+        
+        # extract extensions and create a set containing only unique values
+        ext = list(set(self.df['poses'].apply(extract_extension).to_list()))
+        if len(ext) > 1:
+            logging.warning(f"Multiple file extensions present in poses: {ext}")
+            return ext
+        elif len(ext) == 1:
+            ext = ext[0]
+            if ext == "":
+                logging.warning(f"Could not determine file extension from poses!")
+                return None
+            else:
+                logging.info(f"Poses identified as {ext} files")
+                return ext
+
 
     ############################################ Input Methods ######################################
     def load_poses(self, poses_path: str) -> "Poses":
@@ -521,6 +543,9 @@ class Poses:
         logging.info("Composite score creation completed.")
 
         return self
+
+    ########################################## Metrics ###############################################
+
 
 
 
