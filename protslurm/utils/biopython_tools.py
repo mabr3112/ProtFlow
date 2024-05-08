@@ -5,11 +5,21 @@ Module to provide utilities revolving around BioPython
 # Imports
 import copy
 import os
+from typing import Union
+import pandas as pd
+
+
 
 # dependencies
 import Bio
 import Bio.PDB
 from Bio.PDB.Structure import Structure
+from Bio.Seq import Seq
+from Bio import SeqIO
+from Bio.SeqRecord import SeqRecord
+from Bio.SeqUtils.ProtParam import ProteinAnalysis
+
+
 
 # customs
 from protslurm.residues import ResidueSelection
@@ -239,3 +249,66 @@ def renumber_pose_by_residue_mapping(pose: Bio.PDB.Structure.Structure, residue_
             out_pose.detach_child(chain_id)
 
     return out_pose
+
+
+######################## Bio.Seq functions ##########################################
+
+def load_sequence_from_fasta(fasta:str, return_multiple_entries:bool=True):
+    '''
+    imports a fasta file and returns a single record if it is a single entry fasta or <return_multiple_entries> is False, otherwise return a record iterator
+    '''
+    records = SeqIO.parse(fasta, "fasta")
+    if len([i for i in records]) == 1 or return_multiple_entries == False:
+        return next(records)
+    else:
+        return records
+
+
+def determine_protparams(seq:Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], pH:float=7):
+    '''
+    calculates protein features based on sequence. Returns a dataframe. See Bio.SeqUtils.ProtParam for further information.
+    Included are:
+        -num_amino_acids                    total number of amino acids in the sequence
+        -molecular_weight                   molecular weight of amino acids in sequence in Da
+        -aromaticity                        relative frequency of PHE + TRP + TYR
+        -GRAVY                              gravy according to Kyte and Doolittle
+        -instability_index                  Calculate the instability index according to Guruprasad et al 1990.
+                                            Any value above 40 means the protein is unstable (has a short half life).
+        -isoelectric_point                  isoelectric point based on sequence
+        -molar_extinction_coefficient_red   molar extinction coefficient assuming cysteines are reduced.
+        -molar_extinction_coefficient_ox    molar extinction coefficient assuming cysteines are oxidized, forming CYS-CYS-bond.
+        -flexibility                        flexibility according to Vihinen, 1994.
+        -secondary_structure_fraction       fraction of helix, turn and sheet. returns a list of the fraction of amino acids which tend to
+                                            be in helix, turn or sheet. amino acids in helix: V, I, Y, F, W, L. amino acids in turn: N, P, G, S.
+                                            amino acids in sheet: E, M, A, L. returns a tuple of three floats (helix, turn, sheet).
+        -charge_at_ph_<pH>                  charge of a protein at given pH. default = 7
+    '''
+
+    if isinstance(seq, Bio.SeqRecord.SeqRecord):
+        seq = seq.seq
+    elif isinstance(seq, Bio.Seq.Seq):
+        seq = seq.data
+    elif isinstance(seq, str):
+        seq = seq
+    else:
+        raise TypeError(f"Input must be a sequence, not {type(seq)}!")
+
+    protparams = ProteinAnalysis(seq)
+    data = {
+        "sequence": seq,
+        "num_amino_acids": protparams.count_amino_acids(),
+        "molecular_weight": protparams.molecular_weight(),
+        "aromaticity": protparams.aromaticity(),
+        "GRAVY": protparams.gravy(),
+        "instability_index": protparams.instability_index(),
+        "isoelectric_point": protparams.isoelectric_point(),
+        "molar_extinction_coefficient": protparams.molar_extinction_coefficient(),
+        "flexibility": protparams.flexibility(),
+        "secondary_structure_fraction": protparams.secondary_structure_fraction(),
+        f"charge_at_pH_{pH}": protparams.charge_at_pH(pH=pH)
+    }
+
+    return pd.DataFrame(data)
+    
+    
+
