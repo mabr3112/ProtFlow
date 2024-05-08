@@ -28,7 +28,7 @@ class ProtParam(Runner):
 
 
     ########################## Calculations ################################################
-    def run_protparam(self, poses: Poses, prefix: str, seq_col: str = None, pH: float = 7, overwrite=False, jobstarter: JobStarter = None) -> None:
+    def run(self, poses: Poses, prefix: str, seq_col: str = None, pH: float = 7, overwrite=False, jobstarter: JobStarter = None) -> None:
         '''
         Calculates protparam sequence features like molecular weight, isoelectric point, molar extinction coefficient etc.
             <poses>                 input poses
