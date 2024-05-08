@@ -268,12 +268,9 @@ def determine_protparams(seq:Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], p
     '''
     calculates protein features based on sequence. Returns a dataframe. See Bio.SeqUtils.ProtParam for further information.
     Included are:
-        -num_amino_acids                    total number of amino acids in the sequence
         -molecular_weight                   molecular weight of amino acids in sequence in Da
         -aromaticity                        relative frequency of PHE + TRP + TYR
         -GRAVY                              gravy according to Kyte and Doolittle
-        -instability_index                  Calculate the instability index according to Guruprasad et al 1990.
-                                            Any value above 40 means the protein is unstable (has a short half life).
         -isoelectric_point                  isoelectric point based on sequence
         -molar_extinction_coefficient_red   molar extinction coefficient assuming cysteines are reduced.
         -molar_extinction_coefficient_ox    molar extinction coefficient assuming cysteines are oxidized, forming CYS-CYS-bond.
@@ -284,6 +281,7 @@ def determine_protparams(seq:Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], p
         -charge_at_ph_<pH>                  charge of a protein at given pH. default = 7
     '''
 
+    # check which type of input is used
     if isinstance(seq, Bio.SeqRecord.SeqRecord):
         seq = seq.seq
     elif isinstance(seq, Bio.Seq.Seq):
@@ -292,20 +290,22 @@ def determine_protparams(seq:Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], p
         seq = seq
     else:
         raise TypeError(f"Input must be a sequence, not {type(seq)}!")
-
+    
+    # analyze sequence
     protparams = ProteinAnalysis(seq)
+
+    # create data dict
     data = {
         "sequence": seq,
-        "num_amino_acids": protparams.count_amino_acids(),
-        "molecular_weight": protparams.molecular_weight(),
-        "aromaticity": protparams.aromaticity(),
-        "GRAVY": protparams.gravy(),
+        "molecular_weight": round(protparams.molecular_weight(), 3),
+        "aromaticity": round(protparams.aromaticity(), 4),
+        "GRAVY": round(protparams.gravy(), 4),
         "instability_index": protparams.instability_index(),
-        "isoelectric_point": protparams.isoelectric_point(),
-        "molar_extinction_coefficient": protparams.molar_extinction_coefficient(),
-        "flexibility": protparams.flexibility(),
+        "isoelectric_point": round(protparams.isoelectric_point(), 2),
+        "molar_extinction_coefficient_red": protparams.molar_extinction_coefficient()[0],
+        "molar_extinction_coefficient_ox": protparams.molar_extinction_coefficient()[1],
         "secondary_structure_fraction": protparams.secondary_structure_fraction(),
-        f"charge_at_pH_{pH}": protparams.charge_at_pH(pH=pH)
+        f"charge_at_pH_{pH}": round(protparams.charge_at_pH(pH=pH), 2)
     }
 
     return pd.DataFrame(data)

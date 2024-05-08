@@ -53,15 +53,15 @@ class ProtParam(Runner):
         if not seq_col:
             # check poses file extension
             pose_type = poses.determine_pose_type()
-            if not pose_type in ["fa", "fasta", "pdb"]:
-                raise TypeError(f"Poses must be of type '.fa', '.fasta' or '.pdb, not {pose_type}!")
-            elif pose_type in ["fa", "fasta"]:
+            if not pose_type in [".fa", ".fasta", ".pdb"]:
+                raise TypeError(f"Poses must be of type '.fa', '.fasta' or '.pdb', not {pose_type}!")
+            elif pose_type in [".fa", ".fasta"]:
                 # directly use fasta files as input
                 # TODO: this assumes that it is a single entry fasta file (as it should be!)
                 seqs = [load_sequence_from_fasta(fasta=pose, return_multiple_entries=False).seq for pose in poses.df['poses'].to_list()]     
-            elif pose_type == "pdb":
+            elif pose_type == ".pdb":
                 # extract sequences from pdbs
-                seqs = [get_sequence_from_pose(load_structure_from_pdbfile(pose=pose)) for pose in poses.df['poses'].to_list()]
+                seqs = [get_sequence_from_pose(load_structure_from_pdbfile(path_to_pdb=pose)) for pose in poses.df['poses'].to_list()]
         else:
             # if not running on poses but on arbitrary sequences, get the sequences from the dataframe
             seqs = poses.df[seq_col].to_list()
@@ -71,6 +71,8 @@ class ProtParam(Runner):
         input_df = pd.DataFrame({"name": names, "sequence": seqs})
 
         num_json_files = jobstarter.max_cores
+        if num_json_files > len(input_df.index):
+            num_json_files = len(input_df.index)
 
         json_files = []
         # create multiple input dataframes to run in parallel
@@ -102,6 +104,8 @@ class ProtParam(Runner):
             scores.append(pd.read_json(f"{os.path.splitext(json)[0]}_out.json"))
         
         scores = pd.concat(scores)
+        scores = scores.merge(poses.df[['poses', 'poses_description']], left_on="description", right_on="poses_description").drop('poses_description', axis=1)
+        scores = scores.rename(columns={"poses": "location"})
 
         # write output scorefile
         scores.to_json(scorefile)
