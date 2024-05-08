@@ -45,6 +45,7 @@ from protslurm.jobstarters import JobStarter
 from protslurm.residues import ResidueSelection
 from protslurm.utils.utils import parse_fasta_to_dict
 from protslurm.utils.biopython_tools import load_structure_from_pdbfile
+import protslurm.utils.plotting as plots
 
 FORMAT_STORAGE_DICT = {
     "json": "to_json",
@@ -248,6 +249,28 @@ class Poses:
 
         # return list containing paths to .fa files as poses.
         return out_poses
+    
+    def determine_pose_type(self):
+        '''checks the file extension of poses, returns the extension or a list of extensions'''
+
+        def extract_extension(file_path):
+            _, ext = os.path.splitext(file_path)
+            return ext
+        
+        # extract extensions and create a set containing only unique values
+        ext = list(set(self.df['poses'].apply(extract_extension).to_list()))
+        if len(ext) > 1:
+            logging.warning(f"Multiple file extensions present in poses: {ext}")
+            return ext
+        elif len(ext) == 1:
+            ext = ext[0]
+            if ext == "":
+                logging.warning(f"Could not determine file extension from poses!")
+                return None
+            else:
+                logging.info(f"Poses identified as {ext} files")
+                return ext
+
 
     ############################################ Input Methods ######################################
     def load_poses(self, poses_path: str) -> "Poses":
@@ -344,11 +367,12 @@ class Poses:
             self.motifs = []
         self.motifs.append(motif_col)
 
+
+
     ########################################## Filtering ###############################################
 
 
-
-    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers=None, layer_col="poses_description", sep="_", ascending=True, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> pd.DataFrame:
+    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers=None, layer_col="poses_description", sep="_", ascending=True, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> "Poses":
         '''
         Filters your current poses by a specified scoreterm down to either a fraction (of all poses) or a total number of poses,
         depending on which value was given with <n>.
@@ -373,7 +397,7 @@ class Poses:
             
             
             
-        Returns filtered DataFrame. Updates pose_df.
+        Returns poses with filtered DataFrame. Updates pose_df.
         '''
 
         # define filter output if <prefix> is provided, make sure output directory exists
@@ -382,7 +406,7 @@ class Poses:
                 raise AttributeError(f"Filter directory was not set! Did you set a working directory?")
             os.makedirs(self.filter_dir, exist_ok=True)
             # make sure output format is available
-            format = format.lower() or self.storage_format
+            format = format.lower() if format else self.storage_format
             if not format in FORMAT_STORAGE_DICT: raise KeyError(f"Format {format} not available. Format must be on of {[i for i in FORMAT_STORAGE_DICT]}")
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{format}")
@@ -397,28 +421,30 @@ class Poses:
         filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
         print(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
 
-        """
-        #TODO: plotting functionalities
-        
-        # create filter-plots if specified.
-        if plot:
-            columns = plots.parse_cols_for_plotting(plot, subst=score_col)
-            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
-                                               cols=columns, titles=columns, y_labels=columns, out_path=f"{self.plot_dir}/{output_name}.png")
-        """
-
         # save filtered dataframe if prefix is provided
         if prefix: 
+            logging.info(f"Saving filter output to {output_name}.")
             save_method_name = FORMAT_STORAGE_DICT.get(format)
             getattr(filter_df, save_method_name)(output_name)
-
+        
+        # create filter-plots if specified.
+        if plot == True:
+            if self.plots_dir == None:
+                raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
+            os.makedirs(self.plots_dir, exist_ok=True)
+            out_path = os.path.join(self.plots_dir, f"{prefix}_filter.png")
+            logging.info(f"Creating filter plot at {out_path}.")
+            cols = [score_col]
+            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
+                                               cols=cols, titles=cols, y_labels=cols, out_path=out_path)
+    
         # update object attributs [df]
         self.df = filter_df
-
-        return filter_df
+        logging.info(f"Filtering completed.")
+        return self
     
 
-    def filter_poses_by_value(self, n: float, score_col: str, value, operator: str, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> pd.DataFrame:
+    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> "Poses":
         '''
         Filters your current poses by a specified <score_col> according to the provided <value> and <operator>.
         
@@ -435,8 +461,10 @@ class Poses:
             <format>:              Save filter output in this format, if None use default pose format
         
             
-        Returns filtered DataFrame. Updates pose_df.
+        Returns poses with filtered DataFrame. Updates pose_df.
         '''
+
+        logging.info(f"Filtering poses according to column {score_col} with operator {operator} and target value {value}")
 
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
@@ -444,7 +472,7 @@ class Poses:
                 raise AttributeError(f"Filter directory was not set! Did you set a working directory?")
             os.makedirs(self.filter_dir, exist_ok=True)
             # make sure output format is available
-            format = format.lower() or self.storage_format
+            format = format.lower() if format else self.storage_format
             if not format in FORMAT_STORAGE_DICT: raise KeyError(f"Format {format} not available. Format must be one of {[i for i in FORMAT_STORAGE_DICT]}")
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{format}")
@@ -455,30 +483,136 @@ class Poses:
                 return filter_df
         
         # Filter df down to the number of poses specified with <n>
-        orig_len = str(len(self.df))
+        orig_len = len(self.df)
         filter_df = filter_dataframe_by_value(df=self.df, col=score_col, value=value, operator=operator).reset_index(drop=True)
-        print(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
+        print(f"Filtered poses from {orig_len} to {len(filter_df.index)} poses.")
 
-        """
-        #TODO: plotting functionalities
-        
-        # create filter-plots if specified.
-        if plot:
-            columns = plots.parse_cols_for_plotting(plot, subst=score_col)
-            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
-                                               cols=columns, titles=columns, y_labels=columns, out_path=f"{self.plot_dir}/{output_name}.png")
-        """
 
         # save filtered dataframe if prefix is provided
         if prefix: 
+            logging.info(f"Saving filter output to {output_name}.")
             save_method_name = FORMAT_STORAGE_DICT.get(format)
             getattr(filter_df, save_method_name)(output_name)
 
+        if plot == True:
+            if self.plots_dir == None:
+                raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
+            os.makedirs(self.plots_dir, exist_ok=True)
+            out_path = os.path.join(self.plots_dir, f"{prefix}_filter.png")
+            logging.info(f"Creating filter plot at {out_path}.")
+            cols = [score_col]
+            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
+                                               cols=cols, titles=cols, y_labels=cols, out_path=out_path)
+
         # update object attributs [df]
         self.df = filter_df
+        logging.info(f"Filtering completed.")
+        return self
+    
 
-        return filter_df
 
+    ########################################## Score manipulation ###############################################
+
+    def calculate_composite_score(self, name: str, scoreterms: list[str], weights: list[float], plot: bool=False) -> "Poses":
+        '''
+        Combine multiple score columns by weighted addition. Individual scoreterms will be normalized before combination. Score will be scaled from 0 to 1, with 1 indicating the best score.
+        Args:
+            <name>              name of the column that should contain the composite score
+            <scoreterms>        list of score column names
+            <weights>           list of weights for each score column. score_col will be multiplied with weight before addition with other scoreterms.
+                                if the best value in a score column is the lowest, use negative weights (e.g. -1 for Rosetta total score) and vice versa. 
+        '''
+
+        logging.info(f"Creating composite score {name} for scoreterms {scoreterms} with weights {weights}")
+        # check if output column already exists in dataframe
+        if name in self.df:
+            logging.warning(f"Column {name} already exists in poses dataframe! It will be overwritten!")
+        # calculate composite score
+        self.df[name] = combine_dataframe_score_columns(df=self.df, scoreterms=scoreterms, weights=weights)
+
+        if plot == True:
+            if self.plots_dir == None:
+                raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
+            os.makedirs(self.plots_dir, exist_ok=True)
+            out_path = os.path.join(self.plots_dir, f"{name}_comp_score.png")
+            logging.info(f"Creating composite score plot at {out_path}.")
+            scoreterms.append(name)
+            plots.violinplot_multiple_cols(df=self.df, cols=scoreterms, titles=scoreterms, y_labels=scoreterms, dims=None, out_path=out_path)
+
+        self.save_scores()
+        logging.info("Composite score creation completed.")
+
+        return self
+
+    ########################################## Metrics ###############################################
+
+
+
+
+
+def normalize_series(ser:pd.Series, scale:bool=False) -> pd.Series:
+    '''
+    Normalizes a pandas series by subtracting the median and dividing by standard deviation. If scale = True, the normalized values will be scaled from 0 to 1. Returns a series.
+    '''
+    ser = ser.copy()
+    # calculate median and standard deviation
+    median = ser.median()
+    std = ser.std()
+    # check if all values in <score_col> are the same, return 0 if yes
+    if ser.nunique() == 1:
+        ser[:] = 0
+        return ser
+    # normalize score by subtracting median and dividing by standard deviation
+    ser = (ser - median) / std
+    # scale output to values between 0 and 1
+    if scale == True:
+        ser = scale_series(ser)
+    return ser
+
+
+def scale_series(ser: pd.Series) -> pd.Series:
+    '''
+    Scale a pandas series to values between 0 and 1. Returns a series.
+    '''
+    ser = ser.copy()
+    # check if all values in <score_col> are the same, set all values to 0 if yes as no scaling is possible
+    if ser.nunique() == 1:
+        ser[:] = 0
+        return ser
+    # scale series to values between 0 and 1
+    factor = ser.max() - ser.min()
+    ser = ser / factor
+    ser = ser + (1 - ser.max())
+
+    return ser
+
+
+def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms:list[str], weights:list[float]) -> pd.Series:
+    '''
+    Combine multiple score columns by weighted addition. Individual scoreterms will be normalized before combination. Returns a series of values scaled from 0 to 1, with 1 indicating the best scoring.
+    Args:
+        <df>                input dataframe
+        <scoreterms>        list of score column names
+        <weights>           list of weights for each score column. score_col will be multiplied with weight before addition with other scoreterms.
+                            if the best value in a score column is the lowest, use negative weights (e.g. -1 for Rosetta total score) and vice versa. 
+    '''
+    if not len(scoreterms) == len(weights):
+        raise ValueError(f"Number of scoreterms ({len(scoreterms)}) and weights ({len(weights)}) must be equal!")
+    
+    df = df.copy()
+    for col in scoreterms:
+        # check if column contains only floats or integers, raise an error otherwise
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+        if df[col].isna().any(): raise ValueError(f"Column {col} must only contain float or integers!")
+        # normalize and scale scoreterm
+        df[col] = normalize_series(ser=df[col], scale=True)
+
+    # combine weighted scores
+    combined_col = sum([df[col]*weight for col, weight in zip(scoreterms, weights)])
+    # scale to values between 0 and 1
+    combined_col = scale_series(ser=combined_col)
+
+    return combined_col
 
 
 def get_format(path: str):
@@ -498,10 +632,14 @@ def load_poses(poses_path: str) -> Poses:
     '''Loads Poses class from a stored dataframe.'''
     return Poses().load_poses(poses_path)
 
-def col_in_df(df:pd.DataFrame, column:str):
+def col_in_df(df:pd.DataFrame, column:Union[str, list[str]]):
     '''Checks if column exists in DataFrame and returns KeyError if not.'''
-    if not column in df.columns:
-        raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
+    if isinstance(column, list):
+        for col in column:
+            if not col in df.columns: raise KeyError(f"Could not find {col} in poses dataframe! Are you sure you provided the right column name?")
+    else:
+        if not column in df.columns:
+            raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
     
 
 def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, layer_col="poses_description", sep="_", ascending=True) -> pd.DataFrame:
@@ -510,6 +648,19 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, 
     If the option remove_layers is set (has to be type: int), then n determines how many c
     if <remove_layers> = 0, dataframe will be grouped by values in <layer_col> and the grouped dfs will be filtered for top n rows
     '''
+
+    def determine_filter_n(df: pd.DataFrame, n: float) -> int:
+        '''
+        determines if n is a fraction or an integer and sets cutoff for dataframe filtering accordingly.
+        '''
+        filter_n = float(n)
+        if filter_n < 1:
+            filter_n = round(len(df) * filter_n)
+        elif filter_n <= 0:
+            raise ValueError(f"ERROR: Argument <n> of filter functions cannot be smaller than 0. It has to be positive number. If n < 1, the top n fraction is taken from the DataFrame. if n > 1, the top n rows are taken from the DataFrame")
+
+        return int(filter_n)
+
     # make sure <col> exists columns in <df>
     col_in_df(df, col)
 
@@ -536,19 +687,6 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, 
         filtered_df = df.sort_values(by=col, ascending=ascending).head(determine_filter_n(df, n))
 
     return filtered_df
-
-
-def determine_filter_n(df: pd.DataFrame, n: float) -> int:
-    '''
-    
-    '''
-    filter_n = float(n)
-    if filter_n < 1:
-        filter_n = round(len(df) * filter_n)
-    elif filter_n <= 0:
-        raise ValueError(f"ERROR: Argument <n> of filter functions cannot be smaller than 0. It has to be positive number. If n < 1, the top n fraction is taken from the DataFrame. if n > 1, the top n rows are taken from the DataFrame")
-
-    return int(filter_n)
 
 
 def filter_dataframe_by_value(df: pd.DataFrame, col: str, value, operator: str) -> pd.DataFrame:
