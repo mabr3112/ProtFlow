@@ -240,6 +240,93 @@ def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str
     else: fig.show()
     return None
 
+
+def scatterplot(dataframe, x_column, y_column, color_column=None, size_column=None, labels=None, save_path=None):
+    """
+    Create a scatter plot from a DataFrame using specified columns for x and y axes,
+    and optionally use other columns for color gradient and dot size. Labels must be a list of strings, one element for each column used. Otherwise, column names will be used as labels.
+    """
+
+    def evenly_spaced_values(value1, value2, num_values):
+        # Calculate the step size
+        step = (value2 - value1) / (num_values - 1)
+        # Generate the evenly spaced values
+        spaced_values = [value1 + i * step for i in range(num_values)]
+        return spaced_values
+    
+    # define axes label names
+    expected_labels = 2        
+    if color_column: expected_labels += 1
+    if size_column: expected_labels += 1 
+
+    if not labels:
+        labels = {"x": x_column, "y": y_column, "c": color_column, "s": size_column}
+    else:
+        num_labels = len(labels)
+        if not num_labels == expected_labels:
+            raise ValueError("Number of labels must be the same as number of columns!")
+        labels = {"x": labels[0], "y": labels[1], "c": labels[2] if color_column else None, "s": labels[3] if color_column and size_column else labels[2] if color_column else None}
+
+    x_data = dataframe[x_column]
+    y_data = dataframe[y_column]
+
+    if color_column:
+        color_values = dataframe[color_column]
+        cmap = 'viridis'  # Choose a colormap for the color gradient
+    else:
+        color_values = None
+        cmap = None
+
+
+    # Create a figure with two subplots
+    if size_column:
+        size_values = dataframe[size_column]
+        max_size = np.max(size_values)  # Get the maximum size for normalization
+        sizes = 100 * (size_values / max_size)  # Scale sizes relative to max_size
+        size_label = size_column
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 6), gridspec_kw={'width_ratios': [3, 0.5]})
+
+        # Scatter plot on the first subplot
+        scatter = ax1.scatter(x_data, y_data, c=color_values, cmap=cmap, s=sizes, alpha=0.5)
+        ax1.set_xlabel(x_column)
+        ax1.set_ylabel(y_column)
+
+        if color_column:
+            # Add color bar legend
+            cbar = plt.colorbar(scatter, ax=ax1, label=labels["c"])
+
+        # Size legend on the second subplot
+        for size in evenly_spaced_values(size_values.min(), size_values.max(), 5):
+            size_label = size
+            ax2.scatter([], [], s=100*(size/max_size), label=size, alpha=0.5)
+
+        ax2.set_axis_off()  # Hide axes for the size legend subplot
+        ax2.legend(title=labels["s"], loc='center')
+
+        # Adjust spacing between subplots
+        plt.subplots_adjust(wspace=0)
+    
+    else:
+        plt.figure(figsize=(8, 6))
+
+        scatter = plt.scatter(x_data, y_data, c=color_values, cmap=cmap, alpha=0.5)
+
+        # Add labels and title
+        plt.xlabel(labels["x"])
+        plt.ylabel(labels["y"])
+
+        # Add color bar
+        if color_column:
+            plt.colorbar(scatter, label=labels["c"])
+
+    # Save the plot as a PNG file if save_path is provided
+    if save_path:
+        plt.savefig(save_path, dpi=300)
+        print(f"Plot saved as {save_path}")
+
+    # Show the plot
+    plt.show()
+
 def parse_cols_for_plotting(plot_arg: str, subst:str=None) -> list[str]:
     '''AAA'''
     if type(plot_arg) == str: return [plot_arg]
