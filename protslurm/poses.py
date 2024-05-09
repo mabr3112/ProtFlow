@@ -250,15 +250,17 @@ class Poses:
         # return list containing paths to .fa files as poses.
         return out_poses
     
-    def determine_pose_type(self):
-        '''checks the file extension of poses, returns the extension or a list of extensions'''
+    def determine_pose_type(self, pose_col:str=None):
+        '''checks the file extensions of poses (or the poses provided in <pose_col>), returns the extension or a list of extensions'''
 
         def extract_extension(file_path):
             _, ext = os.path.splitext(file_path)
             return ext
         
+        pose_col = pose_col or 'poses'
+        
         # extract extensions and create a set containing only unique values
-        ext = list(set(self.df['poses'].apply(extract_extension).to_list()))
+        ext = list(set(self.df[pose_col].apply(extract_extension).to_list()))
         if len(ext) > 1:
             logging.warning(f"Multiple file extensions present in poses: {ext}")
             return ext
@@ -367,7 +369,10 @@ class Poses:
             self.motifs = []
         self.motifs.append(motif_col)
 
-
+    def convert_pdb_to_fasta(self, out_dir:str, prefix:str, update_poses:bool=False):
+        '''Converts .pdb files to .fasta files. If update_poses is True, fasta files will be set as new poses. Fasta file paths are saved in <prefix>_fasta_location column in poses.df'''
+        # TODO: implement
+        raise NotImplementedError("conversion of pdbs to fasta not yet implented!")
 
     ########################################## Filtering ###############################################
 
@@ -544,7 +549,6 @@ class Poses:
 
         return self
 
-    ########################################## Metrics ###############################################
 
 
 
