@@ -142,7 +142,7 @@ class Alphafold2(Runner):
 
         def get_json_pdb_tuples_from_description(description: str, input_dir: str) -> list[tuple[str,str]]:
             '''Collects af2-output scores.json and .pdb file for a given 'description' as corresponding tuples (by sorting).'''
-            return list(zip(get_json_files_of_description(description, input_dir), get_pdb_files_of_description(description, dir)))
+            return list(zip(get_json_files_of_description(description, input_dir), get_pdb_files_of_description(description, input_dir)))
 
         def calc_statistics_over_af2_models(index: str, input_tuple_list: list[tuple[str,str]]) -> pd.DataFrame:
             '''
@@ -150,10 +150,13 @@ class Alphafold2(Runner):
             takes list of .json files from af2_predictions and collects scores (mean_plddt, max_plddt, etc.)
             '''
             # no statistics to calculate if only one model was used:
+            print(input_tuple_list)
+            print(len(input_tuple_list))
             if len(input_tuple_list) == 1:
                 json_path, input_pdb = input_tuple_list[0]
                 df = summarize_af2_json(json_path, input_pdb)
                 df["description"] = [f"{index}_{str(i).zfill(4)}" for i in range(1, len(df.index) + 1)]
+                df["rank"] = [1]
                 return df
 
             # otherwise collect scores from individual .json files of models for each input fasta into one DF
