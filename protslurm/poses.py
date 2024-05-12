@@ -420,11 +420,13 @@ class Poses:
             os.makedirs(self.filter_dir, exist_ok=True)
 
             # make sure output format is available
-            storage_format = storage_format.lower() if format else self.storage_format
+            storage_format = storage_format or self.storage_format
             if storage_format not in FORMAT_STORAGE_DICT:
                 raise KeyError(f"Format {storage_format} not available. Format must be on of {list(FORMAT_STORAGE_DICT)}")
+            
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
+
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
             if not overwrite and os.path.isfile(output_name):
                 filter_df = get_format(output_name)(output_name)
@@ -506,12 +508,11 @@ class Poses:
                 filter_df = get_format(output_name)(output_name)
                 self.df = filter_df
                 return filter_df
-        
+
         # Filter df down to the number of poses specified with <n>
         orig_len = len(self.df)
         filter_df = filter_dataframe_by_value(df=self.df, col=score_col, value=value, operator=operator).reset_index(drop=True)
-        print(f"Filtered poses from {orig_len} to {len(filter_df.index)} poses.")
-
+        logging.info(f"Filtered poses from {orig_len} to {len(filter_df.index)} poses.")
 
         # save filtered dataframe if prefix is provided
         if prefix:
