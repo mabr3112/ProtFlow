@@ -58,20 +58,21 @@ FORMAT_STORAGE_DICT = {
 class Poses:
     '''Class that stores and handles protein df. '''
     ############################################# SETUP #########################################
-    def __init__(self, poses:list=None, work_dir:str=None, storage_format:str="json", glob_suffix:str=None, jobstarter:JobStarter=jobstarters.SbatchArrayJobstarter()):
-        # set_poses sets up self.df!
+    def __init__(self, poses: list = None, work_dir: str = None, storage_format: str = "json", glob_suffix: str = None, jobstarter: JobStarter = jobstarters.SbatchArrayJobstarter()):
+        # setup attributes poses.df, poses.work_dir;
         self.df = None
         self.set_poses(poses, glob_suffix=glob_suffix)
-        self.set_work_dir(work_dir)
+        self.set_work_dir(work_dir, set_scorefile=False)
 
-        # setup scorefile for storage
-        if not storage_format.lower() in FORMAT_STORAGE_DICT: raise KeyError(f"Format {storage_format} not available. Format must be on of {[i for i in FORMAT_STORAGE_DICT]}")
-        self.storage_format = storage_format.lower()
-        scorefile_path = os.path.join(work_dir, os.path.basename(work_dir)) if work_dir else "./poses"
-        self.scorefile = f"{scorefile_path}_scores.{self.storage_format}"
+        # setup poses.storage_format and poses.scorefile.
+        self.set_storage_format(storage_format)
+        self.set_scorefile(self.work_dir)
 
         # setup jobstarter
         self.default_jobstarter = jobstarter
+
+        # set other empty attributes
+        self.motifs = []
 
     def __iter__(self):
         for _, row in self.df.iterrows():
@@ -80,30 +81,44 @@ class Poses:
     def __len__(self):
         return len(self.df)
 
-    ############################################# SETUP #########################################
-    def set_work_dir(self, work_dir:str) -> None:
+    ############################################# SETUP METHODS #########################################
+    def set_scorefile(self, work_dir: str) -> None:
+        '''Sets scorefile attribute for poses class. This is the path to which the poses.df will be stored.'''
+        # if no work_dir is set, store scores in current directory.
+        scorefile_path = os.path.join(work_dir, os.path.basename(work_dir)) if work_dir else "./poses"
+        self.scorefile = f"{scorefile_path}_scores.{self.storage_format}"
+
+    def set_storage_format(self, storage_format: str) -> None:
+        '''Sets storage format for poses.df. poses.df is stored in specified format with poses.save_scores() method.'''
+        if storage_format.lower() not in FORMAT_STORAGE_DICT:
+            raise KeyError(f"Format {storage_format} not available. Format must be on of {[list(FORMAT_STORAGE_DICT)]}")
+        self.storage_format = storage_format # removed .lower() maybe there is a storage format that needs caps letters.
+
+    def set_work_dir(self, work_dir: str, set_scorefile: bool = True) -> None:
         '''sets up working_directory for poses. Just creates new work_dir and stores the first instance of Poses DataFrame in there.'''
+        def set_dir(dir_name: str, work_dir: str) -> str:
+            '''Creates a directory inside of work_dir that has the name {dir_name}_dir. 
+            Also sets an attribute self.{dir_name} that points to the directory.'''
+            if work_dir is None:
+                return None
+            dir_ = os.path.join(work_dir, dir_name)
+            os.makedirs(dir_, exist_ok=True)
+            return dir_
+
+        # setup and create work_dir if it does not already exist
         if work_dir is not None and not os.path.isdir(work_dir):
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {work_dir}")
         self.work_dir = work_dir
 
-        # setup scores dir
-        if work_dir is None:
-            self.scores_dir = None
-            self.filter_dir = None
-            self.plots_dir = None
-        else:
-            # setup path
-            scores_dir = os.path.join(work_dir, "scores")
-            filter_dir = os.path.join(work_dir, "filter")
-            plots_dir = os.path.join(work_dir, "plots")
-            os.makedirs(scores_dir, exist_ok=True)
-            os.makedirs(filter_dir, exist_ok=True)
-            os.makedirs(plots_dir, exist_ok=True)
-            self.scores_dir = scores_dir
-            self.filter_dir = filter_dir
-            self.plots_dir = plots_dir
+        # setup common directories for workflows:
+        self.scores_dir = set_dir("scores", work_dir)
+        self.filter_dir = set_dir("filter", work_dir)
+        self.plots_dir = set_dir("plots", work_dir)
+
+        # setup scorefile if option is provided (default: True)
+        if set_scorefile:
+            self.set_scorefile(work_dir)
 
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
         '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
@@ -135,7 +150,7 @@ class Poses:
         self.df["poses"] = new_poses
         return self
 
-    def parse_poses(self, poses:Union[list,str]=None, glob_suffix:str=None) -> list:
+    def parse_poses(self, poses: Union[list,str] = None, glob_suffix: str = None) -> list:
         """
         Parses the input 'poses' which can be a directory path, a file path, or a list of file paths.
         
@@ -161,15 +176,15 @@ class Poses:
         """
         if isinstance(poses, str) and glob_suffix:
             parsed_poses = glob(f"{poses}/{glob_suffix}")
-            if not parsed_poses: 
+            if not parsed_poses:
                 raise FileNotFoundError(f"No {glob_suffix} files were found in {poses}. Did you mean to glob? Was the path correct?")
             return parsed_poses
         if isinstance(poses, str) and not glob_suffix:
-            if not os.path.isfile(poses): 
+            if not os.path.isfile(poses):
                 raise FileNotFoundError(f"File {poses} not found!")
             return [poses]
         if isinstance(poses, list):
-            if not all((os.path.isfile(path) for path in poses)): 
+            if not all((os.path.isfile(path) for path in poses)):
                 raise FileNotFoundError(f"Not all files listed in poses were found.")
             return poses
         if poses is None:
@@ -180,7 +195,7 @@ class Poses:
         '''parses descriptions (names) of poses from a list of pose_paths. Works on already parsed poses'''
         return [pose.strip("/").rsplit("/", maxsplit=1)[-1].split(".", maxsplit=1)[0]for pose in poses]
 
-    def set_poses(self, poses:list=None, glob_suffix:str=None) -> None:
+    def set_poses(self, poses: list = None, glob_suffix: str = None) -> None:
         '''Sets up poses from either a list, or a string.'''
         # if DataFrame is passed, load directly.
         if isinstance(poses, pd.DataFrame):
@@ -249,30 +264,27 @@ class Poses:
 
         # return list containing paths to .fa files as poses.
         return out_poses
-    
-    def determine_pose_type(self, pose_col:str=None):
-        '''checks the file extensions of poses (or the poses provided in <pose_col>), returns the extension or a list of extensions'''
 
+    def determine_pose_type(self, pose_col: str = None) -> list:
+        '''checks the file extensions of poses (or the poses provided in <pose_col>), returns a list of extensions'''
         def extract_extension(file_path):
             _, ext = os.path.splitext(file_path)
             return ext
-        
+
         pose_col = pose_col or 'poses'
-        
+
         # extract extensions and create a set containing only unique values
         ext = list(set(self.df[pose_col].apply(extract_extension).to_list()))
         if len(ext) > 1:
             logging.warning(f"Multiple file extensions present in poses: {ext}")
             return ext
-        elif len(ext) == 1:
-            ext = ext[0]
-            if ext == "":
+        if len(ext) == 1:
+            if ext[0] == "":
                 logging.warning(f"Could not determine file extension from poses!")
-                return None
             else:
                 logging.info(f"Poses identified as {ext} files")
-                return ext
-
+            return ext
+        return []
 
     ############################################ Input Methods ######################################
     def load_poses(self, poses_path: str) -> "Poses":
@@ -365,8 +377,6 @@ class Poses:
             raise TypeError(f"Setting a motif requires the objects in 'motif_col' to be of type ResidueSelection. Check documentation of protslurm.residues module for how to create the object (it's simple).")
 
         # set motif
-        if not hasattr(self, "motifs"):
-            self.motifs = []
         self.motifs.append(motif_col)
 
     def convert_pdb_to_fasta(self, out_dir:str, prefix:str, update_poses:bool=False):
@@ -375,9 +385,7 @@ class Poses:
         raise NotImplementedError("conversion of pdbs to fasta not yet implented!")
 
     ########################################## Filtering ###############################################
-
-
-    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers=None, layer_col="poses_description", sep="_", ascending=True, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> "Poses":
+    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers=None, layer_col="poses_description", sep="_", ascending=True, prefix: str = None, plot: bool=False, overwrite: bool=False, storage_format: str = None) -> "Poses":
         '''
         Filters your current poses by a specified scoreterm down to either a fraction (of all poses) or a total number of poses,
         depending on which value was given with <n>.
@@ -407,49 +415,57 @@ class Poses:
 
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
-            if self.filter_dir == None:
-                raise AttributeError(f"Filter directory was not set! Did you set a working directory?")
+            if self.filter_dir is None:
+                raise AttributeError(f"Filter directory was not set! Did you set a working directory? work_dir can be set with Poses.set_work_dir() and sets up a filter_dir automatically.")
             os.makedirs(self.filter_dir, exist_ok=True)
+
             # make sure output format is available
-            format = format.lower() if format else self.storage_format
-            if not format in FORMAT_STORAGE_DICT: raise KeyError(f"Format {format} not available. Format must be on of {[i for i in FORMAT_STORAGE_DICT]}")
+            storage_format = storage_format.lower() if format else self.storage_format
+            if storage_format not in FORMAT_STORAGE_DICT:
+                raise KeyError(f"Format {storage_format} not available. Format must be on of {list(FORMAT_STORAGE_DICT)}")
             # set filter output name
-            output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{format}")
+            output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
-            if overwrite == False and os.path.isfile(output_name):
+            if not overwrite and os.path.isfile(output_name):
                 filter_df = get_format(output_name)(output_name)
                 self.df = filter_df
                 return filter_df
-        
+
         # Filter df down to the number of poses specified with <n>
         orig_len = str(len(self.df))
         filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
-        print(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
+        logging.info(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
 
         # save filtered dataframe if prefix is provided
-        if prefix: 
+        if prefix:
             logging.info(f"Saving filter output to {output_name}.")
-            save_method_name = FORMAT_STORAGE_DICT.get(format)
+            save_method_name = FORMAT_STORAGE_DICT.get(storage_format)
             getattr(filter_df, save_method_name)(output_name)
-        
+
         # create filter-plots if specified.
-        if plot == True:
-            if self.plots_dir == None:
+        if plot:
+            if self.plots_dir is None:
                 raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
             os.makedirs(self.plots_dir, exist_ok=True)
+
             out_path = os.path.join(self.plots_dir, f"{prefix}_filter.png")
             logging.info(f"Creating filter plot at {out_path}.")
             cols = [score_col]
-            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
-                                               cols=cols, titles=cols, y_labels=cols, out_path=out_path)
-    
+            plots.violinplot_multiple_cols_dfs(
+                dfs=[self.df, filter_df],
+                df_names=["Before Filtering", "After Filtering"],
+                cols=cols,
+                titles=cols,
+                y_labels=cols,
+                out_path=out_path
+            )
+
         # update object attributs [df]
         self.df = filter_df
         logging.info(f"Filtering completed.")
         return self
-    
 
-    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str=None, plot: bool=False, overwrite: bool=False, format: str=None) -> "Poses":
+    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str=None, plot: bool=False, overwrite: bool=False, storage_format: str=None) -> "Poses":
         '''
         Filters your current poses by a specified <score_col> according to the provided <value> and <operator>.
         
@@ -473,16 +489,20 @@ class Poses:
 
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
-            if self.filter_dir == None:
+            if self.filter_dir is None:
                 raise AttributeError(f"Filter directory was not set! Did you set a working directory?")
             os.makedirs(self.filter_dir, exist_ok=True)
+
             # make sure output format is available
-            format = format.lower() if format else self.storage_format
-            if not format in FORMAT_STORAGE_DICT: raise KeyError(f"Format {format} not available. Format must be one of {[i for i in FORMAT_STORAGE_DICT]}")
+            storage_format = storage_format or self.storage_format
+            if storage_format not in FORMAT_STORAGE_DICT:
+                raise KeyError(f"Format {storage_format} not available. Format must be one of {list(FORMAT_STORAGE_DICT)}")
+
             # set filter output name
-            output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{format}")
+            output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
+
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
-            if overwrite == False and os.path.isfile(output_name):
+            if not overwrite and os.path.isfile(output_name):
                 filter_df = get_format(output_name)(output_name)
                 self.df = filter_df
                 return filter_df
@@ -494,31 +514,34 @@ class Poses:
 
 
         # save filtered dataframe if prefix is provided
-        if prefix: 
+        if prefix:
             logging.info(f"Saving filter output to {output_name}.")
-            save_method_name = FORMAT_STORAGE_DICT.get(format)
+            save_method_name = FORMAT_STORAGE_DICT.get(storage_format)
             getattr(filter_df, save_method_name)(output_name)
 
-        if plot == True:
-            if self.plots_dir == None:
+        if plot:
+            if self.plots_dir is None:
                 raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
             os.makedirs(self.plots_dir, exist_ok=True)
             out_path = os.path.join(self.plots_dir, f"{prefix}_filter.png")
             logging.info(f"Creating filter plot at {out_path}.")
             cols = [score_col]
-            plots.violinplot_multiple_cols_dfs(dfs=[self.df, filter_df], df_names=["Before Filtering", "After Filtering"],
-                                               cols=cols, titles=cols, y_labels=cols, out_path=out_path)
+            plots.violinplot_multiple_cols_dfs(
+                dfs=[self.df, filter_df],
+                df_names=["Before Filtering", "After Filtering"],
+                cols=cols,
+                titles=cols,
+                y_labels=cols,
+                out_path=out_path
+            )
 
         # update object attributs [df]
         self.df = filter_df
         logging.info(f"Filtering completed.")
         return self
-    
-
 
     ########################################## Score manipulation ###############################################
-
-    def calculate_composite_score(self, name: str, scoreterms: list[str], weights: list[float], plot: bool=False) -> "Poses":
+    def calculate_composite_score(self, name: str, scoreterms: list[str], weights: list[float], plot: bool = False, scale_output: bool = False) -> "Poses":
         '''
         Combine multiple score columns by weighted addition. Individual scoreterms will be normalized before combination. Score will be scaled from 0 to 1, with 1 indicating the best score.
         Args:
@@ -527,36 +550,38 @@ class Poses:
             <weights>           list of weights for each score column. score_col will be multiplied with weight before addition with other scoreterms.
                                 if the best value in a score column is the lowest, use negative weights (e.g. -1 for Rosetta total score) and vice versa. 
         '''
-
         logging.info(f"Creating composite score {name} for scoreterms {scoreterms} with weights {weights}")
         # check if output column already exists in dataframe
         if name in self.df:
             logging.warning(f"Column {name} already exists in poses dataframe! It will be overwritten!")
         # calculate composite score
-        self.df[name] = combine_dataframe_score_columns(df=self.df, scoreterms=scoreterms, weights=weights)
+        self.df[name] = combine_dataframe_score_columns(df=self.df, scoreterms=scoreterms, weights=weights, scale=scale_output)
 
-        if plot == True:
-            if self.plots_dir == None:
+        if plot:
+            if self.plots_dir is None:
                 raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
             os.makedirs(self.plots_dir, exist_ok=True)
             out_path = os.path.join(self.plots_dir, f"{name}_comp_score.png")
             logging.info(f"Creating composite score plot at {out_path}.")
             scoreterms.append(name)
-            plots.violinplot_multiple_cols(df=self.df, cols=scoreterms, titles=scoreterms, y_labels=scoreterms, dims=None, out_path=out_path)
+            plots.violinplot_multiple_cols(
+                df=self.df,
+                cols=scoreterms,
+                titles=scoreterms,
+                y_labels=scoreterms,
+                dims=None,
+                out_path=out_path
+            )
 
         self.save_scores()
         logging.info("Composite score creation completed.")
 
         return self
 
-
-
-
-
-
 def normalize_series(ser:pd.Series, scale:bool=False) -> pd.Series:
     '''
-    Normalizes a pandas series by subtracting the median and dividing by standard deviation. If scale = True, the normalized values will be scaled from 0 to 1. Returns a series.
+    Normalizes a pandas series by subtracting the median and dividing by standard deviation.
+    If scale = True, the normalized values will be scaled from 0 to 1. Returns a series.
     '''
     ser = ser.copy()
     # calculate median and standard deviation
@@ -569,10 +594,9 @@ def normalize_series(ser:pd.Series, scale:bool=False) -> pd.Series:
     # normalize score by subtracting median and dividing by standard deviation
     ser = (ser - median) / std
     # scale output to values between 0 and 1
-    if scale == True:
+    if scale:
         ser = scale_series(ser)
     return ser
-
 
 def scale_series(ser: pd.Series) -> pd.Series:
     '''
@@ -590,10 +614,12 @@ def scale_series(ser: pd.Series) -> pd.Series:
 
     return ser
 
-
-def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms:list[str], weights:list[float]) -> pd.Series:
+def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], weights: list[float], scale: bool = False) -> pd.Series:
     '''
-    Combine multiple score columns by weighted addition. Individual scoreterms will be normalized before combination. Returns a series of values scaled from 0 to 1, with 1 indicating the best scoring.
+    Combine multiple score columns by weighted addition. 
+    Individual scoreterms will be normalized before combination. 
+    If scale is set, returns a series of values scaled from 0 to 1, with 1 indicating the best scoring.
+
     Args:
         <df>                input dataframe
         <scoreterms>        list of score column names
@@ -602,22 +628,20 @@ def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms:list[str], weig
     '''
     if not len(scoreterms) == len(weights):
         raise ValueError(f"Number of scoreterms ({len(scoreterms)}) and weights ({len(weights)}) must be equal!")
-    
+
     df = df.copy()
     for col in scoreterms:
         # check if column contains only floats or integers, raise an error otherwise
         df[col] = pd.to_numeric(df[col], errors='coerce')
-        if df[col].isna().any(): raise ValueError(f"Column {col} must only contain float or integers!")
+        if df[col].isna().any():
+            raise ValueError(f"Column {col} must only contain float or integers!")
+
         # normalize and scale scoreterm
-        df[col] = normalize_series(ser=df[col], scale=True)
+        df[col] = normalize_series(ser=df[col], scale=False)
 
     # combine weighted scores
-    combined_col = sum([df[col]*weight for col, weight in zip(scoreterms, weights)])
-    # scale to values between 0 and 1
-    combined_col = scale_series(ser=combined_col)
-
-    return combined_col
-
+    combined_col = sum((df[col]*weight for col, weight in zip(scoreterms, weights)))
+    return scale_series(combined_col) if scale else combined_col
 
 def get_format(path: str):
     '''reads in path as str and returns a pandas loading function.'''
@@ -630,8 +654,6 @@ def get_format(path: str):
     }
     return loading_function_dict[path.split(".")[-1]]
 
-
-
 def load_poses(poses_path: str) -> Poses:
     '''Loads Poses class from a stored dataframe.'''
     return Poses().load_poses(poses_path)
@@ -640,11 +662,11 @@ def col_in_df(df:pd.DataFrame, column:Union[str, list[str]]):
     '''Checks if column exists in DataFrame and returns KeyError if not.'''
     if isinstance(column, list):
         for col in column:
-            if not col in df.columns: raise KeyError(f"Could not find {col} in poses dataframe! Are you sure you provided the right column name?")
+            if not col in df.columns:
+                raise KeyError(f"Could not find {col} in poses dataframe! Are you sure you provided the right column name?")
     else:
         if not column in df.columns:
             raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
-    
 
 def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, layer_col="poses_description", sep="_", ascending=True) -> pd.DataFrame:
     '''
@@ -670,17 +692,18 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, 
 
     # if remove_layers is set, compile list of unique pose descriptions after removing one index layer:
     if remove_layers:
-        if type(remove_layers) != int: raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
+        if not isinstance(remove_layers, int):
+            raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
 
         # make sure <layer_col> exists in df
         col_in_df(df, layer_col)
 
         # create temporary description column with removed index layers
         df["tmp_layer_column"] = df[layer_col].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
-        
+
         # group by temporary description column, filter top n rows per group
         filtered = []
-        for group, group_df in df.groupby("tmp_layer_column", sort=False):
+        for _, group_df in df.groupby("tmp_layer_column", sort=False):
             filtered.append(group_df.sort_values(by=col, ascending=ascending).head(determine_filter_n(group_df, n)))
         filtered_df = pd.concat(filtered).reset_index(drop=True)
 
@@ -699,7 +722,7 @@ def filter_dataframe_by_value(df: pd.DataFrame, col: str, value, operator: str) 
     '''
     # make sure <col> exists columns in <df>
     col_in_df(df, col)
-    
+
     # Define the comparison based on the operator
     if operator == '>': filtered_df = df[df[col] > value]
     elif operator == '>=': filtered_df = df[df[col] >= value]
