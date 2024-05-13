@@ -38,6 +38,20 @@ class ResidueSelection:
             return [chain + str(idx) for chain, idx in self]
         return [chain+str(idx) for chain, idx in self]
 
+    def to_dict(self) -> dict:
+        '''Converts a ResidueSelection to a dictionary. 
+        Caution: Converting to a dictionary destroys the ordering of specific residues on the same chain in a motif!
+        '''
+        # collect list of chains and setup chains as dictionary keys
+        chains = list(set([x[0] for x in self.residues]))
+        out_d = {chain: [] for chain in chains}
+
+        # aggregate all residues to the chains and return
+        for (chain, res_id) in self.residues:
+            out_d[chain].append(res_id)
+
+        return out_d
+
 def parse_selection(input_selection, delim: str = ",") -> tuple[tuple[str,int]]:
     '''Parses selction into ResidueSelection formatted selection.'''
     #TODO: This implementation is safe from bugs, but not very efficient.
