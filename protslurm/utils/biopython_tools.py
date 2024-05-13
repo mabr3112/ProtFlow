@@ -1,25 +1,18 @@
 '''
 Module to provide utilities revolving around BioPython
 '''
-
 # Imports
 import copy
 import os
 from typing import Union
 import pandas as pd
 
-
-
 # dependencies
 import Bio
 import Bio.PDB
 from Bio.PDB.Structure import Structure
-from Bio.Seq import Seq
 from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
-
-
 
 # customs
 from protslurm.residues import ResidueSelection
@@ -138,8 +131,11 @@ def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None) 
         # Only select amino acids in each chain:
         residues = [res for res in chain if res.id[0] == " "]
         for residue in residues:
-            for atom in atoms:
-                atms_list.append(residue[atom])
+            # sort atoms by their atom name, ordering of atoms within residues differs depending on the software creating the .pdb file
+            if atoms:
+                atms_list += [residue[atom] for atom in atoms]
+            else:
+                atms_list += sorted(list(residue.get_atoms()), key=lambda a: a.id)
 
     return atms_list
 
@@ -157,7 +153,7 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
         if atoms:
             res_atoms = [pose[chain][(" ", res_id, " ")][atom] for atom in atoms]
         else:
-            res_atoms = pose[chain][(" ", res_id, " ")].get_atoms()
+            res_atoms = sorted(list(pose[chain][(" ", res_id, " ")].get_atoms()), key=lambda a: a.id)
 
         # filter out forbidden atoms
         res_atoms = [atom for atom in res_atoms if atom.name not in excluded_atoms]
@@ -165,8 +161,7 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
             res_atoms = [atom for atom in res_atoms if atom.element != "H"]
 
         # add atoms into aggregation list:
-        for atom in res_atoms:
-            out_atoms.append(atom)
+        out_atoms += res_atoms
     return out_atoms
 
 def add_chain(target: Structure, reference: Structure, copy_chain: str, overwrite: bool = True) -> Structure:
@@ -250,21 +245,18 @@ def renumber_pose_by_residue_mapping(pose: Bio.PDB.Structure.Structure, residue_
 
     return out_pose
 
-
 ######################## Bio.Seq functions ##########################################
-
 def load_sequence_from_fasta(fasta:str, return_multiple_entries:bool=True):
     '''
     imports a fasta file and returns a single record if it is a single entry fasta or <return_multiple_entries> is False, otherwise return a record iterator
     '''
     records = SeqIO.parse(fasta, "fasta")
-    if len([i for i in records]) == 1 or return_multiple_entries == False:
+    if len([i for i in records]) == 1 or not return_multiple_entries:
         return next(records)
     else:
         return records
 
-
-def determine_protparams(seq:Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], pH:float=7):
+def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], pH: float = 7):
     '''
     calculates protein features based on sequence. Returns a dataframe. See Bio.SeqUtils.ProtParam for further information.
     Included are:
@@ -287,10 +279,10 @@ def determine_protparams(seq:Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], p
     elif isinstance(seq, Bio.Seq.Seq):
         seq = seq.data
     elif isinstance(seq, str):
-        seq = seq
+        pass
     else:
         raise TypeError(f"Input must be a sequence, not {type(seq)}!")
-    
+
     # analyze sequence
     protparams = ProteinAnalysis(seq)
 
@@ -309,6 +301,3 @@ def determine_protparams(seq:Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], p
     }
 
     return pd.DataFrame(data)
-    
-    
-

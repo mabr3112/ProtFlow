@@ -297,7 +297,7 @@ class Poses:
         return self
 
     ############################################ Output Methods ######################################
-    def save_scores(self, out_path:str=None, out_format=None) -> None:
+    def save_scores(self, out_path: str = None, out_format: str = None) -> None:
         '''Saves Poses DataFrame as scorefile.'''
         # setup defaults
         out_path = out_path or self.scorefile
@@ -310,13 +310,14 @@ class Poses:
         if (save_method_name := FORMAT_STORAGE_DICT.get(out_format.lower())):
             getattr(self.df, save_method_name)(out_path)
 
-    def save_poses(self, out_path:str, poses_col:str="poses_description", overwrite=True) -> None:
+    def save_poses(self, out_path: str, poses_col: str = "poses", overwrite = True) -> None:
         '''Saves current "poses" from poses.df at out_path. Overwrites poses by default.'''
         poses = self.df[poses_col].to_list()
-        if not os.path.isdir(out_path): os.makedirs(out_path, exist_ok=True)
+        if not os.path.isdir(out_path):
+            os.makedirs(out_path, exist_ok=True)
 
         # check if poses are already at out_path, skip if overwrite is set to False
-        if all([os.path.isfile(pose) for pose in poses]) and not overwrite:
+        if all((os.path.isfile(pose) for pose in poses)) and not overwrite:
             return
 
         # save poses
@@ -379,13 +380,13 @@ class Poses:
         # set motif
         self.motifs.append(motif_col)
 
-    def convert_pdb_to_fasta(self, out_dir:str, prefix:str, update_poses:bool=False):
+    def convert_pdb_to_fasta(self, out_dir: str, prefix: str, update_poses: bool = False):
         '''Converts .pdb files to .fasta files. If update_poses is True, fasta files will be set as new poses. Fasta file paths are saved in <prefix>_fasta_location column in poses.df'''
         # TODO: implement
         raise NotImplementedError("conversion of pdbs to fasta not yet implented!")
 
     ########################################## Filtering ###############################################
-    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers=None, layer_col="poses_description", sep="_", ascending=True, prefix: str = None, plot: bool=False, overwrite: bool=False, storage_format: str = None) -> "Poses":
+    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, overwrite: bool = False, storage_format: str = None) -> "Poses":
         '''
         Filters your current poses by a specified scoreterm down to either a fraction (of all poses) or a total number of poses,
         depending on which value was given with <n>.
@@ -423,7 +424,7 @@ class Poses:
             storage_format = storage_format or self.storage_format
             if storage_format not in FORMAT_STORAGE_DICT:
                 raise KeyError(f"Format {storage_format} not available. Format must be on of {list(FORMAT_STORAGE_DICT)}")
-            
+
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
 

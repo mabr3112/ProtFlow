@@ -65,7 +65,7 @@ def main(args):
     atoms = args.atoms.split(",") if args.atoms is not None else None
 
     # calc heavy-atom rmsd for each target
-    df_dict = {"description": [], "location": [], "heavy_atom_rmsd": []}
+    df_dict = {"description": [], "location": [], "rmsd": []}
     for target in target_dict:
         opts = target_dict[target]
         rms = motif_superimpose_calc_rmsd(
@@ -79,7 +79,7 @@ def main(args):
         # collect data
         df_dict['description'].append(target.rsplit("/", maxsplit=1)[-1].rsplit(".", maxsplit=1)[0])
         df_dict['location'].append(target)
-        df_dict['heavy_atom_rmsd'].append(rms)
+        df_dict['rmsd'].append(rms)
 
     # store scores in .json DataFrame
     pd.DataFrame(df_dict).to_json(args.output_path)
