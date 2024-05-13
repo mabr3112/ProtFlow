@@ -1,13 +1,13 @@
 '''
 Module for creating standardized plots (violins mostyl)
 '''
-
+# dependencies
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import rc
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
-
+import pandas as pd
 import numpy as np
 
 class PlottingTrajectory():
@@ -121,6 +121,11 @@ def singular_violinplot(data: list, y_label: str, title: str, out_path: str = No
 
 def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=None, out_path=None, colormap="tab20") -> None:
     '''Creates a violinplot of multiple columns from multiple Pandas DataFrames. Ideal for comparing stuff.'''
+    # security
+    for df in dfs:
+        for col in cols:
+            check_for_col_in_df(col, df)
+
     def set_violinstyle(axes_subplot_parts, colors="cornflowerblue") -> None:
         '''
         '''
@@ -169,6 +174,10 @@ def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=Non
 
 def violinplot_multiple_cols(df, cols, titles, y_labels, dims=None, out_path=None) -> None:
     '''AAA'''
+    # security
+    for col in cols:
+        check_for_col_in_df(col, df)
+
     if not dims: dims = [None for col in cols]
     def set_violinstyle(axes_subplot_parts) -> None:
         '''
@@ -203,6 +212,12 @@ def violinplot_multiple_cols(df, cols, titles, y_labels, dims=None, out_path=Non
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
     else: fig.show()
     return None
+
+def check_for_col_in_df(col: str, df: pd.DataFrame) -> None:
+    '''CHecks if column is in df and gives similar columns if not'''
+    if col not in df.columns:
+        similar_cols = [c for c in df.columns if col.split("_")[0] in c]
+        raise KeyError(f"Column {col} not found in DataFrame. Did you mean any of these columns? {similar_cols}")
 
 def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str], dims=None, out_path=None) -> None:
     '''AAA'''
