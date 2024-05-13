@@ -85,8 +85,10 @@ class BackboneRMSD(Runner):
 
         # split poses into number of max_cores lists
         num_json_files = jobstarter.max_cores
+        print(jobstarter.max_cores)
         pose_dict = {os.path.abspath(row["poses"]): os.path.abspath(row[ref_col]) for row in poses}
-        pose_sublists = protslurm.jobstarters.split_list(poses.poses_list(), num_json_files)
+        pose_sublists = protslurm.jobstarters.split_list(poses.poses_list(), n_sublists=num_json_files)
+        print("pose_sublists",len(pose_sublists))
 
         # setup inputs to calc_rmsd.py
         json_files = []
@@ -105,6 +107,7 @@ class BackboneRMSD(Runner):
             # write scorefile and cmd
             scorefiles.append((sf := f"{work_dir}/rmsd_input_{str(i)}_scores.json"))
             cmds.append(f"{protslurm_python} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
+        print(len(cmds))
 
         # add options to cmds:
         chains = chains or self.chains
@@ -233,7 +236,7 @@ class MotifRMSD(Runner):
             output_files.append(f"{work_dir}/rmsd_output_{str(i).zfill(4)}.json")
 
         # setup atoms option
-        atoms_str = "" if atoms is None else f"--atoms '{atoms}'"
+        atoms_str = "" if atoms is None else f"--atoms '{','.join(atoms)}'"
 
         # start add_chains_batch.py
         cmds = [f"{protslurm_python} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str}" for json_f, output_path in zip(json_files, output_files)]
