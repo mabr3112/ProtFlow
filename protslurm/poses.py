@@ -386,7 +386,7 @@ class Poses:
         raise NotImplementedError("conversion of pdbs to fasta not yet implented!")
 
     ########################################## Filtering ###############################################
-    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, overwrite: bool = False, storage_format: str = None) -> "Poses":
+    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses":
         '''
         Filters your current poses by a specified scoreterm down to either a fraction (of all poses) or a total number of poses,
         depending on which value was given with <n>.
@@ -468,7 +468,7 @@ class Poses:
         logging.info(f"Filtering completed.")
         return self
 
-    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str=None, plot: bool=False, overwrite: bool=False, storage_format: str=None) -> "Poses":
+    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses":
         '''
         Filters your current poses by a specified <score_col> according to the provided <value> and <operator>.
         
