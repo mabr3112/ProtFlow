@@ -22,7 +22,7 @@ from protslurm.jobstarters import JobStarter
 # TODO @Adrian: Should we rename this runner into colabfold.py? This is essentially the runner for the colabfold implementation of AlphaFold2.
 class Alphafold2(Runner):
     '''Class to run Alphafold2 and collect its outputs into a DataFrame'''
-    def __init__(self, script_path:str=protslurm.config.AF2_SCRIPT_PATH, python_path:str=protslurm.config.AF2_PYTHON_PATH, jobstarter:str=None) -> None:
+    def __init__(self, script_path: str = protslurm.config.AF2_SCRIPT_PATH, python_path: str = protslurm.config.AF2_PYTHON_PATH, jobstarter: str = None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path:
             raise ValueError(f"No path is set for {self}. Set the path in the config.py file under Alphafold2_SCRIPT_PATH.")
@@ -38,7 +38,7 @@ class Alphafold2(Runner):
     def __str__(self):
         return "alphafold2.py"
 
-    def run(self, poses:Poses, prefix:str, jobstarter:JobStarter=None, options:str=None, overwrite:bool=False, num_batches:int=None, return_top_n_poses:int=1) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, overwrite: bool = False, num_batches: int = None, return_top_n_poses: int = 1) -> RunnerOutput:
         '''Runs alphafold2.py on acluster'''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
@@ -52,7 +52,7 @@ class Alphafold2(Runner):
         scorefilepath = os.path.join(work_dir, scorefile)
         if not overwrite and os.path.isfile(scorefilepath):
             return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
-        elif overwrite:
+        if overwrite:
             if os.path.isdir(fasta_dir := os.path.join(work_dir, "input_fastas")):
                 shutil.rmtree(fasta_dir)
             if os.path.isdir(af2_preds_dir := os.path.join(work_dir, "af2_preds")):
@@ -89,18 +89,18 @@ class Alphafold2(Runner):
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
 
-    def prep_fastas_for_prediction(self, poses:list[str], fasta_dir:str, max_filenum:int) -> list[str]:
+    def prep_fastas_for_prediction(self, poses: list[str], fasta_dir: str, max_filenum: int) -> list[str]:
         '''
         Args:
             <poses>             List of paths to *.fa files
             <fasta_dir>         Directory to which the new fastas should be written into
             <max_filenum>          Maximum number of *.fa files that should be written
         '''
-        def mergefastas(files:list, path:str, replace=None) -> str:
+        def mergefastas(files: list, path: str, replace: bool = None) -> str:
             '''
             Merges Fastas located in <files> into one single fasta-file called <path>
             '''
-            fastas = list()
+            fastas = []
             for fp in files:
                 with open(fp, 'r', encoding="UTF-8") as f:
                     fastas.append(f.read().strip())
@@ -121,45 +121,60 @@ class Alphafold2(Runner):
         return [mergefastas(files=poses, path=f"{fasta_dir}/fasta_{str(i+1).zfill(4)}.fa", replace=("/",":")) for i, poses in enumerate(poses_split)]
 
 
-    def write_cmd(self, pose_path:str, output_dir:str, options:str):
+    def write_cmd(self, pose_path: str, output_dir: str, options: str):
         '''Writes Command to run Alphafold2.py'''
 
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, "")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
-        flags = " --".join(flags)
+        flags = " --" + " --".join(flags) if flags else ""
 
         return f"{self.python_path} {self.script_path} {opts} {flags} {pose_path} {output_dir} "
 
-    def collect_scores(self, work_dir:str, scorefile:str, num_return_poses:int=1) -> pd.DataFrame:
+    def collect_scores(self, work_dir: str, scorefile: str, num_return_poses: int =1 ) -> pd.DataFrame:
         '''collects scores from Alphafold2 output'''
 
-        def get_json_files_of_description(description:str, input_dir:str) -> str:
+        def get_json_files_of_description(description: str, input_dir: str) -> str:
             return sorted([filepath for filepath in glob(f"{input_dir}/{description}*rank*.json") if re.search(f"{description}_scores_rank_..._.*_model_._seed_...\.json", filepath)]) # pylint: disable=W1401
 
-        def get_pdb_files_of_description(description:str, input_dir:str) -> str:
+        def get_pdb_files_of_description(description: str, input_dir: str) -> str:
             return sorted([filepath for filepath in glob(f"{input_dir}/{description}*rank*.pdb") if re.search(f"{description}_.?.?relaxed_rank_..._.*_model_._seed_...\.pdb", filepath)]) # pylint: disable=W1401
 
-        def get_json_pdb_tuples_from_description(description:str, input_dir:str) -> "list[tuple[str,str]]":
+        def get_json_pdb_tuples_from_description(description: str, input_dir: str) -> list[tuple[str,str]]:
             '''Collects af2-output scores.json and .pdb file for a given 'description' as corresponding tuples (by sorting).'''
-            return [(jsonf, pdbf) for jsonf, pdbf in zip(get_json_files_of_description(description, input_dir), get_pdb_files_of_description(description, dir))]
+            return list(zip(get_json_files_of_description(description, input_dir), get_pdb_files_of_description(description, input_dir)))
 
-        def calc_statistics_over_af2_models(index, input_tuple_list:"list[tuple[str,str]]") -> list:
+        def calc_statistics_over_af2_models(index: str, input_tuple_list: list[tuple[str,str]]) -> pd.DataFrame:
             '''
+            index: "description" (name) of the pose.
             takes list of .json files from af2_predictions and collects scores (mean_plddt, max_plddt, etc.)
             '''
-            df = pd.concat([summarize_af2_json(af2_tuple[0], af2_tuple[1]) for af2_tuple in input_tuple_list], ignore_index=True)
+            # no statistics to calculate if only one model was used:
+            print(input_tuple_list)
+            print(len(input_tuple_list))
+            if len(input_tuple_list) == 1:
+                json_path, input_pdb = input_tuple_list[0]
+                df = summarize_af2_json(json_path, input_pdb)
+                df["description"] = [f"{index}_{str(i).zfill(4)}" for i in range(1, len(df.index) + 1)]
+                df["rank"] = [1]
+                return df
+
+            # otherwise collect scores from individual .json files of models for each input fasta into one DF
+            df = pd.concat([summarize_af2_json(json_path, input_pdb) for (json_path, input_pdb) in input_tuple_list], ignore_index=True)
             df = df.sort_values("json_file").reset_index(drop=True)
-            df["rank"] = [i for i in range(1, len(df.index) + 1)]
+
+            # assign rank (for tracking) and extract 'description'
+            df["rank"] = list(range(1, len(df.index) + 1))
             df["description"] = [f"{index}_{str(i).zfill(4)}" for i in range(1, len(df.index) + 1)]
-            df.to_csv('df.csv')
+
+            # calculate statistics
             for col in ['plddt', 'max_pae', 'ptm']:
                 df[f"mean_{col}"] = df[col].mean()
                 df[f"std_{col}"] = df[col].std()
                 df[f"top_{col}"] = df[col].max()
             return df
 
-        def summarize_af2_json(json_path:str, input_pdb:str) -> pd.DataFrame:
+        def summarize_af2_json(json_path: str, input_pdb: str) -> pd.DataFrame:
             '''
             Takes raw AF2_scores.json file and calculates mean pLDDT over the entire structure, also puts perresidue pLDDTs and paes in list.
             

@@ -85,8 +85,10 @@ class BackboneRMSD(Runner):
 
         # split poses into number of max_cores lists
         num_json_files = jobstarter.max_cores
+        print(jobstarter.max_cores)
         pose_dict = {os.path.abspath(row["poses"]): os.path.abspath(row[ref_col]) for row in poses}
-        pose_sublists = protslurm.jobstarters.split_list(poses.poses_list(), num_json_files)
+        pose_sublists = protslurm.jobstarters.split_list(poses.poses_list(), n_sublists=num_json_files)
+        print("pose_sublists",len(pose_sublists))
 
         # setup inputs to calc_rmsd.py
         json_files = []
@@ -105,6 +107,7 @@ class BackboneRMSD(Runner):
             # write scorefile and cmd
             scorefiles.append((sf := f"{work_dir}/rmsd_input_{str(i)}_scores.json"))
             cmds.append(f"{protslurm_python} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
+        print(len(cmds))
 
         # add options to cmds:
         chains = chains or self.chains
@@ -169,7 +172,7 @@ class MotifRMSD(Runner):
     def set_target_chains(self, chains: list[str]) -> None:
         '''Sets target chains for MotifRMSD class.'''
         self.target_chains = chains if isinstance(chains, list) else [chains]
-    
+
     def set_ref_chains(self, chains: list[str]) -> None:
         '''Sets reference chains for MotifRMSD class.'''
         self.ref_chains = chains if isinstance(chains, list) else [chains]
@@ -179,8 +182,9 @@ class MotifRMSD(Runner):
     def run(self, poses, prefix, jobstarter):
         raise NotImplementedError
 
-    def calc_rmsd(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, overwrite: bool = False):
-        '''Method to run Motif_rmsd calculation.'''
+    def calc_rmsd(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, atoms: list[str] = None, overwrite: bool = False):
+        '''Method to run Motif_rmsd calculation.
+        :atoms:     comma-separated list of atoms, eg.g CA, C, N'''
         # prep inputs
         ref_col = ref_col or self.ref_col
         ref_motif = ref_motif or self.ref_motif
@@ -193,7 +197,6 @@ class MotifRMSD(Runner):
             prefix = prefix,
             jobstarters = [jobstarter, self.jobstarter, poses.default_jobstarter]
         )
-        print(work_dir)
 
         # check if script exists
         if not os.path.isfile(script_path):
@@ -232,11 +235,14 @@ class MotifRMSD(Runner):
             json_files.append(opts_json_p)
             output_files.append(f"{work_dir}/rmsd_output_{str(i).zfill(4)}.json")
 
+        # setup atoms option
+        atoms_str = "" if atoms is None else f"--atoms '{','.join(atoms)}'"
+
         # start add_chains_batch.py
-        cmds = [f"{protslurm_python} {script_path} --input_json {json_f} --output_path {output_path}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{protslurm_python} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
-            jobname = f"heavyatom_rmsd_{prefix}",
+            jobname = prefix,
             wait = True,
             output_path = work_dir
         )

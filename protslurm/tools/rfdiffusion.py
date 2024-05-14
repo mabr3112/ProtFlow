@@ -110,7 +110,7 @@ class RFdiffusion(Runner):
                 prefix = prefix
             )
         return poses
-    
+
     def remap_motifs(self, poses: Poses, motifs: list, prefix: str) -> None:
         '''Updates ResidueSelection type motifs in poses.df when given prefix of rfdiffusion run'''
         motifs = prep_motif_input(motifs, poses.df)
@@ -239,4 +239,3 @@ def update_motif_res_mapping(motif_l: list[ResidueSelection], con_ref_idx: list,
 def get_residue_mapping(con_ref_idx: list, con_hal_idx: list) -> dict:
     '''Creates a residue mapping dictionary {old: new} from rfdiffusion outputs.'''
     return {(chain, int(res_id)): hal for (chain, res_id), hal in zip(con_ref_idx, con_hal_idx)}
-
