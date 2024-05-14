@@ -53,13 +53,15 @@ class ProtParam(Runner):
         if not seq_col:
             # check poses file extension
             pose_type = poses.determine_pose_type()
-            if not pose_type in [".fa", ".fasta", ".pdb"]:
+            if len(pose_type) > 1:
+                raise TypeError(f"Poses must be of a single type, not {pose_type}!")
+            if not pose_type[0] in [".fa", ".fasta", ".pdb"]:
                 raise TypeError(f"Poses must be of type '.fa', '.fasta' or '.pdb', not {pose_type}!")
-            elif pose_type in [".fa", ".fasta"]:
+            elif pose_type[0] in [".fa", ".fasta"]:
                 # directly use fasta files as input
                 # TODO: this assumes that it is a single entry fasta file (as it should be!)
                 seqs = [load_sequence_from_fasta(fasta=pose, return_multiple_entries=False).seq for pose in poses.df['poses'].to_list()]     
-            elif pose_type == ".pdb":
+            elif pose_type[0] == ".pdb":
                 # extract sequences from pdbs
                 seqs = [get_sequence_from_pose(load_structure_from_pdbfile(path_to_pdb=pose)) for pose in poses.df['poses'].to_list()]
         else:
