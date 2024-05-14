@@ -11,7 +11,7 @@ import protslurm
 # import customs
 from protslurm.config import PROTSLURM_PYTHON as protslurm_python
 from protslurm.runners import Runner, RunnerOutput, col_in_df
-from protslurm.poses import Poses
+from protslurm.poses import Poses, get_format
 from protslurm.jobstarters import JobStarter
 
 
@@ -42,11 +42,11 @@ class TMalign(Runner):
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
-        scorefile = os.path.join(work_dir, f"{prefix}_TM.json")
-        if os.path.isfile(scorefile) and overwrite == False:
-            scores = pd.read_json(scorefile)
-            output = RunnerOutput(poses = poses, results = scores, prefix = prefix)
+        scorefile = os.path.join(work_dir, f"{prefix}_TM.{poses.storage_format}")
+        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+            output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
+
 
         # check if reference column exists in poses.df
         col_in_df(poses.df, ref_col)
@@ -82,7 +82,7 @@ class TMalign(Runner):
         scores = scores.rename(columns={"poses": "location"})
 
         # write output scorefile
-        scores.to_json(scorefile)
+        self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
         # create standardised output for poses class:
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix)

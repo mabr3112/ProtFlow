@@ -45,11 +45,11 @@ class AttnPacker(Runner):
         if not os.path.isdir(pdb_dir): os.makedirs(pdb_dir, exist_ok=True)
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip LigandMPNN.
-        scorefile = "attnpacker_scores.csv"
-        if not overwrite and os.path.isfile(scorefilepath := os.path.join(work_dir, scorefile)):
-            return RunnerOutput(poses=poses, results=pd.read_csv(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
-        elif overwrite and os.path.isfile(scorefilepath := os.path.join(work_dir, scorefile)): 
-            os.remove(scorefilepath)
+        scorefile = os.path.join(work_dir, f"attnpacker_scores.{poses.storage_format}")
+
+        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+            if overwrite == True: os.remove(scorefile)
+            else: return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()        
 
         # parse options and pose_options:
         pose_options = self.prep_pose_options(poses, pose_options)
@@ -67,11 +67,14 @@ class AttnPacker(Runner):
         )
 
         logging.info(f"attnpacker.py finished, collecting scores.")
-        scores = pd.read_csv(scorefilepath)
+        # TODO: this is not done gracefully, too lazy to fix atm
+        scores = pd.read_csv(scorefile)
+        self.save_runner_scorefile(scores=scores, scorefile=scorefile)
+
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
     def write_cmd(self, pose_path:str, output_dir:str, options:str, pose_options:str):
-        '''Writes Command to run ligandmpnn.py'''
+        '''Writes Command to run attnpacker'''
 
         # check if interfering options were set
         forbidden_options = ['--attnpacker_dir', '--output_dir', '--input_pdb', '--scorefile']

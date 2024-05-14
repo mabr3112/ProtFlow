@@ -68,20 +68,12 @@ class BackboneRMSD(Runner):
         )
 
         ref_col = ref_col or self.ref_col
-        scorefile = f"{work_dir}/{prefix}_rmsd.json"
+        scorefile = f"{work_dir}/{prefix}_rmsd.{poses.storage_format}"
 
         # check if RMSD was calculated if overwrite was not set.
-        if os.path.isdir(work_dir): # check if dir exists
-            if os.path.isfile(scorefile) and not self.overwrite: # return precalculated RMSDs
-                output = RunnerOutput(
-                    poses = poses,
-                    results = pd.read_json(scorefile),
-                    prefix = prefix
-                )
-                return output.return_poses()
-
-            # if no outputs present, setup work_dir:
-            os.makedirs(work_dir, exist_ok=True)
+        if output_df := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=self.overwrite):
+            output = RunnerOutput(poses=poses, results=output_df, prefix=prefix)
+            return output.return_poses()
 
         # split poses into number of max_cores lists
         num_json_files = jobstarter.max_cores
@@ -125,7 +117,7 @@ class BackboneRMSD(Runner):
 
         # collect individual DataFrames into one
         output_df = pd.concat([pd.read_json(sf) for sf in scorefiles], ignore_index=True).reset_index()
-        output_df.to_json(scorefile)
+        self.save_runner_scorefile(scores=output_df, scorefile=scorefile)
 
         # create standardised output for poses class:
         output = RunnerOutput(
@@ -203,14 +195,10 @@ class MotifRMSD(Runner):
             raise ValueError(f"Cannot find script 'calc_heavyatom_rmsd_batch.py' at specified directory: '{script_dir}'. Set path to '/PATH/protslurm/tools/runners_auxiliary_scripts/' for variable AUXILIARY_RUNNER_SCRIPTS_DIR in config.py file.")
 
         # check if outputs are present
-        scorefile = f"{work_dir}/{prefix}_rmsds.json"
-        if os.path.isfile(scorefile) and not overwrite:
-            outputs = RunnerOutput(
-                poses = poses,
-                results = pd.read_json(scorefile),
-                prefix = prefix
-            )
-            return outputs.return_poses()
+        scorefile = f"{work_dir}/{prefix}_rmsds.{poses.storage_format}"
+        if rmsd_df := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=self.overwrite):
+            output = RunnerOutput(poses=poses, results=rmsd_df, prefix=prefix)
+            return output.return_poses()
 
         # setup full input dict, batch later
         input_dict = self.setup_input_dict(
@@ -249,7 +237,7 @@ class MotifRMSD(Runner):
 
         # collect outputs
         rmsd_df = pd.concat([pd.read_json(output_path) for output_path in output_files]).reset_index()
-        rmsd_df.to_json(scorefile)
+        self.save_runner_scorefile(scores=rmsd_df, scorefile=scorefile)
 
         outputs = RunnerOutput(
             poses = poses,
