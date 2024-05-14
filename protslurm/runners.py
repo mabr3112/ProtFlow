@@ -9,7 +9,7 @@ import shlex
 import pandas as pd
 
 # custom
-from protslurm.poses import Poses
+from protslurm.poses import Poses, get_format, FORMAT_STORAGE_DICT
 from protslurm.jobstarters import JobStarter
 
 class RunnerOutput:
@@ -138,6 +138,22 @@ class Runner:
         if not os.path.isdir(work_dir) and make_work_dir:
             os.makedirs(work_dir, exist_ok=True)
         return work_dir, jobstarter
+    
+    def check_for_existing_scorefile(self, scorefile:str, overwrite:bool=False):
+        # check if scorefile exists if overwrite is False
+        if os.path.isfile(scorefile) and overwrite == False:
+            # pick method to import scorefile
+            scores = get_format(scorefile)(scorefile)
+            return scores
+        
+    def save_runner_scorefile(self, scores:pd.DataFrame, scorefile:str):
+        # extract file extension from scorefile
+        storage_method = os.path.splitext(scorefile)[1][1:]
+        # pick method to save scorefile
+        if (save_method_name := FORMAT_STORAGE_DICT.get(storage_method.lower())):
+            getattr(scores, save_method_name)(scorefile)
+        else:
+            raise KeyError(f"Could not find method to save scorefile as {storage_method}. Make sure the score file extension is correct!")
 
 def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[dict,list]:
     """
