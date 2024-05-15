@@ -56,7 +56,7 @@ class BackboneRMSD(Runner):
         self.jobstarter = jobstarter
 
     ########################## Calculations ################################################
-    def calc_rmsd(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None) -> None:
+    def calc_rmsd(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None, overwrite: bool = False) -> None:
         '''Calculates RMSD as specified.'''
         # if self.atoms is all, calculate Allatom RMSD.
 
@@ -71,7 +71,8 @@ class BackboneRMSD(Runner):
         scorefile = f"{work_dir}/{prefix}_rmsd.{poses.storage_format}"
 
         # check if RMSD was calculated if overwrite was not set.
-        if output_df := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=self.overwrite):
+        overwrite = overwrite or self.overwrite
+        if (output_df := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=self.overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=output_df, prefix=prefix)
             return output.return_poses()
 
@@ -133,9 +134,12 @@ class BackboneRMSD(Runner):
 
 class MotifRMSD(Runner):
     '''Class handling'''
-    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, target_chains: list[str] = None, ref_chains: list[str] = None, jobstarter: JobStarter = None):
+    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, target_chains: list[str] = None, ref_chains: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False):
         #TODO implement MotifRMSD calculation based on Chain input!
         self.set_jobstarter(jobstarter)
+        self.overwrite = overwrite
+
+        # motif settings
         self.set_ref_col(ref_col)
         self.set_target_motif(target_motif)
         self.set_ref_motif(ref_motif)
@@ -195,8 +199,9 @@ class MotifRMSD(Runner):
             raise ValueError(f"Cannot find script 'calc_heavyatom_rmsd_batch.py' at specified directory: '{script_dir}'. Set path to '/PATH/protslurm/tools/runners_auxiliary_scripts/' for variable AUXILIARY_RUNNER_SCRIPTS_DIR in config.py file.")
 
         # check if outputs are present
+        overwrite = overwrite or self.overwrite
         scorefile = f"{work_dir}/{prefix}_rmsds.{poses.storage_format}"
-        if rmsd_df := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=self.overwrite):
+        if (rmsd_df := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=rmsd_df, prefix=prefix)
             return output.return_poses()
 

@@ -44,7 +44,7 @@ class ProtParam(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
         scorefile = os.path.join(work_dir, f"{prefix}_protparam.{poses.storage_format}")
-        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
 

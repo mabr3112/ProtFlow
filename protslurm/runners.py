@@ -138,17 +138,20 @@ class Runner:
         if not os.path.isdir(work_dir) and make_work_dir:
             os.makedirs(work_dir, exist_ok=True)
         return work_dir, jobstarter
-    
-    def check_for_existing_scorefile(self, scorefile:str, overwrite:bool=False):
+
+    def check_for_existing_scorefile(self, scorefile: str, overwrite: bool = False) -> pd.DataFrame:
+        '''Checks if a scorefile exists and returns DataFrame if overwrite is False. Otherwise returns None'''
         # check if scorefile exists if overwrite is False
-        if os.path.isfile(scorefile) and overwrite == False:
+        if os.path.isfile(scorefile) and not overwrite:
             # pick method to import scorefile
             scores = get_format(scorefile)(scorefile)
             return scores
-        
-    def save_runner_scorefile(self, scores:pd.DataFrame, scorefile:str):
+
+    def save_runner_scorefile(self, scores: pd.DataFrame, scorefile: str) -> None:
+        '''Stores runner's scorefile based on the format specified at the scorefile extension.'''
         # extract file extension from scorefile
         storage_method = os.path.splitext(scorefile)[1][1:]
+
         # pick method to save scorefile
         if (save_method_name := FORMAT_STORAGE_DICT.get(storage_method.lower())):
             getattr(scores, save_method_name)(scorefile)

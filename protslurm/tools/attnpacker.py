@@ -47,7 +47,7 @@ class AttnPacker(Runner):
         # Look for output-file in pdb-dir. If output is present and correct, then skip LigandMPNN.
         scorefile = os.path.join(work_dir, f"attnpacker_scores.{poses.storage_format}")
 
-        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             if overwrite == True: os.remove(scorefile)
             else: return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()        
 

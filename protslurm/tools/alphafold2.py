@@ -49,7 +49,7 @@ class Alphafold2(Runner):
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip Alphafold2.
         scorefile = os.path.join(work_dir, f"Alphafold2_scores.{poses.storage_format}")
-        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
         if overwrite:

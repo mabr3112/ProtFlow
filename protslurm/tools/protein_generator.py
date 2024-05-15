@@ -46,7 +46,7 @@ class ProteinGenerator(Runner):
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip protein_generator.
         scorefile = os.path.join(work_dir, f"protein_generator_scores.{poses.storage_format}")
-        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
 
