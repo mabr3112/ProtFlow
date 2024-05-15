@@ -48,17 +48,14 @@ class Alphafold2(Runner):
         )
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip Alphafold2.
-        scorefile = "Alphafold2_scores.json"
-        scorefilepath = os.path.join(work_dir, scorefile)
-        if not overwrite and os.path.isfile(scorefilepath):
-            return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
+        scorefile = os.path.join(work_dir, f"Alphafold2_scores.{poses.storage_format}")
+        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+            output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
+            return output.return_poses()
         if overwrite:
-            if os.path.isdir(fasta_dir := os.path.join(work_dir, "input_fastas")):
-                shutil.rmtree(fasta_dir)
-            if os.path.isdir(af2_preds_dir := os.path.join(work_dir, "af2_preds")):
-                shutil.rmtree(af2_preds_dir)
-            if os.path.isdir(af2_pdb_dir := os.path.join(work_dir, "output_pdbs")):
-                shutil.rmtree(af2_pdb_dir)
+            if os.path.isdir(fasta_dir := os.path.join(work_dir, "input_fastas")): shutil.rmtree(fasta_dir)
+            if os.path.isdir(af2_preds_dir := os.path.join(work_dir, "af2_preds")): shutil.rmtree(af2_preds_dir)
+            if os.path.isdir(af2_pdb_dir := os.path.join(work_dir, "output_pdbs")): shutil.rmtree(af2_pdb_dir)
 
         # setup af2-specific directories:
         os.makedirs(fasta_dir := os.path.join(work_dir, "input_fastas"), exist_ok=True)
@@ -83,8 +80,9 @@ class Alphafold2(Runner):
 
         # collect scores
         logging.info(f"Predictions finished, starting to collect scores.")
-        scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, num_return_poses=return_top_n_poses)
-        scores.to_json(scorefilepath)
+        scores = self.collect_scores(work_dir=work_dir, num_return_poses=return_top_n_poses)
+
+        self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
@@ -131,7 +129,7 @@ class Alphafold2(Runner):
 
         return f"{self.python_path} {self.script_path} {opts} {flags} {pose_path} {output_dir} "
 
-    def collect_scores(self, work_dir: str, scorefile: str, num_return_poses: int =1 ) -> pd.DataFrame:
+    def collect_scores(self, work_dir: str, num_return_poses: int =1 ) -> pd.DataFrame:
         '''collects scores from Alphafold2 output'''
 
         def get_json_files_of_description(description: str, input_dir: str) -> str:
@@ -211,9 +209,6 @@ class Alphafold2(Runner):
         # Copy poses to pdb_dir and store location in DataFrame
         scores_df.loc[:, "location"] = [shutil.copy(row['pdb_file'], os.path.join(pdb_dir, f"{row['description']}.pdb")) for _, row in scores_df.iterrows()]
         scores_df.drop(['pdb_file', 'json_file'], axis=1, inplace=True)
-
-        # Write output df
-        scores_df.to_json(scorefile)
 
         return scores_df
     
