@@ -52,7 +52,7 @@ class RFdiffusion(Runner):
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip diffusion step.
         scorefile = os.path.join(work_dir, f"rfdiffusion_scores.{poses.storage_format}")
-        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
             if update_motifs:
                 self.remap_motifs(
@@ -63,7 +63,7 @@ class RFdiffusion(Runner):
             return poses
 
         # in case overwrite is set, overwrite previous results.
-        elif overwrite is True or not os.path.isfile(scorefile):
+        elif overwrite or not os.path.isfile(scorefile):
             if os.path.isfile(scorefile): os.remove(scorefile)
             for pdb in glob(f"{pdb_dir}/*pdb"):
                 if os.path.isfile(trb := pdb.replace(".pdb", ".trb")):

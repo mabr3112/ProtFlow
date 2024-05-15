@@ -48,8 +48,10 @@ class AttnPacker(Runner):
         scorefile = os.path.join(work_dir, f"attnpacker_scores.{poses.storage_format}")
 
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
-            if overwrite == True: os.remove(scorefile)
-            else: return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()        
+            if overwrite:
+                os.remove(scorefile)
+            else:
+                return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
 
         # parse options and pose_options:
         pose_options = self.prep_pose_options(poses, pose_options)

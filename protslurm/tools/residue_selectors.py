@@ -4,6 +4,7 @@
 # dependencies
 
 # customs
+import protslurm.residues
 from protslurm.poses import Poses
 from protslurm.residues import ResidueSelection
 from protslurm.utils.biopython_tools import load_structure_from_pdbfile
@@ -105,7 +106,7 @@ class ChainSelector(ResidueSelector):
 
     def prep_chain_input(self, chain: str = None, chains: list[str] = None) -> list[str]:
         '''Prepares chain input for chain_selection.
-        This method makes sure to prioritize options set in method parameters over opteions in class attributes.
+        This method makes sure to prioritize options set in method parameters over options in class attributes.
         This means that ChainSelector.select(chain="A") has higher priority than ChainSelector(chain="C") (attribute set to class).
         '''
         # error handling
@@ -135,7 +136,7 @@ class TrueSelector(ResidueSelector):
         if not (poses := poses or self.poses):
             raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
         poses.check_prefix(prefix)
-        poses[prefix] = [self.select_single(pose) for pose in poses.poses_list()]
+        poses.df[prefix] = [self.select_single(pose) for pose in poses.poses_list()]
 
     def select_single(self, pose_path: str) -> ResidueSelection: # pylint: disable=W0221
         '''Selects all residues in a pose and returns them as ResidueSelection object.'''
@@ -166,14 +167,44 @@ class NotSelector(ResidueSelector):
         self.contig = contig
         self.residue_selection = None
 
+    def prep_residue_selection(self, residue_selection: ResidueSelection|str, poses: Poses) -> list[ResidueSelection]:
+        '''Preps residue_selection parameter for self.select() function.'''
+        if isinstance(residue_selection, str):
+            poses.check_prefix(residue_selection)
+            return poses[residue_selection].to_list()
+        if isinstance(residue_selection, ResidueSelection):
+            return [residue_selection for _ in poses]
+        raise TypeError(f"Unsupported argument type {type(residue_selection)} for NotSelector.select(). Only ResidueSelection or 'str' (column in poses.df) are allowed.")
+
     def select(self, prefix: str, poses: Poses = None, residue_selection: ResidueSelection|str = None, contig: str = None) -> None:
         '''Selects all residues except the ones specified in :residue_selection: or by :contig:
         Parameter :residue_selection: can be either a ResidueSelection object or a string pointing to a column in the poses.df that contains ResidueSelection objects.
         '''
-        return None
+        # error handling
+        if not (poses := poses or self.poses):
+            raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
+        if residue_selection and contig:
+            raise ValueError(f"NotSelector Class cannot be initialized with both parameters :contig: or :residue_selection: set.\n Either choose a residue_selection, or give the residue selectio as a contig, but not both.")
 
-    def select_single(self, pose_path: str, residue_selection: ResidueSelection) -> ResidueSelection:
+        # prep inputs and run
+        poses.check_prefix(prefix)
+        if contig:
+            residue_selection = protslurm.residues.from_contig(input_contig=contig)
+
+        # prep residue_selection
+        residue_selection_list = self.prep_residue_selection(residue_selection, poses)
+
+        # select
+        poses.df[prefix] = [self.select_single(pose, res_sel) for pose, res_sel in zip(poses.poses_list(), residue_selection_list)]
+
+    def select_single(self, pose_path: str, residue_selection: ResidueSelection) -> ResidueSelection: # pylint: disable=W0221
         '''Selects all residues except the ones specified in :residue_selection: or by :contig:
         Parameter :residue_selection: can be either a ResidueSelection object or a string pointing to a column in the poses.df that contains ResidueSelection objects.
         '''
-        
+        pose = load_structure_from_pdbfile(pose_path)
+
+        # load all residues form the pose
+        all_res = ResidueSelection([residue.parent.id + str(residue.id[1]) for residue in pose.get_residues()])
+
+        # select not_selection:
+        return all_res - residue_selection

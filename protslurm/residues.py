@@ -1,18 +1,32 @@
 '''protslurm internal module to handle residue_selection and everything related to residues.'''
+# imports
+from collections import OrderedDict
 
 class ResidueSelection:
     '''Class to represent selections of Residues.
     Selection of Residues is represented as a tuple with the hierarchy ((chain, residue_idx), ...)
 
+    fast: parses the selection without any type checking. For when :selection: already has ResidueSelection Format.
+
     '''
-    def __init__(self, selection: list, delim: str = ","):
-        self.residues = parse_selection(selection, delim=delim)
+    def __init__(self, selection: list = None, delim: str = ",", fast: bool = False):
+        self.residues = parse_selection(selection, delim=delim, fast=fast)
 
     def __str__(self) -> str:
         return ", ".join([f"{chain}{str(resi)}" for chain, resi in self])
 
     def __iter__(self):
         return iter(self.residues)
+
+    def __add__(self, other):
+        if isinstance(other, ResidueSelection):
+            return ResidueSelection(self.residues + (other - self).residues, fast=True)
+        return NotImplemented
+
+    def __sub__(self, other):
+        if isinstance(other, ResidueSelection):
+            return ResidueSelection(tuple(res for res in self.residues if res not in set(other.residues)), fast=True)
+        return NotImplemented
 
     ####################################### INPUT ##############################################
     def from_selection(self, selection) -> "ResidueSelection":
@@ -52,9 +66,15 @@ class ResidueSelection:
 
         return out_d
 
-def parse_selection(input_selection, delim: str = ",") -> tuple[tuple[str,int]]:
+def fast_parse_selection(input_selection: tuple[tuple[str, int]]) -> tuple[tuple[str, int]]:
+    '''Fast selection parser for when :input_selection: is already in ResidueSelection.residues format.'''
+    return input_selection
+
+def parse_selection(input_selection, delim: str = ",", fast: bool = False) -> tuple[tuple[str,int]]:
     '''Parses selction into ResidueSelection formatted selection.'''
     #TODO: This implementation is safe from bugs, but not very efficient.
+    if fast:
+        return fast_parse_selection(input_selection)
     if isinstance(input_selection, str):
         return tuple(parse_residue(residue.strip()) for residue in input_selection.split(delim))
     if isinstance(input_selection, list) or isinstance(input_selection, tuple):
@@ -84,4 +104,18 @@ def from_dict(input_dict: dict) -> ResidueSelection:
     '''Creates ResidueSelection object from dictionary. The dictionary specifies a motif in this way: {chain: [residues], ...}'''
     return ResidueSelection([f"{chain}{resi}" for chain, res_l in input_dict.items() for resi in res_l])
 
-#TODO @Adrian please write a contig parser for ResidueSelection construction: ResidueSelection(contig="A1-6,A8,A10-120,B1-9")
+def from_contig(input_contig: str) -> ResidueSelection:
+    '''Creates ResidueSelection object from a contig.'''
+    sel = []
+    elements = [x.strip() for x in input_contig.split(",") if x]
+    for element in elements:
+        subsplit = element.split("-")
+        if len(subsplit) > 1:
+            sel += [element[0] + str(i) for i in range(int(subsplit[0][1:]), int(subsplit[-1])+1)]
+        else:
+            sel.append(element)
+    return ResidueSelection(sel)
+
+def reduce_to_unique(input_array: list|tuple) -> list|tuple:
+    '''reduces input_array to it's unique elements while preserving order.'''
+    return type(input_array)(OrderedDict.fromkeys(input_array))

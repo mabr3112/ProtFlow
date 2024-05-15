@@ -16,7 +16,7 @@ class TMalign(Runner):
     '''
     Class handling the calculation of TM scores to compare to protein structures (sequence-length independent). See https://zhanggroup.org/TM-align/, https://zhanggroup.org/TM-score/ or 10.1093/nar/gki524 for more information.
     '''
-    def __init__(self, jobstarter: str = None): # pylint: disable=W0102
+    def __init__(self, jobstarter: str = None):
         self.jobstarter = jobstarter
 
 
@@ -56,20 +56,20 @@ class TMalign(Runner):
         num_cmds = jobstarter.max_cores
         if num_cmds > len(poses.df.index):
             num_cmds = len(poses.df.index)
-        
+
         # create batch commands
         cmd_sublists = protslurm.jobstarters.split_list(cmds, n_sublists=num_cmds)
         cmds = []
         for sublist in cmd_sublists:
             cmds.append("; ".join(sublist))
-    
+
         # run command
         jobstarter.start(
             cmds = cmds,
             jobname = "TM",
             output_path = work_dir
         )
-        
+
         scores = self.collect_scores(output_dir=work_dir)
 
         scores = scores.merge(poses.df[['poses', 'poses_description']], left_on="description", right_on="poses_description").drop('poses_description', axis=1)
@@ -81,20 +81,19 @@ class TMalign(Runner):
         # create standardised output for poses class:
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
         return output.return_poses()
-    
-    
+
     def write_cmd(self, pose_path:str, ref_path:str, output_dir:str, options:str=None, pose_options:str=None, superimpose:bool=True) -> str:
         '''Writes Command to run ligandmpnn.py'''
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
         flags = " -" + " -".join(flags) if flags else ""
-        
+
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()]) if opts else ""
         flags = " -" + " -".join(flags) if flags else ""
-        
+
         # check if structures should be superimposed before calculating TM score and use the corresponding application
         if superimpose:
             application = "TMalign"
@@ -108,7 +107,7 @@ class TMalign(Runner):
         run_string = f"{application} {pose_path} {ref_path} {opts} {flags} > {scorefile}"
 
         return run_string
-    
+
     def collect_scores(self, output_dir:str):
         '''Collects scores of TMAlign or TMScore runs.'''
         def extract_scores(score_path:str) -> pd.Series:
