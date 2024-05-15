@@ -2,7 +2,7 @@
 This module contains all paths to tools integrated in ProtSLURM.
 '''
 # protslurm environment python
-PROTSLURM_PYTHON = ""
+PROTSLURM_ENV = ""
 
 #auxiliary runners directory path
 #TODO: @Markus Implement checkup if AUXILIARY_RUNNER_SCRIPTS_DIR points to the correct directory (Think about pointing to protslurm directory)!
