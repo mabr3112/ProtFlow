@@ -45,11 +45,10 @@ class ProteinGenerator(Runner):
             os.makedirs(pdb_dir, exist_ok=True)
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip protein_generator.
-        scorefile = "protein_generator_scores.json"
-        if not overwrite and os.path.isfile((scorefilepath := f"{work_dir}/{scorefile}")):
-            return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
-        elif overwrite and os.path.isfile:
-            pass
+        scorefile = os.path.join(work_dir, f"protein_generator_scores.{poses.storage_format}")
+        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+            output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
+            return output.return_poses()
 
         # parse_options and pose_options:
         pose_options = self.prep_pose_options(poses, pose_options)
@@ -66,7 +65,12 @@ class ProteinGenerator(Runner):
         )
 
         # collect scores
-        scores = self.collect_scores(scores_dir=pdb_dir, scorefile=scorefile)
+        scores = self.collect_scores(scores_dir=pdb_dir)
+    
+        # write scorefile
+        logging.info(f"Saving scores of {self} at {scorefile}")
+        self.save_runner_scorefile(scores=scores, scorefile=scorefile)
+
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
     def safecheck_pose_options(self, pose_options: list, poses:list) -> list:
@@ -93,7 +97,7 @@ class ProteinGenerator(Runner):
 
         return f"{self.python_path} {self.script_path} --out {output_dir}/{desc} {opts} {flags}"
 
-    def collect_scores(self, scores_dir: str, scorefile: str) -> pd.DataFrame:
+    def collect_scores(self, scores_dir: str) -> pd.DataFrame:
         '''collects scores from protein_generator output'''
         # read .pdb files
         pl = glob(f"{scores_dir}/*.pdb")
@@ -102,10 +106,6 @@ class ProteinGenerator(Runner):
 
         # parse .trb-files into DataFrames
         df = pd.concat([self.parse_trbfile(p.replace(".pdb", ".trb")) for p in pl], axis=0).reset_index(drop=True)
-
-        # write scorefile
-        logging.info(f"Saving scores of {self} at {scorefile}")
-        df.to_json(scorefile)
 
         return df
 

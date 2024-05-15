@@ -51,10 +51,9 @@ class RFdiffusion(Runner):
             os.makedirs(pdb_dir, exist_ok=True)
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip diffusion step.
-        scorefile="rfdiffusion_scores.json"
-        scorefilepath = os.path.join(work_dir, scorefile)
-        if overwrite is False and os.path.isfile(scorefilepath):
-            poses = RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
+        scorefile = os.path.join(work_dir, f"rfdiffusion_scores.{poses.storage_format}")
+        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+            poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
             if update_motifs:
                 self.remap_motifs(
                 poses = poses,
@@ -64,8 +63,8 @@ class RFdiffusion(Runner):
             return poses
 
         # in case overwrite is set, overwrite previous results.
-        elif overwrite is True or not os.path.isfile(scorefilepath):
-            if os.path.isfile(scorefilepath): os.remove(scorefilepath)
+        elif overwrite is True or not os.path.isfile(scorefile):
+            if os.path.isfile(scorefile): os.remove(scorefile)
             for pdb in glob(f"{pdb_dir}/*pdb"):
                 if os.path.isfile(trb := pdb.replace(".pdb", ".trb")):
                     os.remove(trb)
@@ -99,7 +98,9 @@ class RFdiffusion(Runner):
         )
 
         # collect RFdiffusion outputs
-        scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath, rename_pdbs=True).reset_index(drop=True)
+        scores = self.collect_scores(work_dir=work_dir, rename_pdbs=True).reset_index(drop=True)
+        logging.info(f"Saving scores of {self} at {scorefile}")
+        self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
         # update residue mappings for stored motifs
         poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
@@ -152,7 +153,7 @@ class RFdiffusion(Runner):
         splitstr = [x for x in re_split_rfdiffusion_opts(options) + re_split_rfdiffusion_opts(pose_options) if x] # adding pose_opts after options makes sure that pose_opts overwrites options!
         return {x.split("=")[0]: "=".join(x.split("=")[1:]) for x in splitstr}
 
-    def collect_scores(self, work_dir: str, scorefile: str, rename_pdbs: bool = True) -> pd.DataFrame:
+    def collect_scores(self, work_dir: str, rename_pdbs: bool = True) -> pd.DataFrame:
         '''collects scores from RFdiffusion output'''
         # collect scores from .trb-files into one pandas DataFrame:
         pdb_dir = os.path.join(work_dir, "output_pdbs")
@@ -179,9 +180,6 @@ class RFdiffusion(Runner):
             scores = scores.drop(columns=["description"]).rename(columns={"new_description": "description"})
 
         scores.reset_index(drop=True, inplace=True)
-
-        logging.info(f"Saving scores of {self} at {scorefile}")
-        scores.to_json(scorefile)
 
         return scores
 

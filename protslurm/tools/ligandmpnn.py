@@ -62,10 +62,10 @@ class LigandMPNN(Runner):
         )
 
         # Look for output-file in pdb-dir. If output is present and correct, skip LigandMPNN.
-        scorefile = "ligandmpnn_scores.json"
-        scorefilepath = os.path.join(work_dir, scorefile)
-        if overwrite is False and os.path.isfile(scorefilepath):
-            return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
+        scorefile = os.path.join(work_dir, f"ligandmpnn_scores.{poses.storage_format}")
+        if scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite):
+            output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
+            return output.return_poses()
 
         # integrate redesigned and fixed residue parameters into pose_opt_cols:
         if fixed_res_col is not None:
@@ -100,10 +100,12 @@ class LigandMPNN(Runner):
         # collect scores
         scores = self.collect_scores(
             work_dir=work_dir,
-            scorefile=scorefilepath,
             return_seq_threaded_pdbs_as_pose=return_seq_threaded_pdbs_as_pose,
             preserve_original_output=preserve_original_output
         )
+        
+        logging.info(f"Saving scores of {self} at {scorefile}")
+        self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
@@ -242,7 +244,7 @@ class LigandMPNN(Runner):
         # write command and return.
         return f"{self.python_path} {self.script_path} {model_checkpoint_options} --out_folder {output_dir}/ --pdb_path {pose_path} {options}"
 
-    def collect_scores(self, work_dir:str, scorefile:str, return_seq_threaded_pdbs_as_pose:bool, preserve_original_output:bool=True) -> pd.DataFrame:
+    def collect_scores(self, work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve_original_output:bool=True) -> pd.DataFrame:
         '''collects scores from ligandmpnn output'''
 
         def mpnn_fastaparser(fasta_path):
@@ -331,10 +333,6 @@ class LigandMPNN(Runner):
         if return_seq_threaded_pdbs_as_pose:
             #replace .fa with sequence threaded pdb files as poses
             scores['location'] = [os.path.join(pdb_dir, f"{os.path.splitext(os.path.basename(series['location']))[0]}.pdb") for _, series in scores.iterrows()]
-
-        logging.info(f"Saving scores of {self} at {scorefile}")
-
-        scores.to_json(scorefile)
 
         if not preserve_original_output:
             if os.path.isdir(original_seqs_dir):
