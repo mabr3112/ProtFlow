@@ -79,6 +79,8 @@ class ChainSelector(ResidueSelector):
 
         # prep inputs
         chains = self.prep_chain_input(chain, chains)
+        if not (poses := poses or self.poses):
+            raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
 
         # select Residues
         poses.df[prefix] = [self.select_single(pose_path=pose, chains=chains) for pose in poses.poses_list()]
@@ -114,7 +116,64 @@ class ChainSelector(ResidueSelector):
         if all(not param for param in [chain, chains, self.chain, self.chains]):
             raise ValueError(f"Set one of parameters :chain: or :chains: to select a chain with ChainSelector!")
 
+        # handle priorities (method parameters over class parameters)
         class_chains = self.chains if self.chains else [self.chain]
         method_chains = chains if chains else [chain]
         return method_chains or class_chains
-    
+
+class TrueSelector(ResidueSelector):
+    '''ResidueSelector that selects all residues of a pose.'''
+    def __init__(self, poses: Poses = None):
+        super().__init__(poses = poses)
+
+    def select(self, prefix: str, poses: Poses = None):
+        '''
+        Selects all residues of a given pose for all poses in a Poses object.
+        Selected residues are added as ResidueSelection objects under the column :prefix: to Poses.df.
+        '''
+        # prep inputs and run
+        if not (poses := poses or self.poses):
+            raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
+        poses.check_prefix(prefix)
+        poses[prefix] = [self.select_single(pose) for pose in poses.poses_list()]
+
+    def select_single(self, pose_path: str) -> ResidueSelection: # pylint: disable=W0221
+        '''Selects all residues in a pose and returns them as ResidueSelection object.'''
+        pose = load_structure_from_pdbfile(pose_path)
+        return ResidueSelection([residue.parent.id + str(residue.id[1]) for residue in pose.get_residues()])
+
+class NotSelector(ResidueSelector):
+    '''ResidueSelector that selects all residues except the ones specified by a residueselection.'''
+    def __init__(self, poses: Poses = None, residue_selection: ResidueSelection|str = None, contig: str = None):
+        super().__init__(poses)
+        if residue_selection and contig:
+            raise ValueError(f"NotSelector Class cannot be initialized with both parameters :contig: or :residue_selection: set.\n Either choose a residue_selection, or give the residue selectio as a contig, but not both.")
+        self.set_residue_selection(residue_selection)
+        self.set_contig(contig)
+
+    def set_residue_selection(self, residue_selection: ResidueSelection = None) -> None:
+        '''Sets residue_selection attribute for NotSelector class.'''
+        if not residue_selection:
+            residue_selection = None
+        if isinstance(residue_selection, ResidueSelection) or isinstance(residue_selection, str):
+            self.residue_selection = residue_selection
+            self.contig = None
+
+    def set_contig(self, contig: str) -> None:
+        '''Sets contig attribute for NotSelector class.'''
+        if not isinstance(contig, str):
+            raise ValueError(f"Contig must be of type str. E.g.: contig='A1-7,A25-109,B45-50,C1,C3,C5")
+        self.contig = contig
+        self.residue_selection = None
+
+    def select(self, prefix: str, poses: Poses = None, residue_selection: ResidueSelection|str = None, contig: str = None) -> None:
+        '''Selects all residues except the ones specified in :residue_selection: or by :contig:
+        Parameter :residue_selection: can be either a ResidueSelection object or a string pointing to a column in the poses.df that contains ResidueSelection objects.
+        '''
+        return None
+
+    def select_single(self, pose_path: str, residue_selection: ResidueSelection) -> ResidueSelection:
+        '''Selects all residues except the ones specified in :residue_selection: or by :contig:
+        Parameter :residue_selection: can be either a ResidueSelection object or a string pointing to a column in the poses.df that contains ResidueSelection objects.
+        '''
+        
