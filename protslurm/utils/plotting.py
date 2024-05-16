@@ -354,7 +354,7 @@ def parse_cols_for_plotting(plot_arg: str, subst:str=None) -> list[str]:
         
 def sequence_logo(dataframe:pd.DataFrame, input_col:str, save_path:str, refseq:str=None, title:str=None, resnums:list=None, units:str="probability"):
     '''
-    Generates a WEBLOGO with adapted x-axes (having correct residue IDs as lables)
+    Generates a WEBLOGO with adapted x-axes (having correct residue IDs as lables).
 
     Parameters
     ----------
@@ -440,7 +440,7 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, save_path:str, refseq:s
                 if sequence==None:
                     line = line.replace(str(pos_count + 1), '%d' % (resid[pos_count]))
                 else:
-                    line = line.replace(str(pos_count + 1), '%d%s' % (resid[pos_count], sequence[pos_count],))
+                    line = line.replace(str(pos_count + 1), '%s%d' % (sequence[pos_count],resid[pos_count]))
                 pos_count=pos_count+1
             new_eps_str_lines.append(line)
         return '\n'.join(new_eps_str_lines)
@@ -498,16 +498,19 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, save_path:str, refseq:s
         else:
             eps_str = replace_logo_numbers(eps_str, resnums, refseq)
 
+    os.remove(tmp_fasta)
     with open(save_path, 'w') as f:
         f.write(eps_str)
 
 
 def write_fasta(seq_dict:dict, fasta:str):
+    '''write a sequence dictionary in the format {seq_id1: seq1, seq_id2: seq2} to a multiline fasta file'''
     with open(fasta, 'w') as f:
         for id in seq_dict:
             f.write(f">{id}\n{seq_dict[id]}\n")
 
 def import_fasta(fasta:str):
+    '''import a fasta file to a dictionary in the format {seq_id1: seq1, seq_id2: seq2}'''
     with open(fasta, 'r') as f:
         fastas = f.read()
     # split along > (separator)
