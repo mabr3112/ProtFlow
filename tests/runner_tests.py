@@ -16,6 +16,10 @@ from protslurm.tools.rfdiffusion import RFdiffusion
 from protslurm.tools.attnpacker import AttnPacker
 from protslurm.tools.esmfold import ESMFold
 from protslurm.tools.metrics.protparam import ProtParam
+from protslurm.tools.metrics.tmscore import TMalign
+from protslurm.tools.metrics.tmscore import TMscore
+from protslurm.utils.plotting import sequence_logo
+
 
 
 #TODO: Print Test output: Which Runners are Implemented, Which runners succeeded (all if the test runs through).
@@ -29,6 +33,14 @@ def main(args):
         "slurm_gpu_jobstarter": SbatchArrayJobstarter(max_cores=10, gpus=1, options="-c1"),
         "local_jobstarter": LocalJobStarter()
     }
+
+    runner_dict = {
+        "ESMFold": "not tested",
+        "AttnPacker": "not tested",
+        "TMalign": "not tested",
+        "TMscore": "not tested",
+    }
+
 
     if args.jobstarter:
         jobstarter = js_dict[args.jobstarter]
@@ -56,6 +68,24 @@ def main(args):
 
         logging.info("ESMFold passed!")
 
+####################### Sequence Logo #######################
+    
+
+    logging.info("Running test for sequence logo generation...")
+    out_dir = "output_seqlogo"
+    if os.path.isdir(out_dir): shutil.rmtree(out_dir)
+
+    proteins = Poses(
+        poses="input_files/esmfold/",
+        glob_suffix="*.fasta",
+        work_dir=out_dir,
+        storage_format="json"
+    )
+
+    sequence_logo(dataframe=proteins.df, input_col="poses", save_path=os.path.join(out_dir, "seq.logo"), refseq="AS", title=None, resnums=[1,2], units="probability")
+
+    logging.info("ESMFold passed!")
+
 ####################### AttnPacker #######################
 
     if os.path.isdir(protslurm.config.ATTNPACKER_DIR_PATH):
@@ -73,6 +103,46 @@ def main(args):
         proteins = AttnPacker().run(poses=proteins, prefix="test", overwrite=False, jobstarter=jobstarter)
 
         logging.info("AttnPacker passed!")
+
+####################### TMalign #######################
+
+    logging.info("Running test for TMalign...")
+    out_dir = "output_TMalign"
+    if os.path.isdir(out_dir): shutil.rmtree(out_dir)
+
+    proteins = Poses(
+        poses="input_files/rosettascripts/",
+        glob_suffix="*.pdb",
+        work_dir=out_dir,
+        storage_format="csv",
+        jobstarter=LocalJobStarter()
+    )
+
+    proteins = TMalign().run(poses=proteins, prefix="test", ref_col="poses", overwrite=True, jobstarter=jobstarter)
+
+
+    logging.info("TMalign passed!")
+
+
+####################### TMscore #######################
+
+    logging.info("Running test for TMscore...")
+    out_dir = "output_TMscore"
+    if os.path.isdir(out_dir): shutil.rmtree(out_dir)
+
+    proteins = Poses(
+        poses="input_files/rosettascripts/",
+        glob_suffix="*.pdb",
+        work_dir=out_dir,
+        storage_format="csv",
+        jobstarter=LocalJobStarter()
+    )
+
+    proteins = TMscore().run(poses=proteins, prefix="test", ref_col="poses", overwrite=True, jobstarter=jobstarter)
+
+
+    logging.info("TMalign passed!")
+
 
 ####################### ProtParam #######################
 
@@ -98,7 +168,7 @@ def main(args):
     if os.path.isdir(protslurm.config.ROSETTA_BIN_PATH):
         logging.info("Running test for Rosetta...")
         out_dir = "output_rosetta"
-        if os.path.isdir(out_dir): shutil.rmtree(out_dir)
+        #if os.path.isdir(out_dir): shutil.rmtree(out_dir)
 
         proteins = Poses(
             poses="input_files/rosettascripts/",
