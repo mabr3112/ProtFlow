@@ -12,13 +12,13 @@ from protslurm.jobstarters import JobStarter
 from protslurm.poses import Poses
 from protslurm.residues import ResidueSelection
 from protslurm.runners import Runner, col_in_df
-from protslurm.config import PROTSLURM_PYTHON
+from protslurm.config import PROTSLURM_ENV
 from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR
 
 class ChainAdder(Runner):
     '''Adds chains into proteins.'''
-    def __init__(self, default_python=PROTSLURM_PYTHON, jobstarter: JobStarter = None):
-        self.python = self.search_path(default_python, "PROTSLURM_PYTHON")
+    def __init__(self, default_python=os.path.join(PROTSLURM_ENV, "python3"), jobstarter: JobStarter = None):
+        self.python = self.search_path(default_python, "PROTSLURM_ENV")
         self.jobstarter = jobstarter
 
     def __str__(self):
@@ -87,7 +87,7 @@ class ChainAdder(Runner):
             json_files.append(opts_json_p)
 
         # start add_chains_batch.py
-        cmds = [f"{PROTSLURM_PYTHON} {script_path} --input_json {json_f} --output_dir {work_dir}" for json_f in json_files]
+        cmds = [f"{self.python} {script_path} --input_json {json_f} --output_dir {work_dir}" for json_f in json_files]
         jobstarter.start(
             cmds = cmds,
             jobname = f"add_chains_{prefix}",
@@ -159,8 +159,8 @@ def parse_chain(chain, pose: pd.Series) -> str:
 
 class ChainRemover(Runner):
     '''Remove chains from poses.'''
-    def __init__(self, default_python=PROTSLURM_PYTHON, jobstarter: JobStarter = None):
-        self.python = self.search_path(default_python, "PROTSLURM_PYTHON")
+    def __init__(self, default_python=os.path.join(PROTSLURM_ENV, "python3"), jobstarter: JobStarter = None):
+        self.python = self.search_path(default_python, "PROTSLURM_ENV")
         self.jobstarter = jobstarter
 
     def __str__(self):
@@ -213,7 +213,7 @@ class ChainRemover(Runner):
             json_files.append(opts_json_p)
 
         # start remove_chains_batch.py
-        cmds = [f"{PROTSLURM_PYTHON} {script_path} --input_json {json_f} --output_dir {work_dir}" for json_f in json_files]
+        cmds = [f"{self.python} {script_path} --input_json {json_f} --output_dir {work_dir}" for json_f in json_files]
         jobstarter.start(
             cmds = cmds,
             jobname = f"remove_chains_{prefix}",

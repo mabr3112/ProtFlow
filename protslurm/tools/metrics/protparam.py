@@ -1,6 +1,5 @@
 '''Runner Module to calculate protparams'''
 # import general
-import json
 import os
 from typing import Any
 
@@ -10,11 +9,11 @@ import numpy as np
 import protslurm
 
 # import customs
-from protslurm.config import PROTSLURM_PYTHON as protslurm_python
+from protslurm.config import PROTSLURM_ENV
 from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
-from protslurm.runners import Runner, RunnerOutput, col_in_df
+from protslurm.runners import Runner, RunnerOutput
 from protslurm.poses import Poses
-from protslurm.jobstarters import JobStarter, split_list
+from protslurm.jobstarters import JobStarter
 from protslurm.utils.biopython_tools import get_sequence_from_pose, load_sequence_from_fasta, load_structure_from_pdbfile
 
 
@@ -23,8 +22,9 @@ class ProtParam(Runner):
     '''
     Class handling the calculation of protparams from sequence using the BioPython Bio.SeqUtils.ProtParam module
     '''
-    def __init__(self, jobstarter: str = None): # pylint: disable=W0102
+    def __init__(self, jobstarter: str = None, default_python=os.path.join(PROTSLURM_ENV, "python3")): # pylint: disable=W0102
         self.jobstarter = jobstarter
+        self.python = self.search_path(default_python, "PROTSLURM_ENV")
 
 
     ########################## Calculations ################################################
@@ -90,7 +90,7 @@ class ProtParam(Runner):
         # write commands
         cmds = []
         for json in json_files:
-            cmds.append(f"{protslurm_python} {script_dir}/run_protparam.py --input_json {json} --output_path {os.path.splitext(json)[0]}_out.json --pH {pH}")
+            cmds.append(f"{self.python} {script_dir}/run_protparam.py --input_json {json} --output_path {os.path.splitext(json)[0]}_out.json --pH {pH}")
         
         # run command
         jobstarter.start(

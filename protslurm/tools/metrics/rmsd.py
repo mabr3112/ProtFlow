@@ -9,7 +9,7 @@ import pandas as pd
 import protslurm
 
 # import customs
-from protslurm.config import PROTSLURM_PYTHON as protslurm_python
+from protslurm.config import PROTSLURM_ENV
 from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 from protslurm.residues import ResidueSelection
 from protslurm.runners import Runner, RunnerOutput, col_in_df
@@ -99,7 +99,7 @@ class BackboneRMSD(Runner):
 
             # write scorefile and cmd
             scorefiles.append((sf := f"{work_dir}/rmsd_input_{str(i)}_scores.json"))
-            cmds.append(f"{protslurm_python} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
+            cmds.append(f"{os.path.join(PROTSLURM_ENV, "python3")} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
         print(len(cmds))
 
         # add options to cmds:
@@ -232,7 +232,7 @@ class MotifRMSD(Runner):
         atoms_str = "" if atoms is None else f"--atoms '{','.join(atoms)}'"
 
         # start add_chains_batch.py
-        cmds = [f"{protslurm_python} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{os.path.join(PROTSLURM_ENV, "python3")} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,
