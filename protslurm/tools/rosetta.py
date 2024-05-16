@@ -68,15 +68,13 @@ class Rosetta(Runner):
         rosetta_exec = self.setup_executable(self.script_path, rosetta_application)
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip RosettaScripts.
-        rosettascore_path = os.path.join(work_dir, 'rosetta_scores.sc')
-        scorefilepath = os.path.join(work_dir, "rosetta_scores.json")
-        if not overwrite and os.path.isfile(scorefilepath):
-            return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
+        scorefile = os.path.join(work_dir, f"{prefix}_rosetta_scores.{poses.storage_format}")
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
+            return output.return_poses()
         elif overwrite and os.path.isdir(work_dir):
-            if os.path.isfile(scorefilepath):
-                os.remove(scorefilepath)
-            if os.path.isfile(scorefilepath):
-                os.remove(scorefilepath)
+            rosetta_scores = glob(os.path.join(work_dir, "r*_*_score.json"))
+            if len(rosetta_scores) > 0: [os.remove(score) for score in rosetta_scores]
 
         # parse_options and pose_options:
         if not os.path.isdir(work_dir): os.makedirs(work_dir, exist_ok=True)
@@ -86,7 +84,7 @@ class Rosetta(Runner):
         cmds = []
         for pose, pose_opts in zip(poses.df['poses'].to_list(), pose_options):
             for i in range(1, nstruct+1):
-                cmds.append(self.write_cmd(pose_path=pose, rosetta_application=rosetta_exec, output_dir=work_dir, i=i, rosettascore_path=rosettascore_path, overwrite=overwrite, options=options, pose_options=pose_opts))
+                cmds.append(self.write_cmd(pose_path=pose, rosetta_application=rosetta_exec, output_dir=work_dir, i=i, overwrite=overwrite, options=options, pose_options=pose_opts))
 
         # run
         jobstarter.start(
@@ -100,11 +98,12 @@ class Rosetta(Runner):
         time.sleep(10) # Rosetta does not have time to write the last score into the scorefile otherwise?
 
         # collect scores
-        scores = self.collect_scores(work_dir=work_dir, rosettascore_path=rosettascore_path, scorefilepath=scorefilepath)
+        scores = collect_scores(work_dir=work_dir)
+        self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
-    def write_cmd(self, rosetta_application: str, pose_path: str, output_dir: str, i: int, rosettascore_path: str, overwrite: bool = False, options: str = None, pose_options: str = None):
+    def write_cmd(self, rosetta_application: str, pose_path: str, output_dir: str, i: int, overwrite: bool = False, options: str = None, pose_options: str = None):
         '''Writes Command to run ligandmpnn.py'''
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
@@ -112,9 +111,9 @@ class Rosetta(Runner):
         flags = " -" + " -".join(flags) if flags else ""
 
         # check if interfering options were set
-        forbidden_options = ['-out:path:all', '-in:file:s', '-out:prefix', '-out:file:scorefile']
+        forbidden_options = ['-out:path:all', '-in:file:s', '-out:prefix', '-out:file:scorefile', '-out:file:scorefile_format', ' -s ', '-scorefile_format']
         if (options and any(opt in options for opt in forbidden_options)) or (pose_options and any(pose_opt in pose_options for pose_opt in forbidden_options)):
-            raise KeyError(f"options and pose_options must not contain '-out:path:all', '-in:file:s', '-out:prefix' or '-out:file:scorefile'!")
+            raise KeyError(f"options and pose_options must not contain any of {forbidden_options}")
         
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options)
@@ -123,70 +122,65 @@ class Rosetta(Runner):
         overwrite = " -overwrite" if overwrite else ""
         
         # compile command
-        run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile {rosettascore_path} {opts} {flags} {overwrite}"
+        run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile r{str(i).zfill(4)}_{os.path.splitext(os.path.basename(pose_path))[0]}_score.json -out:file:scorefile_format json {opts} {flags} {overwrite}"
         return run_string
 
 
-    def collect_scores(self, work_dir: str, rosettascore_path: str, scorefilepath: str) -> pd.DataFrame:
-        '''
-        Collects scores and reindexes .pdb files. Stores scores as .json file.
-        '''
-        def clean_rosetta_scorefile(path_to_file: str, out_path: str) -> str:
-            '''cleans a faulty rosetta scorefile'''
+def collect_scores(work_dir: str) -> pd.DataFrame:
+    '''
+    Collects scores and reindexes .pdb files. Stores scores as .json file.
+    '''
+    def clean_rosetta_scorefile(path_to_file: str, out_path: str) -> str:
+        '''cleans a faulty rosetta scorefile'''
 
-            # read in file line-by-line:
-            with open(path_to_file, 'r', encoding="UTF-8") as f:
-                scores = [line.split() for line in list(f.readlines()[1:])]
+        # read in file line-by-line:
+        with open(path_to_file, 'r', encoding="UTF-8") as f:
+            scores = [line.split() for line in list(f.readlines()[1:])]
 
-            # if any line has a different number of scores than the header (columns), that line will be removed.
-            scores_cleaned = [line for line in scores if len(line) == len(scores[0])]
-            logging.warning(f"{len(scores) - len(scores_cleaned)} scores were removed from Rosetta scorefile at {path_to_file}")
+        # if any line has a different number of scores than the header (columns), that line will be removed.
+        scores_cleaned = [line for line in scores if len(line) == len(scores[0])]
+        logging.warning(f"{len(scores) - len(scores_cleaned)} scores were removed from Rosetta scorefile at {path_to_file}")
 
-            # write cleaned scores to file:
-            with open(out_path, 'w', encoding="UTF-8") as f:
-                f.write("\n".join([",".join(line) for line in scores_cleaned]))
-            return out_path
+        # write cleaned scores to file:
+        with open(out_path, 'w', encoding="UTF-8") as f:
+            f.write("\n".join([",".join(line) for line in scores_cleaned]))
+        return out_path
 
-        try:
-            scores = pd.read_csv(rosettascore_path, delim_whitespace=True, header=[1], na_filter=True)
-        except pd.errors.ParserError:
-            logging.warning(f"Error reading Rosetta Scorefile. Removing faulty scorelines. This means that a few calculations will be lost.")
-            scores = pd.read_csv(clean_rosetta_scorefile(rosettascore_path, os.path.join(work_dir, "clean_rosetta_scores.sc")))
+    scorefiles = glob(os.path.join(work_dir, "r*_*_score.json"))
+    scores = []
+    for scorefile in scorefiles:
+        scores.append(pd.read_json(scorefile, typ='series'))
+    scores = pd.DataFrame(scores).reset_index(drop=True)
+    scores.rename(columns={"decoy": "raw_description"}, inplace=True)
 
-        # remove rows from df that do not contain scores and remove "description" duplicates, because that's what happens in Rosetta...
-        scores = scores[scores["SCORE:"] == "SCORE:"]
-        scores = scores.drop_duplicates(subset="description")
 
-        # create reindexed names of relaxed pdb-files: [r0003_pose_unrelaxed_0001.pdb -> pose_unrelaxed_0003.pdb]
-        scores.rename(columns={"description": "raw_description"}, inplace=True)
-        scores.loc[:, "description"] = scores["raw_description"].str.split("_").str[1:-1].str.join("_") + "_" + scores["raw_description"].str.split("_").str[0].str.replace("r", "")
+    scores.loc[:, "description"] = scores["raw_description"].str.split("_").str[1:-1].str.join("_") + "_" + scores["raw_description"].str.split("_").str[0].str.replace("r", "")
 
-        # wait for all Rosetta output files to appear in the output directory (for some reason, they are sometimes not there after the runs completed.)
-        while len(glob(f"{work_dir}/r*.pdb")) < len(scores):
-            time.sleep(1)
+    # wait for all Rosetta output files to appear in the output directory (for some reason, they are sometimes not there after the runs completed.)
+    while len(glob(f"{work_dir}/r*.pdb")) < len(scores):
+        time.sleep(1)
 
-        # rename .pdb files in work_dir to the reindexed names.
-        names_dict = scores[["raw_description", "description"]].to_dict()
-        print(f"Renaming and reindexing {len(scores)} Rosetta output .pdb files")
-        for oldname, newname in zip(names_dict["raw_description"].values(), names_dict["description"].values()):
+    # rename .pdb files in work_dir to the reindexed names.
+    names_dict = scores[["raw_description", "description"]].to_dict()
+    print(f"Renaming and reindexing {len(scores)} Rosetta output .pdb files")
+    for oldname, newname in zip(names_dict["raw_description"].values(), names_dict["description"].values()):
+        shutil.move(f"{work_dir}/{oldname}.pdb", (nf := f"{work_dir}/{newname}.pdb"))
+        if not os.path.isfile(nf):
+            print(f"WARNING: Could not rename file {oldname} to {nf}\n Retrying renaming.")
             shutil.move(f"{work_dir}/{oldname}.pdb", (nf := f"{work_dir}/{newname}.pdb"))
-            if not os.path.isfile(nf):
-                print(f"WARNING: Could not rename file {oldname} to {nf}\n Retrying renaming.")
-                shutil.move(f"{work_dir}/{oldname}.pdb", (nf := f"{work_dir}/{newname}.pdb"))
 
-        # Collect information of path to .pdb files into dataframe under "location" column
-        scores.loc[:, "location"] = work_dir + "/" + scores["description"] + ".pdb"
+    # Collect information of path to .pdb files into dataframe under "location" column
+    scores.loc[:, "location"] = work_dir + "/" + scores["description"] + ".pdb"
 
-        # safetycheck rename all remaining files with r*.pdb into proper filename:
-        if (remaining_r_pdbfiles := glob(f"{work_dir}/r*.pdb")):
-            for pdb_path in remaining_r_pdbfiles:
-                pdb_path = pdb_path.split("/")[-1]
-                idx = pdb_path.split("_")[0].replace("r", "")
-                new_name = "_".join(pdb_path.split("_")[1:-1]).replace(".pdb", "") + "_" + idx + ".pdb"
-                shutil.move(f"{work_dir}/{pdb_path}", f"{work_dir}/{new_name}")
+    # safetycheck rename all remaining files with r*.pdb into proper filename:
+    if (remaining_r_pdbfiles := glob(f"{work_dir}/r*.pdb")):
+        for pdb_path in remaining_r_pdbfiles:
+            pdb_path = pdb_path.split("/")[-1]
+            idx = pdb_path.split("_")[0].replace("r", "")
+            new_name = "_".join(pdb_path.split("_")[1:-1]).replace(".pdb", "") + "_" + idx + ".pdb"
+            shutil.move(f"{work_dir}/{pdb_path}", f"{work_dir}/{new_name}")
 
-        # reset index and write scores to file
-        scores.reset_index(drop="True", inplace=True)
-        scores.to_json(scorefilepath)
+    # reset index and write scores to file
+    scores.reset_index(drop="True", inplace=True)
 
-        return scores
+    return scores
