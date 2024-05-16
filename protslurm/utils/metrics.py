@@ -6,6 +6,7 @@ Protslurm internal module to calculate various kinds of metrics for proteins and
 # dependencies
 import numpy as np
 from Bio.PDB.Structure import Structure
+import pandas as pd
 
 from protslurm.utils.biopython_tools import load_structure_from_pdbfile
 
@@ -139,3 +140,6 @@ def entropy(prob_distribution: np.array) -> float:
     H = np.sum(prob_distribution * np.log2(prob_distribution))
 
     return -H
+
+def sc_tm() -> float:
+    return NotImplemented
