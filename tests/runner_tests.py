@@ -3,6 +3,8 @@
 import logging
 import os
 import shutil
+import pandas as pd
+
 from protslurm.jobstarters import SbatchArrayJobstarter
 from protslurm.jobstarters import LocalJobStarter
 
@@ -29,7 +31,7 @@ from protslurm.utils.plotting import sequence_logo
 
 def check_runner(name:str, runner, poses_options:dict, runner_options:dict=None, config=None, check:str=None):
 
-    if check == runner or check == None:
+    if check == name or check == None:
         if runner == None:
             return "Not set up"
         logging.info(f"Running test for {name}...")
@@ -42,10 +44,10 @@ def check_runner(name:str, runner, poses_options:dict, runner_options:dict=None,
             except:
                 return "Loading poses failed!"
             try:
-                logging.info(f"Running runner {name}...")
-                runner.run(**runner_options, poses=poses, prefix="test")
+                logging.info(f"Running runner {name} with options {runner_options}...")
+                runner.run(**runner_options, poses=poses, prefix=f"test_{name}")
                 logging.info(f"Runner {name} passed!")
-                return "Passed"
+                return "Working"
             except:
                 logging.warning(f"Runner {name} failed!")
                 return "Failed"
@@ -59,13 +61,14 @@ def check_runner(name:str, runner, poses_options:dict, runner_options:dict=None,
 
 def main(args):
 
-    '''.'''
+    '''run tests'''
 
     js_dict = {
         "slurm_gpu_jobstarter": SbatchArrayJobstarter(max_cores=10, gpus=1, options="-c1"),
         "local_jobstarter": LocalJobStarter()
     }
 
+    # set jobstarter
     if args.jobstarter:
         jobstarter = js_dict[args.jobstarter]
     else:
@@ -83,7 +86,7 @@ def main(args):
             "poses_options": {"poses": "input_files/pdbs/", "glob_suffix": "*.pdb"},
             "runner_options": {
                 "rosetta_application": "rosetta_scripts.linuxgccrelease",
-                "nstruct": 5,
+                "nstruct": 2,
                 "options": "-parser:protocol input_files/rosettascripts/empty.xml -beta",
                 "jobstarter": jobstarter
             },
@@ -116,23 +119,25 @@ def main(args):
         },
         "TMscore": {
             "runner": TMscore(),
-            "poses_options": {"poses": "input_files/rfdiffusion/", "glob_suffix": "*.pdb"},
+            "poses_options": {"poses": pd.read_json("input_files/pose_df/pose_df.json")},
             "runner_options": {
+                "ref_col": "reference",
                 "jobstarter": jobstarter
             },
             "config": [protslurm.config.RFDIFFUSION_SCRIPT_PATH, protslurm.config.RFDIFFUSION_PYTHON_PATH]
         },
         "TMalign": {
             "runner": TMalign(),
-            "poses_options": {"poses": "input_files/rfdiffusion/", "glob_suffix": "*.pdb"},
+            "poses_options": {"poses": pd.read_json("input_files/pose_df/pose_df.json")},
             "runner_options": {
+                "ref_col": "reference",
                 "jobstarter": jobstarter
             },
             "config": None
         },
         "ProtParam": {
             "runner": ProtParam(),
-            "poses_options": {"poses": "input_files/rfdiffusion/", "glob_suffix": "*.pdb"},
+            "poses_options": {"poses": "input_files/pdbs/", "glob_suffix": "*.pdb"},
             "runner_options": {
                 "pH": 6,
                 "jobstarter": jobstarter
@@ -141,88 +146,19 @@ def main(args):
         }
     }
 
-    if protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR == "" or not os.path.isdir(protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR):
+    if not protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR or not os.path.isdir(protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR):
         logging.warning(f"AUXILIARY_RUNNER_SCRIPTS_DIR was not properly set in config.py!")
         runner_dict['AUXILIARY_RUNNER_SCRIPTS_DIR'] = "NOT SET UP CORRECTLY!"
 
     if args.runner and not args.runner in runner_dict:
         raise KeyError(f"Runner must be one of {[i for i in runner_dict]}!")
     
-
-
     for runner in runner_dict:
         runner_dict[runner] = check_runner(name=runner, runner=runner_dict[runner]["runner"], poses_options=runner_dict[runner]["poses_options"], runner_options=runner_dict[runner]["runner_options"], config=runner_dict[runner]["config"], check=args.runner)
 
     print(runner_dict)
-
-'''
-
-
-
-####################### Sequence Logo #######################
-    
-    if not args.runner or args.runner == "SequenceLogo":
-        logging.info("Running test for sequence logo generation...")
-        try:
-            out_dir = "output_seqlogo"
-            if os.path.isdir(out_dir): shutil.rmtree(out_dir)
-
-            proteins = Poses(
-                poses="input_files/esmfold/",
-                glob_suffix="*.fasta",
-                work_dir=out_dir,
-                storage_format="json"
-            )
-
-            sequence_logo(dataframe=proteins.df, input_col="poses", save_path=os.path.join(out_dir, "seq.logo"), refseq="AS", title=None, resnums=[1,2], units="probability")
-
-            logging.info("ESMFold passed!")
-            runner_dict['SequenceLogo'] = "Passed"
-        except:
-            runner_dict['SequenceLogo'] = "Failed"
-
-
-####################### TMalign #######################
-
-    logging.info("Running test for TMalign...")
-    out_dir = "output_TMalign"
-    if os.path.isdir(out_dir): shutil.rmtree(out_dir)
-
-    proteins = Poses(
-        poses="input_files/rosettascripts/",
-        glob_suffix="*.pdb",
-        work_dir=out_dir,
-        storage_format="csv",
-        jobstarter=LocalJobStarter()
-    )
-    proteins.df['ref_col'] = proteins.df['poses']
-    proteins = TMalign().run(poses=proteins, prefix="test", ref_col="ref_col", overwrite=True, jobstarter=jobstarter)
-
-
-    logging.info("TMalign passed!")
-
-
-####################### TMscore #######################
-
-    logging.info("Running test for TMscore...")
-    out_dir = "output_TMscore"
-    if os.path.isdir(out_dir): shutil.rmtree(out_dir)
-
-    proteins = Poses(
-        poses="input_files/rosettascripts/",
-        glob_suffix="*.pdb",
-        work_dir=out_dir,
-        storage_format="csv",
-        jobstarter=LocalJobStarter()
-    )
-
-    proteins = TMscore().run(poses=proteins, prefix="test", ref_col="poses", overwrite=True, jobstarter=jobstarter)
-
-
-    logging.info("TMalign passed!")
-
-
-'''
+    df = pd.DataFrame(runner_dict, index=[0])
+    df.to_csv('test_results.csv')
 
 if __name__ == "__main__":
 
