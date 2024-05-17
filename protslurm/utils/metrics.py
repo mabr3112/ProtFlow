@@ -141,5 +141,39 @@ def entropy(prob_distribution: np.array) -> float:
 
     return -H
 
-def sc_tm() -> float:
-    return NotImplemented
+def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> None:
+    '''Calculates self-consistency TM-score in a dataframe.
+    Calculates in-place. This means that the score is automatically added to input_df.
+    
+    Parameters:
+        :name: (str) Name of the new column that should hold sc-TM score.
+        :input_df: (pd.DataFrame) poses.df formatted pd.DataFrame
+        :ref_col: (str) column pointing to the reference description or location.
+        :tm_col: (str) column pointing to the column holding the tm_scores from TMAlign runner.
+                        This is generally '{prefix}_TM_score_ref', where {prefix} is the prefix used for the TMAlign runner.
+
+    Returns:
+        None! New column gets integrated into the dataframe automatically. 
+    '''
+    # check if name exists in poses
+    if name in input_df.columns:
+        raise KeyError(f"Column {name} already present in DataFrame. Choose different name!")
+
+    # get descriptions of poses and tm_col_description
+    if ref_col.endswith("description"):
+        desc_col = ref_col
+    elif ref_col.endswith("location"):
+        desc_col = ref_col.replace("location", "description")
+    else:
+        raise ValueError(f"Parameter :ref_col: does not point to description or location column in :input_df:. ref_col: {ref_col}")
+
+    # group df by ref_col description and get maximum tm_score in each group.
+    grouped_max = input_df.groupby(desc_col)[tm_col].max().reset_index()
+    grouped_max.columns = [desc_col, name]
+
+    # merge max tm-scores into input_df[name]
+    input_df = input_df.merge(grouped_max, on=desc_col, how='left')
+
+def calc_baker_success(input_df: pd.DataFrame, af2_col: str, bb_rmsd_col: str, motif_rmsd_col: str) -> None:
+    '''Implementation of Baker in silico success score. See RFDiffusion publication for info.'''
+    return NotImplementedError

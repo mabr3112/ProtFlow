@@ -20,9 +20,11 @@ class TMalign(Runner):
     def __init__(self, jobstarter: str = None):
         self.jobstarter = jobstarter
 
+    def __str__(self):
+        return "TMalign"
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None:
+    def run(self, poses: Poses, prefix: str, ref_col: str, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None: # pylint: disable=W0237
         '''
         Calculates the TMscore between poses and a reference structure.
             <poses>                 input poses
@@ -83,7 +85,7 @@ class TMalign(Runner):
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
         return output.return_poses()
 
-    def write_cmd(self, pose_path:str, ref_path:str, output_dir:str, options:str=None, pose_options:str=None) -> str:
+    def write_cmd(self, pose_path: str, ref_path: str, output_dir: str, options: str = None, pose_options: str = None) -> str:
         '''Writes Command to run ligandmpnn.py'''
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
@@ -103,31 +105,31 @@ class TMalign(Runner):
 
         return run_string
 
-    def collect_scores(self, output_dir:str):
+    def collect_scores(self, output_dir: str):
         '''Collects scores of TMAlign or TMScore runs.'''
-        def extract_scores(score_path:str) -> pd.Series:
+        def extract_scores(score_path: str) -> pd.Series:
             '''
             extract TM scores from scorefile, return a Series
             '''
 
-            TM_scores = {}
+            tm_scores = {}
             with open(score_path, 'r', encoding="UTF-8") as f:
                 for line in f:
                     if line.startswith("TM-score") and "Chain_1" in line:
                         # TM score normalized by length of the pose structure
-                        TM_scores['TM_score_pose'] = float(line.split()[1])
+                        tm_scores['TM_score_pose'] = float(line.split()[1])
                     elif line.startswith("TM-score") and "Chain_2" in line:
                         # TM score normalized by length of the reference (this is what should be used)
-                        TM_scores['TM_score_ref'] = float(line.split()[1])
+                        tm_scores['TM_score_ref'] = float(line.split()[1])
                     elif line.startswith("TM-score") and "average" in line:
                         # if -a flag was provided to TMalign, a TM score normalized by the average length of pose and reference will be calculated
-                        TM_scores['TM_score_average'] = float(line.split()[1])
-            TM_scores['description'] = os.path.splitext(os.path.basename(score_path))[0]
+                        tm_scores['TM_score_average'] = float(line.split()[1])
+            tm_scores['description'] = os.path.splitext(os.path.basename(score_path))[0]
 
             # check if scores were present in scorefile
-            if not any('TM_score' in key for key in TM_scores):
+            if not any('TM_score' in key for key in tm_scores):
                 raise RuntimeError(f"Could not find any TM scores in {score_path}!")
-            return pd.Series(TM_scores)
+            return pd.Series(tm_scores)
 
         # collect scorefiles
         scorefiles = glob.glob(os.path.join(output_dir, "*.tmout"))
@@ -144,9 +146,11 @@ class TMscore(Runner):
     def __init__(self, jobstarter: str = None):
         self.jobstarter = jobstarter
 
+    def __str__(self):
+        return "TMscore"
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None:
+    def run(self, poses: Poses, prefix: str, ref_col: str, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None: # pylint: disable=W0237
         '''
         Calculates the TMscore between poses and a reference structure.
             <poses>                 input poses
@@ -207,7 +211,7 @@ class TMscore(Runner):
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
         return output.return_poses()
 
-    def write_cmd(self, pose_path:str, ref_path:str, output_dir:str, options:str=None, pose_options:str=None) -> str:
+    def write_cmd(self, pose_path: str, ref_path: str, output_dir: str, options: str = None, pose_options: str = None ) -> str:
         '''Writes Command to run ligandmpnn.py'''
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
@@ -227,31 +231,31 @@ class TMscore(Runner):
 
         return run_string
 
-    def collect_scores(self, output_dir:str):
+    def collect_scores(self, output_dir: str):
         '''Collects scores of TMAlign or TMScore runs.'''
         def extract_scores(score_path:str) -> pd.Series:
             '''
             extract TM scores from scorefile, return a Series
             '''
 
-            TM_scores = {}
+            tm_scores = {}
             with open(score_path, 'r', encoding="UTF-8") as f:
                 for line in f:
                     # extract scores
                     if line.startswith("TM-score"):
-                        TM_scores['TM_score_ref'] = float(line.split()[2])
+                        tm_scores['TM_score_ref'] = float(line.split()[2])
                     elif line.startswith("MaxSub-score"):
-                        TM_scores['MaxSub_score'] = float(line.split()[1])
+                        tm_scores['MaxSub_score'] = float(line.split()[1])
                     elif line.startswith("GDT-TS-score"):
-                        TM_scores['GDT-TS_score'] = float(line.split()[1])                    
+                        tm_scores['GDT-TS_score'] = float(line.split()[1])
                     elif line.startswith("GDT-HA-score"):
-                        TM_scores['GDT-HA_score'] = float(line.split()[1])
-            TM_scores['description'] = os.path.splitext(os.path.basename(score_path))[0]
+                        tm_scores['GDT-HA_score'] = float(line.split()[1])
+            tm_scores['description'] = os.path.splitext(os.path.basename(score_path))[0]
 
             # check if scores were present in scorefile
-            if len([key for key in TM_scores]) < 2:
+            if len(list(tm_scores)) < 2:
                 raise RuntimeError(f"Could not find any TM scores in {score_path}!")
-            return pd.Series(TM_scores)
+            return pd.Series(tm_scores)
 
         # collect scorefiles
         scorefiles = glob.glob(os.path.join(output_dir, "*.tmout"))
@@ -260,3 +264,4 @@ class TMscore(Runner):
         scores = pd.DataFrame(scores).reset_index(drop=True)
 
         return scores
+    
