@@ -50,10 +50,10 @@ class TMalign(Runner):
 
         scorefile = os.path.join(work_dir, f"{prefix}_TM.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
-            output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
+            output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
             if sc_tm_score:
-                calc_sc_tm(input_df=poses.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
-            return output.return_poses()
+                calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
+            return output
 
         # check if reference column exists in poses.df
         col_in_df(poses.df, ref_col)
@@ -99,10 +99,10 @@ class TMalign(Runner):
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
         # create standardised output for poses class:
-        output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
+        output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
         if sc_tm_score:
-            calc_sc_tm(input_df=poses.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
-        return output.return_poses()
+            calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
+        return output
 
     def write_cmd(self, pose_path: str, ref_path: str, output_dir: str, options: str = None, pose_options: str = None) -> str:
         '''Writes Command to run ligandmpnn.py'''
