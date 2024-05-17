@@ -96,7 +96,7 @@ class Runner:
 
     def check_for_prefix(self, prefix: str, poses: "Poses") -> None:
         '''Checks if a column already exists in the poses DataFrame.'''
-        if prefix in poses.df.columns:
+        if f"{prefix}_location" in poses.df.columns or f"{prefix}_description" in poses.df.columns:
             raise KeyError(f"Column {prefix} found in Poses DataFrame! Pick different Prefix!")
 
     def prep_pose_options(self, poses:Poses, pose_options:list[str]=None) -> list:
