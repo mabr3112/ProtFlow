@@ -9,6 +9,7 @@ import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
 import pandas as pd
 import numpy as np
+import os
 
 class PlottingTrajectory():
     def __init__(self, y_label: str, location: str, title: str = "Refinement Trajectory", dims = None):
@@ -348,3 +349,172 @@ def parse_cols_for_plotting(plot_arg: str, subst:str=None) -> list[str]:
     elif type(plot_arg) == list: return plot_arg
     elif plot_arg == True: return [subst]
     else: raise TypeError("Unsupported argument type for parse_cols_for_plotting(): {type(plot_arg)}. Only list, str or bool allowed.")
+
+
+        
+def sequence_logo(dataframe:pd.DataFrame, input_col:str, save_path:str, refseq:str=None, title:str=None, resnums:list=None, units:str="probability"):
+    '''
+    Generates a WEBLOGO with adapted x-axes (having correct residue IDs as lables).
+
+    Parameters
+    ----------
+    dataframe : pd.DataFrame
+        input dataframe
+    input_col : str
+        name of input column. must contain either protein sequences or paths to fasta files that end with .fa or .fasta
+    save_path : str
+        Path where sequence logo should be stored
+    refseq : str, optional
+        If the native sequene is of interest, the sequence or the path to a fasta file can be given. This sequence must be as long as all other sequences!
+        These residues will be colored in orange in the weblogo and displayed on the x-axis.
+    title: str
+        Write a title on your sequence logo
+    resnums:
+        Only create the sequence logo for certain residues. Must be a list of integers indicating the residue position (first residue is 1, not 0!)
+    units: probability or bits
+        which units should be used, bits are explained here: https://en.wikipedia.org/wiki/Sequence_logo#Logo_creation
+
+    Returns 
+    -------
+    a weblogo
+
+    '''
+    import weblogo
+
+    class RefSeqColor(weblogo.ColorScheme):
+        """
+        Color the given reference sequence in its own color, so you can easily see 
+        which positions match that sequence and which don't.
+        """
+        def __init__(self, ref_seq, color, description=None):
+            self.ref_seq = ref_seq
+            self.color = weblogo.Color.from_string(color)
+            self.description = description
+
+        def symbol_color(self, seq_index, symbol, rank):
+            if symbol == self.ref_seq[seq_index]:
+                return self.color
+
+    def extract_extension(file_path):
+        '''extract file extension'''
+        _, ext = os.path.splitext(file_path)
+        return ext
+    
+    def prepare_input(tmp_fasta:str, dataframe:pd.DataFrame, input_col:str):
+        '''check format of input sequences and write all sequences to a single fasta'''
+        ext = list(set(dataframe[input_col].apply(extract_extension).to_list()))
+        seqs = dataframe[input_col].to_list()
+        if len(ext) > 1:
+            raise RuntimeError("Input column must contain either sequences or paths to fasta files that end with .fa or .fasta!")
+        elif ext[0] == [""]:
+            with open(tmp_fasta, 'a') as t:
+                for i, seq in enumerate(seqs):
+                    t.write(f">{i}\n{seq}\n")
+        elif ext[0] in [".fasta", ".fa"]:
+            for fa in seqs:
+                with open(fa, 'r') as f:
+                    content = f.read()
+                with open(tmp_fasta, 'a') as t:
+                    t.write(content)
+    
+    def prepare_reference_seq(refseq:str):
+        '''check format of reference sequence and extract sequence from fasta if necessary'''
+        if refseq.endswith('.fa') or refseq.endswith('.fasta'):
+            seq = ""
+            seq_dict = import_fasta(refseq)
+            if len([i for i in seq_dict]) > 1:
+                raise RuntimeError("Reference sequence fasta must contain only a single entry!")
+            id, seq = next(iter(seq_dict.items()))
+            return seq
+        else:
+            return refseq
+        
+    def replace_logo_numbers(eps_str, resid, sequence=None):
+        '''
+        Changes the weblogo output to have correct x-labels using correct residuenumbers.
+        '''
+        new_eps_str_lines = []
+        pos_count = 0
+        for line in eps_str.split('\n'):
+            if line.endswith('StartStack') and not line.startswith('%'):
+                if sequence==None:
+                    line = line.replace(str(pos_count + 1), '%d' % (resid[pos_count]))
+                else:
+                    line = line.replace(str(pos_count + 1), '%s%d' % (sequence[pos_count],resid[pos_count]))
+                pos_count=pos_count+1
+            new_eps_str_lines.append(line)
+        return '\n'.join(new_eps_str_lines)
+            
+    def modify_input_fasta_based_on_residues(in_fasta:str, out_fasta:str, resnums:list):
+        '''create a new fasta file containing only the residues according to <resnums>'''
+        seq_dict = import_fasta(in_fasta)
+        for id in seq_dict:
+            seq_dict[id] = ''.join([seq_dict[id][i-1] for i in resnums])
+        write_fasta(seq_dict=seq_dict, fasta=out_fasta)
+
+
+    check_for_col_in_df(col=input_col, df=dataframe)
+    tmp_fasta = "tmp_seqlogo.fasta"
+    # check if input are sequences or fasta files and create a temporary fasta file
+    prepare_input(tmp_fasta=tmp_fasta, dataframe=dataframe, input_col=input_col)
+
+    # check if only certain residues should be used for the creation of the sequence logo
+    if resnums: modify_input_fasta_based_on_residues(in_fasta=tmp_fasta, out_fasta=tmp_fasta, resnums=resnums)
+
+    # set sequence logo parameters
+    protein_alphabet=weblogo.Alphabet('ACDEFGHIKLMNPQRSTVUWY', zip('acdefghiklmnpqrstvuwy','ACDEFGHIKLMNPQRSTVUWY'))
+    baserules = [weblogo.SymbolColor("GSTYC", "green", "polar"),
+                weblogo.SymbolColor("NQ", "purple", "neutral"),
+                weblogo.SymbolColor("KRH", "blue", "basic"),
+                weblogo.SymbolColor("DE", "red", "acidic"),
+                weblogo.SymbolColor("PAWFLIMV", "black", "hydrophobic")
+            ]
+    colorscheme = weblogo.ColorScheme(baserules, alphabet=protein_alphabet)
+
+    fasta_file = open(tmp_fasta, "r")
+    seqs = weblogo.read_seq_data(fasta_file, alphabet=protein_alphabet)
+
+    # check if reference sequence is provided and extract sequence
+    if refseq:
+        refseq = prepare_reference_seq(refseq=refseq)
+        colorscheme = weblogo.ColorScheme([RefSeqColor(refseq, "orange", "refseq")] + baserules, alphabet=protein_alphabet)
+
+    data = weblogo.LogoData.from_seqs(seqs)
+    options = weblogo.LogoOptions()
+    options.logo_title = title
+    options.unit_name=units
+    options.show_fineprint = False
+    options.color_scheme = colorscheme
+    options.xaxis_tic_interval = 1
+    options.number_interval = 1
+    options.number_fontsize = 3
+    logoformat = weblogo.LogoFormat(data, options)
+    eps_binary = weblogo.eps_formatter(data, logoformat)
+    eps_str = eps_binary.decode()
+    # reindex sequence based on resnums
+    if resnums is not None:
+        if refseq==None:
+            eps_str = replace_logo_numbers(eps_str, resnums)      
+        else:
+            eps_str = replace_logo_numbers(eps_str, resnums, refseq)
+
+    os.remove(tmp_fasta)
+    with open(save_path, 'w') as f:
+        f.write(eps_str)
+
+
+def write_fasta(seq_dict:dict, fasta:str):
+    '''write a sequence dictionary in the format {seq_id1: seq1, seq_id2: seq2} to a multiline fasta file'''
+    with open(fasta, 'w') as f:
+        for id in seq_dict:
+            f.write(f">{id}\n{seq_dict[id]}\n")
+
+def import_fasta(fasta:str):
+    '''import a fasta file to a dictionary in the format {seq_id1: seq1, seq_id2: seq2}'''
+    with open(fasta, 'r') as f:
+        fastas = f.read()
+    # split along > (separator)
+    raw_fasta_list = [x.strip().split("\n") for x in fastas.split(">") if x]
+    # parse into dictionary {description: sequence}
+    fasta_dict = {x[0]: "".join(x[1:]) for x in raw_fasta_list if len(x) > 1}
+    return fasta_dict

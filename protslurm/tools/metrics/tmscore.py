@@ -17,21 +17,26 @@ class TMalign(Runner):
     '''
     Class handling the calculation of TM scores to compare to protein structures (sequence-length independent). Structures will be superimposed before calculation. See https://zhanggroup.org/TM-align/ or 10.1093/nar/gki524 for more information.
     '''
-    def __init__(self, jobstarter: str = None):
+    def __init__(self, jobstarter: str = None, application: str = None):
         self.jobstarter = jobstarter
+        self.name = "tmscore.py"
+        self.index_layers = 0
+        self.application = application or os.path.join(protslurm.config.PROTSLURM_ENV, "TMalign")
 
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None:
+    def run(self, poses: Poses, prefix: str, ref_col: str, selfconsistency_tm_cutoff:float=0.5, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None:
         '''
-        Calculates the TMscore between poses and a reference structure.
-            <poses>                 input poses
-            <prefix>                prefix for run
-            <ref_col>               column containing paths to pdb used as reference for TM score calculation
-            <options>               cmd-line options for TMalign or TMscore ()
-            <superimpose>           superimpose structures before calculating TM score? If False, will run TMscore instead of TMalign
-            <overwrite>             if previously generated scorefile is found, read it in or run calculation again?
-            <jobstarter>            define jobstarter (since protparam is quite fast, it is recommended to run it locally)
+        Calculates the TMscore between poses and a reference structure. It is recommended to use TM_score_ref, as this is normalized by length of the reference structure. Also returns a self consistency score 
+        which indicates how many poses with the same reference pose are above the <selfconsistency_tm_cutoff>, indicating the designability of the reference pose. 
+            <poses>                     input poses
+            <prefix>                    prefix for run
+            <ref_col>                   column containing paths to pdb used as reference for TM score calculation
+            <selfconsistency_tm_cutoff> cutoff for TM_score to pass selfconsistency check
+            <options>                   cmd-line options for TMalign
+            <pose_options>              name of poses.df column containing options for TMalign
+            <overwrite>                 if previously generated scorefile is found, read it in or run calculation again?
+            <jobstarter>                define jobstarter (since protparam is quite fast, it is recommended to run it locally)
         '''
 
         work_dir, jobstarter = self.generic_run_setup(
@@ -73,8 +78,16 @@ class TMalign(Runner):
 
         scores = self.collect_scores(output_dir=work_dir)
 
-        scores = scores.merge(poses.df[['poses', 'poses_description']], left_on="description", right_on="poses_description").drop('poses_description', axis=1)
+        scores = scores.merge(poses.df[['poses', 'poses_description', ref_col]], left_on="description", right_on="poses_description").drop('poses_description', axis=1)
         scores = scores.rename(columns={"poses": "location"})
+
+        if selfconsistency_tm_cutoff:
+            dfs = []
+            for ref, df in scores.groupby(ref_col, sort=False):
+                above_cutoff = (df['TM_score_ref'] > selfconsistency_tm_cutoff).sum()
+                df['self_consistency_score'] = above_cutoff / len(df.index)
+                dfs.append(df)
+            scores = pd.concat(dfs).reset_index(drop=True)
 
         # write output scorefile
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -84,7 +97,7 @@ class TMalign(Runner):
         return output.return_poses()
 
     def write_cmd(self, pose_path:str, ref_path:str, output_dir:str, options:str=None, pose_options:str=None) -> str:
-        '''Writes Command to run ligandmpnn.py'''
+        '''Writes Command to run TMalign'''
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
@@ -99,12 +112,12 @@ class TMalign(Runner):
         scorefile = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(pose_path))[0]}.tmout")
 
         # compile command
-        run_string = f"{PROTSLURM_ENV}/TMalign {pose_path} {ref_path} {opts} {flags} > {scorefile}"
+        run_string = f"{self.application} {pose_path} {ref_path} {opts} {flags} > {scorefile}"
 
         return run_string
 
     def collect_scores(self, output_dir:str):
-        '''Collects scores of TMAlign or TMScore runs.'''
+        '''Collects scores of TMalign runs.'''
         def extract_scores(score_path:str) -> pd.Series:
             '''
             extract TM scores from scorefile, return a Series
@@ -113,15 +126,23 @@ class TMalign(Runner):
             TM_scores = {}
             with open(score_path, 'r', encoding="UTF-8") as f:
                 for line in f:
-                    if line.startswith("TM-score") and "Chain_1" in line:
+                    if line.startswith("Aligned length"):
+                        TM_scores['num_aligned_res'] = int(line.split()[2].replace(',', ''))
+                        TM_scores['RMSD'] = float(line.split()[4].replace(',', ''))
+                        TM_scores['n_identical/n_aligned'] = float(line.split()[6])
+                        continue
+                    elif line.startswith("TM-score") and "Chain_1" in line:
                         # TM score normalized by length of the pose structure
                         TM_scores['TM_score_pose'] = float(line.split()[1])
+                        continue
                     elif line.startswith("TM-score") and "Chain_2" in line:
                         # TM score normalized by length of the reference (this is what should be used)
                         TM_scores['TM_score_ref'] = float(line.split()[1])
+                        continue
                     elif line.startswith("TM-score") and "average" in line:
                         # if -a flag was provided to TMalign, a TM score normalized by the average length of pose and reference will be calculated
                         TM_scores['TM_score_average'] = float(line.split()[1])
+
             TM_scores['description'] = os.path.splitext(os.path.basename(score_path))[0]
 
             # check if scores were present in scorefile
@@ -141,9 +162,11 @@ class TMscore(Runner):
     '''
     Class handling the calculation of TM scores to compare to protein structures (sequence-length independent). Structures will NOT be superimposed before calculation. See https://zhanggroup.org/TM-score/ or 10.1093/nar/gki524 for more information.
     '''
-    def __init__(self, jobstarter: str = None):
+    def __init__(self, jobstarter: str = None, application: str = None):
         self.jobstarter = jobstarter
-
+        self.name = "tmscore.py"
+        self.index_layers = 0
+        self.application = application or os.path.join(protslurm.config.PROTSLURM_ENV, "TMscore")
 
     ########################## Calculations ################################################
     def run(self, poses: Poses, prefix: str, ref_col: str, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None:
@@ -152,10 +175,10 @@ class TMscore(Runner):
             <poses>                 input poses
             <prefix>                prefix for run
             <ref_col>               column containing paths to pdb used as reference for TM score calculation
-            <options>               cmd-line options for TMalign or TMscore ()
-            <superimpose>           superimpose structures before calculating TM score? If False, will run TMscore instead of TMalign
+            <options>               cmd-line options for TMscore
+            <pose_option>           name of poses.df column containing options for TMscore
             <overwrite>             if previously generated scorefile is found, read it in or run calculation again?
-            <jobstarter>            define jobstarter (since protparam is quite fast, it is recommended to run it locally)
+            <jobstarter>            previously defined jobstarter
         '''
 
         work_dir, jobstarter = self.generic_run_setup(
@@ -208,7 +231,7 @@ class TMscore(Runner):
         return output.return_poses()
 
     def write_cmd(self, pose_path:str, ref_path:str, output_dir:str, options:str=None, pose_options:str=None) -> str:
-        '''Writes Command to run ligandmpnn.py'''
+        '''Writes command to run TMscore'''
         # parse options
         opts, flags = protslurm.runners.parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
@@ -223,12 +246,12 @@ class TMscore(Runner):
         scorefile = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(pose_path))[0]}.tmout")
 
         # compile command
-        run_string = f"{PROTSLURM_ENV}/TMscore {pose_path} {ref_path} {opts} {flags} > {scorefile}"
+        run_string = f"{self.application} {pose_path} {ref_path} {opts} {flags} > {scorefile}"
 
         return run_string
 
     def collect_scores(self, output_dir:str):
-        '''Collects scores of TMAlign or TMScore runs.'''
+        '''Collects scores of TMscore runs.'''
         def extract_scores(score_path:str) -> pd.Series:
             '''
             extract TM scores from scorefile, return a Series
