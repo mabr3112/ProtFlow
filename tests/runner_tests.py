@@ -5,26 +5,35 @@ import os
 import shutil
 import pandas as pd
 
+# import config
+import protslurm.config
+
+# import jobstarters
 from protslurm.jobstarters import SbatchArrayJobstarter
 from protslurm.jobstarters import LocalJobStarter
 
-import protslurm.config
+
 # customs
 from protslurm.poses import Poses
+
+# import runners
 #from protslurm.runners.protein_generator import ProteinGenerator
 from protslurm.tools.ligandmpnn import LigandMPNN
 from protslurm.tools.rosetta import Rosetta
 from protslurm.tools.rfdiffusion import RFdiffusion
 from protslurm.tools.attnpacker import AttnPacker
 from protslurm.tools.esmfold import ESMFold
+from protslurm.tools.alphafold2 import Alphafold2
+
+# import metrics
 from protslurm.tools.metrics.protparam import ProtParam
 from protslurm.tools.metrics.tmscore import TMalign
 from protslurm.tools.metrics.tmscore import TMscore
+
+
 from protslurm.utils.plotting import sequence_logo
 
 
-
-#TODO: Print Test output: Which Runners are Implemented, Which runners succeeded (all if the test runs through).
 #TODO: @Adrian: For Attnpacker, ligandmpnn and AF please write Tutorials as Jupyter Notebooks in 'examples' Folder.
 #TODO: @Adrian: Please write tests for LigandMPNN running +10 sequences with/ and without pose_options (to test non_batch and batch run)
 
@@ -41,16 +50,17 @@ def check_runner(name:str, runner, poses_options:dict, runner_options:dict=None,
             try:
                 logging.info(f"Initializing poses for {name}...")
                 poses = Poses(**poses_options, work_dir=work_dir, storage_format="json")
-            except:
+                try:
+                    logging.info(f"Running runner {name} with options {runner_options}...")
+                    runner.run(**runner_options, poses=poses, prefix=f"test_{name}")
+                    logging.info(f"Runner {name} passed!")
+                    return "Working"
+                except Exception as e:
+                    logging.warning(f"Runner {name} failed! Error message: \n{e}")
+                    return "Failed"
+            except Exception as e:
+                logging.warning(f"Loading poses for runner {name} failed! Error message: \n{e}")
                 return "Loading poses failed!"
-            try:
-                logging.info(f"Running runner {name} with options {runner_options}...")
-                runner.run(**runner_options, poses=poses, prefix=f"test_{name}")
-                logging.info(f"Runner {name} passed!")
-                return "Working"
-            except:
-                logging.warning(f"Runner {name} failed!")
-                return "Failed"
         else:
             logging.warning(f"Runner {name} config set up incorrectly!")
             return "Config fail"
@@ -64,7 +74,7 @@ def main(args):
     '''run tests'''
 
     js_dict = {
-        "slurm_gpu_jobstarter": SbatchArrayJobstarter(max_cores=10, gpus=1, options="-c1"),
+        "slurm_gpu_jobstarter": SbatchArrayJobstarter(max_cores=10, gpus=1),
         "local_jobstarter": LocalJobStarter()
     }
 
@@ -76,10 +86,10 @@ def main(args):
 
     runner_dict = {
         "ESMFold": {
-            "runner": ESMFold() if protslurm.config.ESMFOLD_PYTHON_PATH and protslurm.config.ESMFOLD_PYTHON_PATH else None,
+            "runner": ESMFold() if protslurm.config.ESMFOLD_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/fastas/", "glob_suffix": "*.fasta"},
-            "runner_options": {"jobstarter": jobstarter},
-            "config": [protslurm.config.ESMFOLD_PYTHON_PATH, protslurm.config.ESMFOLD_PYTHON_PATH]
+            "runner_options": {"jobstarter": jobstarter or js_dict['slurm_gpu_jobstarter']},
+            "config": [protslurm.config.ESMFOLD_PYTHON_PATH]
         },
         "Rosetta": {
             "runner": Rosetta() if protslurm.config.ROSETTA_BIN_PATH else None,
@@ -117,6 +127,12 @@ def main(args):
             },
             "config": [protslurm.config.RFDIFFUSION_SCRIPT_PATH, protslurm.config.RFDIFFUSION_PYTHON_PATH]
         },
+        "Colabfold": {
+            "runner": Alphafold2() if protslurm.config.AF2_DIR_PATH and protslurm.config.AF2_PYTHON_PATH else None,
+            "poses_options": {"poses": "input_files/fastas/", "glob_suffix": "*.fasta"},
+            "runner_options": {"jobstarter": jobstarter},
+            "config": [protslurm.config.AF2_DIR_PATH, protslurm.config.AF2_PYTHON_PATH]
+        },
         "TMscore": {
             "runner": TMscore(),
             "poses_options": {"poses": pd.read_json("input_files/pose_df/pose_df.json")},
@@ -145,6 +161,7 @@ def main(args):
             "config": None
         }
     }
+
 
     if not protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR or not os.path.isdir(protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR):
         logging.warning(f"AUXILIARY_RUNNER_SCRIPTS_DIR was not properly set in config.py!")
