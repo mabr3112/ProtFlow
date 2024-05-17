@@ -158,6 +158,8 @@ def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> 
     # check if name exists in poses
     if name in input_df.columns:
         raise KeyError(f"Column {name} already present in DataFrame. Choose different name!")
+    if tm_col not in input_df.columns:
+        raise KeyError(f"Column {tm_col} does not exist in DataFrame. Did you mean any of {[x for x in input_df.columns if tm_col.split('_')[0] in x]}")
 
     # get descriptions of poses and tm_col_description
     if ref_col.endswith("description"):
