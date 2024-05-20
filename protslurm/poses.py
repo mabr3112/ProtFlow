@@ -31,6 +31,7 @@ Version: 0.1.0
 """
 import os
 from glob import glob
+import re
 from typing import Union
 import shutil
 import logging
@@ -61,8 +62,8 @@ class Poses:
     def __init__(self, poses: list = None, work_dir: str = None, storage_format: str = "json", glob_suffix: str = None, jobstarter: JobStarter = jobstarters.SbatchArrayJobstarter()):
         # setup attributes poses.df, poses.work_dir;
         self.df = None
-        self.set_poses(poses, glob_suffix=glob_suffix)
         self.set_work_dir(work_dir, set_scorefile=False)
+        self.set_poses(poses, glob_suffix=glob_suffix)
 
         # setup poses.storage_format and poses.scorefile.
         self.set_storage_format(storage_format)
@@ -207,7 +208,7 @@ class Poses:
 
         # handle multiline .fa inputs for poses!
         for pose in poses:
-            if not pose.endswith(".fa"):
+            if not pose.endswith(".fa") and not pose.endswith(".fasta"):
                 continue
             if len(parse_fasta_to_dict(pose)) > 1:
                 poses.remove(pose)
@@ -238,8 +239,12 @@ class Poses:
         # read multilie-fasta file and split into individual poses
         fasta_dict = parse_fasta_to_dict(path, encoding=encoding)
 
+        # prepare descriptions in fasta_dict for writing:
+        symbols_to_replace = r"[\/\-\:\ \.\|\,]"
+        fasta_dict = {re.sub(symbols_to_replace, "_", description): seq for description, seq in fasta_dict.items()}
+
         # setup fasta directory self.work_dir/input_fastas_split/
-        output_dir = f"{self.work_dir}/input_fastas_split/"
+        output_dir = os.path.abspath(f"{self.work_dir}/input_fastas_split/")
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 

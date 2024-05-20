@@ -55,14 +55,15 @@ class TMalign(Runner):
                 calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
             return output
 
-        # check if reference column exists in poses.df
-        col_in_df(poses.df, ref_col)
 
         # prepare pose options
         pose_options = self.prep_pose_options(poses, pose_options)
 
+        # prepare references:
+        ref_l = self.prep_ref(ref=ref_col, poses=poses)
+
         cmds = []
-        for pose, ref, pose_opts in zip(poses.df['poses'].to_list(), poses.df[ref_col].to_list(), pose_options):
+        for pose, ref, pose_opts in zip(poses.df['poses'].to_list(), ref_l, pose_options):
             cmds.append(self.write_cmd(pose_path=pose, ref_path=ref, output_dir=work_dir, options=options, pose_options=pose_opts))
 
         num_cmds = jobstarter.max_cores
@@ -103,6 +104,19 @@ class TMalign(Runner):
         if sc_tm_score:
             calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
         return output
+
+    def prep_ref(self, ref: str, poses: Poses) -> list[str]:
+        '''Preps ref_col parameter for TMalign:
+        If ref points to a .pdb file, return list of .pdb-files as ref_l.
+        If ref points to a column in the Poses DataFrame, then return the column's entries as a list.'''
+        if not isinstance(ref, str):
+            raise ValueError(f"Parameter :ref: must be string and either refer to a .pdb file or to a column in poses.df!")
+        if ref.endswith(".pdb"):
+            return [ref for _ in poses]
+
+        # check if reference column exists in poses.df
+        col_in_df(poses.df, ref)
+        return poses.df[ref].to_list()
 
     def write_cmd(self, pose_path: str, ref_path: str, output_dir: str, options: str = None, pose_options: str = None) -> str:
         '''Writes Command to run ligandmpnn.py'''
