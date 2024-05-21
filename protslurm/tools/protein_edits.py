@@ -129,7 +129,7 @@ class ChainAdder(Runner):
 
         return out_dict
 
-    def parse_motif(self, motif, pose: pd.Series) -> str:
+    def parse_motif(self, motif: ResidueSelection|str, pose: pd.Series) -> str:
         '''Sets up motif from target_motif input.'''
         if isinstance(motif, ResidueSelection):
             return motif.to_string()
@@ -137,8 +137,7 @@ class ChainAdder(Runner):
             if motif in pose:
                 # assumes motif is a column in pose (row in poses.df) that points to a ResidueSelection object
                 return pose[motif].to_string()
-            else:
-                raise ValueError(f"If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
+            raise ValueError(f"If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
         raise TypeError(f"Unsupportet parameter type for motif: {type(motif)} - Only ResidueSelection or str allowed!")
 
     def add_sequence(self, prefix: str, poses: Poses, seq: str = None, seq_col: str = None, sep: str = ":") -> None:
