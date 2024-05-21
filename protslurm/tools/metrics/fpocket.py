@@ -9,7 +9,7 @@ import pandas as pd
 # custom
 from protslurm.jobstarters import JobStarter
 from protslurm.poses import Poses
-from protslurm.runners import Runner, RunnerOutput
+from protslurm.runners import Runner, RunnerOutput, parse_generic_options
 from protslurm.config import FPOCKET_PATH
 
 class FPocket(Runner):
@@ -40,7 +40,7 @@ class FPocket(Runner):
             return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
         # prep options:
-        options_l = self.prep_fpocket_options(options, pose_options)
+        options_l = self.prep_fpocket_options(poses, options, pose_options)
 
         # compile cmds
         cmds = [self.write_fpocket_cmd(pose, opt) for pose, opt in zip(poses.poses_list(), options_l)]
@@ -59,12 +59,16 @@ class FPocket(Runner):
         outputs = RunnerOutput(poses, scores, prefix, index_layers=self.index_layers).return_poses()
         return outputs
 
-    def prep_fpocket_options(self, options: str, pose_options: str|list[str]) -> str:
+    def prep_fpocket_options(self, poses: Poses, options: str, pose_options: str|list[str]) -> str:
         '''Preps options from opts and pose_opts for fpocket run.'''
+        pose_options = self.prep_pose_options(poses, pose_options)
+
         # remove forbidden options
+        opts, flags = parse_generic_options(options, pose_options)
+        
 
         # merge options and pose_options, with pose_options priority and return
-        return NotImplemented
+        return opts, flags
 
     def write_fpocket_cmd(self, pose: str, opt: str) -> str:
         '''Writes command that runs fpocket on 'pose' with commandline options specified in 'opt'.'''

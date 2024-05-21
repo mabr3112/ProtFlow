@@ -585,7 +585,7 @@ class Poses:
 
         return self
 
-def normalize_series(ser:pd.Series, scale:bool=False) -> pd.Series:
+def normalize_series(ser: pd.Series, scale: bool = False) -> pd.Series:
     '''
     Normalizes a pandas series by subtracting the median and dividing by standard deviation.
     If scale = True, the normalized values will be scaled from 0 to 1. Returns a series.
@@ -665,7 +665,7 @@ def load_poses(poses_path: str) -> Poses:
     '''Loads Poses class from a stored dataframe.'''
     return Poses().load_poses(poses_path)
 
-def col_in_df(df:pd.DataFrame, column:Union[str, list[str]]):
+def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
     '''Checks if column exists in DataFrame and returns KeyError if not.'''
     if isinstance(column, list):
         for col in column:
@@ -675,7 +675,7 @@ def col_in_df(df:pd.DataFrame, column:Union[str, list[str]]):
         if not column in df.columns:
             raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
 
-def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, layer_col="poses_description", sep="_", ascending=True) -> pd.DataFrame:
+def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_layers: int = None, layer_col: str = "poses_description", sep: str = "_", ascending: bool = True) -> pd.DataFrame:
     '''
     remove_layers option allows to filter dataframe based on groupings after removing index layers.
     If the option remove_layers is set (has to be type: int), then n determines how many c
@@ -723,7 +723,7 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, 
     return filtered_df
 
 
-def filter_dataframe_by_value(df: pd.DataFrame, col: str, value, operator: str) -> pd.DataFrame:
+def filter_dataframe_by_value(df: pd.DataFrame, col: str, value: float|int, operator: str) -> pd.DataFrame:
     '''
     Filters dataframe based on a value and an operator.
     '''
