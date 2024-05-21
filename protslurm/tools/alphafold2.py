@@ -22,15 +22,12 @@ from protslurm.jobstarters import JobStarter
 # TODO @Adrian: Should we rename this runner into colabfold.py? This is essentially the runner for the colabfold implementation of AlphaFold2.
 class Alphafold2(Runner):
     '''Class to run Alphafold2 and collect its outputs into a DataFrame'''
-    def __init__(self, script_path: str = protslurm.config.AF2_SCRIPT_PATH, python_path: str = protslurm.config.AF2_PYTHON_PATH, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = protslurm.config.AF2_SCRIPT_PATH, jobstarter: str = None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path:
             raise ValueError(f"No path is set for {self}. Set the path in the config.py file under Alphafold2_SCRIPT_PATH.")
-        if not python_path:
-            raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under Alphafold2_PYTHON_PATH.")
 
         self.script_path = script_path
-        self.python_path = python_path
         self.name = "alphafold2.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
@@ -127,7 +124,7 @@ class Alphafold2(Runner):
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --" + " --".join(flags) if flags else ""
 
-        return f"{self.python_path} {self.script_path} {opts} {flags} {pose_path} {output_dir} "
+        return f"{self.script_path} {opts} {flags} {pose_path} {output_dir} "
 
     def collect_scores(self, work_dir: str, num_return_poses: int =1 ) -> pd.DataFrame:
         '''collects scores from Alphafold2 output'''
