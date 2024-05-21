@@ -27,7 +27,7 @@ class FPocket(Runner):
     def __str__(self):
         return "fpocket"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter, options: str|list = None, pose_options: str|list = None, return_full_scores: bool = False, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str|list = None, pose_options: str|list = None, return_full_scores: bool = False, overwrite: bool = False) -> Poses:
         '''Implements writing of commands for fpocket and collecting scores into poses integratable DataFrames.'''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
