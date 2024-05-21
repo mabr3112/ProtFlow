@@ -3,7 +3,6 @@
 import logging
 import os
 import re
-import shlex
 
 # dependencies
 import pandas as pd
