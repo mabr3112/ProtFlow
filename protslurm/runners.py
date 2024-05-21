@@ -98,7 +98,7 @@ class Runner:
         if f"{prefix}_location" in poses.df.columns or f"{prefix}_description" in poses.df.columns:
             raise KeyError(f"Column {prefix} found in Poses DataFrame! Pick different Prefix!")
 
-    def prep_pose_options(self, poses:Poses, pose_options:list[str]=None) -> list:
+    def prep_pose_options(self, poses: Poses, pose_options: list[str] = None) -> list:
         '''Checks if pose_options are of the same length as poses, if pose_options are provided, '''
         # if pose_options is str, look up pose_options from poses.df
         if isinstance(pose_options, str):
