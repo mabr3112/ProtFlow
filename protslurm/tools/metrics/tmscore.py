@@ -52,7 +52,8 @@ class TMalign(Runner):
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
             if sc_tm_score:
-                calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
+                output.df = calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
+                print([x for x in output.df.columns if prefix in x])
             return output
 
         # check if reference column exists in poses.df
@@ -101,7 +102,8 @@ class TMalign(Runner):
         # create standardised output for poses class:
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
         if sc_tm_score:
-            calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
+            output.df = calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
+            print([x for x in output.df.columns if prefix in x])
         return output
 
     def write_cmd(self, pose_path: str, ref_path: str, output_dir: str, options: str = None, pose_options: str = None) -> str:
