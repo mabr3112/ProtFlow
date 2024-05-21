@@ -145,6 +145,9 @@ class ChainAdder(Runner):
         poses.check_prefix(prefix)
         if not all(pose.endswith(".fa") or pose.endswith(".fasta") for pose in poses.poses_list()):
             raise ValueError(f"Poses must be .fasta files (.fa also fine)!")
+        out_dir = f"{poses.work_dir}/prefix/"
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
 
         # prep seq input
         if seq and seq_col:
@@ -168,36 +171,40 @@ class ChainAdder(Runner):
             orig_seq += sep + seq_
 
             # store at new location
-            out_path = f"{poses.work_dir}/{prefix}/{desc}.fa"
+            out_path = f"{out_dir}/{desc}.fa"
             with open(out_path, 'w', encoding="UTF-8") as f:
                 f.write(f">{desc}\n{orig_seq}")
             new_poses.append(out_path)
 
         # update poses.df['poses'] to new location
-        poses.change_poses_dir(prefix, copy=False)
+        poses.change_poses_dir(out_dir, copy=False)
 
     def multimerize(self, prefix: str, poses: Poses, n_protomers: int, sep: str = ":") -> None:
         '''Takes .fa files from poses and makes multimers out of the sequences.
-        :n_protomers: (int) specifies the number of protomers to add.'''
+        :n_protomers: (int) specifies the number of protomers in the final .fa file.'''
+        # setup directory and function
         poses.check_prefix(prefix)
         if not all(pose.endswith(".fa") or pose.endswith(".fasta") for pose in poses.poses_list()):
             raise ValueError(f"Poses must be .fasta files (.fa also fine)!")
+        out_dir = f"{poses.work_dir}/prefix/"
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
 
         # iterate over poses and add in sequence
         new_poses = []
         for pose in poses.poses_list():
             # read fasta and add sequence.
             desc, orig_seq = list(parse_fasta_to_dict(pose).items())[0]
-            orig_seq += f"{sep}{orig_seq}" * n_protomers
+            orig_seq += f"{sep}{orig_seq}" * (n_protomers - 1)
 
             # store at new location
-            out_path = f"{poses.work_dir}/{prefix}/{desc}.fa"
+            out_path = f"{out_dir}/{desc}.fa"
             with open(out_path, 'w', encoding="UTF-8") as f:
                 f.write(f">{desc}\n{orig_seq}")
             new_poses.append(out_path)
 
         # update poses.df['poses'] to new location
-        poses.change_poses_dir(prefix, copy=False)
+        poses.change_poses_dir(out_dir, copy=False)
 
 def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
     '''Sets up chains for add_chains_batch.py'''
