@@ -45,7 +45,7 @@ from protslurm import jobstarters
 from protslurm.jobstarters import JobStarter
 from protslurm.residues import ResidueSelection
 from protslurm.utils.utils import parse_fasta_to_dict
-from protslurm.utils.biopython_tools import load_structure_from_pdbfile
+from protslurm.utils.biopython_tools import load_structure_from_pdbfile, get_sequence_from_pose
 import protslurm.utils.plotting as plots
 
 FORMAT_STORAGE_DICT = {
@@ -386,10 +386,24 @@ class Poses:
         # set motif
         self.motifs.append(motif_col)
 
-    def convert_pdb_to_fasta(self, out_dir: str, prefix: str, update_poses: bool = False):
-        '''Converts .pdb files to .fasta files. If update_poses is True, fasta files will be set as new poses. Fasta file paths are saved in <prefix>_fasta_location column in poses.df'''
-        # TODO: implement
-        raise NotImplementedError("conversion of pdbs to fasta not yet implented!")
+    def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":"):
+        '''Converts .pdb files to .fasta files in <prefix>_fasta_location. If update_poses is True, fasta files will be set as new poses. Fasta file paths are saved in <prefix>_fasta_location column in poses.df'''
+        if not self.determine_pose_type() == ['.pdb']:
+            raise RuntimeError(f"Poses must be of type .pdb, not {self.determine_pose_type()}")
+
+        os.makedirs(fasta_dir := os.path.join(self.work_dir, f'{prefix}_fasta_location'), exist_ok=True)
+        seqs = [get_sequence_from_pose(load_structure_from_pdbfile(path_to_pdb=pose), chain_sep=chain_sep) for pose in self.df['poses'].to_list()]
+
+        fasta_paths = []
+        for name, seq in zip(self.df['poses_description'].to_list(), seqs):
+            fasta_path = os.path.join(fasta_dir, f'{name}.fasta')
+            fasta_paths.append(fasta_path)
+            with open(fasta_path, 'w') as f:
+                f.write(f">{name}\n{seq}")
+
+        self.df[f'{prefix}_fasta_location'] = fasta_paths
+        if update_poses:
+            self.df['poses'] = fasta_paths
 
     ########################################## Filtering ###############################################
     def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses":
