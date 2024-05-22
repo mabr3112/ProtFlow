@@ -130,7 +130,7 @@ class Colabfold(Runner):
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --" + " --".join(flags) if flags else ""
 
-        return f"{self.python_path} {self.script_path} {opts} {flags} {pose_path} {output_dir} "
+        return f"{self.script_path} {opts} {flags} {pose_path} {output_dir} "
 
     def collect_scores(self, work_dir: str, num_return_poses: int =1 ) -> pd.DataFrame:
         '''collects scores from colabfold output'''

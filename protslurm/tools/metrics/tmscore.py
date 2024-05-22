@@ -12,6 +12,7 @@ from protslurm.poses import Poses
 from protslurm.runners import Runner, RunnerOutput, col_in_df
 from protslurm.jobstarters import JobStarter
 from protslurm.config import PROTSLURM_ENV
+from protslurm.utils.metrics import calc_sc_tm
 
 class TMalign(Runner):
     '''
@@ -21,44 +22,49 @@ class TMalign(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = application or os.path.join(protslurm.config.PROTSLURM_ENV, "TMalign")
+        self.application = application or os.path.join(PROTSLURM_ENV, "TMalign")
 
     def __str__(self):
         return "TMalign"
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str, selfconsistency_tm_cutoff:float=0.5, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None: # pylint: disable=W0237
+    def run(self, poses: Poses, prefix: str, ref_col: str, sc_tm_score: bool = True, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None: # pylint: disable=W0237
         '''
         Calculates the TMscore between poses and a reference structure. It is recommended to use TM_score_ref, as this is normalized by length of the reference structure. Also returns a self consistency score 
         which indicates how many poses with the same reference pose are above the <selfconsistency_tm_cutoff>, indicating the designability of the reference pose. 
             <poses>                     input poses
             <prefix>                    prefix for run
             <ref_col>                   column containing paths to pdb used as reference for TM score calculation
-            <selfconsistency_tm_cutoff> cutoff for TM_score to pass selfconsistency check
+            <sc_tm_score>               if True, calculates sc-TM score (highest TM-Score) for each backbone in ref_col and adds it into the column {prefix}_sc_tm
             <options>                   cmd-line options for TMalign
             <pose_options>              name of poses.df column containing options for TMalign
             <overwrite>                 if previously generated scorefile is found, read it in or run calculation again?
             <jobstarter>                define jobstarter (since protparam is quite fast, it is recommended to run it locally)
         '''
-
+        # setup runner and files
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
+
         scorefile = os.path.join(work_dir, f"{prefix}_TM.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
-            output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
-            return output.return_poses()
+            output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
+            if sc_tm_score:
+                output.df = calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
+                print([x for x in output.df.columns if prefix in x])
+            return output
 
-        # check if reference column exists in poses.df
-        col_in_df(poses.df, ref_col)
 
         # prepare pose options
         pose_options = self.prep_pose_options(poses, pose_options)
 
+        # prepare references:
+        ref_l = self.prep_ref(ref=ref_col, poses=poses)
+
         cmds = []
-        for pose, ref, pose_opts in zip(poses.df['poses'].to_list(), poses.df[ref_col].to_list(), pose_options):
+        for pose, ref, pose_opts in zip(poses.df['poses'].to_list(), ref_l, pose_options):
             cmds.append(self.write_cmd(pose_path=pose, ref_path=ref, output_dir=work_dir, options=options, pose_options=pose_opts))
 
         num_cmds = jobstarter.max_cores
@@ -83,20 +89,36 @@ class TMalign(Runner):
         scores = scores.merge(poses.df[['poses', 'poses_description', ref_col]], left_on="description", right_on="poses_description").drop('poses_description', axis=1)
         scores = scores.rename(columns={"poses": "location"})
 
-        if selfconsistency_tm_cutoff:
-            dfs = []
-            for ref, df in scores.groupby(ref_col, sort=False):
-                above_cutoff = (df['TM_score_ref'] > selfconsistency_tm_cutoff).sum()
-                df['self_consistency_score'] = above_cutoff / len(df.index)
-                dfs.append(df)
-            scores = pd.concat(dfs).reset_index(drop=True)
+        #if selfconsistency_tm_cutoff:
+        #    dfs = []
+        #    for ref, df in scores.groupby(ref_col, sort=False):
+        #        above_cutoff = (df['TM_score_ref'] > selfconsistency_tm_cutoff).sum()
+        #        df['self_consistency_score'] = above_cutoff / len(df.index)
+        #        dfs.append(df)
+        #    scores = pd.concat(dfs).reset_index(drop=True)
 
         # write output scorefile
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
         # create standardised output for poses class:
-        output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
-        return output.return_poses()
+        output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
+        if sc_tm_score:
+            output.df = calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
+            print([x for x in output.df.columns if prefix in x])
+        return output
+
+    def prep_ref(self, ref: str, poses: Poses) -> list[str]:
+        '''Preps ref_col parameter for TMalign:
+        If ref points to a .pdb file, return list of .pdb-files as ref_l.
+        If ref points to a column in the Poses DataFrame, then return the column's entries as a list.'''
+        if not isinstance(ref, str):
+            raise ValueError(f"Parameter :ref: must be string and either refer to a .pdb file or to a column in poses.df!")
+        if ref.endswith(".pdb"):
+            return [ref for _ in poses]
+
+        # check if reference column exists in poses.df
+        col_in_df(poses.df, ref)
+        return poses.df[ref].to_list()
 
     def write_cmd(self, pose_path: str, ref_path: str, output_dir: str, options: str = None, pose_options: str = None) -> str:
         '''Writes Command to run ligandmpnn.py'''
@@ -168,7 +190,7 @@ class TMscore(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = application or os.path.join(protslurm.config.PROTSLURM_ENV, "TMscore")
+        self.application = application or os.path.join(PROTSLURM_ENV, "TMscore")
 
     def __str__(self):
         return self.name

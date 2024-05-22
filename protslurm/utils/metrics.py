@@ -141,7 +141,7 @@ def entropy(prob_distribution: np.array) -> float:
 
     return -H
 
-def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> None:
+def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> pd.DataFrame:
     '''Calculates self-consistency TM-score in a dataframe.
     Calculates in-place. This means that the score is automatically added to input_df.
     
@@ -153,11 +153,13 @@ def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> 
                         This is generally '{prefix}_TM_score_ref', where {prefix} is the prefix used for the TMAlign runner.
 
     Returns:
-        None! New column gets integrated into the dataframe automatically. 
+        DataFrame with integrated column
     '''
     # check if name exists in poses
     if name in input_df.columns:
         raise KeyError(f"Column {name} already present in DataFrame. Choose different name!")
+    if tm_col not in input_df.columns:
+        raise KeyError(f"Column {tm_col} does not exist in DataFrame. Did you mean any of {[x for x in input_df.columns if tm_col.split('_')[0] in x]}")
 
     # get descriptions of poses and tm_col_description
     if ref_col.endswith("description"):
@@ -173,6 +175,7 @@ def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> 
 
     # merge max tm-scores into input_df[name]
     input_df = input_df.merge(grouped_max, on=desc_col, how='left')
+    return input_df
 
 def calc_baker_success(input_df: pd.DataFrame, af2_col: str, bb_rmsd_col: str, motif_rmsd_col: str) -> None:
     '''Implementation of Baker in silico success score. See RFDiffusion publication for info.'''
