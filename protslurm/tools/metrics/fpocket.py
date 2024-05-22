@@ -98,13 +98,15 @@ def collect_fpocket_scores(output_dir: str, return_full_scores: bool = False) ->
     output_dirs = glob.glob(f"{output_dir}/*_out")
 
     # extract individual scores and merge into DF:
-    return pd.concat([collect_fpocket_output(get_outfile_name(out_dir), return_full_scores=return_full_scores) for out_dir in output_dirs])
+    return pd.concat([collect_fpocket_output(get_outfile_name(out_dir), return_full_scores=return_full_scores) for out_dir in output_dirs]).reset_index(drop=True)
 
 def collect_fpocket_output(output_file: str, return_full_scores: bool = False) -> pd.DataFrame:
     '''Collects output of fpocket.'''
     # instantiate output_dict
-    #out_dict = {"description": output_file.split("/")[-1].replace("_info.txt", "")}
     file_scores = parse_fpocket_outfile(output_file)
+
+    if file_scores.empty:
+        return pd.DataFrame.from_dict({"description": [output_file.split("/")[-1].replace("_info.txt", "")]})
 
     # integrate all scores if option is set:
     top_df = file_scores.head(1)
@@ -117,7 +119,7 @@ def collect_fpocket_output(output_file: str, return_full_scores: bool = False) -
     if return_full_scores:
         top_df["all_pocket_scores"] = file_scores
 
-    return top_df
+    return top_df.reset_index(drop=True)
 
 def parse_fpocket_outfile(output_file: str) -> pd.DataFrame:
     '''Collects output of fpocket.'''
@@ -138,7 +140,10 @@ def parse_fpocket_outfile(output_file: str) -> pd.DataFrame:
         pocket_nr = line_split[0].split()[0].strip()
         pocket_dict[f"pocket_{pocket_nr}"] = {col: val for (col, val) in [parse_pocket_line(line) for line in line_split[1:]]}
 
-    return pd.DataFrame.from_dict(pocket_dict).T.sort_values("Druggability Score", ascending=False)
+    out_df = pd.DataFrame.from_dict(pocket_dict).T
+    if out_df.empty:
+        return out_df
+    return out_df.sort_values("Druggability Score", ascending=False)
 
 def _get_fpocket_input_location(description: str, cmds: list[str]) -> str:
     '''Looks ad a pose_description and tries to find the pose in a list of commands that was used as input to generate the description.
