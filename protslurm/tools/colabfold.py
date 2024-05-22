@@ -1,4 +1,4 @@
-'''Module to handle Alphafold2 within ProtSLURM'''
+'''Module to handle the Alphafold2 implementation in Colabfold within ProtSLURM'''
 # general imports
 import re
 import os
@@ -18,25 +18,26 @@ from protslurm.runners import Runner, RunnerOutput
 from protslurm.poses import Poses
 from protslurm.jobstarters import JobStarter
 
-# TODO @Adrian: Please write AF2 run_singular() method that does not batch fastas together, but predicts each fasta individually. We need this to supply pose_options to af2 prediction runs (e.g. custom-templates that are unique for each pose.)
-# TODO @Adrian: Should we rename this runner into colabfold.py? This is essentially the runner for the colabfold implementation of AlphaFold2.
-class Alphafold2(Runner):
-    '''Class to run Alphafold2 and collect its outputs into a DataFrame'''
-    def __init__(self, script_path: str = protslurm.config.AF2_SCRIPT_PATH, jobstarter: str = None) -> None:
+class Colabfold(Runner):
+    '''Class to run Alphafold2 within Colabfold and collect its outputs into a DataFrame'''
+    def __init__(self, script_path: str = protslurm.config.COLABFOLD_DIR_PATH, python_path: str = protslurm.config.COLABFOLD_PYTHON_PATH, jobstarter: str = None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path:
-            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under Alphafold2_SCRIPT_PATH.")
+            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under COLABFOLD_DIR_PATH.")
+        if not python_path:
+            raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under COLABFOLD_PYTHON_PATH.")
 
         self.script_path = script_path
-        self.name = "alphafold2.py"
+        self.python_path = python_path
+        self.name = "colabfold.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
 
     def __str__(self):
-        return "alphafold2.py"
+        return "colabfold.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, overwrite: bool = False, num_batches: int = None, return_top_n_poses: int = 1) -> RunnerOutput:
-        '''Runs alphafold2.py on acluster'''
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, pose_options: str = None, overwrite: bool = False, return_top_n_poses: int = 1) -> RunnerOutput:
+        '''Runs colabfold.py on acluster'''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
@@ -44,8 +45,8 @@ class Alphafold2(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
-        # Look for output-file in pdb-dir. If output is present and correct, then skip Alphafold2.
-        scorefile = os.path.join(work_dir, f"Alphafold2_scores.{poses.storage_format}")
+        # Look for output-file in pdb-dir. If output is present and correct, then skip Colabfold.
+        scorefile = os.path.join(work_dir, f"colabfold_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
@@ -59,18 +60,23 @@ class Alphafold2(Runner):
         os.makedirs(af2_preds_dir := os.path.join(work_dir, "af2_preds"), exist_ok=True)
         os.makedirs(af2_pdb_dir := os.path.join(work_dir, "output_pdbs"), exist_ok=True)
 
-        # setup input-fastas in batches (to speed up prediction times.)
-        num_batches = num_batches or jobstarter.max_cores
+        # setup input-fastas in batches (to speed up prediction times.), but only if no pose_options are provided!
+        num_batches = len(poses.df.index) if pose_options else jobstarter.max_cores
         pose_fastas = self.prep_fastas_for_prediction(poses=poses.df['poses'].to_list(), fasta_dir=fasta_dir, max_filenum=num_batches)
 
-        # write Alphafold2 cmds:
-        cmds = [self.write_cmd(pose, output_dir=af2_preds_dir, options=options) for pose in pose_fastas]
+        # prepare pose options
+        pose_options = self.prep_pose_options(poses=poses, pose_options=pose_options)
+
+        # write colabfold cmds:
+        cmds = []
+        for pose, pose_opt in zip(pose_fastas, pose_options):
+            cmds.append(self.write_cmd(pose, output_dir=af2_preds_dir, options=options, pose_options=pose_opt))
 
         # run
         logging.info(f"Starting AF2 predictions of {len(poses)} sequences on {jobstarter.max_cores} cores.")
         jobstarter.start(
             cmds=cmds,
-            jobname="alphafold2",
+            jobname="colabfold",
             wait=True,
             output_path=f"{work_dir}/"
         )
@@ -116,18 +122,18 @@ class Alphafold2(Runner):
         return [mergefastas(files=poses, path=f"{fasta_dir}/fasta_{str(i+1).zfill(4)}.fa", replace=("/",":")) for i, poses in enumerate(poses_split)]
 
 
-    def write_cmd(self, pose_path: str, output_dir: str, options: str):
-        '''Writes Command to run Alphafold2.py'''
+    def write_cmd(self, pose_path: str, output_dir: str, options: str = None, pose_options: str = None):
+        '''Writes Command to run colabfold.py'''
 
         # parse options
-        opts, flags = protslurm.runners.parse_generic_options(options, "")
+        opts, flags = protslurm.runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --" + " --".join(flags) if flags else ""
 
         return f"{self.script_path} {opts} {flags} {pose_path} {output_dir} "
 
     def collect_scores(self, work_dir: str, num_return_poses: int =1 ) -> pd.DataFrame:
-        '''collects scores from Alphafold2 output'''
+        '''collects scores from colabfold output'''
 
         def get_json_files_of_description(description: str, input_dir: str) -> str:
             return sorted([filepath for filepath in glob(f"{input_dir}/{description}*rank*.json") if re.search(f"{description}_scores_rank_..._.*_model_._seed_...\.json", filepath)]) # pylint: disable=W1401

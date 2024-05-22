@@ -21,7 +21,7 @@ from protslurm.runners import RunnerOutput
 
 class RFdiffusion(Runner):
     '''Class to run RFdiffusion and collect its outputs into a DataFrame'''
-    def __init__(self, script_path: str = protslurm.config.RFDIFFUSION_SCRIPT_PATH, python_path: str = protslurm.config.RFDIFFUSION_PYTHON_PATH, jobstarter: None = JobStarter, jobstarter_options: str = None) -> None:
+    def __init__(self, script_path: str = protslurm.config.RFDIFFUSION_SCRIPT_PATH, python_path: str = protslurm.config.RFDIFFUSION_PYTHON_PATH, jobstarter: JobStarter = None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path:
             raise ValueError(f"No path is set for {self}. Set the path in the config.py file under RFDIFFUSION_SCRIPT_PATH.")
@@ -31,7 +31,6 @@ class RFdiffusion(Runner):
         self.python_path = python_path
         self.name = "rfdiffusion.py"
         self.index_layers = 1
-        self.jobstarter_options = jobstarter_options
         self.jobstarter = jobstarter
 
     def __str__(self):
