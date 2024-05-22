@@ -193,7 +193,7 @@ class Poses:
             return []
         raise TypeError(f"Unrecognized input type {type(poses)} for function parse_poses(). Allowed types: [list, str]")
 
-    def parse_descriptions(self, poses:list=None) -> list:
+    def parse_descriptions(self, poses: list = None) -> list:
         '''parses descriptions (names) of poses from a list of pose_paths. Works on already parsed poses'''
         return [pose.strip("/").rsplit("/", maxsplit=1)[-1].split(".", maxsplit=1)[0]for pose in poses]
 
@@ -218,7 +218,7 @@ class Poses:
         self.df = pd.DataFrame({"input_poses": poses, "poses": poses, "poses_description": self.parse_descriptions(poses)})
         return None
 
-    def check_prefix(self, prefix:str) -> None:
+    def check_prefix(self, prefix: str) -> None:
         '''checks if prefix is available in poses.df'''
         if f"{prefix}_location" in self.df.columns or f"{prefix}_description" in self.df.columns:
             raise KeyError(f"Prefix {prefix} is already taken in poses.df")
@@ -231,7 +231,7 @@ class Poses:
                 raise KeyError(f"Corrupted Format: DataFrame does not contain mandatory Poses column {col}")
         return df
 
-    def split_multiline_fasta(self, path: str, encoding:str="UTF-8") -> list[str]:
+    def split_multiline_fasta(self, path: str, encoding: str = "UTF-8") -> list[str]:
         '''Splits multiline fasta input files.'''
         logging.warning(f"Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/")
         if not hasattr(self, "work_dir"):
@@ -386,7 +386,7 @@ class Poses:
         # set motif
         self.motifs.append(motif_col)
 
-    def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":"):
+    def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":") -> None:
         '''Converts .pdb files to .fasta files in <prefix>_fasta_location. If update_poses is True, fasta files will be set as new poses. Fasta file paths are saved in <prefix>_fasta_location column in poses.df'''
         if not self.determine_pose_type() == ['.pdb']:
             raise RuntimeError(f"Poses must be of type .pdb, not {self.determine_pose_type()}")
@@ -398,7 +398,7 @@ class Poses:
         for name, seq in zip(self.df['poses_description'].to_list(), seqs):
             fasta_path = os.path.join(fasta_dir, f'{name}.fasta')
             fasta_paths.append(fasta_path)
-            with open(fasta_path, 'w') as f:
+            with open(fasta_path, 'w', encoding="UTF-8") as f:
                 f.write(f">{name}\n{seq}")
 
         self.df[f'{prefix}_fasta_location'] = fasta_paths

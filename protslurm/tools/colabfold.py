@@ -20,15 +20,12 @@ from protslurm.jobstarters import JobStarter
 
 class Colabfold(Runner):
     '''Class to run Alphafold2 within Colabfold and collect its outputs into a DataFrame'''
-    def __init__(self, script_path: str = protslurm.config.COLABFOLD_DIR_PATH, python_path: str = protslurm.config.COLABFOLD_PYTHON_PATH, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = protslurm.config.COLABFOLD_SCRIPT_PATH, jobstarter: str = None) -> None:
         '''jobstarter_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         if not script_path:
             raise ValueError(f"No path is set for {self}. Set the path in the config.py file under COLABFOLD_DIR_PATH.")
-        if not python_path:
-            raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under COLABFOLD_PYTHON_PATH.")
 
         self.script_path = script_path
-        self.python_path = python_path
         self.name = "colabfold.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
