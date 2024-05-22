@@ -65,6 +65,7 @@ class FPocket(Runner):
         # collect outputs and write scorefile
         scores = collect_fpocket_scores(work_dir, return_full_scores=return_full_scores)
         scores["location"] = [_get_fpocket_input_location(description, cmds) for description in scores["description"].to_list()]
+        scores["pocket_location"] = scores["pocket_location"].fillna(scores["location"]) if "pocket_location" in scores.columns else scores["location"]
         self.save_runner_scorefile(scores, scorefile)
 
         # itegrate and return
@@ -98,7 +99,8 @@ def collect_fpocket_scores(output_dir: str, return_full_scores: bool = False) ->
     output_dirs = glob.glob(f"{output_dir}/*_out")
 
     # extract individual scores and merge into DF:
-    return pd.concat([collect_fpocket_output(get_outfile_name(out_dir), return_full_scores=return_full_scores) for out_dir in output_dirs]).reset_index(drop=True)
+    out_df = pd.concat([collect_fpocket_output(get_outfile_name(out_dir), return_full_scores=return_full_scores) for out_dir in output_dirs]).reset_index(drop=True)
+    return out_df
 
 def collect_fpocket_output(output_file: str, return_full_scores: bool = False) -> pd.DataFrame:
     '''Collects output of fpocket.'''
@@ -143,6 +145,7 @@ def parse_fpocket_outfile(output_file: str) -> pd.DataFrame:
     out_df = pd.DataFrame.from_dict(pocket_dict).T
     if out_df.empty:
         return out_df
+    out_df["pocket_location"] = output_file.replace("info.txt", "out.pdb")
     return out_df.sort_values("Druggability Score", ascending=False)
 
 def _get_fpocket_input_location(description: str, cmds: list[str]) -> str:
