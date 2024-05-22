@@ -124,7 +124,7 @@ class Poses:
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
         '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
         # define new poses:
-        new_poses = [os.path.join(poses_dir, pose.rsplit("/", maxsplit=1)[-1]) for pose in self.poses_list()]
+        new_poses = [os.path.join(poses_dir, os.path.basename(pose)) for pose in self.poses_list()]
 
         # exchange with check if work_dir is a directory and the poses exist
         if not copy:

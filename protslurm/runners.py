@@ -13,7 +13,7 @@ from protslurm.jobstarters import JobStarter
 
 class RunnerOutput:
     '''RunnerOutput class handles how protein data is passed between Runners and Poses classes.'''
-    def __init__(self, poses: Poses, results:pd.DataFrame, prefix:str, index_layers:int=0, index_sep:str="_"):
+    def __init__(self, poses: Poses, results: pd.DataFrame, prefix: str, index_layers: int = 0, index_sep: str = "_"):
         self.results = self.check_data_formatting(results)
 
         # Remove layers if option is set
@@ -26,7 +26,7 @@ class RunnerOutput:
         self.poses = poses
         self.prefix = prefix
 
-    def check_data_formatting(self, results:pd.DataFrame):
+    def check_data_formatting(self, results: pd.DataFrame):
         '''Checks if the input DataFrame has the correct format.
         Needs to contain 'description' and 'location' columns.
         '''
@@ -34,8 +34,10 @@ class RunnerOutput:
             return os.path.splitext(os.path.basename(path))[0]
 
         mandatory_cols = ["description", "location"]
-        if any(col not in results.columns for col in mandatory_cols): raise ValueError(f"Input Data to RunnerOutput class MUST contain columns 'description' and 'location'.\nDescription should carry the name of the poses, while 'location' should contain the path (+ filename and suffix).")
-        if not (results['description'] == results['location'].apply(extract_description)).all(): raise ValueError(f"'description' column does not match 'location' column in runner output dataframe!")
+        if any(col not in results.columns for col in mandatory_cols):
+            raise ValueError(f"Input Data to RunnerOutput class MUST contain columns 'description' and 'location'.\nDescription should carry the name of the poses, while 'location' should contain the path (+ filename and suffix).")
+        if not (results['description'] == results['location'].apply(extract_description)).all():
+            raise ValueError(f"'description' column does not match 'location' column in runner output dataframe!")
         return results
 
     def return_poses(self):
