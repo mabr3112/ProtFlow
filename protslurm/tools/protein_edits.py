@@ -238,9 +238,9 @@ class ChainRemover(Runner):
 
     def remove_chains(self, poses: Poses, prefix: str, chains: list = None, jobstarter: JobStarter = None, overwrite: bool = False):
         '''Removes chains from poses.'''
-        def output_exists(work_dir, poses):
+        def output_exists(work_dir: str, files_list: list[str]) -> bool:
             '''checks if output of copying chains exists'''
-            return os.path.isdir(work_dir) and all((os.path.isfile(os.path.join(work_dir, pose.rsplit("/", maxsplit=1)[-1])) for pose in poses.poses_list()))
+            return os.path.isdir(work_dir) and all(os.path.isfile(fn) for fn in files_list)
 
         # setup runner
         script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/remove_chains_batch.py"
@@ -250,9 +250,11 @@ class ChainRemover(Runner):
             jobstarters = [jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
+        # define location of new poses:
+        poses.df[f"{prefix}_location"] = [os.path.join(work_dir, os.path.basename(pose)) for pose in poses.poses_list()]
+
         # check if output is present
-                # check for outputs
-        if output_exists(work_dir, poses) and not overwrite:
+        if output_exists(work_dir, poses.df[f"{prefix}_location"].to_list()) and not overwrite:
             return poses.change_poses_dir(work_dir, copy=False)
 
         # setup chains
