@@ -31,6 +31,7 @@ Version: 0.1.0
 """
 import os
 from glob import glob
+import re
 from typing import Union
 import shutil
 import logging
@@ -61,8 +62,8 @@ class Poses:
     def __init__(self, poses: list = None, work_dir: str = None, storage_format: str = "json", glob_suffix: str = None, jobstarter: JobStarter = jobstarters.SbatchArrayJobstarter()):
         # setup attributes poses.df, poses.work_dir;
         self.df = None
-        self.set_poses(poses, glob_suffix=glob_suffix)
         self.set_work_dir(work_dir, set_scorefile=False)
+        self.set_poses(poses, glob_suffix=glob_suffix)
 
         # setup poses.storage_format and poses.scorefile.
         self.set_storage_format(storage_format)
@@ -107,8 +108,9 @@ class Poses:
 
         # setup and create work_dir if it does not already exist
         if work_dir is not None and not os.path.isdir(work_dir):
+            work_dir = os.path.abspath(work_dir)
             os.makedirs(work_dir, exist_ok=True)
-            logging.info(f"Creating directory {work_dir}")
+            logging.info(f"Creating directory {os.path.abspath(work_dir)}")
         self.work_dir = work_dir
 
         # setup common directories for workflows:
@@ -123,7 +125,7 @@ class Poses:
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
         '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
         # define new poses:
-        new_poses = [os.path.join(poses_dir, pose.rsplit("/", maxsplit=1)[-1]) for pose in self.poses_list()]
+        new_poses = [os.path.join(poses_dir, os.path.basename(pose)) for pose in self.poses_list()]
 
         # exchange with check if work_dir is a directory and the poses exist
         if not copy:
@@ -207,7 +209,7 @@ class Poses:
 
         # handle multiline .fa inputs for poses!
         for pose in poses:
-            if not pose.endswith(".fa"):
+            if not pose.endswith(".fa") and not pose.endswith(".fasta"):
                 continue
             if len(parse_fasta_to_dict(pose)) > 1:
                 poses.remove(pose)
@@ -238,8 +240,12 @@ class Poses:
         # read multilie-fasta file and split into individual poses
         fasta_dict = parse_fasta_to_dict(path, encoding=encoding)
 
+        # prepare descriptions in fasta_dict for writing:
+        symbols_to_replace = r"[\/\-\:\ \.\|\,]"
+        fasta_dict = {re.sub(symbols_to_replace, "_", description): seq for description, seq in fasta_dict.items()}
+
         # setup fasta directory self.work_dir/input_fastas_split/
-        output_dir = f"{self.work_dir}/input_fastas_split/"
+        output_dir = os.path.abspath(f"{self.work_dir}/input_fastas_split/")
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 
@@ -580,7 +586,7 @@ class Poses:
 
         return self
 
-def normalize_series(ser:pd.Series, scale:bool=False) -> pd.Series:
+def normalize_series(ser: pd.Series, scale: bool = False) -> pd.Series:
     '''
     Normalizes a pandas series by subtracting the median and dividing by standard deviation.
     If scale = True, the normalized values will be scaled from 0 to 1. Returns a series.
@@ -660,7 +666,7 @@ def load_poses(poses_path: str) -> Poses:
     '''Loads Poses class from a stored dataframe.'''
     return Poses().load_poses(poses_path)
 
-def col_in_df(df:pd.DataFrame, column:Union[str, list[str]]):
+def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
     '''Checks if column exists in DataFrame and returns KeyError if not.'''
     if isinstance(column, list):
         for col in column:
@@ -670,7 +676,7 @@ def col_in_df(df:pd.DataFrame, column:Union[str, list[str]]):
         if not column in df.columns:
             raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
 
-def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, layer_col="poses_description", sep="_", ascending=True) -> pd.DataFrame:
+def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_layers: int = None, layer_col: str = "poses_description", sep: str = "_", ascending: bool = True) -> pd.DataFrame:
     '''
     remove_layers option allows to filter dataframe based on groupings after removing index layers.
     If the option remove_layers is set (has to be type: int), then n determines how many c
@@ -718,7 +724,7 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n, remove_layers=None, 
     return filtered_df
 
 
-def filter_dataframe_by_value(df: pd.DataFrame, col: str, value, operator: str) -> pd.DataFrame:
+def filter_dataframe_by_value(df: pd.DataFrame, col: str, value: float|int, operator: str) -> pd.DataFrame:
     '''
     Filters dataframe based on a value and an operator.
     '''

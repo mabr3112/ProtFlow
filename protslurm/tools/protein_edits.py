@@ -14,6 +14,7 @@ from protslurm.residues import ResidueSelection
 from protslurm.runners import Runner, col_in_df
 from protslurm.config import PROTSLURM_ENV
 from protslurm.config import AUXILIARY_RUNNER_SCRIPTS_DIR
+from protslurm.utils.utils import parse_fasta_to_dict
 
 class ChainAdder(Runner):
     '''Adds chains into proteins.'''
@@ -128,7 +129,7 @@ class ChainAdder(Runner):
 
         return out_dict
 
-    def parse_motif(self, motif, pose: pd.Series) -> str:
+    def parse_motif(self, motif: ResidueSelection|str, pose: pd.Series) -> str:
         '''Sets up motif from target_motif input.'''
         if isinstance(motif, ResidueSelection):
             return motif.to_string()
@@ -136,9 +137,74 @@ class ChainAdder(Runner):
             if motif in pose:
                 # assumes motif is a column in pose (row in poses.df) that points to a ResidueSelection object
                 return pose[motif].to_string()
-            else:
-                raise ValueError(f"If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
+            raise ValueError(f"If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
         raise TypeError(f"Unsupportet parameter type for motif: {type(motif)} - Only ResidueSelection or str allowed!")
+
+    def add_sequence(self, prefix: str, poses: Poses, seq: str = None, seq_col: str = None, sep: str = ":") -> None:
+        '''Adds Sequence to pose in .fa format.'''
+        poses.check_prefix(prefix)
+        if not all(pose.endswith(".fa") or pose.endswith(".fasta") for pose in poses.poses_list()):
+            raise ValueError(f"Poses must be .fasta files (.fa also fine)!")
+        out_dir = f"{poses.work_dir}/prefix/"
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+
+        # prep seq input
+        if seq and seq_col:
+            raise ValueError(f"Either :seq: or :seq_col: can be passed to specify a sequence, but not both!")
+        if seq:
+            seqs = [seq for _ in poses]
+        elif seq_col:
+            col_in_df(poses.df, seq_col)
+            seqs = poses.df[seq_col].to_list()
+        else:
+            raise ValueError(f"One of the parameters :seq: :seq_col: has to be passed to specify the sequence to add.")
+
+        # separator (add sequence, or add protomer?)
+        sep = "" if sep is None else sep
+
+        # iterate over poses and add in sequence
+        new_poses = []
+        for pose, seq_ in zip(poses.poses_list(), seqs):
+            # read fasta and add sequence.
+            desc, orig_seq = list(parse_fasta_to_dict(pose).items())[0]
+            orig_seq += sep + seq_
+
+            # store at new location
+            out_path = f"{out_dir}/{desc}.fa"
+            with open(out_path, 'w', encoding="UTF-8") as f:
+                f.write(f">{desc}\n{orig_seq}")
+            new_poses.append(out_path)
+
+        # update poses.df['poses'] to new location
+        poses.change_poses_dir(out_dir, copy=False)
+
+    def multimerize(self, prefix: str, poses: Poses, n_protomers: int, sep: str = ":") -> None:
+        '''Takes .fa files from poses and makes multimers out of the sequences.
+        :n_protomers: (int) specifies the number of protomers in the final .fa file.'''
+        # setup directory and function
+        poses.check_prefix(prefix)
+        if not all(pose.endswith(".fa") or pose.endswith(".fasta") for pose in poses.poses_list()):
+            raise ValueError(f"Poses must be .fasta files (.fa also fine)!")
+        out_dir = f"{poses.work_dir}/prefix/"
+        if not os.path.isdir(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+
+        # iterate over poses and add in sequence
+        new_poses = []
+        for pose in poses.poses_list():
+            # read fasta and add sequence.
+            desc, orig_seq = list(parse_fasta_to_dict(pose).items())[0]
+            orig_seq += f"{sep}{orig_seq}" * (n_protomers - 1)
+
+            # store at new location
+            out_path = f"{out_dir}/{desc}.fa"
+            with open(out_path, 'w', encoding="UTF-8") as f:
+                f.write(f">{desc}\n{orig_seq}")
+            new_poses.append(out_path)
+
+        # update poses.df['poses'] to new location
+        poses.change_poses_dir(out_dir, copy=False)
 
 def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
     '''Sets up chains for add_chains_batch.py'''

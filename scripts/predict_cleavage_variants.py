@@ -120,7 +120,7 @@ def main(args) -> None:
 
     # setup AF2
     af2 = Alphafold2(jobstarter = jobstarter)
-    preds = af2.run(
+    af2.run(
         poses = cleaved_seqs,
         prefix = "af2"
     )
