@@ -9,7 +9,7 @@ Dependencies are:
 from setuptools import setup, find_packages
 
 setup(
-    name='protslurm',
+    name='protflow',
     version='0.1.0',
     packages=find_packages(),
     install_requires=[

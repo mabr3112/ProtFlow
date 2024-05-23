@@ -6,32 +6,32 @@ import shutil
 import pandas as pd
 
 # import config
-import protslurm.config
+import protflow.config
 
 # import jobstarters
-from protslurm.jobstarters import SbatchArrayJobstarter
-from protslurm.jobstarters import LocalJobStarter
+from protflow.jobstarters import SbatchArrayJobstarter
+from protflow.jobstarters import LocalJobStarter
 
 
 # customs
-from protslurm.poses import Poses
+from protflow.poses import Poses
 
 # import runners
-#from protslurm.runners.protein_generator import ProteinGenerator
-from protslurm.tools.ligandmpnn import LigandMPNN
-from protslurm.tools.rosetta import Rosetta
-from protslurm.tools.rfdiffusion import RFdiffusion
-from protslurm.tools.attnpacker import AttnPacker
-from protslurm.tools.esmfold import ESMFold
-from protslurm.tools.alphafold2 import Alphafold2
+#from protflow.runners.protein_generator import ProteinGenerator
+from protflow.tools.ligandmpnn import LigandMPNN
+from protflow.tools.rosetta import Rosetta
+from protflow.tools.rfdiffusion import RFdiffusion
+from protflow.tools.attnpacker import AttnPacker
+from protflow.tools.esmfold import ESMFold
+from protflow.tools.alphafold2 import Alphafold2
 
 # import metrics
-from protslurm.tools.metrics.protparam import ProtParam
-from protslurm.tools.metrics.tmscore import TMalign
-from protslurm.tools.metrics.tmscore import TMscore
+from protflow.tools.metrics.protparam import ProtParam
+from protflow.tools.metrics.tmscore import TMalign
+from protflow.tools.metrics.tmscore import TMscore
 
 
-from protslurm.utils.plotting import sequence_logo
+from protflow.utils.plotting import sequence_logo
 
 
 #TODO: @Adrian: For Attnpacker, ligandmpnn and AF please write Tutorials as Jupyter Notebooks in 'examples' Folder.
@@ -86,13 +86,13 @@ def main(args):
 
     runner_dict = {
         "ESMFold": {
-            "runner": ESMFold() if protslurm.config.ESMFOLD_PYTHON_PATH else None,
+            "runner": ESMFold() if protflow.config.ESMFOLD_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/fastas/", "glob_suffix": "*.fasta"},
             "runner_options": {"jobstarter": jobstarter or js_dict['slurm_gpu_jobstarter']},
-            "config": [protslurm.config.ESMFOLD_PYTHON_PATH]
+            "config": [protflow.config.ESMFOLD_PYTHON_PATH]
         },
         "Rosetta": {
-            "runner": Rosetta() if protslurm.config.ROSETTA_BIN_PATH else None,
+            "runner": Rosetta() if protflow.config.ROSETTA_BIN_PATH else None,
             "poses_options": {"poses": "input_files/pdbs/", "glob_suffix": "*.pdb"},
             "runner_options": {
                 "rosetta_application": "rosetta_scripts.linuxgccrelease",
@@ -100,38 +100,38 @@ def main(args):
                 "options": "-parser:protocol input_files/rosettascripts/empty.xml -beta",
                 "jobstarter": jobstarter
             },
-            "config": [protslurm.config.ROSETTA_BIN_PATH]
+            "config": [protflow.config.ROSETTA_BIN_PATH]
         },
         "AttnPacker": {
-            "runner": AttnPacker() if protslurm.config.ATTNPACKER_DIR_PATH and protslurm.config.ATTNPACKER_PYTHON_PATH else None,
+            "runner": AttnPacker() if protflow.config.ATTNPACKER_DIR_PATH and protflow.config.ATTNPACKER_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/pdbs/", "glob_suffix": "*.pdb"},
             "runner_options": {"overwrite": True, "jobstarter": jobstarter},
-            "config": [protslurm.config.ATTNPACKER_DIR_PATH, protslurm.config.ATTNPACKER_PYTHON_PATH]
+            "config": [protflow.config.ATTNPACKER_DIR_PATH, protflow.config.ATTNPACKER_PYTHON_PATH]
         },
         "LigandMPNN": {
-            "runner": LigandMPNN() if protslurm.config.LIGANDMPNN_SCRIPT_PATH and protslurm.config.LIGANDMPNN_PYTHON_PATH else None,
+            "runner": LigandMPNN() if protflow.config.LIGANDMPNN_SCRIPT_PATH and protflow.config.LIGANDMPNN_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/pdbs/", "glob_suffix": "*.pdb"},
             "runner_options": {
                 "model_type": "ligand_mpnn",
                 "nseq": 2,
                 "jobstarter": jobstarter
             },
-            "config": [protslurm.config.LIGANDMPNN_SCRIPT_PATH, protslurm.config.LIGANDMPNN_PYTHON_PATH]
+            "config": [protflow.config.LIGANDMPNN_SCRIPT_PATH, protflow.config.LIGANDMPNN_PYTHON_PATH]
         },
         "RFdiffusion": {
-            "runner": RFdiffusion() if protslurm.config.RFDIFFUSION_SCRIPT_PATH and protslurm.config.RFDIFFUSION_PYTHON_PATH else None,
+            "runner": RFdiffusion() if protflow.config.RFDIFFUSION_SCRIPT_PATH and protflow.config.RFDIFFUSION_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/rfdiffusion/", "glob_suffix": "*.pdb"},
             "runner_options": {
                 "options": "diffuser.T=50 potentials.guide_scale=5 'contigmap.contigs=[Q1-21/0 20/A1-5/10-50/B1-5/10-50/C1-5/10-50/D1-5/20]' contigmap.length=200-200 'contigmap.inpaint_seq=[A1/A2/A4/A5/B1/B2/B4/B5/C1/C2/C4/C5/D1/D2/D4/D5]' potentials.substrate=LIG",
                 "jobstarter": jobstarter
             },
-            "config": [protslurm.config.RFDIFFUSION_SCRIPT_PATH, protslurm.config.RFDIFFUSION_PYTHON_PATH]
+            "config": [protflow.config.RFDIFFUSION_SCRIPT_PATH, protflow.config.RFDIFFUSION_PYTHON_PATH]
         },
         "Colabfold": {
-            "runner": Alphafold2() if protslurm.config.AF2_DIR_PATH and protslurm.config.AF2_PYTHON_PATH else None,
+            "runner": Alphafold2() if protflow.config.AF2_DIR_PATH and protflow.config.AF2_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/fastas/", "glob_suffix": "*.fasta"},
             "runner_options": {"jobstarter": jobstarter},
-            "config": [protslurm.config.AF2_DIR_PATH, protslurm.config.AF2_PYTHON_PATH]
+            "config": [protflow.config.AF2_DIR_PATH, protflow.config.AF2_PYTHON_PATH]
         },
         "TMscore": {
             "runner": TMscore(),
@@ -140,7 +140,7 @@ def main(args):
                 "ref_col": "reference",
                 "jobstarter": jobstarter
             },
-            "config": [protslurm.config.RFDIFFUSION_SCRIPT_PATH, protslurm.config.RFDIFFUSION_PYTHON_PATH]
+            "config": [protflow.config.RFDIFFUSION_SCRIPT_PATH, protflow.config.RFDIFFUSION_PYTHON_PATH]
         },
         "TMalign": {
             "runner": TMalign(),
@@ -163,7 +163,7 @@ def main(args):
     }
 
 
-    if not protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR or not os.path.isdir(protslurm.config.AUXILIARY_RUNNER_SCRIPTS_DIR):
+    if not protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR or not os.path.isdir(protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR):
         logging.warning(f"AUXILIARY_RUNNER_SCRIPTS_DIR was not properly set in config.py!")
         runner_dict['AUXILIARY_RUNNER_SCRIPTS_DIR'] = "NOT SET UP CORRECTLY!"
 

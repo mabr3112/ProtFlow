@@ -7,11 +7,11 @@ from itertools import combinations
 import os
 
 # dependencies
-from protslurm import jobstarters
-from protslurm.poses import Poses
-from protslurm.residues import ResidueSelection
-from protslurm.tools.alphafold2 import Alphafold2
-from protslurm.utils.biopython_tools import get_sequence_from_pose, load_structure_from_pdbfile
+from protflow import jobstarters
+from protflow.poses import Poses
+from protflow.residues import ResidueSelection
+from protflow.tools.alphafold2 import Alphafold2
+from protflow.utils.biopython_tools import get_sequence_from_pose, load_structure_from_pdbfile
 
 def read_fasta(input_str: str, sep: str) -> dict:
     '''Reads fasta file with singular fasta inside and returns as dict {chain: seq(chain), ...}'''

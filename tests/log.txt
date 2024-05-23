@@ -1,24 +1,24 @@
 2024-02-18 18:11:52,608 - INFO - Creating directory output_rfdiffusion
-2024-02-18 20:27:10,730 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/out/rfdiffusion_scores.json
+2024-02-18 20:27:10,730 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/out/rfdiffusion_scores.json
 2024-02-18 20:27:10,764 - INFO - Creating directory output_rosetta
 2024-02-18 20:32:26,451 - INFO - Creating directory output_rfdiffusion
-2024-02-18 21:33:57,616 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-18 21:33:57,616 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
 2024-02-18 21:33:57,629 - INFO - Creating directory output_rosetta
-2024-02-19 16:42:21,001 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
-2024-02-19 16:45:20,972 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-19 16:42:21,001 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-19 16:45:20,972 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
 2024-02-19 16:58:11,873 - INFO - Creating directory output_rfdiffusion
-2024-02-19 17:20:32,672 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-19 17:20:32,672 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
 2024-02-19 17:44:29,482 - INFO - Creating directory output_ligandmpnn
-2024-02-19 17:47:51,634 - INFO - Copying original .fa files into directory /home/tripp/ProtSLURM/tests/output_ligandmpnn/seqs/original_seqs
-2024-02-19 17:47:51,636 - INFO - Copying original .pdb files into directory /home/tripp/ProtSLURM/tests/output_ligandmpnn/backbones/original_backbones
-2024-02-19 17:47:51,655 - INFO - Writing new fastafiles at original location /home/tripp/ProtSLURM/tests/output_ligandmpnn/seqs.
-2024-02-19 17:47:51,662 - INFO - Saving scores of ligandmpnn.py at /home/tripp/ProtSLURM/tests/output_ligandmpnn/ligandmpnn_scores.json
-2024-02-19 19:31:38,431 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-19 17:47:51,634 - INFO - Copying original .fa files into directory /home/tripp/ProtFlow/tests/output_ligandmpnn/seqs/original_seqs
+2024-02-19 17:47:51,636 - INFO - Copying original .pdb files into directory /home/tripp/ProtFlow/tests/output_ligandmpnn/backbones/original_backbones
+2024-02-19 17:47:51,655 - INFO - Writing new fastafiles at original location /home/tripp/ProtFlow/tests/output_ligandmpnn/seqs.
+2024-02-19 17:47:51,662 - INFO - Saving scores of ligandmpnn.py at /home/tripp/ProtFlow/tests/output_ligandmpnn/ligandmpnn_scores.json
+2024-02-19 19:31:38,431 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
 2024-02-19 19:40:09,451 - INFO - Creating directory output_rfdiffusion
-2024-02-19 19:44:46,772 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
-2024-02-19 19:49:15,963 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
-2024-02-19 20:25:57,379 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
-2024-02-20 10:41:41,448 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-19 19:44:46,772 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-19 19:49:15,963 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-19 20:25:57,379 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-20 10:41:41,448 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json
 2024-02-20 10:47:23,916 - INFO - Creating directory output_attnpacker
 2024-02-20 11:42:56,605 - INFO - Creating directory output_attnpacker
 2024-02-20 14:30:04,559 - INFO - Creating directory output_attnpacker
@@ -26,4 +26,4 @@
 2024-02-20 14:43:43,037 - INFO - Creating directory output_attnpacker
 2024-02-20 15:05:15,523 - INFO - Creating directory output_rosetta
 2024-02-20 16:09:15,639 - INFO - Creating directory output_esmfold
-2024-02-26 13:23:09,715 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtSLURM/tests/output_rfdiffusion/rfdiffusion_scores.json
+2024-02-26 13:23:09,715 - INFO - Saving scores of rfdiffusion.py at /home/tripp/ProtFlow/tests/output_rfdiffusion/rfdiffusion_scores.json

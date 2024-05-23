@@ -8,9 +8,9 @@ import logging
 import argparse
 
 # dependencies
-import protslurm.utils.biopython_tools as bio_tools
-from protslurm.utils import metrics
-from protslurm.utils import pymol_tools
+import protflow.utils.biopython_tools as bio_tools
+from protflow.utils import metrics
+from protflow.utils import pymol_tools
 
 def str_to_bool(input_str: str) -> bool:
     '''turns str to bool'''
