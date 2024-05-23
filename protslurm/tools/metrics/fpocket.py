@@ -65,7 +65,8 @@ class FPocket(Runner):
         # collect outputs and write scorefile
         scores = collect_fpocket_scores(work_dir, return_full_scores=return_full_scores)
         scores["location"] = [_get_fpocket_input_location(description, cmds) for description in scores["description"].to_list()]
-        scores["pocket_location"] = scores["pocket_location"].fillna(scores["location"]) if "pocket_location" in scores.columns else scores["location"]
+        scores["pocket_location"] = scores["pocket_location"].fillna(scores["location"])
+        print("inside run()", scores["pocket_location"].head(30).to_list())
         self.save_runner_scorefile(scores, scorefile)
 
         # itegrate and return
@@ -120,6 +121,9 @@ def collect_fpocket_output(output_file: str, return_full_scores: bool = False) -
     top_df["description"] = output_file.split("/")[-1].replace("_info.txt", "")
     if return_full_scores:
         top_df["all_pocket_scores"] = file_scores
+
+    # rename pocket_location column back.
+    top_df = top_df.rename(columns={"top_pocket_location": "pocket_location"})
 
     return top_df.reset_index(drop=True)
 

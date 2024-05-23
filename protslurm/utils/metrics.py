@@ -162,19 +162,15 @@ def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> 
         raise KeyError(f"Column {tm_col} does not exist in DataFrame. Did you mean any of {[x for x in input_df.columns if tm_col.split('_')[0] in x]}")
 
     # get descriptions of poses and tm_col_description
-    if ref_col.endswith("description"):
-        desc_col = ref_col
-    elif ref_col.endswith("location"):
-        desc_col = ref_col.replace("location", "description")
-    else:
+    if not ref_col.endswith("description") and not ref_col.endswith("location"):
         raise ValueError(f"Parameter :ref_col: does not point to description or location column in :input_df:. ref_col: {ref_col}")
 
     # group df by ref_col description and get maximum tm_score in each group.
-    grouped_max = input_df.groupby(desc_col)[tm_col].max().reset_index()
-    grouped_max.columns = [desc_col, name]
+    grouped_max = input_df.groupby(ref_col)[tm_col].max().reset_index()
+    grouped_max.columns = [ref_col, name]
 
     # merge max tm-scores into input_df[name]
-    input_df = input_df.merge(grouped_max, on=desc_col, how='left')
+    input_df = input_df.merge(grouped_max, on=ref_col, how='left')
     return input_df
 
 def calc_baker_success(input_df: pd.DataFrame, af2_col: str, bb_rmsd_col: str, motif_rmsd_col: str) -> None:
