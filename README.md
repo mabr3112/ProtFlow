@@ -27,3 +27,7 @@ pip install -e .
 You will need to link protslurm's runners to the individual python environments you have set up on your system.
 By Default, ProtSLURM looks for environment paths in the file 'config.py'.
 Add the paths of your tool's python evironments and their scripts into this file how it is described in the module's docstring.
+
+# Overview
+![protflow_organigramm drawio (1)](https://github.com/TecnomaLaser/ProtSLURM/assets/45593003/3842712a-2399-4e3c-9c90-1525ad6b6690)
+

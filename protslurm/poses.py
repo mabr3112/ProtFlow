@@ -122,6 +122,9 @@ class Poses:
         if set_scorefile:
             self.set_scorefile(work_dir)
 
+    def set_jobstarter(self, jobstarter: JobStarter):
+        self.default_jobstarter = jobstarter
+
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
         '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
         # define new poses:
@@ -202,6 +205,11 @@ class Poses:
         # if DataFrame is passed, load directly.
         if isinstance(poses, pd.DataFrame):
             self.df = self.check_poses_df_integrity(poses)
+            return None
+        
+        if isinstance(poses, str) and any([poses.endswith(ext) for ext in ['csv', 'json', 'parquet', 'pickle', 'feather']]):
+            self.df = get_format(poses)(poses)
+            self.df = self.check_poses_df_integrity(self.df)
             return None
 
         # if Poses are initialized freshly (with input poses as strings:)
