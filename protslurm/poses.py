@@ -122,6 +122,9 @@ class Poses:
         if set_scorefile:
             self.set_scorefile(work_dir)
 
+    def set_jobstarter(self, jobstarter: JobStarter):
+        self.default_jobstarter = jobstarter
+
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
         '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
         # define new poses:
