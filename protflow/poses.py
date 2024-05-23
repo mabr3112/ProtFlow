@@ -21,7 +21,7 @@ Note:
 This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in SLURM environments.
 
 Example Usage:
-To use the Poses class for managing protein data:
+    To use the Poses class for managing protein data:
     from poses import Poses
     poses_instance = Poses(poses=my_protein_data, work_dir='path/to/work_dir')
     # Further operations using poses_instance

@@ -15,7 +15,8 @@ setup(
     install_requires=[
         'pandas',
         'numpy',
-        'Bio'
+        'Bio',
+        'matplotlib'
     ],
     # Other metadata
 )

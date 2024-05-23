@@ -20,16 +20,13 @@ from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.runners import Runner, RunnerOutput, regex_expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string
 
-if not protflow.config.LIGANDMPNN_SCRIPT_PATH:
-    raise ValueError(f"No path is set for ligandmpnn run.py. Set the path in the config.py file under LIGANDMPNN_SCRIPT_PATH")
 
-LIGANDMPNN_DIR = protflow.config.LIGANDMPNN_SCRIPT_PATH.rsplit("/", maxsplit=1)[0]
 LIGANDMPNN_CHECKPOINT_DICT = {
-    "protein_mpnn": f"{LIGANDMPNN_DIR}/model_params/proteinmpnn_v_48_020.pt",
-    "ligand_mpnn": f"{LIGANDMPNN_DIR}/model_params/ligandmpnn_v_32_010_25.pt",
-    "per_residue_label_membrane_mpnn": f"{LIGANDMPNN_DIR}/model_params/per_residue_label_membrane_mpnn_v_48_020.pt",
-    "global_label_membrane_mpnn": f"{LIGANDMPNN_DIR}/model_params/global_label_membrane_mpnn_v_48_020.pt",
-    "soluble_mpnn": f"{LIGANDMPNN_DIR}/model_params/solublempnn_v_48_020.pt"
+    "protein_mpnn": f"/model_params/proteinmpnn_v_48_020.pt",
+    "ligand_mpnn": f"/model_params/ligandmpnn_v_32_010_25.pt",
+    "per_residue_label_membrane_mpnn": f"/model_params/per_residue_label_membrane_mpnn_v_48_020.pt",
+    "global_label_membrane_mpnn": f"/model_params/global_label_membrane_mpnn_v_48_020.pt",
+    "soluble_mpnn": f"/model_params/solublempnn_v_48_020.pt"
 }
 
 class LigandMPNN(Runner):
@@ -103,7 +100,7 @@ class LigandMPNN(Runner):
             return_seq_threaded_pdbs_as_pose=return_seq_threaded_pdbs_as_pose,
             preserve_original_output=preserve_original_output
         )
-        
+
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -214,6 +211,9 @@ class LigandMPNN(Runner):
         '''Writes Command to run ligandmpnn.py
         default model: ligand_mpnn
         default number of sequences: 1'''
+        # parse ligandmpnn_dir:
+        ligandmpnn_dir = protflow.config.LIGANDMPNN_SCRIPT_PATH.rsplit("/", maxsplit=1)[0]
+
         # check if specified model is correct.
         available_models = ["protein_mpnn", "ligand_mpnn", "soluble_mpnn", "global_label_membrane_mpnn", "per_residue_label_membrane_mpnn"]
         if model not in available_models:
@@ -229,7 +229,7 @@ class LigandMPNN(Runner):
             opts["number_of_batches"] = nseq or "1"
         # define model_checkpoint option:
         if f"checkpoint_{model}" not in opts:
-            model_checkpoint_options = f"--checkpoint_{model}={LIGANDMPNN_CHECKPOINT_DICT[model]}"
+            model_checkpoint_options = f"--checkpoint_{model}={ligandmpnn_dir}/{LIGANDMPNN_CHECKPOINT_DICT[model]}"
 
         # safety
         logging.info(f"Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
