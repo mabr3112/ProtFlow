@@ -1,33 +1,33 @@
-# ProtSLURM
+# ProtFlow
 A Python package for running protein design tools on SLURM clusters.
 
 # Installation
 First, clone the repository
 
 ```
-git clone https://github.com/mabr3112/ProtSLURM.git
+git clone https://github.com/mabr3112/ProtFlow.git
 ```
 
-Create a conda environment for ProtSLURM:
+Create a conda environment for ProtFlow:
 
 ```
-conda create -n protslurm python=3.11
+conda create -n protflow python=3.11
 ```
 
 Then, install in development mode (Package currently under development and changes a lot.)
-Install in the protslurm environment to limit interference with other systems.
+Install in the protflow environment to limit interference with other systems.
 
 ```
-cd ProtSLURM
-conda activate protslurm
+cd ProtFlow
+conda activate protflow
 pip install -e .
 ```
 
 # The Configuration File
-You will need to link protslurm's runners to the individual python environments you have set up on your system.
-By Default, ProtSLURM looks for environment paths in the file 'config.py'.
+You will need to link protflow's runners to the individual python environments you have set up on your system.
+By Default, ProtFlow looks for environment paths in the file 'config.py'.
 Add the paths of your tool's python evironments and their scripts into this file how it is described in the module's docstring.
 
 # Overview
-![protflow_organigramm drawio (1)](https://github.com/TecnomaLaser/ProtSLURM/assets/45593003/3842712a-2399-4e3c-9c90-1525ad6b6690)
+![protflow_organigramm drawio (1)](https://github.com/TecnomaLaser/ProtFlow/assets/45593003/3842712a-2399-4e3c-9c90-1525ad6b6690)
 
