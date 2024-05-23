@@ -321,20 +321,22 @@ class Poses:
         if (save_method_name := FORMAT_STORAGE_DICT.get(out_format.lower())):
             getattr(self.df, save_method_name)(out_path)
 
-    def save_poses(self, out_path: str, poses_col: str = "poses", overwrite = True) -> None:
+    def save_poses(self, out_path: str, poses_col: str = "poses", overwrite: bool = True) -> None:
         '''Saves current "poses" from poses.df at out_path. Overwrites poses by default.'''
         poses = self.df[poses_col].to_list()
+        new_poses = [os.path.join(out_path, os.path.basename(pose)) for pose in poses]
         if not os.path.isdir(out_path):
             os.makedirs(out_path, exist_ok=True)
 
         # check if poses are already at out_path, skip if overwrite is set to False
-        if all((os.path.isfile(pose) for pose in poses)) and not overwrite:
+        if all((os.path.isfile(pose) for pose in new_poses)) and not overwrite:
+            logging.info(f"Poses already found at {out_path} and overwrite is set to 'False'. Skipping save_poses.")
             return
 
         # save poses
-        logging.info(f"Storing poses at {out_path}")
-        for pose in poses:
-            shutil.copy(pose, f"{out_path}/{pose.rsplit('/', maxsplit=1)[-1]}")
+        logging.info(f"Storing poses from column {poses_col} at {out_path}")
+        for pose, new_pose in zip(poses, new_poses):
+            shutil.copy(pose, new_pose)
 
     def poses_list(self):
         '''Simple method to return current poses from DataFrame as a list.'''
