@@ -2,7 +2,7 @@
 This module contains all paths to tools integrated in ProtFlow.
 '''
 # protflow environment python
-PROTSLURM_ENV = ""
+PROTFLOW_ENV = ""
 
 # auxiliary runners directory path
 #TODO: @Markus Implement checkup if AUXILIARY_RUNNER_SCRIPTS_DIR points to the correct directory (Think about pointing to protflow directory)!
