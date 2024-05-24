@@ -23,7 +23,7 @@ from protflow.tools.rosetta import Rosetta
 from protflow.tools.rfdiffusion import RFdiffusion
 from protflow.tools.attnpacker import AttnPacker
 from protflow.tools.esmfold import ESMFold
-from protflow.tools.alphafold2 import Alphafold2
+from protflow.tools.colabfold import Colabfold
 
 # import metrics
 from protflow.tools.metrics.protparam import ProtParam
@@ -128,10 +128,10 @@ def main(args):
             "config": [protflow.config.RFDIFFUSION_SCRIPT_PATH, protflow.config.RFDIFFUSION_PYTHON_PATH]
         },
         "Colabfold": {
-            "runner": Alphafold2() if protflow.config.AF2_DIR_PATH and protflow.config.AF2_PYTHON_PATH else None,
+            "runner": Colabfold() if protflow.config.COLABFOLD_SCRIPT_PATH else None,
             "poses_options": {"poses": "input_files/fastas/", "glob_suffix": "*.fasta"},
             "runner_options": {"jobstarter": jobstarter},
-            "config": [protflow.config.AF2_DIR_PATH, protflow.config.AF2_PYTHON_PATH]
+            "config": [protflow.config.COLABFOLD_SCRIPT_PATH]
         },
         "TMscore": {
             "runner": TMscore(),
