@@ -11,7 +11,7 @@ import protflow
 from protflow.poses import Poses
 from protflow.runners import Runner, RunnerOutput, col_in_df
 from protflow.jobstarters import JobStarter
-from protflow.config import PROTSLURM_ENV
+from protflow.config import PROTFLOW_ENV
 from protflow.utils.metrics import calc_sc_tm
 
 class TMalign(Runner):
@@ -22,7 +22,7 @@ class TMalign(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = application or os.path.join(PROTSLURM_ENV, "TMalign")
+        self.application = application or os.path.join(PROTFLOW_ENV, "TMalign")
 
     def __str__(self):
         return "TMalign"
@@ -190,7 +190,7 @@ class TMscore(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = application or os.path.join(PROTSLURM_ENV, "TMscore")
+        self.application = application or os.path.join(PROTFLOW_ENV, "TMscore")
 
     def __str__(self):
         return self.name

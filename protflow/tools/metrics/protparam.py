@@ -9,7 +9,7 @@ import numpy as np
 import protflow
 
 # import customs
-from protflow.config import PROTSLURM_ENV
+from protflow.config import PROTFLOW_ENV
 from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
@@ -22,9 +22,9 @@ class ProtParam(Runner):
     '''
     Class handling the calculation of protparams from sequence using the BioPython Bio.SeqUtils.ProtParam module
     '''
-    def __init__(self, jobstarter: str = None, default_python=os.path.join(PROTSLURM_ENV, "python3")): # pylint: disable=W0102
+    def __init__(self, jobstarter: str = None, default_python=os.path.join(PROTFLOW_ENV, "python3")): # pylint: disable=W0102
         self.jobstarter = jobstarter
-        self.python = self.search_path(default_python, "PROTSLURM_ENV")
+        self.python = self.search_path(default_python, "PROTFLOW_ENV")
 
 
     ########################## Calculations ################################################

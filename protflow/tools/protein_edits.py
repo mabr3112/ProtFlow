@@ -12,14 +12,14 @@ from protflow.jobstarters import JobStarter
 from protflow.poses import Poses
 from protflow.residues import ResidueSelection
 from protflow.runners import Runner, col_in_df
-from protflow.config import PROTSLURM_ENV
+from protflow.config import PROTFLOW_ENV
 from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR
 from protflow.utils.utils import parse_fasta_to_dict
 
 class ChainAdder(Runner):
     '''Adds chains into proteins.'''
-    def __init__(self, default_python=os.path.join(PROTSLURM_ENV, "python3"), jobstarter: JobStarter = None):
-        self.python = self.search_path(default_python, "PROTSLURM_ENV")
+    def __init__(self, default_python=os.path.join(PROTFLOW_ENV, "python3"), jobstarter: JobStarter = None):
+        self.python = self.search_path(default_python, "PROTFLOW_ENV")
         self.jobstarter = jobstarter
 
     def __str__(self):
@@ -225,8 +225,8 @@ def parse_chain(chain, pose: pd.Series) -> str:
 
 class ChainRemover(Runner):
     '''Remove chains from poses.'''
-    def __init__(self, default_python=os.path.join(PROTSLURM_ENV, "python3"), jobstarter: JobStarter = None):
-        self.python = self.search_path(default_python, "PROTSLURM_ENV")
+    def __init__(self, default_python=os.path.join(PROTFLOW_ENV, "python3"), jobstarter: JobStarter = None):
+        self.python = self.search_path(default_python, "PROTFLOW_ENV")
         self.jobstarter = jobstarter
 
     def __str__(self):
