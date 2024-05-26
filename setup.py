@@ -16,7 +16,7 @@ setup(
         'pandas',
         'numpy',
         'Bio',
-        'matplotlib'
+        'matplotlib',
     ],
     # Other metadata
 )

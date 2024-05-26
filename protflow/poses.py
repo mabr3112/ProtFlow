@@ -544,6 +544,10 @@ class Poses:
         # Filter df down to the number of poses specified with <n>
         orig_len = len(self.df)
         filter_df = filter_dataframe_by_value(df=self.df, col=score_col, value=value, operator=operator).reset_index(drop=True)
+
+        # make sure there are still poses left in the Poses class.
+        if len(filter_df) == 0:
+            raise ValueError(f"All poses removed from Poses object. No pose fullfills the filtering criterium {operator} {value} for score {score_col}")
         logging.info(f"Filtered poses from {orig_len} to {len(filter_df.index)} poses.")
 
         # save filtered dataframe if prefix is provided

@@ -22,10 +22,17 @@ class TMalign(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = application or os.path.join(PROTFLOW_ENV, "TMalign")
+        self.application = self._check_install(application or os.path.join(PROTFLOW_ENV, "TMalign"))
 
     def __str__(self):
         return "TMalign"
+
+    def _check_install(self, application_path) -> str:
+        '''checks if TMalign is installed in the environment'''
+        if not os.path.isfile(application_path):
+            raise ValueError(f"Could not find executable for TMalign at {application_path}. Did you set it up in your protflow environment? If not, either install it in your protflow env with 'conda install -c bioconda tmalign' or in any other environment and provide the path to the application with the :application: parameter when initializing a TMalign() runner instance.")
+        return application_path
+
 
     ########################## Calculations ################################################
     def run(self, poses: Poses, prefix: str, ref_col: str, sc_tm_score: bool = True, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None: # pylint: disable=W0237
