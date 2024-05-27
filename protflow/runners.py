@@ -105,7 +105,7 @@ class Runner:
         # if pose_options is str, look up pose_options from poses.df
         if isinstance(pose_options, str):
             col_in_df(poses.df, pose_options)
-            pose_options = poses.df[pose_options].poses_list()
+            pose_options = poses.df[pose_options].to_list()
 
         # if pose_options is None (not set) return list with empty dicts.
         if pose_options is None:
@@ -254,6 +254,6 @@ def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
     out_str = " " + " ".join([f"{sep}{key}={value_in_quotes(value)}" for key, value in options.items()]) if options else ""
 
     # if flags are present, assemble those too and return
-    if flags:
+    if flags and len(flags) > 1:
         out_str += f" {sep}" + f" {sep}".join(flags)
     return out_str
