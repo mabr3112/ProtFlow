@@ -411,7 +411,7 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:st
         seqs = dataframe[input_col].to_list()
         if len(ext) > 1:
             raise RuntimeError("Input column must contain either sequences or paths to fasta files that end with .fa or .fasta!")
-        elif ext[0] == [""]:
+        elif ext == [""]:
             with open(tmp_fasta, 'a') as t:
                 for i, seq in enumerate(seqs):
                     t.write(f">{i}\n{seq}\n")
@@ -478,6 +478,7 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:st
 
     fasta_file = open(tmp_fasta, "r")
     seqs = weblogo.read_seq_data(fasta_file, alphabet=protein_alphabet)
+    os.remove(tmp_fasta)
 
     # check if reference sequence is provided and extract sequence
     if refseq:
@@ -503,7 +504,6 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:st
         else:
             eps_str = replace_logo_numbers(eps_str, resnums, refseq)
 
-    os.remove(tmp_fasta)
     with open(out_path, 'w') as f:
         f.write(eps_str)
 
