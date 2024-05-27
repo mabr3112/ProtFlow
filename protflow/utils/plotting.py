@@ -83,7 +83,7 @@ class PlottingTrajectory():
                   fancybox=True, shadow=True, ncol=1, fontsize=13)
 
         if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-        else: fig.show()
+        fig.show()
         return None
 
     def add_and_plot(self, data_list, label):
@@ -117,7 +117,7 @@ def singular_violinplot(data: list, y_label: str, title: str, out_path: str = No
     ax.vlines(1, np.min(data), np.max(data), color="k", linestyle="-", lw=2)
 
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    else: fig.show()
+    fig.show()
     return None
 
 def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=None, out_path=None, colormap="tab20") -> None:
@@ -170,7 +170,7 @@ def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=Non
                   fancybox=True, shadow=True, ncol=5, fontsize=13)
         
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    else: fig.show()
+    fig.show()
     return None
 
 def violinplot_multiple_cols(df, cols, titles, y_labels, dims=None, out_path=None) -> None:
@@ -211,7 +211,7 @@ def violinplot_multiple_cols(df, cols, titles, y_labels, dims=None, out_path=Non
     plt.figtext(0.5, 0.05, f'n = {len(df.index)}', ha='center', fontsize=12)
     
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    else: fig.show()
+    fig.show()
     return None
 
 def check_for_col_in_df(col: str, df: pd.DataFrame) -> None:
@@ -253,11 +253,11 @@ def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str
         ax.vlines(1, np.min(sublist), np.max(sublist), color="k", linestyle="-", lw=2)
 
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    else: fig.show()
+    fig.show()
     return None
 
 
-def scatterplot(dataframe, x_column, y_column, color_column=None, size_column=None, labels=None, save_path=None):
+def scatterplot(dataframe, x_column, y_column, color_column=None, size_column=None, labels=None, out_path=None):
     """
     Create a scatter plot from a DataFrame using specified columns for x and y axes,
     and optionally use other columns for color gradient and dot size. Labels must be a list of strings, one element for each column used. Otherwise, column names will be used as labels.
@@ -335,10 +335,10 @@ def scatterplot(dataframe, x_column, y_column, color_column=None, size_column=No
         if color_column:
             plt.colorbar(scatter, label=labels["c"])
 
-    # Save the plot as a PNG file if save_path is provided
-    if save_path:
-        plt.savefig(save_path, dpi=300)
-        print(f"Plot saved as {save_path}")
+    # Save the plot as a PNG file if out_path is provided
+    if out_path:
+        plt.savefig(out_path, dpi=300)
+        print(f"Plot saved as {out_path}")
 
     # Show the plot
     plt.show()
@@ -352,7 +352,7 @@ def parse_cols_for_plotting(plot_arg: str, subst:str=None) -> list[str]:
 
 
         
-def sequence_logo(dataframe:pd.DataFrame, input_col:str, save_path:str, refseq:str=None, title:str=None, resnums:list=None, units:str="probability"):
+def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:str=None, title:str=None, resnums:list=None, units:str="probability"):
     '''
     Generates a WEBLOGO with adapted x-axes (having correct residue IDs as lables).
 
@@ -362,7 +362,7 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, save_path:str, refseq:s
         input dataframe
     input_col : str
         name of input column. must contain either protein sequences or paths to fasta files that end with .fa or .fasta
-    save_path : str
+    out_path : str
         Path where sequence logo should be stored
     refseq : str, optional
         If the native sequene is of interest, the sequence or the path to a fasta file can be given. This sequence must be as long as all other sequences!
@@ -499,7 +499,7 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, save_path:str, refseq:s
             eps_str = replace_logo_numbers(eps_str, resnums, refseq)
 
     os.remove(tmp_fasta)
-    with open(save_path, 'w') as f:
+    with open(out_path, 'w') as f:
         f.write(eps_str)
 
 
