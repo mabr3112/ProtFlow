@@ -173,11 +173,11 @@ def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=Non
     fig.show()
     return None
 
-def violinplot_multiple_cols(df, cols, titles, y_labels, dims=None, out_path=None) -> None:
+def violinplot_multiple_cols(dataframe:pd.DataFrame, cols:list[str], y_labels:list[str], title:str=None, dims=None, out_path=None) -> None:
     '''AAA'''
     # security
     for col in cols:
-        check_for_col_in_df(col, df)
+        check_for_col_in_df(col, dataframe)
 
     if not dims: dims = [None for col in cols]
     def set_violinstyle(axes_subplot_parts) -> None:
@@ -195,12 +195,11 @@ def violinplot_multiple_cols(df, cols, titles, y_labels, dims=None, out_path=Non
     fig, ax_list = plt.subplots(1, len(cols), figsize=(3*len(cols), 5))
     fig.subplots_adjust(wspace=1, hspace=0.8)
 
-    for ax, col, title, label, dim in zip(ax_list, cols, titles, y_labels, dims):
-        ax.set_title(title, size=15, y=1.05)
+    for ax, col, label, dim in zip(ax_list, cols, y_labels, dims):
         ax.set_ylabel(label, size=13)
         ax.set_xticks([])
-        data = df[col].to_list()
-        parts = ax.violinplot(df[col].to_list(), widths=0.5)
+        data = dataframe[col].to_list()
+        parts = ax.violinplot(dataframe[col].to_list(), widths=0.5)
         if dim: ax.set_ylim(dim)
         set_violinstyle(parts)
         quartile1, median, quartile3 = np.percentile(data, [25, 50, 75])
@@ -208,7 +207,10 @@ def violinplot_multiple_cols(df, cols, titles, y_labels, dims=None, out_path=Non
         ax.vlines(1, quartile1, quartile3, color="k", linestyle="-", lw=10)
         ax.vlines(1, np.min(data), np.max(data), color="k", linestyle="-", lw=2)
 
-    plt.figtext(0.5, 0.05, f'n = {len(df.index)}', ha='center', fontsize=12)
+    if title:
+        fig.suptitle(title, size=20)
+
+    plt.figtext(0.5, 0.05, f'n = {len(dataframe.index)}', ha='center', fontsize=12)
     
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
     fig.show()
@@ -257,7 +259,7 @@ def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str
     return None
 
 
-def scatterplot(dataframe, x_column, y_column, color_column=None, size_column=None, labels=None, out_path=None):
+def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column:str, color_column:str=None, size_column:str=None, labels:list[str]=None, title:str=None, out_path:str=None):
     """
     Create a scatter plot from a DataFrame using specified columns for x and y axes,
     and optionally use other columns for color gradient and dot size. Labels must be a list of strings, one element for each column used. Otherwise, column names will be used as labels.
@@ -334,6 +336,9 @@ def scatterplot(dataframe, x_column, y_column, color_column=None, size_column=No
         # Add color bar
         if color_column:
             plt.colorbar(scatter, label=labels["c"])
+
+    if title:
+        plt.suptitle(title, size=20)
 
     # Save the plot as a PNG file if out_path is provided
     if out_path:
