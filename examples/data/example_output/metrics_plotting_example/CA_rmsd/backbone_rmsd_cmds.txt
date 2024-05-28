@@ -1,1 +1,0 @@
-/home/tripp/anaconda3/envs/protslurm/bin/python3 /home/tripp/ProtFlow/protflow/tools/runners_auxiliary_scripts//calc_rmsd.py --input_json /home/tripp/ProtFlow/examples/metrics_plotting_example/CA_rmsd/rmsd_input_1.json --output_path /home/tripp/ProtFlow/examples/metrics_plotting_example/CA_rmsd/rmsd_input_1_scores.json --atoms='CA'
