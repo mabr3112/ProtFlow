@@ -210,6 +210,8 @@ class Poses:
 
         if isinstance(poses, str) and any([poses.endswith(ext) for ext in ['csv', 'json', 'parquet', 'pickle', 'feather']]):
             self.df = get_format(poses)(poses)
+            # importing .csv files results in the index column being read in as Unnamed: 0, it can be dropped
+            if 'Unnamed: 0' in self.df.columns: self.df.drop('Unnamed: 0', axis=1, inplace=True)
             self.df = self.check_poses_df_integrity(self.df)
             return None
 
