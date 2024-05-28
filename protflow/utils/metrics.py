@@ -136,7 +136,7 @@ def entropy(prob_distribution: np.array) -> float:
     prob_distribution = prob_distribution[prob_distribution > 0]
 
     # Compute entropy
-    H = np.sum(prob_distribution * np.log2(prob_distribution))
+    H = np.sum(prob_distribution * np.log2(prob_distribution)) # pylint: disable=C0103
 
     return -H
 

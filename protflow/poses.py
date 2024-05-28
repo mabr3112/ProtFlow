@@ -602,7 +602,7 @@ class Poses:
             logging.info(f"Creating composite score plot at {out_path}.")
             scoreterms.append(name)
             plots.violinplot_multiple_cols(
-                df=self.df,
+                dataframe=self.df,
                 cols=scoreterms,
                 titles=scoreterms,
                 y_labels=scoreterms,
