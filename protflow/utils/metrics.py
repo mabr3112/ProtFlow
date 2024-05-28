@@ -190,13 +190,13 @@ def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3,
         raise KeyError(f"Chain {ligand_chain} not found in pose. Available Chains: {pose_chains}")
 
     # get atoms
-    if not atoms or atoms.lower() == "all":
-        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.chain != ligand_chain]
+    if not atoms or atoms == "all":
+        pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain])
     elif isinstance(atoms, list) and all(isinstance(atom, str) for atom in atoms):
-        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.chain != ligand_chain and atom.id in atoms]
+        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms]
     else:
         raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
-    ligand_atoms = [atom.get_coord() for atom in pose[ligand_chain].get_atoms()]
+    ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms()])
 
     # calculate clashes
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
@@ -219,13 +219,13 @@ def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_
         raise KeyError(f"Chain {ligand_chain} not found in pose. Available Chains: {pose_chains}")
 
     # get pose atoms
-    if not atoms or atoms.lower() == "all":
-        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.chain != ligand_chain and atom.element not in excluded_elements]
+    if not atoms or atoms == "all":
+        pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.element not in excluded_elements])
     elif isinstance(atoms, list) and all(isinstance(atom, str) for atom in atoms):
-        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.chain != ligand_chain and atom.id in atoms and atom.element not in excluded_elements]
+        pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms and atom.element not in excluded_elements])
     else:
         raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
-    ligand_atoms = [atom.get_coord() for atom in pose[ligand_chain].get_atoms() if atom.element not in excluded_elements]
+    ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if atom.element not in excluded_elements])
 
     # calculate complete dgram
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
