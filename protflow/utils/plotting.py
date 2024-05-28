@@ -121,12 +121,15 @@ def singular_violinplot(data: list, y_label: str, title: str, out_path: str = No
     fig.show()
     return None
 
-def violinplot_multiple_cols_dfs(dfs: list[pd.DataFrame], df_names: list[str], cols: list[str], titles: list[str], y_labels: list[str], dims: list[tuple[float,float]] = None, out_path: str = None, colormap: str = "tab20", show_fig: bool = True) -> None:
+def violinplot_multiple_cols_dfs(dfs: list[pd.DataFrame], df_names: list[str], cols: list[str], y_labels: list[str], titles: list[str] = None, dims: list[tuple[float,float]] = None, out_path: str = None, colormap: str = "tab20", show_fig: bool = True) -> None:
     '''Creates a violinplot of multiple columns from multiple Pandas DataFrames. Ideal for comparing stuff.'''
     # security
     for df in dfs:
         for col in cols:
             check_for_col_in_df(col, df)
+
+    if not titles:
+        titles = ["" for _ in cols]
 
     def set_violinstyle(axes_subplot_parts, colors="cornflowerblue") -> None:
         '''

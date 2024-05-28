@@ -518,6 +518,8 @@ class Poses:
 
         # create filter-plots if specified.
         if plot:
+            if not prefix:
+                raise RuntimeError(f"<prefix> was not set, but is mandatory for plotting!")
             if self.plots_dir is None:
                 raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
             os.makedirs(self.plots_dir, exist_ok=True)
@@ -529,7 +531,6 @@ class Poses:
                 dfs=[self.df, filter_df],
                 df_names=["Before Filtering", "After Filtering"],
                 cols=cols,
-                titles=cols,
                 y_labels=cols,
                 out_path=out_path
             )
@@ -597,6 +598,8 @@ class Poses:
             getattr(filter_df, save_method_name)(output_name)
 
         if plot:
+            if not prefix:
+                raise RuntimeError(f"<prefix> was not set, but is mandatory for plotting!")
             if self.plots_dir is None:
                 raise AttributeError(f"Plots directory was not set! Did you set a working directory?")
             os.makedirs(self.plots_dir, exist_ok=True)
@@ -607,7 +610,6 @@ class Poses:
                 dfs=[self.df, filter_df],
                 df_names=["Before Filtering", "After Filtering"],
                 cols=cols,
-                titles=cols,
                 y_labels=cols,
                 out_path=out_path
             )
