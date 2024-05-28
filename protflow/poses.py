@@ -122,6 +122,22 @@ class Poses:
         if set_scorefile:
             self.set_scorefile(work_dir)
 
+    def set_logger(self):
+        '''Sets Logger for Poses class. Writes logfile to working directory (if set) and prints logs to screen.'''
+        # Create a logger
+        
+        if self.work_dir: logfile_path = os.path.join(self.work_dir, f"{os.path.basename(self.work_dir)}.log")
+        else: logfile_path = None
+
+        # Configure the basic logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[logging.StreamHandler()]
+        )
+
+        if logfile_path: logging.getLogger().addHandler(logging.FileHandler(logfile_path))
+
     def set_jobstarter(self, jobstarter: JobStarter):
         '''Sets JobStarter attribute for Poses class.'''
         self.default_jobstarter = jobstarter
