@@ -1,0 +1,85 @@
+24/05/28 15:57:29 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0001.fa
+24/05/28 15:57:29 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0001.fa
+24/05/28 15:57:29 | INFO | root | Loading model
+24/05/28 17:57:29 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0007.fa
+24/05/28 17:57:29 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0007.fa
+24/05/28 17:57:29 | INFO | root | Loading model
+24/05/28 17:57:29 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0004.fa
+24/05/28 17:57:29 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0004.fa
+24/05/28 17:57:29 | INFO | root | Loading model
+24/05/28 17:57:30 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0003.fa
+24/05/28 17:57:30 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0003.fa
+24/05/28 17:57:30 | INFO | root | Loading model
+24/05/28 17:57:30 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0006.fa
+24/05/28 17:57:30 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0006.fa
+24/05/28 17:57:30 | INFO | root | Loading model
+24/05/28 17:57:30 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0002.fa
+24/05/28 17:57:30 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0002.fa
+24/05/28 17:57:30 | INFO | root | Loading model
+24/05/28 17:57:30 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0009.fa
+24/05/28 17:57:30 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0009.fa
+24/05/28 17:57:30 | INFO | root | Loading model
+24/05/28 17:57:30 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0005.fa
+24/05/28 17:57:30 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0005.fa
+24/05/28 17:57:30 | INFO | root | Loading model
+24/05/28 17:57:30 | INFO | root | Reading sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0008.fa
+24/05/28 17:57:30 | INFO | root | Loaded 3 sequences from /home/tripp/ProtFlow/examples/runners_example/esm_pred/input_fastas/fasta_0008.fa
+24/05/28 17:57:30 | INFO | root | Loading model
+24/05/28 17:57:31 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmpk8_2m5w0
+24/05/28 17:57:31 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmpk8_2m5w0/_remote_module_non_scriptable.py
+24/05/28 15:57:31 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmpns9d0no9
+24/05/28 15:57:31 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmpns9d0no9/_remote_module_non_scriptable.py
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmpzp6icgpy
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmpzp6icgpy/_remote_module_non_scriptable.py
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmp_ugzm80s
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmp_ugzm80s/_remote_module_non_scriptable.py
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmpxulaicos
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmpxulaicos/_remote_module_non_scriptable.py
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmphkg15bv0
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmphkg15bv0/_remote_module_non_scriptable.py
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmpba86gruc
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmpba86gruc/_remote_module_non_scriptable.py
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmpb7oj_7g8
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmpb7oj_7g8/_remote_module_non_scriptable.py
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmpe1bb_0rf
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmpe1bb_0rf/_remote_module_non_scriptable.py
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Created a temporary directory at /tmp/tmp4h_remf7
+24/05/28 17:57:32 | INFO | torch.distributed.nn.jit.instantiator | Writing /tmp/tmp4h_remf7/_remote_module_non_scriptable.py
+24/05/28 17:58:03 | INFO | root | Starting Predictions
+24/05/28 17:58:03 | INFO | root | Starting Predictions
+24/05/28 15:58:03 | INFO | root | Starting Predictions
+24/05/28 17:58:03 | INFO | root | Starting Predictions
+24/05/28 17:58:03 | INFO | root | Starting Predictions
+24/05/28 17:58:04 | INFO | root | Starting Predictions
+24/05/28 17:58:04 | INFO | root | Starting Predictions
+24/05/28 17:58:04 | INFO | root | Starting Predictions
+24/05/28 17:58:04 | INFO | root | Starting Predictions
+24/05/28 17:58:04 | INFO | root | Starting Predictions
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_3_0008 with length 200, pLDDT 87.4, pTM 0.908 in 9.0s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_3_0009 with length 200, pLDDT 87.8, pTM 0.910 in 9.0s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_3_0010 with length 200, pLDDT 57.2, pTM 0.446 in 9.0s (amortized, batch size 3). 3 / 3 completed.
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_2_0009 with length 200, pLDDT 88.2, pTM 0.902 in 9.0s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_2_0010 with length 200, pLDDT 56.1, pTM 0.391 in 9.0s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_3_0001 with length 200, pLDDT 65.8, pTM 0.552 in 9.0s (amortized, batch size 3). 3 / 3 completed.
+24/05/28 15:58:30 | INFO | root | Predicted structure for structure_1_0001 with length 200, pLDDT 49.6, pTM 0.465 in 9.0s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 15:58:30 | INFO | root | Predicted structure for structure_1_0002 with length 200, pLDDT 85.4, pTM 0.907 in 9.0s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 15:58:30 | INFO | root | Predicted structure for structure_1_0003 with length 200, pLDDT 71.2, pTM 0.724 in 9.0s (amortized, batch size 3). 3 / 3 completed.
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_1_0010 with length 200, pLDDT 52.4, pTM 0.473 in 9.0s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_2_0001 with length 200, pLDDT 60.1, pTM 0.428 in 9.0s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 17:58:30 | INFO | root | Predicted structure for structure_2_0002 with length 200, pLDDT 84.9, pTM 0.845 in 9.0s (amortized, batch size 3). 3 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_2_0006 with length 200, pLDDT 71.1, pTM 0.719 in 9.0s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_2_0007 with length 200, pLDDT 82.2, pTM 0.835 in 9.0s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_2_0008 with length 200, pLDDT 89.5, pTM 0.896 in 9.0s (amortized, batch size 3). 3 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_1_0007 with length 200, pLDDT 86.7, pTM 0.917 in 9.0s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_1_0008 with length 200, pLDDT 41.3, pTM 0.268 in 9.0s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_1_0009 with length 200, pLDDT 50.9, pTM 0.468 in 9.0s (amortized, batch size 3). 3 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_1_0004 with length 200, pLDDT 50.4, pTM 0.472 in 8.9s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_3_0002 with length 200, pLDDT 83.4, pTM 0.880 in 8.9s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_3_0003 with length 200, pLDDT 89.3, pTM 0.917 in 8.9s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_3_0004 with length 200, pLDDT 70.1, pTM 0.645 in 8.9s (amortized, batch size 3). 3 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_2_0003 with length 200, pLDDT 83.8, pTM 0.822 in 9.0s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_2_0004 with length 200, pLDDT 87.0, pTM 0.890 in 9.0s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_2_0005 with length 200, pLDDT 89.1, pTM 0.897 in 9.0s (amortized, batch size 3). 3 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_3_0005 with length 200, pLDDT 89.3, pTM 0.919 in 9.0s (amortized, batch size 3). 1 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_3_0006 with length 200, pLDDT 54.7, pTM 0.443 in 9.0s (amortized, batch size 3). 2 / 3 completed.
+24/05/28 17:58:31 | INFO | root | Predicted structure for structure_3_0007 with length 200, pLDDT 88.4, pTM 0.927 in 9.0s (amortized, batch size 3). 3 / 3 completed.
