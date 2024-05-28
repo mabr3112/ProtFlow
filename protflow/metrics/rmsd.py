@@ -56,7 +56,7 @@ class BackboneRMSD(Runner):
         self.jobstarter = jobstarter
 
     ########################## Calculations ################################################
-    def calc_rmsd(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None, overwrite: bool = False) -> None:
+    def run(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None, overwrite: bool = False) -> None:
         '''Calculates RMSD as specified.'''
         # if self.atoms is all, calculate Allatom RMSD.
 
@@ -172,10 +172,7 @@ class MotifRMSD(Runner):
 
     ################################################# Calcs ################################################
 
-    def run(self, poses, prefix, jobstarter):
-        raise NotImplementedError
-
-    def calc_rmsd(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, atoms: list[str] = None, overwrite: bool = False):
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, atoms: list[str] = None, overwrite: bool = False):
         '''Method to run Motif_rmsd calculation.
         :atoms:     comma-separated list of atoms, eg.g CA, C, N'''
         # prep inputs

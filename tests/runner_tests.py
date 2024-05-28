@@ -26,9 +26,9 @@ from protflow.tools.esmfold import ESMFold
 from protflow.tools.colabfold import Colabfold
 
 # import metrics
-from protflow.tools.metrics.protparam import ProtParam
-from protflow.tools.metrics.tmscore import TMalign
-from protflow.tools.metrics.tmscore import TMscore
+from protflow.metrics.protparam import ProtParam
+from protflow.metrics.tmscore import TMalign
+from protflow.metrics.tmscore import TMscore
 
 
 from protflow.utils.plotting import sequence_logo
@@ -161,7 +161,7 @@ def main(args):
             "config": None
         }
     }
-
+    test = LigandMPNN()
 
     if not protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR or not os.path.isdir(protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR):
         logging.warning(f"AUXILIARY_RUNNER_SCRIPTS_DIR was not properly set in config.py!")
