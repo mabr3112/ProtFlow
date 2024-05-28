@@ -1,14 +1,120 @@
-'''protflow internal module to handle residue_selection and everything related to residues.'''
+"""
+residues
+========
+
+The `residues` module is a part of the `protflow` package and is designed to handle residue selection and related operations in protein structures. This module provides functionality to parse, manipulate, and convert residue selections in various formats, making it an essential tool for bioinformatics and computational biology workflows.
+
+The module includes the `ResidueSelection` class for representing and manipulating selections of residues, as well as various functions for parsing and converting residue selections.
+
+Classes
+-------
+
+- `ResidueSelection`
+    Represents a selection of residues with functionality for parsing, converting, and manipulating selections.
+
+Functions
+---------
+
+- `fast_parse_selection`
+    Fast parser for selections already in `ResidueSelection` format.
+- `parse_selection`
+    Parses a selection into `ResidueSelection` formatted selection.
+- `parse_residue`
+    Parses a single residue identifier into a tuple (chain, residue_index).
+- `residue_selection`
+    Creates a `ResidueSelection` from a selection of residues.
+- `from_dict`
+    Creates a `ResidueSelection` object from a dictionary specifying a motif.
+- `from_contig`
+    Creates a `ResidueSelection` object from a contig string.
+- `reduce_to_unique`
+    Reduces an input array to its unique elements while preserving order.
+
+Example Usage
+-------------
+
+Creating and manipulating `ResidueSelection` objects:
+
+.. code-block:: python
+    
+    from residues import ResidueSelection, from_dict, from_contig
+
+    # Create a ResidueSelection from a list
+    selection = ResidueSelection(["A1", "A2", "B3"])
+
+    # Convert to string
+    selection_str = selection.to_string()
+    print(selection_str)
+    # Output: A1, A2, B3
+
+    # Convert to dictionary
+    selection_dict = selection.to_dict()
+    print(selection_dict)
+    # Output: {'A': [1, 2], 'B': [3]}
+
+    # Create a ResidueSelection from a dictionary
+    selection_from_dict = from_dict({"A": [1, 2], "B": [3]})
+    print(selection_from_dict.to_string())
+    # Output: A1, A2, B3
+
+    # Create a ResidueSelection from a contig string
+    selection_from_contig = from_contig("A1-A3, B5")
+    print(selection_from_contig.to_string())
+    # Output: A1, A2, A3, B5
+
+This module simplifies the process of handling residue selections in bioinformatics workflows, providing a consistent interface for different types of input and output formats.
+"""
+
 # imports
 from collections import OrderedDict
 
 class ResidueSelection:
-    '''Class to represent selections of Residues.
-    Selection of Residues is represented as a tuple with the hierarchy ((chain, residue_idx), ...)
+    """
+    ResidueSelection
+    ================
 
-    fast: parses the selection without any type checking. For when :selection: already has ResidueSelection Format.
+    A class to represent selections of residues in protein structures. A selection of residues is represented 
+    as a tuple with the hierarchy ((chain, residue_idx), ...).
 
-    '''
+    Parameters
+    ----------
+    selection : list, optional
+        A list of residues in string format, e.g., ["A1", "A2", "B3"]. Default is None.
+    delim : str, optional
+        The delimiter used to parse the selection string. Default is ",".
+    fast : bool, optional
+        If True, parses the selection without any type checking. Use when `selection` is already in 
+        ResidueSelection format. Default is False.
+
+    Attributes
+    ----------
+    residues : tuple
+        A tuple representing the parsed residues selection.
+
+    Methods
+    -------
+    from_selection(selection) -> "ResidueSelection"
+        Constructs a ResidueSelection instance from the provided selection.
+    
+    to_string(delim: str = ",", ordering: str = None) -> str
+        Converts the ResidueSelection to a string.
+
+    to_list(ordering: str = None) -> list[str]
+        Converts the ResidueSelection to a list of strings.
+
+    to_dict() -> dict
+        Converts the ResidueSelection to a dictionary. Note: This destroys the ordering of specific residues 
+        on the same chain in a motif.
+
+    Examples
+    --------
+    >>> from residues import ResidueSelection
+    >>> selection = ResidueSelection(["A1", "A2", "B3"])
+    >>> print(selection.to_string())
+    A1, A2, B3
+    >>> print(selection.to_dict())
+    {'A': [1, 2], 'B': [3]}
+    """
     def __init__(self, selection: list = None, delim: str = ",", fast: bool = False):
         self.residues = parse_selection(selection, delim=delim, fast=fast)
 
@@ -30,12 +136,48 @@ class ResidueSelection:
 
     ####################################### INPUT ##############################################
     def from_selection(self, selection) -> "ResidueSelection":
-        '''Construct ResidueSelection Class.'''
+        """
+        Constructs a ResidueSelection instance from the provided selection.
+
+        Parameters
+        ----------
+        selection : list or str
+            The selection of residues to be parsed.
+
+        Returns
+        -------
+        ResidueSelection
+            A new ResidueSelection instance.
+        """
         return residue_selection(selection)
 
     ####################################### OUTPUT #############################################
     def to_string(self, delim: None = ",", ordering: str = None) -> str:
-        '''Converts ResidueSelection to string.'''
+        """
+        Converts the ResidueSelection to a string.
+
+        Parameters
+        ----------
+        delim : str, optional
+            The delimiter to use in the resulting string. Default is ",".
+        ordering : str, optional
+            Specifies the ordering of the residues in the output string. Options are "rosetta" or "pymol".
+            Default is None.
+
+        Returns
+        -------
+        str
+            ResidueSelection object formatted as a string, separated by :delim:
+            ueSelection.
+
+        Examples
+        --------
+        >>> selection = ResidueSelection(["A1", "A2", "B3"])
+        >>> print(selection.to_string())
+        A1, A2, B3
+        >>> print(selection.to_string(ordering="rosetta"))
+        1A, 2A, 3B
+        """
         ordering = ordering or ""
         if ordering.lower() == "rosetta":
             return delim.join([str(idx) + chain for chain, idx in self])
@@ -44,7 +186,28 @@ class ResidueSelection:
         return delim.join([chain + str(idx) for chain, idx in self])
 
     def to_list(self, ordering: str = None) -> list[str]:
-        '''Converts ResidueSelection to list'''
+        """
+        Converts the ResidueSelection to a list of strings.
+
+        Parameters
+        ----------
+        ordering : str, optional
+            Specifies the ordering of the residues in the output list. Options are "rosetta" or "pymol".
+            Default is None.
+
+        Returns
+        -------
+        list of str
+            The list representation of the ResidueSelection.
+
+        Examples
+        --------
+        >>> selection = ResidueSelection(["A1", "A2", "B3"])
+        >>> print(selection.to_list())
+        ['A1', 'A2', 'B3']
+        >>> print(selection.to_list(ordering="rosetta"))
+        ['1A', '2A', '3B']
+        """
         ordering = ordering or ""
         if ordering.lower() == "rosetta":
             return [str(idx) + chain for chain, idx in self]
@@ -53,9 +216,25 @@ class ResidueSelection:
         return [chain+str(idx) for chain, idx in self]
 
     def to_dict(self) -> dict:
-        '''Converts a ResidueSelection to a dictionary. 
-        Caution: Converting to a dictionary destroys the ordering of specific residues on the same chain in a motif!
-        '''
+        """
+        Converts the ResidueSelection to a dictionary. 
+
+        Note
+        ----
+        Converting to a dictionary destroys the ordering of specific residues on the same chain in a motif.
+
+        Returns
+        -------
+        dict
+            A dictionary representation of the ResidueSelection with chains as keys and lists of residue 
+            indices as values.
+
+        Examples
+        --------
+        >>> selection = ResidueSelection(["A1", "A2", "B3"])
+        >>> print(selection.to_dict())
+        {'A': [1, 2], 'B': [3]}
+        """
         # collect list of chains and setup chains as dictionary keys
         chains = list(set([x[0] for x in self.residues]))
         out_d = {chain: [] for chain in chains}
@@ -67,12 +246,75 @@ class ResidueSelection:
         return out_d
 
 def fast_parse_selection(input_selection: tuple[tuple[str, int]]) -> tuple[tuple[str, int]]:
-    '''Fast selection parser for when :input_selection: is already in ResidueSelection.residues format.'''
+    """
+    Fast selection parser for pre-formatted selections.
+
+    This function is a fast parser for residue selections that are already in the `ResidueSelection` format.
+    It bypasses any additional type checking or parsing to improve performance when the input is guaranteed
+    to be correctly formatted.
+
+    Parameters
+    ----------
+    input_selection : tuple of tuple of (str, int)
+        A tuple of tuples where each inner tuple represents a residue with the format (chain, residue_index).
+
+    Returns
+    -------
+    tuple of tuple of (str, int)
+        The input selection, unchanged.
+
+    Examples
+    --------
+    >>> input_selection = (("A", 1), ("B", 2), ("C", 3))
+    >>> fast_parse_selection(input_selection)
+    (('A', 1), ('B', 2), ('C', 3))
+    """
     return input_selection
 
 def parse_selection(input_selection, delim: str = ",", fast: bool = False) -> tuple[tuple[str,int]]:
-    '''Parses selction into ResidueSelection formatted selection.'''
-    #TODO: This implementation is safe from bugs, but not very efficient.
+    """
+    Parses a selection into ResidueSelection formatted selection.
+
+    This function takes a selection of residues in various formats and parses it into the `ResidueSelection` 
+    format, which is a tuple of tuples. Each inner tuple represents a residue with the format (chain, residue_index).
+
+    Parameters
+    ----------
+    input_selection : str, list, or tuple
+        The selection of residues to be parsed. This can be:
+        - A string with residues separated by a delimiter.
+        - A list or tuple of residue strings.
+        - A list or tuple of lists/tuples, where each inner list/tuple represents a residue.
+    delim : str, optional
+        The delimiter used to split the input string if `input_selection` is a string. Default is ",".
+    fast : bool, optional
+        If True, uses `fast_parse_selection` to bypass type checking and parsing for performance reasons.
+        Use when `input_selection` is already in the correct format. Default is False.
+
+    Returns
+    -------
+    tuple of tuple of (str, int)
+        A tuple of tuples where each inner tuple represents a residue in the format (chain, residue_index).
+
+    Raises
+    ------
+    TypeError
+        If `input_selection` is not a supported type (str, list, or tuple).
+
+    Examples
+    --------
+    >>> parse_selection("A1, B2, C3")
+    (('A', 1), ('B', 2), ('C', 3))
+
+    >>> parse_selection(["A1", "B2", "C3"])
+    (('A', 1), ('B', 2), ('C', 3))
+
+    >>> parse_selection([["A", 1], ["B", 2], ["C", 3]])
+    (('A', 1), ('B', 2), ('C', 3))
+
+    >>> parse_selection([("A", 1), ("B", 2), ("C", 3)], fast=True)
+    (('A', 1), ('B', 2), ('C', 3))
+    """
     if fast:
         return fast_parse_selection(input_selection)
     if isinstance(input_selection, str):
@@ -85,9 +327,39 @@ def parse_selection(input_selection, delim: str = ",", fast: bool = False) -> tu
     raise TypeError(f"Unsupported Input type for parameter 'input_selection' {type(input_selection)}. Only str and list allowed.")
 
 def parse_residue(residue_identifier: str) -> tuple[str,int]:
-    '''parses singular residue identifier into a tuple (chain, residue_index).
-    Currently only supports single letter chain identifiers!'''
-    chain_first = False if residue_identifier[0].isdigit() else True
+    """
+    Parses a single residue identifier into a tuple (chain, residue_index).
+
+    This function takes a residue identifier string and parses it into a tuple containing the chain identifier
+    and the residue index. It currently only supports single-letter chain identifiers.
+
+    Parameters
+    ----------
+    residue_identifier : str
+        A string representing the residue identifier. The format is expected to be either "chain+residue_index" 
+        or "residue_index+chain", where "chain" is a single letter and "residue_index" is an integer.
+
+    Returns
+    -------
+    tuple of (str, int)
+        A tuple containing the chain identifier and the residue index.
+
+    Examples
+    --------
+    >>> parse_residue("A123")
+    ('A', 123)
+
+    >>> parse_residue("123A")
+    ('A', 123)
+
+    Notes
+    -----
+    - The function determines whether the chain identifier is at the beginning or the end of the string based 
+      on whether the first character is a digit.
+    - Only single-letter chain identifiers are supported.
+
+    """
+    chain_first = not residue_identifier[0].isdigit()
 
     # assemble residue tuple
     chain = residue_identifier[0] if chain_first else residue_identifier[-1]
@@ -97,15 +369,94 @@ def parse_residue(residue_identifier: str) -> tuple[str,int]:
     return (chain, int(residue_index))
 
 def residue_selection(input_selection, delim: str = ",") -> ResidueSelection:
-    '''Creates residue selection from selection of residues.'''
+    """
+    Creates a ResidueSelection from a selection of residues.
+
+    This function takes an input selection of residues in various formats and creates a `ResidueSelection` 
+    object. The selection can be provided as a string, list, or tuple.
+
+    Parameters
+    ----------
+    input_selection : str, list, or tuple
+        The selection of residues to be parsed. This can be:
+            - A string with residues separated by a delimiter.
+            - A list or tuple of residue strings.
+            - A list or tuple of lists/tuples, where each inner list/tuple represents a residue.
+    delim : str, optional
+        The delimiter used to split the input string if `input_selection` is a string. Default is ",".
+
+    Returns
+    -------
+    ResidueSelection
+        An instance of the `ResidueSelection` class representing the parsed selection of residues.
+
+    Examples
+    --------
+    >>> residue_selection("A1, B2, C3")
+    <ResidueSelection object representing ('A', 1), ('B', 2), ('C', 3)>
+
+    >>> residue_selection(["A1", "B2", "C3"])
+    <ResidueSelection object representing ('A', 1), ('B', 2), ('C', 3)>
+
+    >>> residue_selection([["A", 1], ["B", 2], ["C", 3]])
+    <ResidueSelection object representing ('A', 1), ('B', 2), ('C', 3)>
+    """
     return ResidueSelection(input_selection, delim=delim)
 
 def from_dict(input_dict: dict) -> ResidueSelection:
-    '''Creates ResidueSelection object from dictionary. The dictionary specifies a motif in this way: {chain: [residues], ...}'''
+    """
+    Creates a ResidueSelection object from a dictionary.
+
+    This function constructs a `ResidueSelection` instance from a dictionary where the keys represent 
+    chain identifiers and the values are lists of residue indices. This format specifies a motif in the 
+    following way: {chain: [residues], ...}.
+
+    Parameters
+    ----------
+    input_dict : dict
+        A dictionary specifying the motif. The keys are chain identifiers (str) and the values are lists 
+        of residue indices (int).
+
+    Returns
+    -------
+    ResidueSelection
+        An instance of the `ResidueSelection` class representing the parsed selection of residues.
+
+    Examples
+    --------
+    >>> input_dict = {"A": [1, 2], "B": [3, 4]}
+    >>> from_dict(input_dict)
+    <ResidueSelection object representing ('A', 1), ('A', 2), ('B', 3), ('B', 4)>
+    """
     return ResidueSelection([f"{chain}{resi}" for chain, res_l in input_dict.items() for resi in res_l])
 
 def from_contig(input_contig: str) -> ResidueSelection:
-    '''Creates ResidueSelection object from a contig.'''
+    """
+    Creates a ResidueSelection object from a contig string.
+
+    This function constructs a `ResidueSelection` instance from a contig string. The contig string can specify 
+    ranges of residues using a hyphen (-) to denote the range, with residues separated by commas (,). For example, 
+    "A1-A3, B5" specifies residues A1, A2, A3, and B5.
+
+    Parameters
+    ----------
+    input_contig : str
+        A contig string specifying the residues. Ranges can be denoted using hyphens, and residues are separated 
+        by commas.
+
+    Returns
+    -------
+    ResidueSelection
+        An instance of the `ResidueSelection` class representing the parsed selection of residues.
+
+    Examples
+    --------
+    >>> from_contig("A1-A3, B5")
+    <ResidueSelection object representing ('A', 1), ('A', 2), ('A', 3), ('B', 5)>
+
+    >>> from_contig("C1, C3-C5, D2")
+    <ResidueSelection object representing ('C', 1), ('C', 3), ('C', 4), ('C', 5), ('D', 2)>
+    """
     sel = []
     elements = [x.strip() for x in input_contig.split(",") if x]
     for element in elements:
@@ -117,5 +468,35 @@ def from_contig(input_contig: str) -> ResidueSelection:
     return ResidueSelection(sel)
 
 def reduce_to_unique(input_array: list|tuple) -> list|tuple:
-    '''reduces input_array to it's unique elements while preserving order.'''
+    """
+    Reduces an input array to its unique elements while preserving order.
+
+    This function takes a list or tuple and returns a new list or tuple containing only the unique elements 
+    from the input, with their original order preserved. The type of the returned collection matches the type 
+    of the input.
+
+    Parameters
+    ----------
+    input_array : list or tuple
+        The input array from which to remove duplicate elements. The order of the elements is preserved.
+
+    Returns
+    -------
+    list or tuple
+        A new list or tuple containing only the unique elements from the input array, with the original order 
+        preserved.
+
+    Examples
+    --------
+    >>> reduce_to_unique([1, 2, 2, 3, 1])
+    [1, 2, 3]
+
+    >>> reduce_to_unique(("a", "b", "a", "c", "b"))
+    ('a', 'b', 'c')
+
+    Notes
+    -----
+    - The function uses `OrderedDict.fromkeys` to remove duplicates while preserving order.
+    - The returned collection is of the same type as the input (list or tuple).
+    """
     return type(input_array)(OrderedDict.fromkeys(input_array))
