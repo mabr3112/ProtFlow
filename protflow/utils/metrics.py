@@ -8,9 +8,8 @@ import numpy as np
 from Bio.PDB.Structure import Structure
 import pandas as pd
 
+# customs
 from protflow.utils.biopython_tools import load_structure_from_pdbfile
-
-#import protflow.utils.biopython_tools as bio_tools
 
 def get_mutations_list(wt: str, variant:str) -> None:
     '''AAA'''
@@ -176,3 +175,60 @@ def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> 
 def calc_baker_success(input_df: pd.DataFrame, af2_col: str, bb_rmsd_col: str, motif_rmsd_col: str) -> None:
     '''Implementation of Baker in silico success score. See RFDiffusion publication for info.'''
     return NotImplementedError
+
+def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3, atoms: list[str] = None) -> float:
+    '''Calculates ligand clashes for a .pdb file given a ligand_chain.'''
+    # verify inputs
+    if isinstance(pose, str):
+        pose = load_structure_from_pdbfile(pose)
+    elif not isinstance(pose, Structure):
+        raise ValueError(f"Parameter :pose: has to be of type str or Bio.PDB.Structure.Structure. type(pose) = {type(pose)}")
+
+    # check for ligand chain
+    pose_chains = list(chain.id for chain in pose.get_chains())
+    if ligand_chain not in pose_chains:
+        raise KeyError(f"Chain {ligand_chain} not found in pose. Available Chains: {pose_chains}")
+
+    # get atoms
+    if not atoms or atoms.lower() == "all":
+        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.chain != ligand_chain]
+    elif isinstance(atoms, list) and all(isinstance(atom, str) for atom in atoms):
+        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.chain != ligand_chain and atom.id in atoms]
+    else:
+        raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
+    ligand_atoms = [atom.get_coord() for atom in pose[ligand_chain].get_atoms()]
+
+    # calculate clashes
+    dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
+
+    return np.any(dgram < dist)
+
+def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_dist: float = 5, atoms: list[str] = None, excluded_elements: list[str] = None) -> float:
+    '''Calculates contacts of ligand (n atoms within min_dist - max_dist (shortest) distance of any ligand atom).'''
+    excluded_elements = excluded_elements or ["H"]
+
+    # verify inputs
+    if isinstance(pose, str):
+        pose = load_structure_from_pdbfile(pose)
+    elif not isinstance(pose, Structure):
+        raise ValueError(f"Parameter :pose: has to be of type str or Bio.PDB.Structure.Structure. type(pose) = {type(pose)}")
+
+    # check for ligand chain
+    pose_chains = list(chain.id for chain in pose.get_chains())
+    if ligand_chain not in pose_chains:
+        raise KeyError(f"Chain {ligand_chain} not found in pose. Available Chains: {pose_chains}")
+
+    # get pose atoms
+    if not atoms or atoms.lower() == "all":
+        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.chain != ligand_chain and atom.element not in excluded_elements]
+    elif isinstance(atoms, list) and all(isinstance(atom, str) for atom in atoms):
+        pose_atoms = [atom.get_coord() for atom in pose.get_atoms() if atom.chain != ligand_chain and atom.id in atoms and atom.element not in excluded_elements]
+    else:
+        raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
+    ligand_atoms = [atom.get_coord() for atom in pose[ligand_chain].get_atoms() if atom.element not in excluded_elements]
+
+    # calculate complete dgram
+    dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
+
+    # return number of contacts
+    return np.sum((dgram > min_dist) & (dgram < max_dist))
