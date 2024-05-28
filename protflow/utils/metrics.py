@@ -201,7 +201,7 @@ def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3,
     # calculate clashes
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
 
-    return np.any(dgram < dist)
+    return np.sum((dgram < dist))
 
 def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_dist: float = 5, atoms: list[str] = None, excluded_elements: list[str] = None) -> float:
     '''Calculates contacts of ligand (n atoms within min_dist - max_dist (shortest) distance of any ligand atom).'''
