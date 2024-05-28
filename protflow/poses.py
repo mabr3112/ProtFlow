@@ -387,9 +387,10 @@ class Poses:
         self.df["poses"] = self.df["temp_dp_location"]
         self.df["poses_description"] = self.df["description"]
 
-    def reset_poses(self, new_poses_col: str='input_poses', reset_df: bool=False):
-        '''Resets poses to the poses in <new_poses_col>. Updates the 'poses', 'poses_description' and 'input_poses' columns, if necessary.
-        If <reset_df> is True or the number of unique poses in <new_poses_col> is different to the current number of poses, it will delete the poses dataframe (except for the mandatory columns).'''
+    def reset_poses(self, new_poses_col: str='input_poses', force_reset_df: bool=False):
+        '''Resets poses to the poses in <new_poses_col>. Updates the 'poses' and 'poses_description' columns, if necessary.
+        If the number of unique poses in <new_poses_col> is different to the current number of poses, the original dataframe cannot be preserved and an error will occur (if reset_df is set to False). 
+        If <reset_df> is True, this error will be circumvented and a new empty poses dataframe will be created, containing only the new 'poses', 'poses_description' and 'input_poses' columns.'''
         
         def unique_ordered_list(original_list):
             seen = set()  # Initialize an empty set to track seen elements
@@ -414,15 +415,12 @@ class Poses:
         # create unique poses
         new_poses = unique_ordered_list(new_poses)
 
-        if reset_df:
-            if len(new_poses) == len(self.df.index): input_poses = self.df['input_poses'].to_list()
-            else:
-                logging.warning(f"Different number of new poses ({len(new_poses)}) than number of original poses ({len(self.df.index)}). Input poses will be reset!")
-                input_poses = new_poses
-            self.df = pd.DataFrame({"input_poses": input_poses, "poses": new_poses, "poses_description": self.parse_descriptions(new_poses)})
-        elif not len(new_poses) == len(self.df.index):
-            logging.warning(f"Different number of new poses ({len(new_poses)}) than number of original poses ({len(self.df.index)}). Poses dataframe will be reset!")
-            self.df = pd.DataFrame({"input_poses": new_poses, "poses": new_poses, "poses_description": self.parse_descriptions(new_poses)})
+        if not len(new_poses) == len(self.df.index):
+            logging.warning(f"Different number of new poses ({len(new_poses)}) than number of original poses ({len(self.df.index)})!")
+            if force_reset_df:
+                logging.warning(f"Resetting poses dataframe. Be aware of the consequences like possibly reading in false outputs when reusing prefixes!")
+                self.df = pd.DataFrame({"input_poses": new_poses, "poses": new_poses, "poses_description": self.parse_descriptions(new_poses)})
+            else: raise RuntimeError(f"Could not preserve original dataframe. You can set <force_reset_df> if you want to delete it, but be aware of the consequences like possibly reading in false outputs when reusing prefixes!")
         else:
             self.df['poses'] = new_poses
             self.df['poses_description'] = self.parse_descriptions(poses=self.df['poses'].to_list())
