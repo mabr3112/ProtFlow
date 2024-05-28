@@ -2,6 +2,7 @@
 Module for creating standardized plots (violins mostyl)
 '''
 # dependencies
+import logging
 import matplotlib
 from matplotlib import pyplot as plt
 from matplotlib import rc
@@ -41,7 +42,7 @@ class PlottingTrajectory():
 
     def add(self, data_list: list, label: str) -> None:
         '''AAA'''
-        if not type(data_list) == list:
+        if not isinstance(data_list, list):
             data_list = list(data_list)
         self.data.append((label, data_list))
         return None
@@ -49,7 +50,8 @@ class PlottingTrajectory():
     def violin_plot(self, out_path:str=None):
         '''AAA'''
         out_path = out_path or self.location
-        if not self.data: return print(f"Nothing can be plotted, no data added yet.")
+        if not self.data:
+            return logging.info(f"Nothing can be plotted, no data added yet.")
         def set_violinstyle(axes_subplot_parts, colors="cornflowerblue") -> None:
             '''AAA'''
             for color, pc in zip(colors, axes_subplot_parts["bodies"]):
@@ -110,7 +112,6 @@ def singular_violinplot(data: list, y_label: str, title: str, out_path: str = No
 
     parts["cmins"].set_edgecolor("black")
     parts["cmaxes"].set_edgecolor("black")
-    print([x for x in parts["bodies"]])
 
     ax.scatter(1, median, marker='o', color="white", s=40, zorder=3)
     ax.vlines(1, quartile1, quartile3, color="k", linestyle="-", lw=10)
@@ -120,7 +121,7 @@ def singular_violinplot(data: list, y_label: str, title: str, out_path: str = No
     fig.show()
     return None
 
-def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=None, out_path=None, colormap="tab20") -> None:
+def violinplot_multiple_cols_dfs(dfs: list[pd.DataFrame], df_names: list[str], cols: list[str], titles: list[str], y_labels: list[str], dims: list[tuple[float,float]] = None, out_path: str = None, colormap: str = "tab20", show_fig: bool = True) -> None:
     '''Creates a violinplot of multiple columns from multiple Pandas DataFrames. Ideal for comparing stuff.'''
     # security
     for df in dfs:
@@ -168,18 +169,25 @@ def violinplot_multiple_cols_dfs(dfs, df_names, cols, titles, y_labels, dims=Non
         handles = [mpatches.Patch(color=c, label=l) for c, l in zip(colors, labels)]
         fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 0.1),
                   fancybox=True, shadow=True, ncol=5, fontsize=13)
-        
-    if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    fig.show()
+
+    if out_path:
+        fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
+    if show_fig:
+        fig.show()
     return None
 
-def violinplot_multiple_cols(dataframe:pd.DataFrame, cols:list[str], y_labels:list[str], title:str=None, dims=None, out_path=None) -> None:
+def violinplot_multiple_cols(dataframe: pd.DataFrame, cols: list[str], y_labels: list[str], titles: list[str] = None, dims: list[tuple[int,int]] = None, out_path: str = None, show_fig: bool = True) -> None:
     '''AAA'''
     # security
     for col in cols:
         check_for_col_in_df(col, dataframe)
 
-    if not dims: dims = [None for col in cols]
+    if not dims:
+        dims = [None for _ in cols]
+
+    if not titles:
+        titles = ["" for _ in cols]
+
     def set_violinstyle(axes_subplot_parts) -> None:
         '''
         '''
@@ -190,30 +198,31 @@ def violinplot_multiple_cols(dataframe:pd.DataFrame, cols:list[str], y_labels:li
 
         axes_subplot_parts["cmins"].set_edgecolor("black")
         axes_subplot_parts["cmaxes"].set_edgecolor("black")
-        return None
 
     fig, ax_list = plt.subplots(1, len(cols), figsize=(3*len(cols), 5))
     fig.subplots_adjust(wspace=1, hspace=0.8)
 
-    for ax, col, label, dim in zip(ax_list, cols, y_labels, dims):
+    for ax, col, label, dim, title in zip(ax_list, cols, y_labels, dims, titles):
         ax.set_ylabel(label, size=13)
         ax.set_xticks([])
         data = dataframe[col].to_list()
         parts = ax.violinplot(dataframe[col].to_list(), widths=0.5)
-        if dim: ax.set_ylim(dim)
+        if dim:
+            ax.set_ylim(dim)
+        if title:
+            ax.set_title(title, size=15)
         set_violinstyle(parts)
         quartile1, median, quartile3 = np.percentile(data, [25, 50, 75])
         ax.scatter(1, median, marker='o', color="white", s=40, zorder=3)
         ax.vlines(1, quartile1, quartile3, color="k", linestyle="-", lw=10)
         ax.vlines(1, np.min(data), np.max(data), color="k", linestyle="-", lw=2)
 
-    if title:
-        fig.suptitle(title, size=20)
-
     plt.figtext(0.5, 0.05, f'n = {len(dataframe.index)}', ha='center', fontsize=12)
-    
-    if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    fig.show()
+
+    if out_path:
+        fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
+    if show_fig:
+        fig.show()
     return None
 
 def check_for_col_in_df(col: str, df: pd.DataFrame) -> None:
@@ -222,7 +231,7 @@ def check_for_col_in_df(col: str, df: pd.DataFrame) -> None:
         similar_cols = [c for c in df.columns if col.split("_")[0] in c]
         raise KeyError(f"Column {col} not found in DataFrame. Did you mean any of these columns? {similar_cols}")
 
-def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str], dims=None, out_path=None) -> None:
+def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str], dims: list[tuple[float,float]] = None, out_path: str = None, show_fig: bool = True) -> None:
     '''AAA'''
     if not dims: dims = [None for sublist in lists]
     def set_violinstyle(axes_subplot_parts) -> None:
@@ -254,12 +263,13 @@ def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str
         ax.vlines(1, quartile1, quartile3, color="k", linestyle="-", lw=10)
         ax.vlines(1, np.min(sublist), np.max(sublist), color="k", linestyle="-", lw=2)
 
-    if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    fig.show()
+    if out_path:
+        fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
+    if show_fig:
+        fig.show()
     return None
 
-
-def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column:str, color_column:str=None, size_column:str=None, labels:list[str]=None, title:str=None, out_path:str=None):
+def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column: str, color_column: str = None, size_column: str = None, labels: list[str] = None, title: str =None, out_path: str = None, show_fig: bool = False):
     """
     Create a scatter plot from a DataFrame using specified columns for x and y axes,
     and optionally use other columns for color gradient and dot size. Labels must be a list of strings, one element for each column used. Otherwise, column names will be used as labels.
@@ -271,17 +281,19 @@ def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column:str, color_column
         # Generate the evenly spaced values
         spaced_values = [value1 + i * step for i in range(num_values)]
         return spaced_values
-    
+
     # define axes label names
-    expected_labels = 2        
-    if color_column: expected_labels += 1
-    if size_column: expected_labels += 1 
+    expected_labels = 2
+    if color_column:
+        expected_labels += 1
+    if size_column:
+        expected_labels += 1
 
     if not labels:
         labels = {"x": x_column, "y": y_column, "c": color_column, "s": size_column}
     else:
         num_labels = len(labels)
-        if not num_labels == expected_labels:
+        if num_labels != expected_labels:
             raise ValueError("Number of labels must be the same as number of columns!")
         labels = {"x": labels[0], "y": labels[1], "c": labels[2] if color_column else None, "s": labels[3] if color_column and size_column else labels[2] if color_column else None}
 
@@ -323,7 +335,7 @@ def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column:str, color_column
 
         # Adjust spacing between subplots
         plt.subplots_adjust(wspace=0)
-    
+
     else:
         plt.figure(figsize=(8, 6))
 
@@ -343,21 +355,24 @@ def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column:str, color_column
     # Save the plot as a PNG file if out_path is provided
     if out_path:
         plt.savefig(out_path, dpi=300)
-        print(f"Plot saved as {out_path}")
+        logging.info(f"Plot saved as {out_path}")
 
     # Show the plot
-    plt.show()
+    if show_fig:
+        plt.show()
 
 def parse_cols_for_plotting(plot_arg: str, subst:str=None) -> list[str]:
     '''AAA'''
-    if type(plot_arg) == str: return [plot_arg]
-    elif type(plot_arg) == list: return plot_arg
-    elif plot_arg == True: return [subst]
-    else: raise TypeError("Unsupported argument type for parse_cols_for_plotting(): {type(plot_arg)}. Only list, str or bool allowed.")
+    if isinstance(plot_arg, str):
+        return [plot_arg]
+    elif isinstance(plot_arg, list):
+        return plot_arg
+    elif plot_arg == True:
+        return [subst]
+    else:
+        raise TypeError("Unsupported argument type for parse_cols_for_plotting(): {type(plot_arg)}. Only list, str or bool allowed.")
 
-
-        
-def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:str=None, title:str=None, resnums:list=None, units:str="probability"):
+def sequence_logo(dataframe: pd.DataFrame, input_col:str, out_path:str, refseq:str=None, title:str=None, resnums:list=None, units:str="probability"):
     '''
     Generates a WEBLOGO with adapted x-axes (having correct residue IDs as lables).
 
@@ -404,36 +419,36 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:st
         '''extract file extension'''
         _, ext = os.path.splitext(file_path)
         return ext
-    
+
     def prepare_input(tmp_fasta:str, dataframe:pd.DataFrame, input_col:str):
         '''check format of input sequences and write all sequences to a single fasta'''
         ext = list(set(dataframe[input_col].apply(extract_extension).to_list()))
         seqs = dataframe[input_col].to_list()
         if len(ext) > 1:
             raise RuntimeError("Input column must contain either sequences or paths to fasta files that end with .fa or .fasta!")
-        elif ext == [""]:
-            with open(tmp_fasta, 'a') as t:
+        if ext == [""]:
+            with open(tmp_fasta, 'a', encoding="UTF-8") as t:
                 for i, seq in enumerate(seqs):
                     t.write(f">{i}\n{seq}\n")
         elif ext[0] in [".fasta", ".fa"]:
             for fa in seqs:
-                with open(fa, 'r') as f:
+                with open(fa, 'r', encoding="UTF-8") as f:
                     content = f.read()
-                with open(tmp_fasta, 'a') as t:
+                with open(tmp_fasta, 'a', encoding="UTF-8") as t:
                     t.write(content)
-    
+
     def prepare_reference_seq(refseq:str):
         '''check format of reference sequence and extract sequence from fasta if necessary'''
         if refseq.endswith('.fa') or refseq.endswith('.fasta'):
             seq = ""
             seq_dict = import_fasta(refseq)
-            if len([i for i in seq_dict]) > 1:
+            if len(seq_dict) > 1:
                 raise RuntimeError("Reference sequence fasta must contain only a single entry!")
-            id, seq = next(iter(seq_dict.items()))
+            _, seq = next(iter(seq_dict.items()))
             return seq
         else:
             return refseq
-        
+
     def replace_logo_numbers(eps_str, resid, sequence=None):
         '''
         Changes the weblogo output to have correct x-labels using correct residuenumbers.
@@ -449,7 +464,7 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:st
                 pos_count=pos_count+1
             new_eps_str_lines.append(line)
         return '\n'.join(new_eps_str_lines)
-            
+
     def modify_input_fasta_based_on_residues(in_fasta:str, out_fasta:str, resnums:list):
         '''create a new fasta file containing only the residues according to <resnums>'''
         seq_dict = import_fasta(in_fasta)
@@ -476,8 +491,8 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:st
             ]
     colorscheme = weblogo.ColorScheme(baserules, alphabet=protein_alphabet)
 
-    fasta_file = open(tmp_fasta, "r")
-    seqs = weblogo.read_seq_data(fasta_file, alphabet=protein_alphabet)
+    with open(tmp_fasta, 'r', encoding="UTF-8") as f:
+        seqs = weblogo.read_seq_data(f, alphabet=protein_alphabet)
     os.remove(tmp_fasta)
 
     # check if reference sequence is provided and extract sequence
@@ -504,19 +519,19 @@ def sequence_logo(dataframe:pd.DataFrame, input_col:str, out_path:str, refseq:st
         else:
             eps_str = replace_logo_numbers(eps_str, resnums, refseq)
 
-    with open(out_path, 'w') as f:
+    with open(out_path, 'w', encoding="UTF-8") as f:
         f.write(eps_str)
 
 
 def write_fasta(seq_dict:dict, fasta:str):
     '''write a sequence dictionary in the format {seq_id1: seq1, seq_id2: seq2} to a multiline fasta file'''
-    with open(fasta, 'w') as f:
-        for id in seq_dict:
-            f.write(f">{id}\n{seq_dict[id]}\n")
+    with open(fasta, 'w', encoding="UTF-8") as f:
+        for id_ in seq_dict:
+            f.write(f">{id_}\n{seq_dict[id_]}\n")
 
 def import_fasta(fasta:str):
     '''import a fasta file to a dictionary in the format {seq_id1: seq1, seq_id2: seq2}'''
-    with open(fasta, 'r') as f:
+    with open(fasta, 'r', encoding="UTF-8") as f:
         fastas = f.read()
     # split along > (separator)
     raw_fasta_list = [x.strip().split("\n") for x in fastas.split(">") if x]

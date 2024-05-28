@@ -349,7 +349,7 @@ class Poses:
     ########################################## Operations ###############################################
     def get_pose(self, pose_description: str) -> Bio.PDB.Structure.Structure:
         '''Loads a singular pose from DataFrame. pose_description has to be current description of pose (stored in poses.df["poses_description"] column)'''
-        if not pose_description in self.df["poses_description"]:
+        if pose_description not in self.df["poses_description"]:
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
         return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
 
@@ -640,7 +640,7 @@ class Poses:
             logging.info(f"Creating composite score plot at {out_path}.")
             scoreterms.append(name)
             plots.violinplot_multiple_cols(
-                df=self.df,
+                dataframe=self.df,
                 cols=scoreterms,
                 titles=scoreterms,
                 y_labels=scoreterms,
