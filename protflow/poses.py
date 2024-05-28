@@ -387,6 +387,46 @@ class Poses:
         self.df["poses"] = self.df["temp_dp_location"]
         self.df["poses_description"] = self.df["description"]
 
+    def reset_poses(self, new_poses_col: str='input_poses', reset_df: bool=False):
+        '''Resets poses to the poses in <new_poses_col>. Updates the 'poses', 'poses_description' and 'input_poses' columns, if necessary.
+        If <reset_df> is True or the number of unique poses in <new_poses_col> is different to the current number of poses, it will delete the poses dataframe (except for the mandatory columns).'''
+        
+        def unique_ordered_list(original_list):
+            seen = set()  # Initialize an empty set to track seen elements
+            unique_list = []
+            for item in original_list:
+                if item not in seen:  # Check membership in the set, which is O(1) (faster lookup in sets than in lists)
+                    unique_list.append(item)
+                    seen.add(item)  # Add the item to the set
+            return unique_list
+
+        col_in_df(self.df, new_poses_col)
+
+        new_poses = self.df[new_poses_col].to_list()
+        # handle multiline .fa inputs for poses!
+        for pose in new_poses:
+            if not pose.endswith(".fa") and not pose.endswith(".fasta"):
+                continue
+            if len(parse_fasta_to_dict(pose)) > 1:
+                new_poses.remove(pose)
+                new_poses += self.split_multiline_fasta(pose)
+
+        # create unique poses
+        new_poses = unique_ordered_list(new_poses)
+
+        if reset_df:
+            if len(new_poses) == len(self.df.index): input_poses = self.df['input_poses'].to_list()
+            else:
+                logging.warning(f"Different number of new poses ({len(new_poses)}) than number of original poses ({len(self.df.index)}). Input poses will be reset!")
+                input_poses = new_poses
+            self.df = pd.DataFrame({"input_poses": input_poses, "poses": new_poses, "poses_description": self.parse_descriptions(new_poses)})
+        elif not len(new_poses) == len(self.df.index):
+            logging.warning(f"Different number of new poses ({len(new_poses)}) than number of original poses ({len(self.df.index)}). Poses dataframe will be reset!")
+            self.df = pd.DataFrame({"input_poses": new_poses, "poses": new_poses, "poses_description": self.parse_descriptions(new_poses)})
+        else:
+            self.df['poses'] = new_poses
+            self.df['poses_description'] = self.parse_descriptions(poses=self.df['poses'].to_list())
+
     def set_motif(self, motif_col: str) -> None:
         '''Sets a motif attribute. This will be accessed by some runners, for example, RFdiffusion, to automatically update residue mappings from contigs to diffused structures.'''
         # check if motif_col exists. check if all entries in motif col are ResidueSelection objects.
