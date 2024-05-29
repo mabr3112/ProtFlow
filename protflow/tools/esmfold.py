@@ -44,12 +44,14 @@ class ESMFold(Runner):
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
+        
+        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip ESMFold.
-        scorefile = "ESMFold_scores.json"
-        scorefilepath = os.path.join(work_dir, scorefile)
-        if not overwrite and os.path.isfile(scorefilepath):
-            return RunnerOutput(poses=poses, results=pd.read_json(scorefilepath), prefix=prefix, index_layers=self.index_layers).return_poses()
+        scorefile = os.path.join(work_dir, f"ESMFold_scores.json.{poses.storage_format}")
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
+            return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
         # set up esm-specific directories
         os.makedirs((fasta_dir := f"{work_dir}/input_fastas"), exist_ok=True)
@@ -77,8 +79,13 @@ class ESMFold(Runner):
         )
 
         # collect scores
-        logging.info(f"Predictions finished. Collecting Scores.")
-        scores = self.collect_scores(work_dir=work_dir, scorefile=scorefilepath)
+        logging.info(f"Predictions finished, starting to collect scores.")
+        scores = self.collect_scores(work_dir=work_dir)
+        logging.info(f"Saving scores of {self} at {scorefile}")
+        self.save_runner_scorefile(scores=scores, scorefile=scorefile)
+
+        logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
+
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
     def prep_fastas_for_prediction(self, poses:list[str], fasta_dir:str, max_filenum:int) -> list[str]:
@@ -119,7 +126,7 @@ class ESMFold(Runner):
 
         return f"{self.python_path} {protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {protflow.runners.options_flags_to_string(opts, flags, sep='--')}"
 
-    def collect_scores(self, work_dir:str, scorefile:str) -> pd.DataFrame:
+    def collect_scores(self, work_dir:str) -> pd.DataFrame:
         '''collects scores from ESMFold output'''
         # collect all .json files
         pdb_dir = os.path.join(work_dir, "esm_preds")
@@ -137,7 +144,6 @@ class ESMFold(Runner):
 
         # merge with df containing locations
         df = df.merge(df_pdb, on='description')
-        df.to_json(scorefile)
         shutil.rmtree(pdb_dir)
 
         return df

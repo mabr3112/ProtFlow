@@ -12,7 +12,6 @@ import pandas as pd
 # custom
 import protflow.config
 import protflow.jobstarters
-import protflow.tools
 from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
@@ -65,9 +64,12 @@ class Rosetta(Runner):
         # check if script_path / rosetta_application have an executable.
         rosetta_exec = self.setup_executable(self.script_path, rosetta_application)
 
+        logging.info(f"Running {self} application {rosetta_exec} in {work_dir} on {len(poses.df.index)} poses.")
+
         # Look for output-file in pdb-dir. If output is present and correct, then skip RosettaScripts.
         scorefile = os.path.join(work_dir, f"{prefix}_rosetta_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
         elif overwrite and os.path.isdir(work_dir):
@@ -99,7 +101,10 @@ class Rosetta(Runner):
 
         # collect scores
         scores = collect_scores(work_dir=work_dir)
+        logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
+
+        logging.info(f"{rosetta_exec} finished. Returning {len(scores.index)} poses.")
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
@@ -123,6 +128,9 @@ class Rosetta(Runner):
 
         # compile command
         run_string = f"{rosetta_application} -out:path:all {output_dir} -in:file:s {pose_path} -out:prefix r{str(i).zfill(4)}_ -out:file:scorefile r{str(i).zfill(4)}_{os.path.splitext(os.path.basename(pose_path))[0]}_score.json -out:file:scorefile_format json {opts} {flags} {overwrite}"
+        
+        logging.debug(f"Run command: {run_string}")
+
         return run_string
 
 def collect_scores(work_dir: str) -> pd.DataFrame:
