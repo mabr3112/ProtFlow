@@ -1,34 +1,52 @@
 """
-The 'poses' module in the ProtFlow package is designed for running protein design tools, managing and manipulating protein data. 
+poses
+=====
 
-It primarily focuses on handling proteins and their associated data represented as Pandas DataFrames. 
-This module provides functionalities to parse, store, and manipulate protein data in various file formats, aiding in the management of complex protein study workflows. 
+The 'poses' module in the ProtFlow package is designed for running protein design tools, managing, and manipulating protein data. 
 
-Key Features:
+This module primarily focuses on handling proteins and their associated data represented as Pandas DataFrames. 
+It provides functionalities to parse, store, and manipulate protein data in various file formats, aiding in the management of complex protein study workflows. 
+
+Key Features
+------------
 - Parsing protein data from different sources and formats.
 - Storing and retrieving protein data in multiple file formats like JSON, CSV, Pickle, Feather, and Parquet.
-- Integration with the ProtFlow package for managing SLURM jobs, facilitating the handling of protein data in distributed computing environments.
+- Integration with the ProtFlow package for managing compute jobs, facilitating the handling of protein data in distributed computing environments.
 - Advanced data manipulation capabilities, including merging and prefixing data from various sources.
 
-Classes:
+Classes
+-------
 - Poses: A central class for storing and handling protein data frames. It supports various operations like setting up work directories, parsing protein data, and integrating outputs from different runners.
 
-Dependencies:
+Dependencies
+------------
 - pandas: Used for DataFrame operations.
-- protflow: Required for job management and integrating with SLURM job runners.
+- protflow: Required for job management.
 
-Note:
-This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in SLURM environments.
+Usage
+-----
+Example of how to use the Poses class for managing protein data:
 
-Example Usage:
-    To use the Poses class for managing protein data:
+.. code-block:: python
+
     from poses import Poses
+
     poses_instance = Poses(poses=my_protein_data, work_dir='path/to/work_dir')
     # Further operations using poses_instance
 
-Author: Markus Braun
-Version: 0.1.0
+Notes
+-----
+This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in SLURM environments.
+
+Author
+------
+Markus Braun
+
+Version
+-------
+0.1.0
 """
+
 import os
 from glob import glob
 import re
@@ -57,10 +75,114 @@ FORMAT_STORAGE_DICT = {
 }
 
 class Poses:
-    '''Class that stores and handles protein df. '''
+    """
+    A class for storing and handling protein data frames.
+
+    The Poses class manages protein data using Pandas DataFrames, providing functionalities
+    to set up working directories, parse protein data, and integrate outputs from different
+    runners. It supports various operations for manipulating and filtering protein data.
+
+    Parameters
+    ----------
+    poses : list, optional
+        List of initial poses to be managed by the Poses class. Default is None.
+    work_dir : str, optional
+        Path to the working directory. Default is None.
+    storage_format : str, optional
+        Format for storing the poses DataFrame. Default is "json".
+    glob_suffix : str, optional
+        Suffix for glob pattern matching if poses is a directory path. Default is None.
+    jobstarter : JobStarter, optional
+        JobStarter instance for managing job submissions. Default is jobstarters.SbatchArrayJobstarter().
+
+    Attributes
+    ----------
+    df : pandas.DataFrame
+        DataFrame to store and manage protein poses.
+    work_dir : str
+        Path to the working directory.
+    storage_format : str
+        Format for storing the poses DataFrame.
+    scorefile : str
+        Path to the scorefile where poses DataFrame will be stored.
+    default_jobstarter : JobStarter
+        JobStarter instance for managing job submissions.
+    motifs : list
+        List of motif columns.
+
+    Methods
+    -------
+    set_scorefile(work_dir: str) -> None
+        Sets the scorefile attribute for the Poses class.
+    set_storage_format(storage_format: str) -> None
+        Sets the storage format for the poses DataFrame.
+    set_work_dir(work_dir: str, set_scorefile: bool = True) -> None
+        Sets up the working directory for the Poses class.
+    set_logger() -> None
+        Sets the logger for the Poses class.
+    set_jobstarter(jobstarter: JobStarter) -> None
+        Sets the JobStarter attribute for the Poses class.
+    change_poses_dir(poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses"
+        Changes the location of current poses.
+    parse_poses(poses: Union[list, str] = None, glob_suffix: str = None) -> list
+        Parses the input poses, which can be a directory path, a file path, or a list of file paths.
+    parse_descriptions(poses: list = None) -> list
+        Parses descriptions (names) of poses from a list of pose paths.
+    set_poses(poses: list = None, glob_suffix: str = None) -> None
+        Sets up poses from either a list or a string.
+    check_prefix(prefix: str) -> None
+        Checks if the prefix is available in the poses DataFrame.
+    check_poses_df_integrity(df: pandas.DataFrame) -> pandas.DataFrame
+        Checks if mandatory columns are present in the poses DataFrame.
+    split_multiline_fasta(path: str, encoding: str = "UTF-8") -> list[str]
+        Splits multiline FASTA input files.
+    determine_pose_type(pose_col: str = None) -> list
+        Checks the file extensions of poses and returns a list of extensions.
+    load_poses(poses_path: str) -> "Poses"
+        Loads Poses class from a stored DataFrame.
+    save_scores(out_path: str = None, out_format: str = None) -> None
+        Saves the poses DataFrame as a scorefile.
+    save_poses(out_path: str, poses_col: str = "poses", overwrite: bool = True) -> None
+        Saves current poses from the poses DataFrame to the specified path.
+    poses_list() -> list
+        Returns the current poses from the DataFrame as a list.
+    get_pose(pose_description: str) -> Bio.PDB.Structure.Structure
+        Loads a singular pose from the DataFrame.
+    duplicate_poses(output_dir: str, n_duplicates: int) -> None
+        Creates pose duplicates with added index layers.
+    reset_poses(new_poses_col: str = 'input_poses', force_reset_df: bool = False) -> None
+        Resets poses to the poses in the specified column and updates the DataFrame.
+    set_motif(motif_col: str) -> None
+        Sets a motif attribute to be accessed by runners.
+    convert_pdb_to_fasta(prefix: str, update_poses: bool = False, chain_sep: str = ":") -> None
+        Converts PDB files to FASTA files and optionally updates poses.
+    filter_poses_by_rank(n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses"
+        Filters poses by a specified score term down to a fraction or a total number of poses.
+    filter_poses_by_value(score_col: str, value, operator: str, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses"
+        Filters poses by a specified score column according to the provided value and operator.
+    calculate_composite_score(name: str, scoreterms: list[str], weights: list[float], plot: bool = False, scale_output: bool = False) -> "Poses"
+        Combines multiple score columns by weighted addition and scales the result.
+    """
     ############################################# SETUP #########################################
     def __init__(self, poses: list = None, work_dir: str = None, storage_format: str = "json", glob_suffix: str = None, jobstarter: JobStarter = jobstarters.SbatchArrayJobstarter()):
-        # setup attributes poses.df, poses.work_dir;
+        """
+        Initializes the Poses class.
+
+        Sets up the initial attributes, working directory, storage format, and job starter for managing protein data.
+
+        Parameters
+        ----------
+        poses : list, optional
+            List of initial poses to be managed by the Poses class. Default is None.
+        work_dir : str, optional
+            Path to the working directory. Default is None.
+        storage_format : str, optional
+            Format for storing the poses DataFrame. Default is "json".
+        glob_suffix : str, optional
+            Suffix for glob pattern matching if poses is a directory path. Default is None.
+        jobstarter : JobStarter, optional
+            JobStarter instance for managing job submissions. Default is jobstarters.SbatchArrayJobstarter().
+        """
         self.df = None
         self.set_work_dir(work_dir, set_scorefile=False)
         self.set_poses(poses, glob_suffix=glob_suffix)
@@ -76,27 +198,80 @@ class Poses:
         self.motifs = []
 
     def __iter__(self):
+        """
+        Iterates over the rows of the poses DataFrame.
+
+        Yields
+        ------
+        pandas.Series
+            A row of the poses DataFrame.
+        """
         for _, row in self.df.iterrows():
             yield row
 
     def __len__(self):
+        """
+        Returns the number of poses in the DataFrame.
+
+        Returns
+        -------
+        int
+            The number of poses.
+        """
         return len(self.df)
 
     ############################################# SETUP METHODS #########################################
     def set_scorefile(self, work_dir: str) -> None:
-        '''Sets scorefile attribute for poses class. This is the path to which the poses.df will be stored.'''
+        """
+        Sets the scorefile attribute for the Poses class.
+
+        The scorefile is the path where the poses DataFrame will be stored.
+
+        Parameters
+        ----------
+        work_dir : str
+            The working directory where the scorefile will be saved. If not provided, 
+            the scorefile will be stored in the current directory.
+        """
         # if no work_dir is set, store scores in current directory.
         scorefile_path = os.path.join(work_dir, os.path.basename(work_dir)) if work_dir else "./poses"
         self.scorefile = f"{scorefile_path}_scores.{self.storage_format}"
 
     def set_storage_format(self, storage_format: str) -> None:
-        '''Sets storage format for poses.df. poses.df is stored in specified format with poses.save_scores() method.'''
+        """
+        Sets the storage format for the poses DataFrame.
+
+        The poses DataFrame is stored in the specified format using the save_scores() method.
+
+        Parameters
+        ----------
+        storage_format : str
+            The format in which the poses DataFrame will be stored. Must be one of the formats 
+            available in FORMAT_STORAGE_DICT.
+
+        Raises
+        ------
+        KeyError
+            If the specified format is not available.
+        """
         if storage_format.lower() not in FORMAT_STORAGE_DICT:
             raise KeyError(f"Format {storage_format} not available. Format must be on of {[list(FORMAT_STORAGE_DICT)]}")
         self.storage_format = storage_format # removed .lower() maybe there is a storage format that needs caps letters.
 
     def set_work_dir(self, work_dir: str, set_scorefile: bool = True) -> None:
-        '''sets up working_directory for poses. Just creates new work_dir and stores the first instance of Poses DataFrame in there.'''
+        """
+        Sets up the working directory for the Poses class.
+
+        Creates the working directory and common subdirectories if they do not already exist.
+        Optionally sets the scorefile.
+
+        Parameters
+        ----------
+        work_dir : str
+            The path to the working directory.
+        set_scorefile : bool, optional
+            Whether to set the scorefile. Default is True.
+        """
         def set_dir(dir_name: str, work_dir: str) -> str:
             '''Creates a directory inside of work_dir that has the name {dir_name}_dir. 
             Also sets an attribute self.{dir_name} that points to the directory.'''
@@ -122,12 +297,60 @@ class Poses:
         if set_scorefile:
             self.set_scorefile(work_dir)
 
+    def set_logger(self):
+        """
+        Sets the logger for the Poses class.
+
+        Writes log messages to a logfile in the working directory (if set) and prints logs to the screen.
+        """
+        # Create a logger
+        
+        if self.work_dir: logfile_path = os.path.join(self.work_dir, f"{os.path.basename(self.work_dir)}.log")
+        else: logfile_path = None
+
+        # Configure the basic logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            handlers=[logging.StreamHandler()]
+        )
+
+        if logfile_path: logging.getLogger().addHandler(logging.FileHandler(logfile_path))
+
     def set_jobstarter(self, jobstarter: JobStarter):
-        '''Sets JobStarter attribute for Poses class.'''
+        """
+        Sets the JobStarter attribute for the Poses class.
+
+        Parameters
+        ----------
+        jobstarter : JobStarter
+            An instance of the JobStarter class to manage job submissions.
+        """
         self.default_jobstarter = jobstarter
 
     def change_poses_dir(self, poses_dir: str, copy: bool = False, overwrite: bool = False) -> "Poses":
-        '''Changes the location of current poses. (works only if name of poses did not change!!!)'''
+        """
+        Changes the location of current poses.
+
+        Parameters
+        ----------
+        poses_dir : str
+            The new directory where the poses will be located.
+        copy : bool, optional
+            Whether to copy the poses to the new directory. Default is False.
+        overwrite : bool, optional
+            Whether to overwrite existing files in the new directory. Default is False.
+
+        Returns
+        -------
+        Poses
+            The updated Poses instance.
+
+        Raises
+        ------
+        ValueError
+            If the specified directory does not exist or the poses do not exist at the specified directory.
+        """
         # define new poses:
         new_poses = [os.path.join(poses_dir, os.path.basename(pose)) for pose in self.poses_list()]
 
@@ -159,26 +382,29 @@ class Poses:
     def parse_poses(self, poses: Union[list,str] = None, glob_suffix: str = None) -> list:
         """
         Parses the input 'poses' which can be a directory path, a file path, or a list of file paths.
-        
+
         If 'poses' is a directory path and 'glob_suffix' is provided, it will return a list of file paths
         matching the glob pattern. If 'poses' is a single file path, it returns a list containing just that file path.
         If 'poses' is a list of file paths, it verifies that each file exists and returns the list.
 
-        Parameters:
-        - poses (Union[List[str], str, None]): Input poses which could be a list of file paths, a single file path, or None.
-        - glob_suffix (str): Optional suffix for glob pattern matching if 'poses' is a directory path.
+        Parameters
+        ----------
+        poses : Union[list, str, None], optional
+            Input poses which could be a list of file paths, a single file path, or None. Default is None.
+        glob_suffix : str, optional
+            Suffix for glob pattern matching if 'poses' is a directory path. Default is None.
 
-        Returns:
-        - List[str]: A list of file paths.
+        Returns
+        -------
+        list
+            A list of file paths.
 
-        Raises:
-        - FileNotFoundError: If any of the files or patterns provided do not exist.
-        - TypeError: If 'poses' is neither a list, a string, nor None.
-
-        Example usage:
-        - parse_poses('/path/to/directory', '*.pdb')  # Returns all '.pdb' files in the directory.
-        - parse_poses('/path/to/file.pdb')            # Returns ['/path/to/file.pdb'] if file exists.
-        - parse_poses(['/path/to/file1.pdb', '/path/to/file2.pdb'])  # Returns the list if all files exist.
+        Raises
+        ------
+        FileNotFoundError
+            If any of the files or patterns provided do not exist.
+        TypeError
+            If 'poses' is neither a list, a string, nor None.
         """
         if isinstance(poses, str) and glob_suffix:
             parsed_poses = glob(f"{poses}/{glob_suffix}")
@@ -198,11 +424,37 @@ class Poses:
         raise TypeError(f"Unrecognized input type {type(poses)} for function parse_poses(). Allowed types: [list, str]")
 
     def parse_descriptions(self, poses: list = None) -> list:
-        '''parses descriptions (names) of poses from a list of pose_paths. Works on already parsed poses'''
+        """
+        Parses descriptions (names) of poses from a list of pose paths.
+
+        Parameters
+        ----------
+        poses : list
+            List of pose paths.
+
+        Returns
+        -------
+        list
+            List of parsed pose descriptions.
+        """
         return [pose.strip("/").rsplit("/", maxsplit=1)[-1].split(".", maxsplit=1)[0]for pose in poses]
 
-    def set_poses(self, poses: list = None, glob_suffix: str = None) -> None:
-        '''Sets up poses from either a list, or a string.'''
+    def set_poses(self, poses: Union[list,str,pd.DataFrame] = None, glob_suffix: str = None) -> None:
+        """
+        Sets up poses from either a list, a string, or a Pandas DataFrame.
+
+        Parameters
+        ----------
+        poses : Union[list, str, pd.DataFrame, None], optional
+            Poses to be managed. Can be either a list of poses, a path to a directory or file, 
+            a path to a scorefile, or a Pandas DataFrame. Default is None.
+        glob_suffix : str, optional
+            Suffix for glob pattern matching if poses is a directory path. Default is None.
+
+        Returns
+        -------
+        None
+        """
         # if DataFrame is passed, load directly.
         if isinstance(poses, pd.DataFrame):
             self.df = self.check_poses_df_integrity(poses)
@@ -230,12 +482,41 @@ class Poses:
         return None
 
     def check_prefix(self, prefix: str) -> None:
-        '''checks if prefix is available in poses.df'''
+        """
+        Checks if the prefix is available in the poses DataFrame.
+
+        Parameters
+        ----------
+        prefix : str
+            The prefix to check.
+
+        Raises
+        ------
+        KeyError
+            If the prefix is already taken in the poses DataFrame.
+        """
         if f"{prefix}_location" in self.df.columns or f"{prefix}_description" in self.df.columns:
             raise KeyError(f"Prefix {prefix} is already taken in poses.df")
 
     def check_poses_df_integrity(self, df: pd.DataFrame) -> pd.DataFrame:
-        '''checks if mandatory columns are in poses.df'''
+        """
+        Checks if mandatory columns are present in the poses DataFrame.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            The DataFrame to check.
+
+        Returns
+        -------
+        pd.DataFrame
+            The validated DataFrame.
+
+        Raises
+        ------
+        KeyError
+            If mandatory columns are missing.
+        """
         cols = ["input_poses", "poses", "poses_description"]
         for col in cols:
             if col not in df.columns:
@@ -243,7 +524,21 @@ class Poses:
         return df
 
     def split_multiline_fasta(self, path: str, encoding: str = "UTF-8") -> list[str]:
-        '''Splits multiline fasta input files.'''
+        """
+        Splits multiline FASTA input files.
+
+        Parameters
+        ----------
+        path : str
+            The path to the multiline FASTA file.
+        encoding : str, optional
+            The encoding of the FASTA file. Default is "UTF-8".
+
+        Returns
+        -------
+        list[str]
+            List of paths to individual FASTA files.
+        """
         logging.warning(f"Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/")
         if not hasattr(self, "work_dir"):
             raise AttributeError(f"Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
@@ -283,7 +578,19 @@ class Poses:
         return out_poses
 
     def determine_pose_type(self, pose_col: str = None) -> list:
-        '''checks the file extensions of poses (or the poses provided in <pose_col>), returns a list of extensions'''
+        """
+        Checks the file extensions of poses and returns a list of extensions.
+
+        Parameters
+        ----------
+        pose_col : str, optional
+            The column to check for file extensions. Default is 'poses'.
+
+        Returns
+        -------
+        list
+            List of unique file extensions.
+        """
         def extract_extension(file_path):
             _, ext = os.path.splitext(file_path)
             return ext
@@ -305,7 +612,19 @@ class Poses:
 
     ############################################ Input Methods ######################################
     def load_poses(self, poses_path: str) -> "Poses":
-        '''Loads Poses class from a stored dataframe.'''
+        """
+        Loads Poses class from a stored DataFrame.
+
+        Parameters
+        ----------
+        poses_path : str
+            The path to the stored DataFrame.
+
+        Returns
+        -------
+        Poses
+            The updated Poses instance.
+        """
         # read format
         load_function = get_format(poses_path)
 
@@ -315,7 +634,16 @@ class Poses:
 
     ############################################ Output Methods ######################################
     def save_scores(self, out_path: str = None, out_format: str = None) -> None:
-        '''Saves Poses DataFrame as scorefile.'''
+        """
+        Saves the poses DataFrame as a scorefile.
+
+        Parameters
+        ----------
+        out_path : str, optional
+            The path to save the scorefile. Default is None.
+        out_format : str, optional
+            The format to save the scorefile. Default is None.
+        """
         # setup defaults
         out_path = out_path or self.scorefile
         out_format = out_format or self.storage_format
@@ -328,7 +656,18 @@ class Poses:
             getattr(self.df, save_method_name)(out_path)
 
     def save_poses(self, out_path: str, poses_col: str = "poses", overwrite: bool = True) -> None:
-        '''Saves current "poses" from poses.df at out_path. Overwrites poses by default.'''
+        """
+        Saves current poses from the poses DataFrame to the specified path.
+
+        Parameters
+        ----------
+        out_path : str
+            The path to save the poses.
+        poses_col : str, optional
+            The column containing the poses to save. Default is "poses".
+        overwrite : bool, optional
+            Whether to overwrite existing files. Default is True.
+        """
         poses = self.df[poses_col].to_list()
         new_poses = [os.path.join(out_path, os.path.basename(pose)) for pose in poses]
         if not os.path.isdir(out_path):
@@ -345,20 +684,53 @@ class Poses:
             shutil.copy(pose, new_pose)
 
     def poses_list(self):
-        '''Simple method to return current poses from DataFrame as a list.'''
+        """
+        Returns the current poses from the DataFrame as a list.
+
+        Returns
+        -------
+        list
+            List of current poses.
+        """
         return self.df["poses"].to_list()
 
     ########################################## Operations ###############################################
     def get_pose(self, pose_description: str) -> Bio.PDB.Structure.Structure:
-        '''Loads a singular pose from DataFrame. pose_description has to be current description of pose (stored in poses.df["poses_description"] column)'''
+        """
+        Loads a singular pose from the DataFrame.
+
+        Parameters
+        ----------
+        pose_description : str
+            The description of the pose to load.
+
+        Returns
+        -------
+        Bio.PDB.Structure.Structure
+            The loaded pose.
+
+        Raises
+        ------
+        KeyError
+            If the pose is not found in the poses DataFrame.
+        """
         if pose_description not in self.df["poses_description"]:
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
         return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
 
     def duplicate_poses(self, output_dir:str, n_duplicates:int) -> None:
-        '''Creates Pose duplicates with added index layers.
-        This Function is intended to be used when multiple processing units are needed with distinct inputs.
-        '''
+        """
+        Creates pose duplicates with added index layers.
+
+        This function is intended to be used when multiple processing units are needed with distinct inputs.
+
+        Parameters
+        ----------
+        output_dir : str
+            The directory to save the duplicated poses.
+        n_duplicates : int
+            The number of duplicates to create.
+        """
         def insert_index_layer(pose, n, sep:str="_") -> str:
             '''inserts index layer.'''
             filepath, filename = pose.rsplit("/", maxsplit=1)
@@ -390,10 +762,21 @@ class Poses:
         self.df["poses_description"] = self.df["description"]
 
     def reset_poses(self, new_poses_col: str='input_poses', force_reset_df: bool=False):
-        '''Resets poses to the poses in <new_poses_col>. Updates the 'poses' and 'poses_description' columns, if necessary.
-        If the number of unique poses in <new_poses_col> is different to the current number of poses, the original dataframe cannot be preserved and an error will occur (if reset_df is set to False). 
-        If <reset_df> is True, this error will be circumvented and a new empty poses dataframe will be created, containing only the new 'poses', 'poses_description' and 'input_poses' columns.'''
-        
+        """
+        Resets poses to the poses in the specified column and updates the DataFrame.
+
+        Parameters
+        ----------
+        new_poses_col : str, optional
+            The column containing the new poses. Default is 'input_poses'.
+        force_reset_df : bool, optional
+            Whether to force reset the DataFrame if the number of unique poses differs. Default is False.
+
+        Raises
+        ------
+        RuntimeError
+            If the number of unique poses differs and force_reset_df is False.
+        """        
         def unique_ordered_list(original_list):
             seen = set()  # Initialize an empty set to track seen elements
             unique_list = []
@@ -428,7 +811,19 @@ class Poses:
             self.df['poses_description'] = self.parse_descriptions(poses=self.df['poses'].to_list())
 
     def set_motif(self, motif_col: str) -> None:
-        '''Sets a motif attribute. This will be accessed by some runners, for example, RFdiffusion, to automatically update residue mappings from contigs to diffused structures.'''
+        """
+        Sets a motif attribute to be accessed by runners.
+
+        Parameters
+        ----------
+        motif_col : str
+            The column containing the motif to set.
+
+        Raises
+        ------
+        TypeError
+            If the objects in 'motif_col' are not of type ResidueSelection.
+        """
         # check if motif_col exists. check if all entries in motif col are ResidueSelection objects.
         col_in_df(self.df, motif_col)
         if not all([isinstance(motif, ResidueSelection) for motif in self.df[motif_col].to_list()]):
@@ -438,7 +833,25 @@ class Poses:
         self.motifs.append(motif_col)
 
     def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":") -> None:
-        '''Converts .pdb files to .fasta files in <prefix>_fasta_location. If update_poses is True, fasta files will be set as new poses. Fasta file paths are saved in <prefix>_fasta_location column in poses.df'''
+        """
+        Converts PDB files to FASTA files.
+
+        The converted FASTA files are stored in the specified prefix directory. Optionally updates poses.
+
+        Parameters
+        ----------
+        prefix : str
+            The prefix for the directory where FASTA files will be stored.
+        update_poses : bool, optional
+            Whether to update poses with the converted FASTA files. Default is False.
+        chain_sep : str, optional
+            Separator for chains in the FASTA file. Default is ":".
+
+        Raises
+        ------
+        RuntimeError
+            If poses are not of type .pdb.
+        """
         if not self.determine_pose_type() == ['.pdb']:
             raise RuntimeError(f"Poses must be of type .pdb, not {self.determine_pose_type()}")
 
@@ -458,33 +871,46 @@ class Poses:
 
     ########################################## Filtering ###############################################
     def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses":
-        '''
-        Filters your current poses by a specified scoreterm down to either a fraction (of all poses) or a total number of poses,
-        depending on which value was given with <n>.
-        
-        Args:
-            <n>:                   Any positive number. Number between 0 and 1 are interpreted as a fraction to filter,
-                                   Numbers >1 are interpreted as absolute number of poses after filtering.
-            <score_col>:           Column name of the column that contains the scores by which the poses should be filtered.
-            <plot>:                (bool, str, list) Do you want to plot filtered stats? If True, it will plot filtered scoreterm. 
-                                   If str, it will look for the argument in self.df and use that scoreterm for plotting.
-                                   If list, it will try to plot all scoreterms in the list.
-            <ascending>:           Whether to filter ascending (True) or descending (False)
-            <prefix>:              Save filter output to <prefix>_filter in filter directory, if given
-            <format>:              Save filter output in this format, if None use default pose format
-        
-        To filter your DataFrame poses based on parent poses, add arguments: 
-            <remove_layers>        how many index layers must be removed to reach parent pose? If <remove_layers> = 0, groups 
-                                   <layer_col> and filters individual groups (useful e.g. if <layer_col> is not poses_description,
-                                   but a group identifier)
-            <layer_col>            column name that contains names of the poses, Default="poses_description"
-            <sep>                  index layer separator for pose names in layer_col (pose_0001_0003.pdb -> '_')
-            
-            
-            
-        Returns poses with filtered DataFrame. Updates pose_df.
-        '''
+        """
+        Filters poses by a specified score term down to a fraction or a total number of poses.
 
+        Parameters
+        ----------
+        n : float
+            The fraction (0 to 1) or total number of poses to retain after filtering.
+        score_col : str
+            The column containing the scores by which the poses should be filtered.
+        remove_layers : int, optional
+            Number of index layers to remove to reach parent pose. Default is None.
+        layer_col : str, optional
+            The column containing the names of the poses. Default is "poses_description".
+        sep : str, optional
+            Separator for pose names in layer_col. Default is "_".
+        ascending : bool, optional
+            Whether to filter in ascending order. Default is True.
+        prefix : str, optional
+            Prefix for saving the filter output. Default is None.
+        plot : bool, optional
+            Whether to plot filtered statistics. Default is False.
+        overwrite : bool, optional
+            Whether to overwrite existing filter output. Default is True.
+        storage_format : str, optional
+            Format to save the filter output. Default is None.
+
+        Returns
+        -------
+        Poses
+            The updated Poses instance.
+
+        Raises
+        ------
+        AttributeError
+            If filter directory or plots directory is not set.
+        KeyError
+            If the specified storage format is not available.
+        RuntimeError
+            If prefix is not set but plotting is requested.
+        """
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
             if self.filter_dir is None:
@@ -541,24 +967,42 @@ class Poses:
         return self
 
     def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses":
-        '''
-        Filters your current poses by a specified <score_col> according to the provided <value> and <operator>.
-        
-        Args:
-            <n>:                   Any positive number. Number between 0 and 1 are interpreted as a fraction to filter,
-                                   Numbers >1 are interpreted as absolute number of poses after filtering.
-            <score_col>:           Column name of the column that contains the scores by which the poses should be filtered.
-            <plot>:                (bool, str, list) Do you want to plot filtered stats? If True, it will plot filtered scoreterm. 
-                                   If str, it will look for the argument in self.df and use that scoreterm for plotting.
-                                   If list, it will try to plot all scoreterms in the list.
-            <value>:               Value that is used for comparison.
-            <operator>             Type of comparison operator. Can be either '>','>=', '<', '<=', '=' or '!='.")
-            <prefix>:              Save filter output to <prefix>_filter.<format> in filter directory, if provided
-            <format>:              Save filter output in this format, if None use default pose format
-        
-            
-        Returns poses with filtered DataFrame. Updates pose_df.
-        '''
+        """
+        Filters poses by a specified score column according to the provided value and operator.
+
+        Parameters
+        ----------
+        score_col : str
+            The column containing the scores by which the poses should be filtered.
+        value : float or int
+            The value to filter by.
+        operator : str
+            The comparison operator. Supported operators are '>','>=', '<', '<=', '=', '!='.
+        prefix : str, optional
+            Prefix for saving the filter output. Default is None.
+        plot : bool, optional
+            Whether to plot filtered statistics. Default is False.
+        overwrite : bool, optional
+            Whether to overwrite existing filter output. Default is True.
+        storage_format : str, optional
+            Format to save the filter output. Default is None.
+
+        Returns
+        -------
+        Poses
+            The updated Poses instance.
+
+        Raises
+        ------
+        AttributeError
+            If filter directory or plots directory is not set.
+        KeyError
+            If the specified storage format is not available.
+        ValueError
+            If all poses are removed after filtering.
+        RuntimeError
+            If prefix is not set but plotting is requested.
+        """
 
         logging.info(f"Filtering poses according to column {score_col} with operator {operator} and target value {value}")
 
@@ -621,14 +1065,37 @@ class Poses:
 
     ########################################## Score manipulation ###############################################
     def calculate_composite_score(self, name: str, scoreterms: list[str], weights: list[float], plot: bool = False, scale_output: bool = False) -> "Poses":
-        '''
-        Combine multiple score columns by weighted addition. Individual scoreterms will be normalized before combination. Score will be scaled from 0 to 1, with 1 indicating the best score.
-        Args:
-            <name>              name of the column that should contain the composite score
-            <scoreterms>        list of score column names
-            <weights>           list of weights for each score column. score_col will be multiplied with weight before addition with other scoreterms.
-                                if the best value in a score column is the lowest, use negative weights (e.g. -1 for Rosetta total score) and vice versa. 
-        '''
+        """
+        Combines multiple score columns by weighted addition.
+
+        Individual score terms will be normalized before combination. 
+
+        The score will be scaled from 0 to 1, with 1 indicating the best score.
+
+        Parameters
+        ----------
+        name : str
+            The name of the column that will contain the composite score.
+        scoreterms : list[str]
+            List of score column names.
+        weights : list[float]
+            List of weights for each score column. Scores will be multiplied by their respective weights 
+            before addition.
+        plot : bool, optional
+            Whether to plot the composite score statistics. Default is False.
+        scale_output : bool, optional
+            Whether to scale the output from 0 to 1. Default is False.
+
+        Returns
+        -------
+        Poses
+            The updated Poses instance.
+
+        Raises
+        ------
+        AttributeError
+            If plots directory is not set.
+        """
         logging.info(f"Creating composite score {name} for scoreterms {scoreterms} with weights {weights}")
         # check if output column already exists in dataframe
         if name in self.df:
@@ -658,10 +1125,28 @@ class Poses:
         return self
 
 def normalize_series(ser: pd.Series, scale: bool = False) -> pd.Series:
-    '''
-    Normalizes a pandas series by subtracting the median and dividing by standard deviation.
-    If scale = True, the normalized values will be scaled from 0 to 1. Returns a series.
-    '''
+    """
+    Normalizes a pandas series by subtracting the median and dividing by the standard deviation.
+
+    If scale is True, the normalized values will be scaled from 0 to 1.
+
+    Parameters
+    ----------
+    ser : pd.Series
+        The pandas series to normalize.
+    scale : bool, optional
+        Whether to scale the normalized values from 0 to 1. Default is False.
+
+    Returns
+    -------
+    pd.Series
+        The normalized (and optionally scaled) series.
+
+    Raises
+    ------
+    ValueError
+        If the series contains non-numeric values.
+    """
     ser = ser.copy()
     # calculate median and standard deviation
     median = ser.median()
@@ -678,9 +1163,24 @@ def normalize_series(ser: pd.Series, scale: bool = False) -> pd.Series:
     return ser
 
 def scale_series(ser: pd.Series) -> pd.Series:
-    '''
-    Scale a pandas series to values between 0 and 1. Returns a series.
-    '''
+    """
+    Scales a pandas series to values between 0 and 1.
+
+    Parameters
+    ----------
+    ser : pd.Series
+        The pandas series to scale.
+
+    Returns
+    -------
+    pd.Series
+        The scaled series.
+
+    Raises
+    ------
+    ValueError
+        If the series contains non-numeric values.
+    """
     ser = ser.copy()
     # check if all values in <score_col> are the same, set all values to 0 if yes as no scaling is possible
     if ser.nunique() == 1:
@@ -694,17 +1194,34 @@ def scale_series(ser: pd.Series) -> pd.Series:
     return ser
 
 def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], weights: list[float], scale: bool = False) -> pd.Series:
-    '''
-    Combine multiple score columns by weighted addition. 
-    Individual scoreterms will be normalized before combination. 
-    If scale is set, returns a series of values scaled from 0 to 1, with 1 indicating the best scoring.
+    """
+    Combines multiple score columns by weighted addition.
 
-    Args:
-        <df>                input dataframe
-        <scoreterms>        list of score column names
-        <weights>           list of weights for each score column. score_col will be multiplied with weight before addition with other scoreterms.
-                            if the best value in a score column is the lowest, use negative weights (e.g. -1 for Rosetta total score) and vice versa. 
-    '''
+    Individual score terms will be normalized before combination. If scale is set, returns a series of values
+    scaled from 0 to 1, with 1 indicating the best scoring.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame containing the score columns.
+    scoreterms : list[str]
+        List of score column names.
+    weights : list[float]
+        List of weights for each score column. Scores will be multiplied by their respective weights 
+        before addition.
+    scale : bool, optional
+        Whether to scale the combined scores from 0 to 1. Default is False.
+
+    Returns
+    -------
+    pd.Series
+        The combined (and optionally scaled) series.
+
+    Raises
+    ------
+    ValueError
+        If the number of score terms and weights are not equal or if any score column contains non-numeric values.
+    """
     if not len(scoreterms) == len(weights):
         raise ValueError(f"Number of scoreterms ({len(scoreterms)}) and weights ({len(weights)}) must be equal!")
 
@@ -715,7 +1232,7 @@ def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], wei
         if df[col].isna().any():
             raise ValueError(f"Column {col} must only contain float or integers!")
 
-        # normalize and scale scoreterm
+        # normalize scoreterm
         df[col] = normalize_series(ser=df[col], scale=False)
 
     # combine weighted scores
@@ -723,7 +1240,19 @@ def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], wei
     return scale_series(combined_col) if scale else combined_col
 
 def get_format(path: str):
-    '''reads in path as str and returns a pandas loading function.'''
+    """
+    Reads the file path extension and returns the corresponding pandas loading function.
+
+    Parameters
+    ----------
+    path : str
+        The file path.
+
+    Returns
+    -------
+    function
+        The pandas function to load the specified file format.
+    """
     loading_function_dict = {
         "json": pd.read_json,
         "csv": pd.read_csv,
@@ -734,11 +1263,37 @@ def get_format(path: str):
     return loading_function_dict[path.split(".")[-1]]
 
 def load_poses(poses_path: str) -> Poses:
-    '''Loads Poses class from a stored dataframe.'''
+    """
+    Loads Poses class from a stored DataFrame.
+
+    Parameters
+    ----------
+    poses_path : str
+        The path to the stored DataFrame.
+
+    Returns
+    -------
+    Poses
+        The Poses instance with the loaded DataFrame.
+    """
     return Poses().load_poses(poses_path)
 
 def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
-    '''Checks if column exists in DataFrame and returns KeyError if not.'''
+    """
+    Checks if a column or list of columns exists in a DataFrame.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame to check.
+    column : Union[str, list[str]]
+        The column or list of columns to check for existence.
+
+    Raises
+    ------
+    KeyError
+        If any of the specified columns are not found in the DataFrame.
+    """
     if isinstance(column, list):
         for col in column:
             if not col in df.columns:
@@ -748,11 +1303,40 @@ def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
             raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
 
 def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_layers: int = None, layer_col: str = "poses_description", sep: str = "_", ascending: bool = True) -> pd.DataFrame:
-    '''
-    remove_layers option allows to filter dataframe based on groupings after removing index layers.
-    If the option remove_layers is set (has to be type: int), then n determines how many c
-    if <remove_layers> = 0, dataframe will be grouped by values in <layer_col> and the grouped dfs will be filtered for top n rows
-    '''
+    """
+    Filters a DataFrame based on rankings in a specified column.
+
+    The remove_layers option allows filtering based on groupings after removing index layers.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame to filter.
+    col : str
+        The column to filter by.
+    n : Union[float, int]
+        The fraction (0 to 1) or total number of rows to retain after filtering.
+    remove_layers : int, optional
+        Number of index layers to remove to reach parent pose. Default is None.
+    layer_col : str, optional
+        The column containing the names of the poses. Default is "poses_description".
+    sep : str, optional
+        Separator for pose names in layer_col. Default is "_".
+    ascending : bool, optional
+        Whether to filter in ascending order. Default is True.
+
+    Returns
+    -------
+    pd.DataFrame
+        The filtered DataFrame.
+
+    Raises
+    ------
+    ValueError
+        If n is less than or equal to 0.
+    TypeError
+        If remove_layers is not an integer.
+    """
 
     def determine_filter_n(df: pd.DataFrame, n: float) -> int:
         '''
@@ -796,9 +1380,30 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_la
 
 
 def filter_dataframe_by_value(df: pd.DataFrame, col: str, value: float|int, operator: str) -> pd.DataFrame:
-    '''
-    Filters dataframe based on a value and an operator.
-    '''
+    """
+    Filters a DataFrame based on a value and a comparison operator.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame to filter.
+    col : str
+        The column to filter by.
+    value : Union[float, int]
+        The value to filter by.
+    operator : str
+        The comparison operator. Supported operators are '>','>=', '<', '<=', '=', '!='.
+
+    Returns
+    -------
+    pd.DataFrame
+        The filtered DataFrame.
+
+    Raises
+    ------
+    KeyError
+        If the specified operator is not supported.
+    """
     # make sure <col> exists columns in <df>
     col_in_df(df, col)
 
