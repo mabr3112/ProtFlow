@@ -269,10 +269,13 @@ class SbatchArrayJobstarter(JobStarter):
             f.write("\n".join(cmds))
 
         # write sbatch command and run
-        self.options += f" -vvv -e {output_path}/{jobname}_slurm.err -o {output_path}/{jobname}_slurm.out"
+        self.options += f" -vvv -e {output_path}/{jobname}_slurm.err -o {output_path}/{jobname}_slurm.out --open-mode=append"
         sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {self.options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
-        subprocess.run(sbatch_cmd, shell=True, stdout=True, stderr=True, check=True)
-
+        
+        with open(f"{output_path}/{jobname}_jobstarter.log", "w") as out_file:
+            # Run the sbatch command and direct both stdout and stderr to the log file
+            subprocess.run(sbatch_cmd, shell=True, stdout=out_file, stderr=out_file, check=True)
+        
         # wait for job and clean up
         if wait:
             self.wait_for_job(jobname)
