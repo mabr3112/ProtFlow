@@ -60,7 +60,6 @@ class TMalign(Runner):
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
             if sc_tm_score:
                 output.df = calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
-                print([x for x in output.df.columns if prefix in x])
             return output
 
 
@@ -111,7 +110,6 @@ class TMalign(Runner):
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
         if sc_tm_score:
             output.df = calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
-            print([x for x in output.df.columns if prefix in x])
         return output
 
     def prep_ref(self, ref: str, poses: Poses) -> list[str]:

@@ -66,7 +66,6 @@ class FPocket(Runner):
         scores = collect_fpocket_scores(work_dir, return_full_scores=return_full_scores)
         scores["location"] = [_get_fpocket_input_location(description, cmds) for description in scores["description"].to_list()]
         scores["pocket_location"] = scores["pocket_location"].fillna(scores["location"])
-        print("inside run()", scores["pocket_location"].head(30).to_list())
         self.save_runner_scorefile(scores, scorefile)
 
         # itegrate and return

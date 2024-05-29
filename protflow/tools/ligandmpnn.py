@@ -232,7 +232,7 @@ class LigandMPNN(Runner):
             model_checkpoint_options = f"--checkpoint_{model}={ligandmpnn_dir}/{LIGANDMPNN_CHECKPOINT_DICT[model]}"
 
         # safety
-        logging.info(f"Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
+        logging.debug(f"Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
         if "parse_atoms_with_zero_occupancy" not in opts:
             opts["parse_atoms_with_zero_occupancy"] = "1"
         elif opts["parse_atoms_with_zero_occupancy"] != "1":
