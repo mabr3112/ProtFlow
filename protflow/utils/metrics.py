@@ -231,4 +231,4 @@ def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
 
     # return number of contacts
-    return np.sum((dgram > min_dist) & (dgram < max_dist))
+    return np.sum((dgram > min_dist) & (dgram < max_dist)) / len(ligand_atoms)
