@@ -178,25 +178,6 @@ class Runner:
     The `Runner` class provides an abstract base for defining runners that handle the interface between runner processes and the Poses class.
     It includes methods for running jobs, checking paths, verifying prefixes, preparing pose options, and managing job setup and score files.
 
-    Methods
-    -------
-    __str__()
-        Abstract method that should be overridden to provide the name of the runner.
-    run(poses: Poses, prefix: str, jobstarter: JobStarter) -> RunnerOutput
-        Abstract method that should be overridden to define the runner's job execution logic.
-    search_path(input_path: str, path_name: str) -> str
-        Checks if a given path exists and if it exists on the local filesystem. Returns the path or raises an error.
-    check_for_prefix(prefix: str, poses: Poses) -> None
-        Checks if a column with the given prefix already exists in the Poses DataFrame. Raises an error if it does.
-    prep_pose_options(poses: Poses, pose_options: list[str] = None) -> list
-        Prepares pose options, ensuring they are of the same length as the poses.
-    generic_run_setup(poses: Poses, prefix: str, jobstarters: list[JobStarter], make_work_dir: bool = True) -> tuple[str, JobStarter]
-        Sets up the runner's working directory and jobstarter. Returns the path to the working directory and the selected jobstarter.
-    check_for_existing_scorefile(scorefile: str, overwrite: bool = False) -> pd.DataFrame
-        Checks if a scorefile exists and returns it as a DataFrame if overwrite is False. Returns None otherwise.
-    save_runner_scorefile(scores: pd.DataFrame, scorefile: str) -> None
-        Saves the runner's scorefile based on the file extension format.
-
     Examples
     --------
     To create a custom runner, subclass `Runner` and implement the abstract methods:

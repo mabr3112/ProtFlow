@@ -6,17 +6,20 @@ represented as Poses objects. It includes various selector classes that allow fo
 criteria of residue selection, such as by chain or based on existing residue selections.
 
 Classes:
-    ResidueSelector: Abstract base class for all residue selectors.
-    ChainSelector: Selects all residues of specified chains.
-    TrueSelector: Selects all residues of a pose.
-    NotSelector: Selects all residues except those specified by a residue selection.
+    - ResidueSelector: Abstract base class for all residue selectors.
+    - ChainSelector: Selects all residues of specified chains.
+    - TrueSelector: Selects all residues of a pose.
+    - NotSelector: Selects all residues except those specified by a residue selection.
 
 Dependencies:
-    protflow.residues
-    protflow.poses
-    protflow.utils.biopython_tools
+    - protflow.residues
+    - protflow.poses
+    - protflow.utils.biopython_tools
 
 Examples:
+
+.. code-block:: python
+
     # Example usage of ChainSelector
     poses = Poses()
     chain_selector = ChainSelector(poses=poses, chain='A')
@@ -30,6 +33,18 @@ Examples:
     residue_selection = ResidueSelection(['A1', 'A2'])
     not_selector = NotSelector(poses=poses, residue_selection=residue_selection)
     not_selector.select(prefix='not_selected')
+
+Notes
+-----
+This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.
+
+Author
+------
+Markus Braun, Adrian Tripp
+
+Version
+-------
+0.1.0    
 """
 
 # customs
@@ -46,14 +61,6 @@ class ResidueSelector:
 
     Attributes:
         poses (Poses): The Poses object containing the protein structures.
-
-    Methods:
-        set_poses(poses: Poses = None) -> None:
-            Sets the poses for the ResidueSelector class.
-        select(prefix: str) -> None:
-            Abstract method to select residues in poses.
-        select_single(*args) -> ResidueSelection:
-            Abstract method to select residues for a single pose.
     """
 
     def __init__(self, poses: Poses = None):
@@ -144,17 +151,6 @@ class ChainSelector(ResidueSelector):
         chains (list[str]): A list of chain identifiers to select residues from.
         chain (str): A single chain identifier to select residues from.
 
-    Methods:
-        set_chains(chains: list[str] = None) -> None:
-            Sets chains for the select() method.
-        set_chain(chain: str = None) -> None:
-            Sets a single chain for the select() method.
-        select(prefix: str, poses: Poses = None, chain: str = None, chains: list[str] = None) -> None:
-            Selects all residues of a given chain for all poses in a Poses object.
-        select_single(pose_path: str, chains: list[str]) -> ResidueSelection:
-            Selects residues of a given chain of poses and returns them as a ResidueSelection object.
-        prep_chain_input(chain: str = None, chains: list[str] = None) -> list[str]:
-            Prepares chain input for chain selection.
     """
     def __init__(self, poses: Poses = None, chain: list = None, chains: list = None):
         """
@@ -324,12 +320,6 @@ class TrueSelector(ResidueSelector):
 
     This class extends ResidueSelector to select all residues from each pose in a Poses object.
     It adds the selected residues as ResidueSelection objects under a specified column in Poses.df.
-
-    Methods:
-        select(prefix: str, poses: Poses = None) -> None:
-            Selects all residues of a given pose for all poses in a Poses object.
-        select_single(pose_path: str) -> ResidueSelection:
-            Selects all residues in a single pose and returns them as a ResidueSelection object.
     """
     def __init__(self, poses: Poses = None):
         """
@@ -389,18 +379,6 @@ class NotSelector(ResidueSelector):
     This class extends ResidueSelector to exclude specified residues from selection. 
     The excluded residues can be provided either as a ResidueSelection object or 
     as a contig string.
-
-    Methods:
-        set_residue_selection(residue_selection: ResidueSelection = None) -> None:
-            Sets the residue_selection attribute for the NotSelector class.
-        set_contig(contig: str) -> None:
-            Sets the contig attribute for the NotSelector class.
-        prep_residue_selection(residue_selection: ResidueSelection|str, poses: Poses) -> list[ResidueSelection]:
-            Prepares the residue_selection parameter for the select() function.
-        select(prefix: str, poses: Poses = None, residue_selection: ResidueSelection|str = None, contig: str = None) -> None:
-            Selects all residues except the ones specified in residue_selection or by contig.
-        select_single(pose_path: str, residue_selection: ResidueSelection) -> ResidueSelection:
-            Selects all residues except the ones specified in residue_selection or by contig.
     """
     def __init__(self, poses: Poses = None, residue_selection: ResidueSelection|str = None, contig: str = None):
         """
