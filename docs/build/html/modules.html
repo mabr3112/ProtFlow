@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="_static/jquery.js?v=5d32c60e"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="_static/documentation_options.js?v=8d563738"></script>
+        <script src="_static/doctools.js?v=9a2dae69"></script>
+        <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">protflow</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/modules.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="protflow">
+<h1>protflow<a class="headerlink" href="#protflow" title="Link to this heading"></a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="protflow.html">protflow package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="protflow.metrics.html">protflow.metrics package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.metrics.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.metrics.html#module-protflow.metrics.fpocket">protflow.metrics.fpocket module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.metrics.html#module-protflow.metrics.protparam">protflow.metrics.protparam module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.metrics.html#module-protflow.metrics.rmsd">protflow.metrics.rmsd module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.metrics.html#module-protflow.metrics.tmscore">protflow.metrics.tmscore module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.metrics.html#module-protflow.metrics">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.tools.html">protflow.tools package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.attnpacker">protflow.tools.attnpacker module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.colabfold">protflow.tools.colabfold module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.esmfold">protflow.tools.esmfold module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.ligandmpnn">protflow.tools.ligandmpnn module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.protein_edits">protflow.tools.protein_edits module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.protein_generator">protflow.tools.protein_generator module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.residue_selectors">protflow.tools.residue_selectors module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.rfdiffusion">protflow.tools.rfdiffusion module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools.rosetta">protflow.tools.rosetta module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#protflow-tools-rosettascripts-module">protflow.tools.rosettascripts module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.tools.html#module-protflow.tools">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#protflow-config-module">protflow.config module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#protflow-config-template-module">protflow.config_template module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#module-protflow.jobstarters">protflow.jobstarters module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#jobstarters">jobstarters</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#classes">Classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#usage">Usage</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.jobstarters.JobStarter"><code class="docutils literal notranslate"><span class="pre">JobStarter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.JobStarter.__init__"><code class="docutils literal notranslate"><span class="pre">JobStarter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.JobStarter.start"><code class="docutils literal notranslate"><span class="pre">JobStarter.start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.JobStarter.wait_for_job"><code class="docutils literal notranslate"><span class="pre">JobStarter.wait_for_job()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.JobStarter.set_max_cores"><code class="docutils literal notranslate"><span class="pre">JobStarter.set_max_cores()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id0"><code class="docutils literal notranslate"><span class="pre">JobStarter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id1"><code class="docutils literal notranslate"><span class="pre">JobStarter.set_max_cores()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id2"><code class="docutils literal notranslate"><span class="pre">JobStarter.start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id3"><code class="docutils literal notranslate"><span class="pre">JobStarter.wait_for_job()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.jobstarters.LocalJobStarter"><code class="docutils literal notranslate"><span class="pre">LocalJobStarter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.LocalJobStarter.__init__"><code class="docutils literal notranslate"><span class="pre">LocalJobStarter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.LocalJobStarter.start"><code class="docutils literal notranslate"><span class="pre">LocalJobStarter.start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.LocalJobStarter.wait_for_job"><code class="docutils literal notranslate"><span class="pre">LocalJobStarter.wait_for_job()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id4"><code class="docutils literal notranslate"><span class="pre">LocalJobStarter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id5"><code class="docutils literal notranslate"><span class="pre">LocalJobStarter.start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id6"><code class="docutils literal notranslate"><span class="pre">LocalJobStarter.wait_for_job()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.jobstarters.SbatchArrayJobstarter"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.SbatchArrayJobstarter.__init__"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.SbatchArrayJobstarter.start"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.SbatchArrayJobstarter.parse_options"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.parse_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.SbatchArrayJobstarter.set_options"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.set_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.jobstarters.SbatchArrayJobstarter.wait_for_job"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.wait_for_job()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id7"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id8"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.parse_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id9"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.set_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id10"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id11"><code class="docutils literal notranslate"><span class="pre">SbatchArrayJobstarter.wait_for_job()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.jobstarters.add_timestamp"><code class="docutils literal notranslate"><span class="pre">add_timestamp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.jobstarters.split_list"><code class="docutils literal notranslate"><span class="pre">split_list()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#module-protflow.poses">protflow.poses module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#poses">poses</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#key-features">Key Features</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id12">Classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#dependencies">Dependencies</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id13">Usage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#author">Author</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#version">Version</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.Poses"><code class="docutils literal notranslate"><span class="pre">Poses</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.df"><code class="docutils literal notranslate"><span class="pre">Poses.df</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.work_dir"><code class="docutils literal notranslate"><span class="pre">Poses.work_dir</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.storage_format"><code class="docutils literal notranslate"><span class="pre">Poses.storage_format</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.scorefile"><code class="docutils literal notranslate"><span class="pre">Poses.scorefile</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.default_jobstarter"><code class="docutils literal notranslate"><span class="pre">Poses.default_jobstarter</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.motifs"><code class="docutils literal notranslate"><span class="pre">Poses.motifs</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.set_scorefile"><code class="docutils literal notranslate"><span class="pre">Poses.set_scorefile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.set_storage_format"><code class="docutils literal notranslate"><span class="pre">Poses.set_storage_format()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.set_work_dir"><code class="docutils literal notranslate"><span class="pre">Poses.set_work_dir()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.set_logger"><code class="docutils literal notranslate"><span class="pre">Poses.set_logger()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.set_jobstarter"><code class="docutils literal notranslate"><span class="pre">Poses.set_jobstarter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.change_poses_dir"><code class="docutils literal notranslate"><span class="pre">Poses.change_poses_dir()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.parse_poses"><code class="docutils literal notranslate"><span class="pre">Poses.parse_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.parse_descriptions"><code class="docutils literal notranslate"><span class="pre">Poses.parse_descriptions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.set_poses"><code class="docutils literal notranslate"><span class="pre">Poses.set_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.check_prefix"><code class="docutils literal notranslate"><span class="pre">Poses.check_prefix()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.check_poses_df_integrity"><code class="docutils literal notranslate"><span class="pre">Poses.check_poses_df_integrity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.split_multiline_fasta"><code class="docutils literal notranslate"><span class="pre">Poses.split_multiline_fasta()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.determine_pose_type"><code class="docutils literal notranslate"><span class="pre">Poses.determine_pose_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.load_poses"><code class="docutils literal notranslate"><span class="pre">Poses.load_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.save_scores"><code class="docutils literal notranslate"><span class="pre">Poses.save_scores()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.save_poses"><code class="docutils literal notranslate"><span class="pre">Poses.save_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.poses_list"><code class="docutils literal notranslate"><span class="pre">Poses.poses_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.get_pose"><code class="docutils literal notranslate"><span class="pre">Poses.get_pose()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.duplicate_poses"><code class="docutils literal notranslate"><span class="pre">Poses.duplicate_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.reset_poses"><code class="docutils literal notranslate"><span class="pre">Poses.reset_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.set_motif"><code class="docutils literal notranslate"><span class="pre">Poses.set_motif()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.convert_pdb_to_fasta"><code class="docutils literal notranslate"><span class="pre">Poses.convert_pdb_to_fasta()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.filter_poses_by_rank"><code class="docutils literal notranslate"><span class="pre">Poses.filter_poses_by_rank()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.filter_poses_by_value"><code class="docutils literal notranslate"><span class="pre">Poses.filter_poses_by_value()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.calculate_composite_score"><code class="docutils literal notranslate"><span class="pre">Poses.calculate_composite_score()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.__init__"><code class="docutils literal notranslate"><span class="pre">Poses.__init__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.__iter__"><code class="docutils literal notranslate"><span class="pre">Poses.__iter__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.poses.Poses.__len__"><code class="docutils literal notranslate"><span class="pre">Poses.__len__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id14"><code class="docutils literal notranslate"><span class="pre">Poses.calculate_composite_score()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id15"><code class="docutils literal notranslate"><span class="pre">Poses.change_poses_dir()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id16"><code class="docutils literal notranslate"><span class="pre">Poses.check_poses_df_integrity()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id17"><code class="docutils literal notranslate"><span class="pre">Poses.check_prefix()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id18"><code class="docutils literal notranslate"><span class="pre">Poses.convert_pdb_to_fasta()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id19"><code class="docutils literal notranslate"><span class="pre">Poses.determine_pose_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id20"><code class="docutils literal notranslate"><span class="pre">Poses.duplicate_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id21"><code class="docutils literal notranslate"><span class="pre">Poses.filter_poses_by_rank()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id22"><code class="docutils literal notranslate"><span class="pre">Poses.filter_poses_by_value()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id23"><code class="docutils literal notranslate"><span class="pre">Poses.get_pose()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id24"><code class="docutils literal notranslate"><span class="pre">Poses.load_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id25"><code class="docutils literal notranslate"><span class="pre">Poses.parse_descriptions()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id26"><code class="docutils literal notranslate"><span class="pre">Poses.parse_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id27"><code class="docutils literal notranslate"><span class="pre">Poses.poses_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id28"><code class="docutils literal notranslate"><span class="pre">Poses.reset_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id29"><code class="docutils literal notranslate"><span class="pre">Poses.save_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id30"><code class="docutils literal notranslate"><span class="pre">Poses.save_scores()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id31"><code class="docutils literal notranslate"><span class="pre">Poses.set_jobstarter()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id32"><code class="docutils literal notranslate"><span class="pre">Poses.set_logger()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id33"><code class="docutils literal notranslate"><span class="pre">Poses.set_motif()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id34"><code class="docutils literal notranslate"><span class="pre">Poses.set_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id35"><code class="docutils literal notranslate"><span class="pre">Poses.set_scorefile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id36"><code class="docutils literal notranslate"><span class="pre">Poses.set_storage_format()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id37"><code class="docutils literal notranslate"><span class="pre">Poses.set_work_dir()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id38"><code class="docutils literal notranslate"><span class="pre">Poses.split_multiline_fasta()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.col_in_df"><code class="docutils literal notranslate"><span class="pre">col_in_df()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.combine_dataframe_score_columns"><code class="docutils literal notranslate"><span class="pre">combine_dataframe_score_columns()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.filter_dataframe_by_rank"><code class="docutils literal notranslate"><span class="pre">filter_dataframe_by_rank()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.filter_dataframe_by_value"><code class="docutils literal notranslate"><span class="pre">filter_dataframe_by_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.get_format"><code class="docutils literal notranslate"><span class="pre">get_format()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.load_poses"><code class="docutils literal notranslate"><span class="pre">load_poses()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.normalize_series"><code class="docutils literal notranslate"><span class="pre">normalize_series()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.poses.scale_series"><code class="docutils literal notranslate"><span class="pre">scale_series()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#module-protflow.residues">protflow.residues module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#residues">residues</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id39">Classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#functions">Functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#example-usage">Example Usage</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.residues.ResidueSelection"><code class="docutils literal notranslate"><span class="pre">ResidueSelection</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.residues.ResidueSelection.residues"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.residues</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.residues.ResidueSelection.from_selection"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.from_selection()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.residues.ResidueSelection.to_string"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.to_string()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.residues.ResidueSelection.to_list"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.to_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.residues.ResidueSelection.to_dict"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.to_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id40"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.from_selection()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id41"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.to_dict()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id42"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.to_list()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id43"><code class="docutils literal notranslate"><span class="pre">ResidueSelection.to_string()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.residues.fast_parse_selection"><code class="docutils literal notranslate"><span class="pre">fast_parse_selection()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.residues.from_contig"><code class="docutils literal notranslate"><span class="pre">from_contig()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.residues.from_dict"><code class="docutils literal notranslate"><span class="pre">from_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.residues.parse_residue"><code class="docutils literal notranslate"><span class="pre">parse_residue()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.residues.parse_selection"><code class="docutils literal notranslate"><span class="pre">parse_selection()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.residues.reduce_to_unique"><code class="docutils literal notranslate"><span class="pre">reduce_to_unique()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.residues.residue_selection"><code class="docutils literal notranslate"><span class="pre">residue_selection()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#module-protflow.runners">protflow.runners module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#runners-module">runners module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id44">Dependencies:</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id45">Overview:</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id46">Author</a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id47">Version</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.runners.Runner"><code class="docutils literal notranslate"><span class="pre">Runner</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.Runner.__str__"><code class="docutils literal notranslate"><span class="pre">Runner.__str__()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.Runner.check_for_existing_scorefile"><code class="docutils literal notranslate"><span class="pre">Runner.check_for_existing_scorefile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.Runner.check_for_prefix"><code class="docutils literal notranslate"><span class="pre">Runner.check_for_prefix()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.Runner.generic_run_setup"><code class="docutils literal notranslate"><span class="pre">Runner.generic_run_setup()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.Runner.prep_pose_options"><code class="docutils literal notranslate"><span class="pre">Runner.prep_pose_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.Runner.run"><code class="docutils literal notranslate"><span class="pre">Runner.run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.Runner.save_runner_scorefile"><code class="docutils literal notranslate"><span class="pre">Runner.save_runner_scorefile()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.Runner.search_path"><code class="docutils literal notranslate"><span class="pre">Runner.search_path()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.runners.RunnerOutput"><code class="docutils literal notranslate"><span class="pre">RunnerOutput</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.RunnerOutput.check_data_formatting"><code class="docutils literal notranslate"><span class="pre">RunnerOutput.check_data_formatting()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#protflow.runners.RunnerOutput.return_poses"><code class="docutils literal notranslate"><span class="pre">RunnerOutput.return_poses()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id48"><code class="docutils literal notranslate"><span class="pre">RunnerOutput.check_data_formatting()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="protflow.html#id49"><code class="docutils literal notranslate"><span class="pre">RunnerOutput.return_poses()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.runners.col_in_df"><code class="docutils literal notranslate"><span class="pre">col_in_df()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.runners.expand_options_flags"><code class="docutils literal notranslate"><span class="pre">expand_options_flags()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.runners.options_flags_to_string"><code class="docutils literal notranslate"><span class="pre">options_flags_to_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.runners.parse_generic_options"><code class="docutils literal notranslate"><span class="pre">parse_generic_options()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="protflow.html#protflow.runners.regex_expand_options_flags"><code class="docutils literal notranslate"><span class="pre">regex_expand_options_flags()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="protflow.html#module-contents">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

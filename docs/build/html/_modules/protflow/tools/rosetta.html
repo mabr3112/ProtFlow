@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.tools.rosetta &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.tools.rosetta</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.tools.rosetta</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Rosetta Module</span>
+<span class="sd">==============</span>
+
+<span class="sd">This module provides the functionality to integrate Rosetta within the ProtFlow framework. It offers tools to run various Rosetta applications, handle their inputs and outputs, and process the resulting data in a structured and automated manner.</span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `Rosetta` class encapsulates the functionality necessary to execute Rosetta runs. It manages the configuration of paths to essential scripts and executables, sets up the environment, and handles the execution of Rosetta processes. It also includes methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.</span>
+<span class="sd">The module is designed to streamline the integration of Rosetta into larger computational workflows. It supports the automatic setup of job parameters, execution of Rosetta commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create an instance of the `Rosetta` class and invoke its `run` method with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the Rosetta process is provided through various parameters, allowing for customized runs tailored to specific research needs.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `Rosetta` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from rosetta import Rosetta</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the Rosetta class</span>
+<span class="sd">    rosetta = Rosetta()</span>
+
+<span class="sd">    # Run the Rosetta process</span>
+<span class="sd">    results = rosetta.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        jobstarter=jobstarter,</span>
+<span class="sd">        rosetta_application=&quot;RosettaScripts&quot;,</span>
+<span class="sd">        nstruct=10,</span>
+<span class="sd">        options=&quot;&quot;,</span>
+<span class="sd">        pose_options=[&quot;-parser:protocol my_protocol.xml&quot;],</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">    - Edge Cases: The module handles various edge cases, such as invalid paths for executables and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the Rosetta process.</span>
+<span class="sd">    - Customizability: Users can customize the Rosetta process through multiple parameters, including the number of structures (nstruct), specific options for the Rosetta application, and options for handling pose-specific parameters.</span>
+<span class="sd">    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate Rosetta into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Author</span>
+<span class="sd">------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># general imports</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+
+<span class="c1"># dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="c1"># custom</span>
+<span class="kn">import</span> <span class="nn">protflow.config</span>
+<span class="kn">import</span> <span class="nn">protflow.jobstarters</span>
+<span class="kn">import</span> <span class="nn">protflow.tools</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">RunnerOutput</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+
+<div class="viewcode-block" id="Rosetta">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rosetta.Rosetta">[docs]</a>
+<span class="k">class</span> <span class="nc">Rosetta</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Rosetta Class</span>
+<span class="sd">    =============</span>
+
+<span class="sd">    The `Rosetta` class is a specialized class designed to facilitate the execution of Rosetta applications within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with Rosetta processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `Rosetta` class manages all aspects of running Rosetta simulations. It handles the configuration of necessary scripts and executables, prepares the environment for Rosetta processes, and executes the Rosetta commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to Rosetta scripts and executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of Rosetta commands with support for multiple structures (nstruct).</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">        - Cleaning and renaming PDB files based on Rosetta outputs.</span>
+<span class="sd">        - Handling score files and converting them into a readable format.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `Rosetta` class, configured to run Rosetta processes and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">        - KeyError: If forbidden options are provided to the methods.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `Rosetta` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from rosetta import Rosetta</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the Rosetta class</span>
+<span class="sd">        rosetta = Rosetta()</span>
+
+<span class="sd">        # Run the Rosetta process</span>
+<span class="sd">        results = rosetta.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            rosetta_application=&quot;RosettaScripts&quot;,</span>
+<span class="sd">            nstruct=10,</span>
+<span class="sd">            options=&quot;&quot;,</span>
+<span class="sd">            pose_options=[&quot;-parser:protocol my_protocol.xml&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as invalid paths for executables, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the Rosetta process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The Rosetta class is intended for researchers and developers who need to perform Rosetta simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="Rosetta.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rosetta.Rosetta.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">script_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">ROSETTA_BIN_PATH</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the Rosetta class with the necessary configuration.</span>
+
+<span class="sd">        This method sets up the Rosetta class with the provided script path and job starter configuration. It initializes the necessary parameters and prepares the environment for executing Rosetta processes.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            script_path (str, optional): The path to the Rosetta executable scripts. Defaults to the path specified in `protflow.config.ROSETTA_BIN_PATH`.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no valid script path is provided.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize the `Rosetta` class:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from rosetta import Rosetta</span>
+
+<span class="sd">                # Initialize the Rosetta class with a specific script path</span>
+<span class="sd">                rosetta = Rosetta(script_path=&quot;/path/to/rosetta&quot;, jobstarter=JobStarter())</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Configuration:** The method checks if the provided script path is valid and sets it up for further use. If no script path is provided, it defaults to the path specified in the ProtFlow configuration.</span>
+<span class="sd">            - **Job Starter:** The job starter parameter can be provided to manage the execution of Rosetta jobs. If not provided, it defaults to None, and the default job starter configuration from ProtFlow will be used.</span>
+
+<span class="sd">        This method ensures that the Rosetta class is correctly initialized with the necessary configurations to run Rosetta applications within the ProtFlow framework.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">script_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_path</span><span class="p">(</span><span class="n">script_path</span><span class="p">,</span> <span class="s2">&quot;ROSETTA_BIN_PATH&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;rosetta.py&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;rosetta.py&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_setup_executable</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">script_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rosetta_application</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets up the Rosetta executable.</span>
+
+<span class="sd">        This method verifies and sets up the path to the Rosetta executable script. It ensures that the provided executable path is valid and can be executed. If the Rosetta application is not provided, it checks the default script path for executables.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            script_path (str): The path to the Rosetta scripts directory.</span>
+<span class="sd">            rosetta_application (str, optional): The specific Rosetta application to be executed. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The full path to the executable Rosetta application.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the executable is not properly set up or the provided path is not executable.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `setup_executable` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rosetta import Rosetta</span>
+
+<span class="sd">                # Initialize the Rosetta class</span>
+<span class="sd">                rosetta = Rosetta(script_path=&quot;/path/to/rosetta&quot;)</span>
+
+<span class="sd">                # Set up the Rosetta executable</span>
+<span class="sd">                executable_path = rosetta.setup_executable(</span>
+<span class="sd">                    script_path=&quot;/path/to/rosetta&quot;,</span>
+<span class="sd">                    rosetta_application=&quot;RosettaScripts&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                print(executable_path)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Executable Verification:** The method checks if the provided path or the Rosetta application is executable. If neither is executable, it raises a ValueError indicating improper setup.</span>
+<span class="sd">            - **Path Handling:** If the Rosetta application is provided, it verifies if it is executable. If not, it checks the default script path directory for the executable application. The method ensures that a valid executable path is returned for running Rosetta applications.</span>
+
+<span class="sd">        This method is designed to ensure that the Rosetta executable is properly set up and can be executed, facilitating the smooth running of Rosetta processes within the ProtFlow framework.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># if rosetta_application is not provided, check if script_path is executable:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">rosetta_application</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">script_path</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">script_path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">X_OK</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">script_path</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rosetta Executable not setup properly. Either provide executable through Runner.script_path or give directly to run(rosetta_application)&quot;</span><span class="p">)</span>
+
+        <span class="c1"># if rosetta_application is provided, check if it is executable:</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">rosetta_application</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">rosetta_application</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">X_OK</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">rosetta_application</span>
+
+        <span class="c1"># if rosetta_application is not executable, find it at script_dir/rosetta_executable and check if this is executable:</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">script_path</span><span class="p">):</span>
+            <span class="n">combined_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">script_path</span><span class="p">,</span> <span class="n">rosetta_application</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">combined_path</span><span class="p">)</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">access</span><span class="p">(</span><span class="n">combined_path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">X_OK</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">combined_path</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Provided rosetta_applicatiaon is not executable: </span><span class="si">{</span><span class="n">combined_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># otherwise raise error for not properly setting up the rosetta script paths.</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Rosetta.run">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rosetta.Rosetta.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">rosetta_application</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">nstruct</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">list</span><span class="o">|</span><span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Poses</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute the Rosetta process with given poses and jobstarter configuration.</span>
+
+<span class="sd">        This method sets up and runs the Rosetta process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+<span class="sd">            rosetta_application (str, optional): The specific Rosetta application to be executed. Defaults to None.</span>
+<span class="sd">            nstruct (int, optional): The number of structures to generate for each input pose. Defaults to 1.</span>
+<span class="sd">            options (str, optional): Additional options for the Rosetta application. Defaults to None.</span>
+<span class="sd">            pose_options (list[str] | str, optional): A list of pose-specific options for the Rosetta application. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the Rosetta process.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the method.</span>
+<span class="sd">            KeyError: If forbidden options are provided to the method.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `run` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from rosetta import Rosetta</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the Rosetta class</span>
+<span class="sd">                rosetta = Rosetta()</span>
+
+<span class="sd">                # Run the Rosetta process</span>
+<span class="sd">                results = rosetta.run(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    rosetta_application=&quot;RosettaScripts&quot;,</span>
+<span class="sd">                    nstruct=10,</span>
+<span class="sd">                    options=&quot;&quot;,</span>
+<span class="sd">                    pose_options=[&quot;-parser:protocol my_protocol.xml&quot;],</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(results)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It verifies that the Rosetta application is executable and configures the execution environment accordingly.</span>
+<span class="sd">            - **Output Management:** The method handles the collection and processing of output data, ensuring that results are organized and accessible for further analysis. It manages score files, renames PDB files, and compiles output data into a structured format.</span>
+<span class="sd">            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the Rosetta process to their specific needs. This includes setting the number of structures to generate, providing additional options for the Rosetta application, and specifying pose-specific options.</span>
+
+<span class="sd">        This method is designed to streamline the execution of Rosetta processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze Rosetta simulations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># setup runner:</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="c1"># check if script_path / rosetta_application have an executable.</span>
+        <span class="n">rosetta_exec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_setup_executable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">script_path</span><span class="p">,</span> <span class="n">rosetta_application</span><span class="p">)</span>
+
+        <span class="c1"># Look for output-file in pdb-dir. If output is present and correct, then skip RosettaScripts.</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_rosetta_scores.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">scores</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">overwrite</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">):</span>
+            <span class="n">rosetta_scores</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;r*_*_score.json&quot;</span><span class="p">))</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">rosetta_scores</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">score</span> <span class="ow">in</span> <span class="n">rosetta_scores</span><span class="p">:</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">score</span><span class="p">)</span>
+
+        <span class="c1"># parse_options and pose_options:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">):</span> <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">pose_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_pose_options</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+
+        <span class="c1"># write rosettascripts cmds:</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">pose_opts</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span> <span class="n">pose_options</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">nstruct</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+                <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose_path</span><span class="o">=</span><span class="n">pose</span><span class="p">,</span> <span class="n">rosetta_application</span><span class="o">=</span><span class="n">rosetta_exec</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">i</span><span class="o">=</span><span class="n">i</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="o">=</span><span class="n">pose_opts</span><span class="p">))</span>
+
+        <span class="c1"># run</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span><span class="o">=</span><span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span><span class="o">=</span><span class="s2">&quot;rosetta&quot;</span><span class="p">,</span>
+            <span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">output_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># collect scores and rename pdbs.</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span> <span class="c1"># Rosetta does not have time to write the last score into the scorefile otherwise?</span>
+
+        <span class="c1"># collect scores</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">collect_scores</span><span class="p">(</span><span class="n">work_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="Rosetta.write_cmd">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rosetta.Rosetta.write_cmd">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_cmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rosetta_application</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">i</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Writes the command to run a Rosetta application.</span>
+
+<span class="sd">        This method constructs the command string needed to execute a Rosetta application with the specified options and parameters. It ensures that the command includes all necessary arguments and handles the setup for running the application.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            rosetta_application (str): The path to the Rosetta executable.</span>
+<span class="sd">            pose_path (str): The path to the input pose file.</span>
+<span class="sd">            output_dir (str): The directory where output files will be stored.</span>
+<span class="sd">            i (int): The index of the current structure being processed.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+<span class="sd">            options (str, optional): Additional options for the Rosetta application. Defaults to None.</span>
+<span class="sd">            pose_options (str, optional): Pose-specific options for the Rosetta application. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The command string to execute the Rosetta application.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If forbidden options are included in the provided options or pose_options.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `write_cmd` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rosetta import Rosetta</span>
+
+<span class="sd">                # Initialize the Rosetta class</span>
+<span class="sd">                rosetta = Rosetta(script_path=&quot;/path/to/rosetta&quot;)</span>
+
+<span class="sd">                # Write the command to run the Rosetta application</span>
+<span class="sd">                cmd = rosetta.write_cmd(</span>
+<span class="sd">                    rosetta_application=&quot;/path/to/rosetta/RosettaScripts&quot;,</span>
+<span class="sd">                    pose_path=&quot;input.pdb&quot;,</span>
+<span class="sd">                    output_dir=&quot;/path/to/output&quot;,</span>
+<span class="sd">                    i=1,</span>
+<span class="sd">                    overwrite=True,</span>
+<span class="sd">                    options=&quot;-parser:protocol my_protocol.xml&quot;,</span>
+<span class="sd">                    pose_options=&quot;-in:file:s input.pdb&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                print(cmd)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Command Construction:** The method constructs the command string by combining the executable path, input pose path, output directory, and additional options. It ensures that all necessary arguments are included in the command.</span>
+<span class="sd">            - **Option Parsing:** The method parses the provided options and pose_options, ensuring they are correctly formatted and do not include any forbidden options. Forbidden options include arguments that could interfere with the correct execution of the Rosetta application, such as output path settings.</span>
+<span class="sd">            - **Overwrite Handling:** If the overwrite parameter is set to True, the command includes the necessary argument to overwrite existing output files. This ensures that the process can be re-run without conflicts.</span>
+
+<span class="sd">        This method is designed to facilitate the construction of command strings for running Rosetta applications, making it easier for researchers and developers to execute and manage Rosetta simulations within the ProtFlow framework.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;-</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span>
+        <span class="n">flags</span> <span class="o">=</span> <span class="s2">&quot; -&quot;</span> <span class="o">+</span> <span class="s2">&quot; -&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="k">if</span> <span class="n">flags</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># check if interfering options were set</span>
+        <span class="n">forbidden_options</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;-out:path:all&#39;</span><span class="p">,</span> <span class="s1">&#39;-in:file:s&#39;</span><span class="p">,</span> <span class="s1">&#39;-out:prefix&#39;</span><span class="p">,</span> <span class="s1">&#39;-out:file:scorefile&#39;</span><span class="p">,</span> <span class="s1">&#39;-out:file:scorefile_format&#39;</span><span class="p">,</span> <span class="s1">&#39; -s &#39;</span><span class="p">,</span> <span class="s1">&#39;-scorefile_format&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">options</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">opt</span> <span class="ow">in</span> <span class="n">options</span> <span class="k">for</span> <span class="n">opt</span> <span class="ow">in</span> <span class="n">forbidden_options</span><span class="p">))</span> <span class="ow">or</span> <span class="p">(</span><span class="n">pose_options</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">pose_opt</span> <span class="ow">in</span> <span class="n">pose_options</span> <span class="k">for</span> <span class="n">pose_opt</span> <span class="ow">in</span> <span class="n">forbidden_options</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;options and pose_options must not contain any of </span><span class="si">{</span><span class="n">forbidden_options</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;-</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span> <span class="k">if</span> <span class="n">opts</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">flags</span> <span class="o">=</span> <span class="s2">&quot; -&quot;</span> <span class="o">+</span> <span class="s2">&quot; -&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="k">if</span> <span class="n">flags</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">overwrite</span> <span class="o">=</span> <span class="s2">&quot; -overwrite&quot;</span> <span class="k">if</span> <span class="n">overwrite</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># compile command</span>
+        <span class="n">run_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">rosetta_application</span><span class="si">}</span><span class="s2"> -out:path:all </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2"> -in:file:s </span><span class="si">{</span><span class="n">pose_path</span><span class="si">}</span><span class="s2"> -out:prefix r</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">_ -out:file:scorefile r</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pose_path</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">_score.json -out:file:scorefile_format json </span><span class="si">{</span><span class="n">opts</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">flags</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">overwrite</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">return</span> <span class="n">run_string</span></div>
+</div>
+
+
+<div class="viewcode-block" id="collect_scores">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rosetta.collect_scores">[docs]</a>
+<span class="k">def</span> <span class="nf">collect_scores</span><span class="p">(</span><span class="n">work_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Collects scores from Rosetta output files and reindexes PDB files.</span>
+
+<span class="sd">    This function collects scores from Rosetta output files, reindexes PDB files based on the scores, and stores the scores in a pandas DataFrame. It also renames PDB files in the working directory to match the reindexed names.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        work_dir (str): The directory where Rosetta output files are stored.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pandas.DataFrame: A DataFrame containing the collected scores with reindexed PDB file names.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Here is an example of how to use the `collect_scores` function:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            from rosetta import collect_scores</span>
+
+<span class="sd">            # Collect scores from the Rosetta output directory</span>
+<span class="sd">            scores_df = collect_scores(work_dir=&quot;/path/to/output_directory&quot;)</span>
+
+<span class="sd">            print(scores_df)</span>
+
+<span class="sd">    Further Details:</span>
+<span class="sd">        - **Score Collection:** The function collects score files from the specified directory and reads them into a pandas DataFrame.</span>
+<span class="sd">        - **Reindexing:** The function reindexes the PDB files based on the scores and renames the files in the working directory accordingly.</span>
+<span class="sd">        - **File Renaming:** The function ensures that all Rosetta output PDB files are renamed to match the reindexed names, and the paths to these files are stored in the DataFrame.</span>
+<span class="sd">        - **Consistency Check:** The function waits for all Rosetta output files to appear in the output directory, ensuring that the renaming process is consistent and complete.</span>
+
+<span class="sd">    This function is designed to streamline the process of collecting and organizing Rosetta output data, making it easier for researchers and developers to analyze the results of Rosetta simulations within the ProtFlow framework.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">scorefiles</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;r*_*_score.json&quot;</span><span class="p">))</span>
+    <span class="n">scores_l</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">scorefile</span> <span class="ow">in</span> <span class="n">scorefiles</span><span class="p">:</span>
+        <span class="n">scores_l</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">read_json</span><span class="p">(</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">typ</span><span class="o">=</span><span class="s1">&#39;series&#39;</span><span class="p">))</span>
+    <span class="n">scores_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">scores_l</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;decoy&quot;</span><span class="p">:</span> <span class="s2">&quot;raw_description&quot;</span><span class="p">})</span>
+    <span class="n">scores_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s2">&quot;description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">scores_df</span><span class="p">[</span><span class="s2">&quot;raw_description&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">scores_df</span><span class="p">[</span><span class="s2">&quot;raw_description&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+    <span class="c1"># wait for all Rosetta output files to appear in the output directory (for some reason, they are sometimes not there after the runs completed.)</span>
+    <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/r*.pdb&quot;</span><span class="p">))</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">scores_df</span><span class="p">):</span>
+        <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># rename .pdb files in work_dir to the reindexed names.</span>
+    <span class="n">names_dict</span> <span class="o">=</span> <span class="n">scores_df</span><span class="p">[[</span><span class="s2">&quot;raw_description&quot;</span><span class="p">,</span> <span class="s2">&quot;description&quot;</span><span class="p">]]</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Renaming and reindexing </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">scores_df</span><span class="p">)</span><span class="si">}</span><span class="s2"> Rosetta output .pdb files&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">oldname</span><span class="p">,</span> <span class="n">newname</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">names_dict</span><span class="p">[</span><span class="s2">&quot;raw_description&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">names_dict</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">oldname</span><span class="si">}</span><span class="s2">.pdb&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">nf</span> <span class="o">:=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">newname</span><span class="si">}</span><span class="s2">.pdb&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">nf</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;WARNING: Could not rename file </span><span class="si">{</span><span class="n">oldname</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">nf</span><span class="si">}</span><span class="se">\n</span><span class="s2"> Retrying renaming.&quot;</span><span class="p">)</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">oldname</span><span class="si">}</span><span class="s2">.pdb&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">nf</span> <span class="o">:=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">newname</span><span class="si">}</span><span class="s2">.pdb&quot;</span><span class="p">))</span>
+
+    <span class="c1"># Collect information of path to .pdb files into dataframe under &quot;location&quot; column</span>
+    <span class="n">scores_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s2">&quot;location&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">work_dir</span> <span class="o">+</span> <span class="s2">&quot;/&quot;</span> <span class="o">+</span> <span class="n">scores_df</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="s2">&quot;.pdb&quot;</span>
+
+    <span class="c1"># safetycheck rename all remaining files with r*.pdb into proper filename:</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">remaining_r_pdbfiles</span> <span class="o">:=</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/r*.pdb&quot;</span><span class="p">)):</span>
+        <span class="k">for</span> <span class="n">pdb_path</span> <span class="ow">in</span> <span class="n">remaining_r_pdbfiles</span><span class="p">:</span>
+            <span class="n">pdb_path</span> <span class="o">=</span> <span class="n">pdb_path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">idx</span> <span class="o">=</span> <span class="n">pdb_path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;r&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">new_name</span> <span class="o">=</span> <span class="s2">&quot;_&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pdb_path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.pdb&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="n">idx</span> <span class="o">+</span> <span class="s2">&quot;.pdb&quot;</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">move</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">pdb_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">new_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># reset index and write scores to file</span>
+    <span class="n">scores_df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="s2">&quot;True&quot;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">scores_df</span></div>
+
+
+<div class="viewcode-block" id="clean_rosetta_scorefile">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rosetta.clean_rosetta_scorefile">[docs]</a>
+<span class="k">def</span> <span class="nf">clean_rosetta_scorefile</span><span class="p">(</span><span class="n">path_to_file</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">out_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Cleans a faulty Rosetta scorefile.</span>
+
+<span class="sd">    This function reads a Rosetta scorefile and removes any lines that do not match the expected format (i.e., lines with a different number of columns than the header). It writes the cleaned scores to a new file.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        path_to_file (str): The path to the original Rosetta scorefile.</span>
+<span class="sd">        out_path (str): The path where the cleaned scorefile will be saved.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: The path to the cleaned scorefile.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Here is an example of how to use the `clean_rosetta_scorefile` function:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            from rosetta import clean_rosetta_scorefile</span>
+
+<span class="sd">            # Clean the Rosetta scorefile</span>
+<span class="sd">            cleaned_file_path = clean_rosetta_scorefile(</span>
+<span class="sd">                path_to_file=&quot;path/to/original_scorefile.sc&quot;,</span>
+<span class="sd">                out_path=&quot;path/to/cleaned_scorefile.sc&quot;</span>
+<span class="sd">            )</span>
+
+<span class="sd">            print(f&quot;Cleaned scorefile saved at: {cleaned_file_path}&quot;)</span>
+
+<span class="sd">    Further Details:</span>
+<span class="sd">        - **File Reading:** The function reads the scorefile line by line and splits each line into columns.</span>
+<span class="sd">        - **Format Verification:** It verifies that each line has the same number of columns as the header. Lines with a different number of columns are removed.</span>
+<span class="sd">        - **File Writing:** The cleaned scores are written to the specified output file. A warning is logged indicating the number of lines removed during the cleaning process.</span>
+
+<span class="sd">    This function is useful for ensuring that Rosetta scorefiles are properly formatted and free of inconsistencies, facilitating accurate data analysis.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># read in file line-by-line:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path_to_file</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">readlines</span><span class="p">()[</span><span class="mi">1</span><span class="p">:])]</span>
+
+    <span class="c1"># if any line has a different number of scores than the header (columns), that line will be removed.</span>
+    <span class="n">scores_cleaned</span> <span class="o">=</span> <span class="p">[</span><span class="n">line</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">scores</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">scores</span><span class="p">[</span><span class="mi">0</span><span class="p">])]</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="nb">len</span><span class="p">(</span><span class="n">scores_cleaned</span><span class="p">)</span><span class="si">}</span><span class="s2"> scores were removed from Rosetta scorefile at </span><span class="si">{</span><span class="n">path_to_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># write cleaned scores to file:</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="s2">&quot;,&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">line</span><span class="p">)</span> <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">scores_cleaned</span><span class="p">]))</span>
+    <span class="k">return</span> <span class="n">out_path</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

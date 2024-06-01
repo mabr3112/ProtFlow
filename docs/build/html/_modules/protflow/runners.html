@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.runners &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.runners</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.runners</h1><div class="highlight"><pre>
+<span></span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">runners module</span>
+<span class="sd">==============</span>
+
+<span class="sd">This module provides functionality for handling the interaction between runners and poses in protein data processing workflows.</span>
+
+<span class="sd">It includes classes and utility functions to:</span>
+
+<span class="sd">- Manage the output from runner processes.</span>
+<span class="sd">- Define abstract runner interfaces.</span>
+<span class="sd">- Parse and manage command-line options and flags for runner processes.</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">-------------</span>
+
+<span class="sd">- builtins: logging, os, re</span>
+<span class="sd">- pandas</span>
+<span class="sd">- protflow.poses: Poses, get_format, FORMAT_STORAGE_DICT</span>
+<span class="sd">- protflow.jobstarters: JobStarter</span>
+
+<span class="sd">Overview:</span>
+<span class="sd">---------</span>
+
+<span class="sd">The `runners` module is designed to facilitate the integration of various runner processes with protein pose data, ensuring</span>
+<span class="sd">consistent data formatting, error handling, and integration of results into the Poses class. Utility functions provided in</span>
+<span class="sd">this module support the parsing and handling of command-line options and flags, making it easier to configure and execute</span>
+<span class="sd">runner processes in a flexible manner.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Author</span>
+<span class="sd">------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&#39;&#39;&#39;</span>
+<span class="c1"># builtins</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">re</span>
+
+<span class="c1"># dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="c1"># custom</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">get_format</span><span class="p">,</span> <span class="n">FORMAT_STORAGE_DICT</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+
+<div class="viewcode-block" id="RunnerOutput">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.RunnerOutput">[docs]</a>
+<span class="k">class</span> <span class="nc">RunnerOutput</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    RunnerOutput class</span>
+<span class="sd">    ==================</span>
+
+<span class="sd">    The `RunnerOutput` class handles how protein data is passed between `Runner` and `Poses` classes. It ensures the correct</span>
+<span class="sd">    formatting of results and facilitates the integration of runner outputs into the Poses data structure.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    poses : Poses</span>
+<span class="sd">        An instance of the Poses class.</span>
+<span class="sd">    results : pandas.DataFrame</span>
+<span class="sd">        A DataFrame containing the results to be checked and formatted. The DataFrame must contain &#39;description&#39; and &#39;location&#39; columns.</span>
+<span class="sd">    prefix : str</span>
+<span class="sd">        A prefix to be added to the results columns.</span>
+<span class="sd">    index_layers : int, optional</span>
+<span class="sd">        Number of index layers to remove from the &#39;description&#39; column (default is 0).</span>
+<span class="sd">    index_sep : str, optional</span>
+<span class="sd">        Separator used in the index (default is &quot;_&quot;).</span>
+
+<span class="sd">    Methods</span>
+<span class="sd">    -------</span>
+<span class="sd">    check_data_formatting(results: pd.DataFrame)</span>
+<span class="sd">        Checks if the input DataFrame has the correct format. It must contain &#39;description&#39; and &#39;location&#39; columns.</span>
+<span class="sd">    return_poses()</span>
+<span class="sd">        Integrates the output of a runner into a Poses class by merging the formatted runner output into `Poses.df` and returns the updated Poses instance.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">results</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">index_layers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">index_sep</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;_&quot;</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_data_formatting</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+
+        <span class="c1"># Remove layers if option is set</span>
+        <span class="k">if</span> <span class="n">index_layers</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s2">&quot;select_col&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">index_sep</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="n">index_layers</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">index_sep</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s2">&quot;select_col&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">results</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">add_prefix</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span>
+
+<div class="viewcode-block" id="RunnerOutput.check_data_formatting">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.RunnerOutput.check_data_formatting">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_data_formatting</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">results</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks if the input DataFrame has the correct format.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        results : pandas.DataFrame</span>
+<span class="sd">            The input DataFrame to be checked. It must contain &#39;description&#39; and &#39;location&#39; columns.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            The validated and formatted DataFrame.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If the input DataFrame does not contain the required columns or if the &#39;description&#39; column does not match the &#39;location&#39; column.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">extract_description</span><span class="p">(</span><span class="n">path</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">path</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">mandatory_cols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">,</span> <span class="s2">&quot;location&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">results</span><span class="o">.</span><span class="n">columns</span> <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">mandatory_cols</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Input Data to RunnerOutput class MUST contain columns &#39;description&#39; and &#39;location&#39;.</span><span class="se">\n</span><span class="s2">Description should carry the name of the poses, while &#39;location&#39; should contain the path (+ filename and suffix).&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="n">results</span><span class="p">[</span><span class="s1">&#39;location&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">extract_description</span><span class="p">))</span><span class="o">.</span><span class="n">all</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;description&#39; column does not match &#39;location&#39; column in runner output dataframe!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">results</span></div>
+
+
+<div class="viewcode-block" id="RunnerOutput.return_poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.RunnerOutput.return_poses">[docs]</a>
+    <span class="k">def</span> <span class="nf">return_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Integrates the output of a runner into a Poses class.</span>
+
+<span class="sd">        This method adds the output of a Runner class formatted in RunnerOutput into `Poses.df` and returns the updated Poses instance.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Poses</span>
+<span class="sd">            The updated Poses instance with the integrated runner output.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If merging DataFrames fails due to no overlap between `Poses.df[&#39;poses_description&#39;]` and `results[new_df_col]` or if some rows in `results[new_df_col]` were not found in `Poses.df[&#39;poses_description&#39;]`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">startlen</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+
+        <span class="c1"># check for duplicate columns</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">x</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="o">.</span><span class="n">columns</span><span class="p">)):</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># if poses are empty, concatenate DataFrames:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">())</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses.df is empty. This means the existing poses.df will be merged with the new results of </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">merged_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">])</span>
+
+        <span class="c1"># if poses.df contains scores, merge DataFrames based on poses_description to keep scores continous</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">merged_df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">results</span><span class="p">,</span> <span class="n">left_on</span><span class="o">=</span><span class="s2">&quot;poses_description&quot;</span><span class="p">,</span> <span class="n">right_on</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_select_col&quot;</span><span class="p">)</span> <span class="c1"># pylint: disable=W0201</span>
+
+        <span class="c1"># cleanup after merger</span>
+        <span class="n">merged_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_select_col&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">merged_df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># check if merger was successful:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">merged_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Merging DataFrames failed. This means there was no overlap found between poses.df[&#39;poses_description&#39;] and results[new_df_col]&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">merged_df</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">startlen</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df[&#39;poses_description&#39;]&quot;</span><span class="p">)</span>
+
+        <span class="c1"># reset poses and poses_description column</span>
+        <span class="n">merged_df</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">merged_df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_location&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()]</span>
+        <span class="n">merged_df</span><span class="p">[</span><span class="s2">&quot;poses_description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">merged_df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_description&quot;</span><span class="p">]</span>
+
+        <span class="c1"># integrate new results into Poses object</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">merged_df</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="o">.</span><span class="n">save_scores</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses</span></div>
+</div>
+
+
+<div class="viewcode-block" id="Runner">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner">[docs]</a>
+<span class="k">class</span> <span class="nc">Runner</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Abstract Runner base class</span>
+<span class="sd">    ==========================</span>
+
+<span class="sd">    The `Runner` class provides an abstract base for defining runners that handle the interface between runner processes and the Poses class.</span>
+<span class="sd">    It includes methods for running jobs, checking paths, verifying prefixes, preparing pose options, and managing job setup and score files.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    To create a custom runner, subclass `Runner` and implement the abstract methods:</span>
+
+<span class="sd">    &gt;&gt;&gt; class MyRunner(Runner):</span>
+<span class="sd">    &gt;&gt;&gt;     def __str__(self):</span>
+<span class="sd">    &gt;&gt;&gt;         return &quot;MyRunner&quot;</span>
+<span class="sd">    &gt;&gt;&gt;</span>
+<span class="sd">    &gt;&gt;&gt;     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -&gt; RunnerOutput:</span>
+<span class="sd">    &gt;&gt;&gt;         # Custom implementation for running jobs</span>
+<span class="sd">    &gt;&gt;&gt;         pass</span>
+
+<span class="sd">    Example usage:</span>
+
+<span class="sd">    &gt;&gt;&gt; my_runner = MyRunner()</span>
+<span class="sd">    &gt;&gt;&gt; poses = Poses()</span>
+<span class="sd">    &gt;&gt;&gt; jobstarter = JobStarter()</span>
+<span class="sd">    &gt;&gt;&gt; runner_output = my_runner.run(poses, &quot;example_prefix&quot;, jobstarter)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Runner.__str__">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner.__str__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract method to provide the name of the runner.</span>
+
+<span class="sd">        This method should be overridden in subclasses to return the name of the runner.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        NotImplementedError</span>
+<span class="sd">            If the method is not overridden in the subclass.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; class MyRunner(Runner):</span>
+<span class="sd">        &gt;&gt;&gt;     def __str__(self):</span>
+<span class="sd">        &gt;&gt;&gt;         return &quot;MyRunner&quot;</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Your Runner needs a name! Set in your Runner class: &#39;def __str__(self): return </span><span class="se">\&quot;</span><span class="s2">runner_name</span><span class="se">\&quot;</span><span class="s2">&#39;&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.run">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RunnerOutput</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract method to run jobs and send scores to Poses.</span>
+
+<span class="sd">        This method should be overridden in subclasses to define the job execution logic and integrate the results into the Poses class.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses : Poses</span>
+<span class="sd">            An instance of the Poses class to be processed.</span>
+<span class="sd">        prefix : str</span>
+<span class="sd">            Prefix to be added to the results columns.</span>
+<span class="sd">        jobstarter : JobStarter</span>
+<span class="sd">            An instance of the JobStarter class to handle job execution.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        RunnerOutput</span>
+<span class="sd">            An instance of the RunnerOutput class containing the processed results.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        NotImplementedError</span>
+<span class="sd">            If the method is not overridden in the subclass.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; class MyRunner(Runner):</span>
+<span class="sd">        &gt;&gt;&gt;     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -&gt; RunnerOutput:</span>
+<span class="sd">        &gt;&gt;&gt;         # Custom implementation for running jobs</span>
+<span class="sd">        &gt;&gt;&gt;         pass</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Runner Method &#39;run&#39; was not overwritten yet!&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.search_path">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner.search_path">[docs]</a>
+    <span class="k">def</span> <span class="nf">search_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">path_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks if a given path exists and is valid.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        input_path : str</span>
+<span class="sd">            The path to be checked.</span>
+<span class="sd">        path_name : str</span>
+<span class="sd">            The name associated with the path, used for error messages.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str</span>
+<span class="sd">            The validated path.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If the path is not set or does not exist on the local filesystem.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; runner = MyRunner()</span>
+<span class="sd">        &gt;&gt;&gt; valid_path = runner.search_path(&quot;/path/to/file&quot;, &quot;example_path&quot;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">input_path</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Path for </span><span class="si">{</span><span class="n">path_name</span><span class="si">}</span><span class="s2"> not set: </span><span class="si">{</span><span class="n">input_path</span><span class="si">}</span><span class="s2">. Set the path uner </span><span class="si">{</span><span class="n">path_name</span><span class="si">}</span><span class="s2"> in protflow&#39;s config.py file.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">input_path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Path set for </span><span class="si">{</span><span class="n">path_name</span><span class="si">}</span><span class="s2"> does not exist at </span><span class="si">{</span><span class="n">input_path</span><span class="si">}</span><span class="s2">. Check correct filepath!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">input_path</span></div>
+
+
+<div class="viewcode-block" id="Runner.check_for_prefix">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner.check_for_prefix">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_for_prefix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="s2">&quot;Poses&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks if a column with the given prefix already exists in the Poses DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        prefix : str</span>
+<span class="sd">            The prefix to be checked.</span>
+<span class="sd">        poses : Poses</span>
+<span class="sd">            An instance of the Poses class whose DataFrame will be checked.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If a column with the given prefix already exists in the Poses DataFrame.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; runner = MyRunner()</span>
+<span class="sd">        &gt;&gt;&gt; poses = Poses()</span>
+<span class="sd">        &gt;&gt;&gt; runner.check_for_prefix(&quot;example_prefix&quot;, poses)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_location&quot;</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_description&quot;</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column </span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2"> found in Poses DataFrame! Pick different Prefix!&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Runner.prep_pose_options">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner.prep_pose_options">[docs]</a>
+    <span class="k">def</span> <span class="nf">prep_pose_options</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepares pose options, ensuring they are of the same length as the poses.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses : Poses</span>
+<span class="sd">            An instance of the Poses class.</span>
+<span class="sd">        pose_options : list[str], optional</span>
+<span class="sd">            A list of pose options to be prepared. If not provided, an empty list will be used.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list</span>
+<span class="sd">            A list of prepared pose options.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If the length of pose_options does not match the length of poses.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; runner = MyRunner()</span>
+<span class="sd">        &gt;&gt;&gt; poses = Poses()</span>
+<span class="sd">        &gt;&gt;&gt; prepared_options = runner.prep_pose_options(poses, [&quot;option1&quot;, &quot;option2&quot;])</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># if pose_options is str, look up pose_options from poses.df</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pose_options</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">col_in_df</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+            <span class="n">pose_options</span> <span class="o">=</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">pose_options</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+
+        <span class="c1"># if pose_options is None (not set) return list with empty dicts.</span>
+        <span class="k">if</span> <span class="n">pose_options</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># make sure an empty list is passed as pose_options!</span>
+            <span class="n">pose_options</span> <span class="o">=</span> <span class="p">[</span><span class="kc">None</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pose_options</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Arguments &lt;poses&gt; and &lt;pose_options&gt; for RFdiffusion must be of the same length. There might be an error with your pose_options argument!</span><span class="se">\n</span><span class="s2">len(poses) = </span><span class="si">{</span><span class="n">poses</span><span class="si">}</span><span class="se">\n</span><span class="s2">len(pose_options) = </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">pose_options</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># if pose_options is list and as long as poses, just return list. Has to be list of dicts.</span>
+        <span class="k">return</span> <span class="n">pose_options</span></div>
+
+
+<div class="viewcode-block" id="Runner.generic_run_setup">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner.generic_run_setup">[docs]</a>
+    <span class="k">def</span> <span class="nf">generic_run_setup</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">jobstarters</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">JobStarter</span><span class="p">],</span> <span class="n">make_work_dir</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">JobStarter</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets up the runner&#39;s working directory and jobstarter.</span>
+
+<span class="sd">        Checks if the prefix exists in poses.df, sets up a jobstarter, and creates the working directory if necessary.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses : Poses</span>
+<span class="sd">            An instance of the Poses class.</span>
+<span class="sd">        prefix : str</span>
+<span class="sd">            The prefix to be used for the setup.</span>
+<span class="sd">        jobstarters : list[JobStarter]</span>
+<span class="sd">            A list of JobStarter instances to choose from.</span>
+<span class="sd">        make_work_dir : bool, optional</span>
+<span class="sd">            Whether to create the working directory if it does not exist (default is True).</span>
+
+<span class="sd">        Note: Order of jobstarters in :jobstarter: parameter is: [Runner.run(jobstarter), Runner.jobstarter, poses.default_jobstarter]</span>
+<span class="sd">    </span>
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        tuple[str, JobStarter]</span>
+<span class="sd">            A tuple containing the path to the working directory and the selected JobStarter instance.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If no valid JobStarter is set.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; runner = MyRunner()</span>
+<span class="sd">        &gt;&gt;&gt; poses = Poses()</span>
+<span class="sd">        &gt;&gt;&gt; jobstarters = [JobStarter(), JobStarter(), JobStarter()]</span>
+<span class="sd">        &gt;&gt;&gt; work_dir, jobstarter = runner.generic_run_setup(poses, &quot;example_prefix&quot;, jobstarters)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="c1"># check for prefix</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">check_for_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">,</span> <span class="n">poses</span><span class="p">)</span>
+
+        <span class="c1"># setup jobstarter</span>
+        <span class="n">run_jobstarter</span><span class="p">,</span> <span class="n">runner_jobstarter</span><span class="p">,</span> <span class="n">poses_jobstarter</span> <span class="o">=</span> <span class="n">jobstarters</span>
+        <span class="n">jobstarter</span> <span class="o">=</span> <span class="n">run_jobstarter</span> <span class="ow">or</span> <span class="p">(</span><span class="n">runner_jobstarter</span> <span class="ow">or</span> <span class="n">poses_jobstarter</span><span class="p">)</span> <span class="c1"># select jobstarter, priorities: Runner.run(jobstarter) &gt; Runner.jobstarter &gt; poses.jobstarter</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">jobstarter</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">JobStarter</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No Jobstarter was set either in the Runner, the .run() function or the Poses class.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># setup directory</span>
+        <span class="n">work_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">)</span> <span class="ow">and</span> <span class="n">make_work_dir</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span></div>
+
+
+<div class="viewcode-block" id="Runner.check_for_existing_scorefile">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner.check_for_existing_scorefile">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_for_existing_scorefile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scorefile</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks if a scorefile exists and returns it as a DataFrame if overwrite is False.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        scorefile : str</span>
+<span class="sd">            The path to the scorefile.</span>
+<span class="sd">        overwrite : bool, optional</span>
+<span class="sd">            Whether to overwrite the scorefile if it exists (default is False).</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pandas.DataFrame</span>
+<span class="sd">            The scorefile as a DataFrame if it exists and overwrite is False. None otherwise.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; runner = MyRunner()</span>
+<span class="sd">        &gt;&gt;&gt; scores_df = runner.check_for_existing_scorefile(&quot;/path/to/scorefile.csv&quot;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># check if scorefile exists if overwrite is False</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">scorefile</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+            <span class="c1"># pick method to import scorefile</span>
+            <span class="n">scores</span> <span class="o">=</span> <span class="n">get_format</span><span class="p">(</span><span class="n">scorefile</span><span class="p">)(</span><span class="n">scorefile</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">scores</span></div>
+
+
+<div class="viewcode-block" id="Runner.save_runner_scorefile">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.Runner.save_runner_scorefile">[docs]</a>
+    <span class="k">def</span> <span class="nf">save_runner_scorefile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scores</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">scorefile</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves the runner&#39;s scorefile based on the file extension format.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        scores : pandas.DataFrame</span>
+<span class="sd">            The DataFrame containing the scores to be saved.</span>
+<span class="sd">        scorefile : str</span>
+<span class="sd">            The path to the scorefile to be saved.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If the file extension format is not recognized.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; runner = MyRunner()</span>
+<span class="sd">        &gt;&gt;&gt; scores_df = pd.DataFrame({&#39;score&#39;: [1, 2, 3]})</span>
+<span class="sd">        &gt;&gt;&gt; runner.save_runner_scorefile(scores_df, &quot;/path/to/scorefile.csv&quot;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># extract file extension from scorefile</span>
+        <span class="n">storage_method</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">scorefile</span><span class="p">)[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">:]</span>
+
+        <span class="c1"># pick method to save scorefile</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">save_method_name</span> <span class="o">:=</span> <span class="n">FORMAT_STORAGE_DICT</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">storage_method</span><span class="o">.</span><span class="n">lower</span><span class="p">())):</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">scores</span><span class="p">,</span> <span class="n">save_method_name</span><span class="p">)(</span><span class="n">scorefile</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not find method to save scorefile as </span><span class="si">{</span><span class="n">storage_method</span><span class="si">}</span><span class="s2">. Make sure the score file extension is correct!&quot;</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="parse_generic_options">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.parse_generic_options">[docs]</a>
+<span class="k">def</span> <span class="nf">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span><span class="nb">list</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parses generic options and pose-specific options from two input strings, combining them into a single dictionary of options</span>
+<span class="sd">    and a list of flags. Pose-specific options overwrite generic options in case of conflicts. Options are expected to be separated</span>
+<span class="sd">    by a specified separator within each input string, with options and their values separated by spaces.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - options (str): A string of generic options, where different options are separated by the specified separator and each option&#39;s</span>
+<span class="sd">      value (if any) is separated by space.</span>
+<span class="sd">    - pose_options (str): A string of pose-specific options, formatted like the `options` parameter. These options take precedence</span>
+<span class="sd">      over generic options.</span>
+<span class="sd">    - sep (str, optional): The separator used to distinguish between different options in both input strings. Defaults to &quot;--&quot;.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - tuple: A 2-element tuple where the first element is a dictionary of merged options (key-value pairs) and the second element</span>
+<span class="sd">      is a list of unique flags (options without values) from both input strings.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">    &gt;&gt;&gt; parse_generic_options(&quot;--width 800 --height 600&quot;, &quot;--color blue --verbose&quot;)</span>
+<span class="sd">    ({&#39;width&#39;: &#39;800&#39;, &#39;height&#39;: &#39;600&#39;, &#39;color&#39;: &#39;blue&#39;}, [&#39;verbose&#39;])</span>
+
+<span class="sd">    This function internally utilizes a helper function `expand_options_flags` to process each input string separately before</span>
+<span class="sd">    merging the results, ensuring that pose-specific options and flags are appropriately prioritized and duplicates are removed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># parse into options and flags:</span>
+    <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">regex_expand_options_flags</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="n">sep</span><span class="p">)</span>
+    <span class="n">pose_opts</span><span class="p">,</span> <span class="n">pose_flags</span> <span class="o">=</span> <span class="n">regex_expand_options_flags</span><span class="p">(</span><span class="n">pose_options</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="n">sep</span><span class="p">)</span>
+
+    <span class="c1"># merge options and pose_options (pose_opts overwrite opts), same for flags</span>
+    <span class="n">opts</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pose_opts</span><span class="p">)</span>
+    <span class="n">flags</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="o">|</span> <span class="nb">set</span><span class="p">(</span><span class="n">pose_flags</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span></div>
+
+
+<div class="viewcode-block" id="col_in_df">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.col_in_df">[docs]</a>
+<span class="k">def</span> <span class="nf">col_in_df</span><span class="p">(</span><span class="n">df</span><span class="p">:</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">column</span><span class="p">:</span><span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Checks if a column exists in a DataFrame.</span>
+
+<span class="sd">    This function verifies whether a specified column is present in the given DataFrame.</span>
+<span class="sd">    If the column is not found, it raises a KeyError.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pandas.DataFrame</span>
+<span class="sd">        The DataFrame to be checked.</span>
+<span class="sd">    column : str</span>
+<span class="sd">        The name of the column to be verified.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    KeyError</span>
+<span class="sd">        If the specified column is not found in the DataFrame.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; import pandas as pd</span>
+<span class="sd">    &gt;&gt;&gt; df = pd.DataFrame({&#39;A&#39;: [1, 2, 3], &#39;B&#39;: [4, 5, 6]})</span>
+<span class="sd">    &gt;&gt;&gt; col_in_df(df, &#39;A&#39;)  # No error raised</span>
+<span class="sd">    &gt;&gt;&gt; col_in_df(df, &#39;C&#39;)  # Raises KeyError</span>
+<span class="sd">    Traceback (most recent call last):</span>
+<span class="sd">        ...</span>
+<span class="sd">    KeyError: &#39;Could not find C in poses dataframe! Are you sure you provided the right column name?&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not find </span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2"> in poses dataframe! Are you sure you provided the right column name?&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="expand_options_flags">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.expand_options_flags">[docs]</a>
+<span class="k">def</span> <span class="nf">expand_options_flags</span><span class="p">(</span><span class="n">options_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sep</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span> <span class="nb">set</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parses options and flags from an input string.</span>
+
+<span class="sd">    This function splits an input string into options and flags based on a specified separator.</span>
+<span class="sd">    Options are key-value pairs, while flags are standalone keys without values.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    options_str : str</span>
+<span class="sd">        The input string containing options and flags to be parsed.</span>
+<span class="sd">    sep : str, optional</span>
+<span class="sd">        The separator used to distinguish different options and flags (default is &quot;--&quot;).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple[dict, set]</span>
+<span class="sd">        A tuple containing a dictionary of options and a set of flags.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; options_str = &quot;--width 800 --height 600 --verbose&quot;</span>
+<span class="sd">    &gt;&gt;&gt; opts, flags = expand_options_flags(options_str)</span>
+<span class="sd">    &gt;&gt;&gt; print(opts)</span>
+<span class="sd">    {&#39;width&#39;: &#39;800&#39;, &#39;height&#39;: &#39;600&#39;}</span>
+<span class="sd">    &gt;&gt;&gt; print(flags)</span>
+<span class="sd">    {&#39;verbose&#39;}</span>
+
+<span class="sd">    &gt;&gt;&gt; options_str = &quot;--color=blue --debug --timeout=30&quot;</span>
+<span class="sd">    &gt;&gt;&gt; opts, flags = expand_options_flags(options_str)</span>
+<span class="sd">    &gt;&gt;&gt; print(opts)</span>
+<span class="sd">    {&#39;color&#39;: &#39;blue&#39;, &#39;timeout&#39;: &#39;30&#39;}</span>
+<span class="sd">    &gt;&gt;&gt; print(flags)</span>
+<span class="sd">    {&#39;debug&#39;}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">options_str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{},</span> <span class="p">[]</span>
+
+    <span class="c1"># split along separator</span>
+    <span class="n">firstsplit</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">options_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">sep</span><span class="p">)</span> <span class="k">if</span> <span class="n">x</span><span class="p">]</span>
+
+    <span class="c1"># parse into options and flags:</span>
+    <span class="n">opts</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">flags</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">firstsplit</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">((</span><span class="n">x</span> <span class="o">:=</span> <span class="n">item</span><span class="o">.</span><span class="n">split</span><span class="p">()))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">opts</span><span class="p">[</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">((</span><span class="n">x</span> <span class="o">:=</span> <span class="n">item</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">)))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">opts</span><span class="p">[</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">flags</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">opts</span><span class="p">,</span> <span class="nb">set</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="regex_expand_options_flags">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.regex_expand_options_flags">[docs]</a>
+<span class="k">def</span> <span class="nf">regex_expand_options_flags</span><span class="p">(</span><span class="n">options_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sep</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;--&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">,</span><span class="nb">set</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parses options and flags from an input string using regular expressions.</span>
+
+<span class="sd">    This function uses regular expressions to split an input string into options and flags. </span>
+<span class="sd">    It ensures that separators within quotes are not split.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    options_str : str</span>
+<span class="sd">        The input string containing options and flags to be parsed.</span>
+<span class="sd">    sep : str, optional</span>
+<span class="sd">        The separator used to distinguish different options and flags (default is &quot;--&quot;).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple[dict, set]</span>
+<span class="sd">        A tuple containing a dictionary of options and a set of flags.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; options_str = &#39;--width 800 --height 600 --verbose&#39;</span>
+<span class="sd">    &gt;&gt;&gt; opts, flags = regex_expand_options_flags(options_str)</span>
+<span class="sd">    &gt;&gt;&gt; print(opts)</span>
+<span class="sd">    {&#39;width&#39;: &#39;800&#39;, &#39;height&#39;: &#39;600&#39;}</span>
+<span class="sd">    &gt;&gt;&gt; print(flags)</span>
+<span class="sd">    {&#39;verbose&#39;}</span>
+
+<span class="sd">    &gt;&gt;&gt; options_str = &#39;--color=&quot;dark blue&quot; --debug --timeout=30&#39;</span>
+<span class="sd">    &gt;&gt;&gt; opts, flags = regex_expand_options_flags(options_str)</span>
+<span class="sd">    &gt;&gt;&gt; print(opts)</span>
+<span class="sd">    {&#39;color&#39;: &#39;dark blue&#39;, &#39;timeout&#39;: &#39;30&#39;}</span>
+<span class="sd">    &gt;&gt;&gt; print(flags)</span>
+<span class="sd">    {&#39;debug&#39;}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">options_str</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(),</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="c1"># Regex to split the command line at the separator which is not inside quotes</span>
+    <span class="n">split_pattern</span> <span class="o">=</span> <span class="sa">rf</span><span class="s2">&quot;(?&lt;!\S)</span><span class="si">{</span><span class="n">sep</span><span class="si">}</span><span class="s2">(?=(?:[^</span><span class="se">\&quot;</span><span class="s2">]*</span><span class="se">\&quot;</span><span class="s2">[^</span><span class="se">\&quot;</span><span class="s2">]*</span><span class="se">\&quot;</span><span class="s2">)*[^</span><span class="se">\&quot;</span><span class="s2">]*$)(?=(?:[^\&#39;]*\&#39;[^\&#39;]*\&#39;)*[^\&#39;]*$)&quot;</span>
+    <span class="n">parts</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">split_pattern</span><span class="p">,</span> <span class="n">options_str</span><span class="p">)</span> <span class="k">if</span> <span class="n">x</span><span class="p">]</span>
+
+    <span class="n">opts</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">flags</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Setup part_pattern that splits individual parts at first occurrence of whitespace or equals sign.</span>
+    <span class="n">part_pattern</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;\s+|\s*=\s*&quot;</span>
+
+    <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">:</span>
+        <span class="n">split</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">part_pattern</span><span class="p">,</span> <span class="n">part</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">split</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">opts</span><span class="p">[</span><span class="n">split</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span> <span class="o">=</span> <span class="n">split</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">flags</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">split</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">opts</span><span class="p">,</span> <span class="nb">set</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="options_flags_to_string">
+<a class="viewcode-back" href="../../protflow.html#protflow.runners.options_flags_to_string">[docs]</a>
+<span class="k">def</span> <span class="nf">options_flags_to_string</span><span class="p">(</span><span class="n">options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">flags</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Converts options dictionary and flags list into a single string.</span>
+
+<span class="sd">    This function combines a dictionary of options and a list of flags into a single command-line style string.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    options : dict</span>
+<span class="sd">        A dictionary of options, where keys are option names and values are option values.</span>
+<span class="sd">    flags : list</span>
+<span class="sd">        A list of flags (standalone options without values).</span>
+<span class="sd">    sep : str, optional</span>
+<span class="sd">        The separator used to distinguish different options and flags (default is &quot;--&quot;).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        A string representation of the combined options and flags.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; options = {&#39;width&#39;: &#39;800&#39;, &#39;height&#39;: &#39;600&#39;}</span>
+<span class="sd">    &gt;&gt;&gt; flags = [&#39;verbose&#39;, &#39;debug&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; options_flags_to_string(options, flags)</span>
+<span class="sd">    &quot; --width=800 --height=600 --verbose --debug&quot;</span>
+
+<span class="sd">    &gt;&gt;&gt; options = {&#39;color&#39;: &#39;dark blue&#39;, &#39;timeout&#39;: &#39;30&#39;}</span>
+<span class="sd">    &gt;&gt;&gt; flags = [&#39;force&#39;]</span>
+<span class="sd">    &gt;&gt;&gt; options_flags_to_string(options, flags)</span>
+<span class="sd">    &quot; --color=&#39;dark blue&#39; --timeout=30 --force&quot;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">value_in_quotes</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Makes sure that split commandline options are passed in quotes: --option=&#39;quoted list of args&#39; &#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;&#39;&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">value</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">value</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">):</span>
+                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+        <span class="k">return</span> <span class="n">value</span>
+
+    <span class="c1"># assemble options</span>
+    <span class="n">out_str</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">sep</span><span class="si">}{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value_in_quotes</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">options</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span> <span class="k">if</span> <span class="n">options</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="c1"># if flags are present, assemble those too and return</span>
+    <span class="k">if</span> <span class="n">flags</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">out_str</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="n">sep</span><span class="si">}</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="n">sep</span><span class="si">}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">out_str</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

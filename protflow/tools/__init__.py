@@ -1,5 +1,4 @@
 '''runners submodule init'''
 import protflow
-import protflow.tools.rfdiffusion
-import protflow.tools.colabfold
+from . import rfdiffusion, rosetta, colabfold, esmfold, ligandmpnn, attnpacker, protein_edits, protein_generator, residue_selectors
 #from . import runners

@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.metrics.tmscore &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.metrics.tmscore</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.metrics.tmscore</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">TMscore Module</span>
+<span class="sd">==============</span>
+
+<span class="sd">This module provides the functionality to integrate TMscore calculations within the ProtFlow framework. It offers tools to run TMscore and TMalign, handle their inputs and outputs, and process the resulting data in a structured and automated manner.</span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `TMalign` and `TMscore` classes encapsulate the functionality necessary to execute TM-align and TM-score runs, respectively. These classes manage the configuration of paths to essential scripts and Python executables, set up the environment, and handle the execution of scoring processes. They include methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.</span>
+
+<span class="sd">The module is designed to streamline the integration of TM-align and TM-score into larger computational workflows. It supports the automatic setup of job parameters, execution of TM-align/TM-score commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create an instance of the `TMalign` or `TMscore` class and invoke their `run` method with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the scoring process is provided through various parameters, allowing for customized runs tailored to specific research needs.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `TMalign` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from tmscore import TMalign</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the TMalign class</span>
+<span class="sd">    tmalign = TMalign()</span>
+
+<span class="sd">    # Run the alignment process</span>
+<span class="sd">    results = tmalign.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        ref_col=&quot;reference_pdb&quot;,</span>
+<span class="sd">        sc_tm_score=True,</span>
+<span class="sd">        options=&quot;-a&quot;,</span>
+<span class="sd">        pose_options=[&quot;-b&quot;],</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Here is an example of how to initialize and use the `TMscore` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from tmscore import TMscore</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the TMscore class</span>
+<span class="sd">    tmscore = TMscore()</span>
+
+<span class="sd">    # Run the scoring process</span>
+<span class="sd">    results = tmscore.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_2&quot;,</span>
+<span class="sd">        ref_col=&quot;reference_pdb&quot;,</span>
+<span class="sd">        options=&quot;-c&quot;,</span>
+<span class="sd">        pose_options=[&quot;-d&quot;],</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the scoring process.</span>
+<span class="sd">    - Customizability: Users can customize the scoring process through multiple parameters, including specific options for the TM-align or TM-score scripts, and options for handling pose-specific parameters.</span>
+<span class="sd">    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate TM-align or TM-score into their protein structure comparison and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Author</span>
+<span class="sd">------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0    </span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># import general</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">glob</span>
+
+<span class="c1"># import dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="c1"># import customs</span>
+<span class="kn">import</span> <span class="nn">protflow</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">RunnerOutput</span><span class="p">,</span> <span class="n">col_in_df</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+<span class="kn">from</span> <span class="nn">protflow.config</span> <span class="kn">import</span> <span class="n">PROTFLOW_ENV</span>
+<span class="kn">from</span> <span class="nn">protflow.utils.metrics</span> <span class="kn">import</span> <span class="n">calc_sc_tm</span>
+
+<div class="viewcode-block" id="TMalign">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMalign">[docs]</a>
+<span class="k">class</span> <span class="nc">TMalign</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    TMalign Class</span>
+<span class="sd">    =============</span>
+
+<span class="sd">    The `TMalign` class is a specialized class designed to facilitate the execution of TMalign within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with TMalign processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `TMalign` class manages all aspects of running TMalign simulations. It handles the configuration of necessary scripts and executables, prepares the environment for alignment processes, and executes the alignment commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to TMalign executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of TMalign commands with support for various alignment options.</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">        - Normalizing TM scores based on the reference structure and calculating self-consistency scores.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `TMalign` class, configured to run TMalign processes and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If the TMalign executable is not found in the specified environment.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods or if required reference columns are missing.</span>
+<span class="sd">        - RuntimeError: If no TM scores are found in the output files.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `TMalign` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from tmscore import TMalign</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the TMalign class</span>
+<span class="sd">        tmalign = TMalign()</span>
+
+<span class="sd">        # Run the alignment process</span>
+<span class="sd">        results = tmalign.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">            ref_col=&quot;reference_pdb&quot;,</span>
+<span class="sd">            sc_tm_score=True,</span>
+<span class="sd">            options=&quot;-a&quot;,</span>
+<span class="sd">            pose_options=[&quot;-b&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the alignment process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    Difference Between TMscore and TMalign</span>
+<span class="sd">    --------------------------------------</span>
+<span class="sd">    - **TMscore**: This class calculates the TM-score between protein structures without superimposing them. It is suitable for comparing the overall similarity of protein structures in a sequence-length independent manner. TMscore is used when you need to score the structural similarity directly without modifying the positions of the structures.</span>
+<span class="sd">    </span>
+<span class="sd">    - **TMalign**: This class not only calculates the TM-score but also superimposes the structures before scoring. It is used when structural alignment and superimposition are necessary to get a more accurate measure of structural similarity, considering the spatial arrangement of the protein structures.</span>
+
+<span class="sd">    The TMalign class is intended for researchers and developers who need to perform TMalign alignments as part of their protein structure comparison and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="TMalign.__init__">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMalign.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">application</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the TMalign class with optional jobstarter and application path.</span>
+
+<span class="sd">        This method sets up the TMalign class by configuring the jobstarter and the path to the TMalign executable. It ensures that the necessary components are ready for executing TMalign processes.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            jobstarter (JobStarter, optional): An optional jobstarter configuration. Defaults to None.</span>
+<span class="sd">            application (str, optional): Path to the TMalign executable. If not provided, it defaults to the TMalign executable in the ProtFlow environment.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the TMalign executable is not found in the specified environment.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize the `TMalign` class:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from tmscore import TMalign</span>
+
+<span class="sd">                # Initialize the TMalign class</span>
+<span class="sd">                tmalign = TMalign(</span>
+<span class="sd">                    jobstarter=LocalJobStarter(max_cores=4),</span>
+<span class="sd">                    application=&quot;/path/to/TMalign&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Check the instance</span>
+<span class="sd">                print(tmalign)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Jobstarter Configuration:** This parameter allows setting up the jobstarter for managing job execution.</span>
+<span class="sd">            - **Application Path:** This parameter sets the path to the TMalign executable, ensuring the correct executable is used for alignment processes.</span>
+
+<span class="sd">        This method is designed to prepare the TMalign class for executing TMalign processes, ensuring that all necessary configurations are in place.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;tmscore.py&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">application</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_check_install</span><span class="p">(</span><span class="n">application</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROTFLOW_ENV</span><span class="p">,</span> <span class="s2">&quot;TMalign&quot;</span><span class="p">))</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;TMalign&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_check_install</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">application_path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;checks if TMalign is installed in the environment&#39;&#39;&#39;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">application_path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not find executable for TMalign at </span><span class="si">{</span><span class="n">application_path</span><span class="si">}</span><span class="s2">. Did you set it up in your protflow environment? If not, either install it in your protflow env with &#39;conda install -c bioconda tmalign&#39; or in any other environment and provide the path to the application with the :application: parameter when initializing a TMalign() runner instance.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">application_path</span>
+
+
+    <span class="c1">########################## Calculations ################################################</span>
+<div class="viewcode-block" id="TMalign.run">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMalign.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sc_tm_score</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="c1"># pylint: disable=W0237</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute the TMalign process with given poses and jobstarter configuration.</span>
+
+<span class="sd">        This method sets up and runs the TMalign process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            ref_col (str): Column containing paths to PDB files used as reference for TM score calculation.</span>
+<span class="sd">            sc_tm_score (bool, optional): If True, calculates the self-consistency TM score for each backbone in ref_col and adds it into the column {prefix}_sc_tm. Defaults to True.</span>
+<span class="sd">            options (str, optional): Additional command-line options for the TMalign script. Defaults to None.</span>
+<span class="sd">            pose_options (str, optional): Name of poses.df column containing options for TMalign. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the TMalign process.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If the TMalign executable is not found in the specified environment.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the method or if required reference columns are missing.</span>
+<span class="sd">            RuntimeError: If no TM scores are found in the output files.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `run` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from tmscore import TMalign</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the TMalign class</span>
+<span class="sd">                tmalign = TMalign()</span>
+
+<span class="sd">                # Run the alignment process</span>
+<span class="sd">                results = tmalign.run(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    ref_col=&quot;reference_pdb&quot;,</span>
+<span class="sd">                    sc_tm_score=True,</span>
+<span class="sd">                    options=&quot;-a&quot;,</span>
+<span class="sd">                    pose_options=[&quot;-b&quot;],</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(results)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed.</span>
+<span class="sd">            - **Reference Preparation:** The method prepares the reference structures for alignment based on the provided reference column or specific PDB file.</span>
+<span class="sd">            - **Output Management:** The method handles the collection and processing of output data, including merging and normalizing TM scores, ensuring that results are organized and accessible for further analysis.</span>
+<span class="sd">            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the alignment process to their specific needs.</span>
+
+<span class="sd">        This method is designed to streamline the execution of TMalign processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein structure alignments.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># setup runner and files</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_TM.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">scores</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">sc_tm_score</span><span class="p">:</span>
+                <span class="n">output</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">calc_sc_tm</span><span class="p">(</span><span class="n">input_df</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_sc_tm&quot;</span><span class="p">,</span> <span class="n">ref_col</span><span class="o">=</span><span class="n">ref_col</span><span class="p">,</span> <span class="n">tm_col</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_TM_score_ref&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span>
+
+
+        <span class="c1"># prepare pose options</span>
+        <span class="n">pose_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_pose_options</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+
+        <span class="c1"># prepare references:</span>
+        <span class="n">ref_l</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_ref</span><span class="p">(</span><span class="n">ref</span><span class="o">=</span><span class="n">ref_col</span><span class="p">,</span> <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">)</span>
+
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="n">pose_opts</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span> <span class="n">ref_l</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">):</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose_path</span><span class="o">=</span><span class="n">pose</span><span class="p">,</span> <span class="n">ref_path</span><span class="o">=</span><span class="n">ref</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="o">=</span><span class="n">pose_opts</span><span class="p">))</span>
+
+        <span class="n">num_cmds</span> <span class="o">=</span> <span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span>
+        <span class="k">if</span> <span class="n">num_cmds</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">):</span>
+            <span class="n">num_cmds</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+
+        <span class="c1"># create batch commands</span>
+        <span class="n">cmd_sublists</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">jobstarters</span><span class="o">.</span><span class="n">split_list</span><span class="p">(</span><span class="n">cmds</span><span class="p">,</span> <span class="n">n_sublists</span><span class="o">=</span><span class="n">num_cmds</span><span class="p">)</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">sublist</span> <span class="ow">in</span> <span class="n">cmd_sublists</span><span class="p">:</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sublist</span><span class="p">))</span>
+
+        <span class="c1"># run command</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span> <span class="o">=</span> <span class="s2">&quot;TM&quot;</span><span class="p">,</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">work_dir</span>
+        <span class="p">)</span>
+
+        <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collect_scores</span><span class="p">(</span><span class="n">output_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">)</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">scores</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[[</span><span class="s1">&#39;poses&#39;</span><span class="p">,</span> <span class="s1">&#39;poses_description&#39;</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">]],</span> <span class="n">left_on</span><span class="o">=</span><span class="s2">&quot;description&quot;</span><span class="p">,</span> <span class="n">right_on</span><span class="o">=</span><span class="s2">&quot;poses_description&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s1">&#39;poses_description&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">scores</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;poses&quot;</span><span class="p">:</span> <span class="s2">&quot;location&quot;</span><span class="p">})</span>
+
+        <span class="c1"># write output scorefile</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="c1"># create standardised output for poses class:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">sc_tm_score</span><span class="p">:</span>
+            <span class="n">output</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">calc_sc_tm</span><span class="p">(</span><span class="n">input_df</span><span class="o">=</span><span class="n">output</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_sc_tm&quot;</span><span class="p">,</span> <span class="n">ref_col</span><span class="o">=</span><span class="n">ref_col</span><span class="p">,</span> <span class="n">tm_col</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_TM_score_ref&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">output</span></div>
+
+
+<div class="viewcode-block" id="TMalign.prep_ref">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMalign.prep_ref">[docs]</a>
+    <span class="k">def</span> <span class="nf">prep_ref</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepare the reference structures for TMalign.</span>
+
+<span class="sd">        This method prepares the reference structures for alignment based on the provided reference column or specific PDB file. It ensures that the references are correctly formatted for the TMalign process.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            ref (str): The reference structure, either as a path to a PDB file or as a column name in the Poses DataFrame.</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[str]: A list of reference paths for each pose.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the ref parameter is not a string or if the reference column is missing from the Poses DataFrame.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `prep_ref` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from tmscore import TMalign</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                tmalign = TMalign()</span>
+
+<span class="sd">                # Prepare reference structures</span>
+<span class="sd">                ref_list = tmalign.prep_ref(</span>
+<span class="sd">                    ref=&quot;reference_pdb&quot;,</span>
+<span class="sd">                    poses=poses</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Print the reference list</span>
+<span class="sd">                print(ref_list)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Reference Handling:** The method can handle both a single PDB file and a column name referring to multiple PDB files within the Poses DataFrame.</span>
+<span class="sd">            - **Validation:** Ensures that the provided reference is valid and exists in the Poses DataFrame if specified as a column name.</span>
+
+<span class="sd">        This method is designed to streamline the preparation of reference structures for TMalign processes, ensuring that all references are correctly formatted and validated.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Parameter :ref: must be string and either refer to a .pdb file or to a column in poses.df!&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ref</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.pdb&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">ref</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+
+        <span class="c1"># check if reference column exists in poses.df</span>
+        <span class="n">col_in_df</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">ref</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">ref</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TMalign.write_cmd">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMalign.write_cmd">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_cmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Write the command to run TMalign.</span>
+
+<span class="sd">        This method constructs the command to execute TMalign based on the provided parameters. It formats the options and flags correctly and sets up the command to be run in the environment.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose_path (str): The path to the pose file.</span>
+<span class="sd">            ref_path (str): The path to the reference file.</span>
+<span class="sd">            output_dir (str): The directory where output files will be saved.</span>
+<span class="sd">            options (str, optional): Additional command-line options for TMalign. Defaults to None.</span>
+<span class="sd">            pose_options (str, optional): Pose-specific options for TMalign. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The constructed command string to run TMalign.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `write_cmd` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from tmscore import TMalign</span>
+
+<span class="sd">                # Initialize the TMalign class</span>
+<span class="sd">                tmalign = TMalign()</span>
+
+<span class="sd">                # Write the command</span>
+<span class="sd">                cmd = tmalign.write_cmd(</span>
+<span class="sd">                    pose_path=&quot;pose.pdb&quot;,</span>
+<span class="sd">                    ref_path=&quot;reference.pdb&quot;,</span>
+<span class="sd">                    output_dir=&quot;output/&quot;,</span>
+<span class="sd">                    options=&quot;-a&quot;,</span>
+<span class="sd">                    pose_options=&quot;-b&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Print the command</span>
+<span class="sd">                print(cmd)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Command Construction:** The method constructs the command string by parsing and formatting the provided options and pose-specific options.</span>
+<span class="sd">            - **Output Management:** Ensures that the output files are correctly named and saved in the specified directory.</span>
+
+<span class="sd">        This method is designed to streamline the construction of commands for TMalign processes, ensuring that all necessary options are correctly formatted and included.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;-</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span>
+        <span class="n">flags</span> <span class="o">=</span> <span class="s2">&quot; -&quot;</span> <span class="o">+</span> <span class="s2">&quot; -&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="k">if</span> <span class="n">flags</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;-</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span> <span class="k">if</span> <span class="n">opts</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">flags</span> <span class="o">=</span> <span class="s2">&quot; -&quot;</span> <span class="o">+</span> <span class="s2">&quot; -&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="k">if</span> <span class="n">flags</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># define scorefile names</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pose_path</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">.tmout&quot;</span><span class="p">)</span>
+
+        <span class="c1"># compile command</span>
+        <span class="n">run_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">application</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">pose_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">ref_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">opts</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">flags</span><span class="si">}</span><span class="s2"> &gt; </span><span class="si">{</span><span class="n">scorefile</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="k">return</span> <span class="n">run_string</span></div>
+
+
+<div class="viewcode-block" id="TMalign.collect_scores">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMalign.collect_scores">[docs]</a>
+    <span class="k">def</span> <span class="nf">collect_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collect scores from TMalign output files.</span>
+
+<span class="sd">        This method collects and processes the scores from the output files generated by TMalign. It reads the scores, extracts relevant information, and organizes the data into a structured pandas DataFrame.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            output_dir (str): The directory where TMalign output files are located.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: A DataFrame containing the collected scores.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no TM scores are found in the output files.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `collect_scores` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from tmscore import TMalign</span>
+
+<span class="sd">                # Initialize the TMalign class</span>
+<span class="sd">                tmalign = TMalign()</span>
+
+<span class="sd">                # Collect scores</span>
+<span class="sd">                scores_df = tmalign.collect_scores(</span>
+<span class="sd">                    output_dir=&quot;output/&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Print the scores DataFrame</span>
+<span class="sd">                print(scores_df)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Score Extraction:** The method reads the output files, extracts relevant scores, and organizes them into a pandas DataFrame.</span>
+<span class="sd">            - **Validation:** Ensures that the scores are correctly extracted and that no errors occurred during the process.</span>
+
+<span class="sd">        This method is designed to streamline the collection and processing of scores from TMalign output files, ensuring that all relevant data is accurately captured and organized.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">extract_scores</span><span class="p">(</span><span class="n">score_path</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">            extract TM scores from scorefile, return a Series</span>
+<span class="sd">            &#39;&#39;&#39;</span>
+
+            <span class="n">tm_scores</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">score_path</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;Aligned length&quot;</span><span class="p">):</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;num_aligned_res&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">2</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;RMSD&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">4</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;,&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">))</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;n_identical/n_aligned&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">6</span><span class="p">])</span>
+                        <span class="k">continue</span>
+                    <span class="k">elif</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;TM-score&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;Chain_1&quot;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                        <span class="c1"># TM score normalized by length of the pose structure</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;TM_score_pose&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="k">continue</span>
+                    <span class="k">elif</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;TM-score&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;Chain_2&quot;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                        <span class="c1"># TM score normalized by length of the reference (this is what should be used)</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;TM_score_ref&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+                        <span class="k">continue</span>
+                    <span class="k">elif</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;TM-score&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="s2">&quot;average&quot;</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+                        <span class="c1"># if -a flag was provided to TMalign, a TM score normalized by the average length of pose and reference will be calculated</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;TM_score_average&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+
+            <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">score_path</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="c1"># check if scores were present in scorefile</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="s1">&#39;TM_score&#39;</span> <span class="ow">in</span> <span class="n">key</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">tm_scores</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not find any TM scores in </span><span class="si">{</span><span class="n">score_path</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">tm_scores</span><span class="p">)</span>
+
+        <span class="c1"># collect scorefiles</span>
+        <span class="n">scorefiles</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;*.tmout&quot;</span><span class="p">))</span>
+
+        <span class="n">scores</span> <span class="o">=</span> <span class="p">[</span><span class="n">extract_scores</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">scorefiles</span><span class="p">]</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">scores</span></div>
+</div>
+
+
+<div class="viewcode-block" id="TMscore">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMscore">[docs]</a>
+<span class="k">class</span> <span class="nc">TMscore</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    TMscore Class</span>
+<span class="sd">    =============</span>
+
+<span class="sd">    The `TMscore` class is a specialized class designed to facilitate the execution of TMscore within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with TMscore processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `TMscore` class manages all aspects of running TMscore simulations. It handles the configuration of necessary scripts and executables, prepares the environment for scoring processes, and executes the scoring commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to TMscore executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of TMscore commands with support for various scoring options.</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+
+<span class="sd">    Difference Between TMscore and TMalign</span>
+<span class="sd">    --------------------------------------</span>
+<span class="sd">    - **TMscore**: This class calculates the TM-score between protein structures without superimposing them. It is suitable for comparing the overall similarity of protein structures in a sequence-length independent manner. TMscore is used when you need to score the structural similarity directly without modifying the positions of the structures.</span>
+<span class="sd">    </span>
+<span class="sd">    - **TMalign**: This class not only calculates the TM-score but also superimposes the structures before scoring. It is used when structural alignment and superimposition are necessary to get a more accurate measure of structural similarity, considering the spatial arrangement of the protein structures.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `TMscore` class, configured to run TMscore processes and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If the TMscore executable is not found in the specified environment.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods or if required reference columns are missing.</span>
+<span class="sd">        - RuntimeError: If no TM scores are found in the output files.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `TMscore` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from tmscore import TMscore</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the TMscore class</span>
+<span class="sd">        tmscore = TMscore()</span>
+
+<span class="sd">        # Run the scoring process</span>
+<span class="sd">        results = tmscore.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_2&quot;,</span>
+<span class="sd">            ref_col=&quot;reference_pdb&quot;,</span>
+<span class="sd">            options=&quot;-c&quot;,</span>
+<span class="sd">            pose_options=[&quot;-d&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the scoring process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The TMscore class is intended for researchers and developers who need to perform TMscore calculations as part of their protein structure comparison and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="TMscore.__init__">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMscore.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">application</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the TMscore class with optional jobstarter and application path.</span>
+
+<span class="sd">        This method sets up the TMscore class by configuring the jobstarter and the path to the TMscore executable. It ensures that the necessary components are ready for executing TMscore processes.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            jobstarter (str, optional): An optional jobstarter configuration. Defaults to None.</span>
+<span class="sd">            application (str, optional): Path to the TMscore executable. If not provided, it defaults to the TMscore executable in the ProtFlow environment.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize the `TMscore` class:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from tmscore import TMscore</span>
+
+<span class="sd">                # Initialize the TMscore class</span>
+<span class="sd">                tmscore = TMscore(</span>
+<span class="sd">                    jobstarter=&quot;local&quot;,</span>
+<span class="sd">                    application=&quot;/path/to/TMscore&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Check the instance</span>
+<span class="sd">                print(tmscore)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Jobstarter Configuration:** This parameter allows setting up the jobstarter for managing job execution.</span>
+<span class="sd">            - **Application Path:** This parameter sets the path to the TMscore executable, ensuring the correct executable is used for scoring processes.</span>
+
+<span class="sd">        This method is designed to prepare the TMscore class for executing TMscore processes, ensuring that all necessary configurations are in place.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;tmscore.py&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">application</span> <span class="o">=</span> <span class="n">application</span> <span class="ow">or</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROTFLOW_ENV</span><span class="p">,</span> <span class="s2">&quot;TMscore&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
+
+    <span class="c1">########################## Calculations ################################################</span>
+<div class="viewcode-block" id="TMscore.run">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMscore.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span> <span class="c1"># pylint: disable=W0237</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute the TMscore process with given poses and jobstarter configuration.</span>
+
+<span class="sd">        This method sets up and runs the TMscore process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            ref_col (str): Column containing paths to PDB files used as reference for TM score calculation.</span>
+<span class="sd">            options (str, optional): Additional command-line options for the TMscore script. Defaults to None.</span>
+<span class="sd">            pose_options (str, optional): Name of poses.df column containing options for TMscore. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the TMscore process.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If the TMscore executable is not found in the specified environment.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the method or if required reference columns are missing.</span>
+<span class="sd">            RuntimeError: If no TM scores are found in the output files.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `run` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from tmscore import TMscore</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the TMscore class</span>
+<span class="sd">                tmscore = TMscore()</span>
+
+<span class="sd">                # Run the scoring process</span>
+<span class="sd">                results = tmscore.run(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_2&quot;,</span>
+<span class="sd">                    ref_col=&quot;reference_pdb&quot;,</span>
+<span class="sd">                    options=&quot;-c&quot;,</span>
+<span class="sd">                    pose_options=[&quot;-d&quot;],</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(results)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed.</span>
+<span class="sd">            - **Reference Handling:** The method validates the reference column and prepares the reference structures for scoring.</span>
+<span class="sd">            - **Output Management:** The method handles the collection and processing of output data, ensuring that results are organized and accessible for further analysis.</span>
+<span class="sd">            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the scoring process to their specific needs.</span>
+
+<span class="sd">        This method is designed to streamline the execution of TMscore processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein structure comparisons.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_TM.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">scores</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+
+        <span class="c1"># check if reference column exists in poses.df</span>
+        <span class="n">col_in_df</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">)</span>
+
+        <span class="c1"># prepare pose options</span>
+        <span class="n">pose_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_pose_options</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="n">pose_opts</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">ref_col</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span> <span class="n">pose_options</span><span class="p">):</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose_path</span><span class="o">=</span><span class="n">pose</span><span class="p">,</span> <span class="n">ref_path</span><span class="o">=</span><span class="n">ref</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="o">=</span><span class="n">pose_opts</span><span class="p">))</span>
+
+        <span class="n">num_cmds</span> <span class="o">=</span> <span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span>
+        <span class="k">if</span> <span class="n">num_cmds</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">):</span>
+            <span class="n">num_cmds</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+
+        <span class="c1"># create batch commands</span>
+        <span class="n">cmd_sublists</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">jobstarters</span><span class="o">.</span><span class="n">split_list</span><span class="p">(</span><span class="n">cmds</span><span class="p">,</span> <span class="n">n_sublists</span><span class="o">=</span><span class="n">num_cmds</span><span class="p">)</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">sublist</span> <span class="ow">in</span> <span class="n">cmd_sublists</span><span class="p">:</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sublist</span><span class="p">))</span>
+
+        <span class="c1"># run command</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span> <span class="o">=</span> <span class="s2">&quot;TM&quot;</span><span class="p">,</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">work_dir</span>
+        <span class="p">)</span>
+
+        <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collect_scores</span><span class="p">(</span><span class="n">output_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">)</span>
+
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">scores</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[[</span><span class="s1">&#39;poses&#39;</span><span class="p">,</span> <span class="s1">&#39;poses_description&#39;</span><span class="p">]],</span> <span class="n">left_on</span><span class="o">=</span><span class="s2">&quot;description&quot;</span><span class="p">,</span> <span class="n">right_on</span><span class="o">=</span><span class="s2">&quot;poses_description&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s1">&#39;poses_description&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">scores</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;poses&quot;</span><span class="p">:</span> <span class="s2">&quot;location&quot;</span><span class="p">})</span>
+
+        <span class="c1"># write output scorefile</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="c1"># create standardised output for poses class:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="TMscore.write_cmd">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMscore.write_cmd">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_cmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span> <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Write the command to run TMscore.</span>
+
+<span class="sd">        This method constructs the command to execute TMscore based on the provided parameters. It formats the options and flags correctly and sets up the command to be run in the environment.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose_path (str): The path to the pose file.</span>
+<span class="sd">            ref_path (str): The path to the reference file.</span>
+<span class="sd">            output_dir (str): The directory where output files will be saved.</span>
+<span class="sd">            options (str, optional): Additional command-line options for TMscore. Defaults to None.</span>
+<span class="sd">            pose_options (str, optional): Pose-specific options for TMscore. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The constructed command string to run TMscore.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `write_cmd` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from tmscore import TMscore</span>
+
+<span class="sd">                # Initialize the TMscore class</span>
+<span class="sd">                tmscore = TMscore()</span>
+
+<span class="sd">                # Write the command</span>
+<span class="sd">                cmd = tmscore.write_cmd(</span>
+<span class="sd">                    pose_path=&quot;pose.pdb&quot;,</span>
+<span class="sd">                    ref_path=&quot;reference.pdb&quot;,</span>
+<span class="sd">                    output_dir=&quot;output/&quot;,</span>
+<span class="sd">                    options=&quot;-a&quot;,</span>
+<span class="sd">                    pose_options=&quot;-b&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Print the command</span>
+<span class="sd">                print(cmd)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Command Construction:** The method constructs the command string by parsing and formatting the provided options and pose-specific options.</span>
+<span class="sd">            - **Output Management:** Ensures that the output files are correctly named and saved in the specified directory.</span>
+
+<span class="sd">        This method is designed to streamline the construction of commands for TMscore processes, ensuring that all necessary options are correctly formatted and included.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;-</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span>
+        <span class="n">flags</span> <span class="o">=</span> <span class="s2">&quot; -&quot;</span> <span class="o">+</span> <span class="s2">&quot; -&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="k">if</span> <span class="n">flags</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;-</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span> <span class="k">if</span> <span class="n">opts</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+        <span class="n">flags</span> <span class="o">=</span> <span class="s2">&quot; -&quot;</span> <span class="o">+</span> <span class="s2">&quot; -&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="k">if</span> <span class="n">flags</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># define scorefile names</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pose_path</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">.tmout&quot;</span><span class="p">)</span>
+
+        <span class="c1"># compile command</span>
+        <span class="n">run_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">application</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">pose_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">ref_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">opts</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">flags</span><span class="si">}</span><span class="s2"> &gt; </span><span class="si">{</span><span class="n">scorefile</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="k">return</span> <span class="n">run_string</span></div>
+
+
+<div class="viewcode-block" id="TMscore.collect_scores">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.tmscore.TMscore.collect_scores">[docs]</a>
+    <span class="k">def</span> <span class="nf">collect_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collect scores from TMscore output files.</span>
+
+<span class="sd">        This method collects and processes the scores from the output files generated TMscore. It reads the scores, extracts relevant information, and organizes the data into a structured pandas DataFrame.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            output_dir (str): The directory where TMscore output files are located.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: A DataFrame containing the collected scores.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If no TM scores are found in the output files.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `collect_scores` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from tmscore import TMscore</span>
+
+<span class="sd">                # Initialize the TMscore class</span>
+<span class="sd">                tmalign = TMscore()</span>
+
+<span class="sd">                # Collect scores</span>
+<span class="sd">                scores_df = tmscore.collect_scores(</span>
+<span class="sd">                    output_dir=&quot;output/&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Print the scores DataFrame</span>
+<span class="sd">                print(scores_df)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Score Extraction:** The method reads the output files, extracts relevant scores, and organizes them into a pandas DataFrame.</span>
+<span class="sd">            - **Validation:** Ensures that the scores are correctly extracted and that no errors occurred during the process.</span>
+
+<span class="sd">        This method is designed to streamline the collection and processing of scores from TMscore output files, ensuring that all relevant data is accurately captured and organized.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">extract_scores</span><span class="p">(</span><span class="n">score_path</span><span class="p">:</span><span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">            extract TM scores from scorefile, return a Series</span>
+<span class="sd">            &#39;&#39;&#39;</span>
+
+            <span class="n">tm_scores</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">score_path</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="c1"># extract scores</span>
+                    <span class="k">if</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;TM-score&quot;</span><span class="p">):</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;TM_score_ref&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">2</span><span class="p">])</span>
+                    <span class="k">elif</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;MaxSub-score&quot;</span><span class="p">):</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;MaxSub_score&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">elif</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;GDT-TS-score&quot;</span><span class="p">):</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;GDT-TS_score&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+                    <span class="k">elif</span> <span class="n">line</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;GDT-HA-score&quot;</span><span class="p">):</span>
+                        <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;GDT-HA_score&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">line</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">tm_scores</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">score_path</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="c1"># check if scores were present in scorefile</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">tm_scores</span><span class="p">))</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not find any TM scores in </span><span class="si">{</span><span class="n">score_path</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">tm_scores</span><span class="p">)</span>
+
+        <span class="c1"># collect scorefiles</span>
+        <span class="n">scorefiles</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;*.tmout&quot;</span><span class="p">))</span>
+
+        <span class="n">scores</span> <span class="o">=</span> <span class="p">[</span><span class="n">extract_scores</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">scorefiles</span><span class="p">]</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">scores</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
