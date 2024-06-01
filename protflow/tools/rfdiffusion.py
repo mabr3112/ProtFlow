@@ -56,8 +56,8 @@ Notes
 -----
 This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.
 
-Author
-------
+Authors
+-------
 Markus Braun, Adrian Tripp
 
 Version
