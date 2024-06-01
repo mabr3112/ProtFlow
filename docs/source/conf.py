@@ -7,6 +7,7 @@
 import os
 import sys
 sys.path.insert(0, os.path.abspath('../../'))  # Adjust the path to your module's location
+sys.path.insert(0, os.path.abspath('../../protflow/'))  # Adjust the path to your module's location
 
 # -- Project information -----------------------------------------------------
 
