@@ -1,4 +1,29 @@
-'''Module for general utility functions of protflow.'''
+"""
+General Utility Functions for ProtFlow
+
+This module provides a collection of general utility functions designed to support various
+operations within the ProtFlow package. These utilities include functions for parsing data files,
+calculating molecular interactions, and other common tasks needed in bioinformatics and structural
+biology workflows.
+
+Examples:
+    Here is an example of how to use the `parse_fasta_to_dict` function:
+
+    .. code-block:: python
+
+        # Parse a FASTA file
+        fasta_dict = parse_fasta_to_dict('example.fasta')
+        for desc, seq in fasta_dict.items():
+            print(f"{desc}: {seq}")
+
+This module is designed to provide essential utilities for common tasks encountered in
+bioinformatics and structural biology, facilitating the development of more complex workflows
+within the ProtFlow package.
+
+Authors
+-------
+Markus Braun, Adrian Tripp
+"""
 
 def parse_fasta_to_dict(fasta_path: str, encoding:str="UTF-8") -> dict[str:str]:
     '''
