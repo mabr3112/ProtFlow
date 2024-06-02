@@ -9,6 +9,7 @@ Subpackages
 
    protflow.metrics
    protflow.tools
+   protflow.utils
 
 Submodules
 ----------
