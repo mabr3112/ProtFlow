@@ -12,7 +12,7 @@ import pandas as pd
 from protflow.utils.biopython_tools import load_structure_from_pdbfile
 
 def get_mutations_list(wt: str, variant:str) -> None:
-    '''AAA'''
+    '''Not implemented.'''
     raise NotImplementedError
 
 def count_mutations(wt: str, variant:str) -> tuple[int, list[str]]:
