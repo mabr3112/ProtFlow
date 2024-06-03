@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.tools.rfdiffusion &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.tools.rfdiffusion</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.tools.rfdiffusion</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">RFdiffusion Module</span>
+<span class="sd">==================</span>
+
+<span class="sd">This module provides the functionality to integrate RFdiffusion within the ProtFlow framework. It offers tools to run RFdiffusion, handle its inputs and outputs, and process the resulting data in a structured and automated manner. </span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `RFdiffusion` class encapsulates the functionality necessary to execute RFdiffusion runs. It manages the configuration of paths to essential scripts and Python executables, sets up the environment, and handles the execution of diffusion processes. It also includes methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.</span>
+<span class="sd">The module is designed to streamline the integration of RFdiffusion into larger computational workflows. It supports the automatic setup of job parameters, execution of RFdiffusion commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create an instance of the `RFdiffusion` class and invoke its `run` method with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the diffusion process is provided through various parameters, allowing for customized runs tailored to specific research needs.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `RFdiffusion` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from rfdiffusion import RFdiffusion</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the RFdiffusion class</span>
+<span class="sd">    rfdiffusion = RFdiffusion()</span>
+
+<span class="sd">    # Run the diffusion process</span>
+<span class="sd">    results = rfdiffusion.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        jobstarter=jobstarter,</span>
+<span class="sd">        num_diffusions=3,</span>
+<span class="sd">        options=&quot;inference.num_designs=10&quot;,</span>
+<span class="sd">        pose_options=[&quot;inference.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the diffusion process.</span>
+<span class="sd">    - Customizability: Users can customize the diffusion process through multiple parameters, including the number of diffusions, specific options for the RFdiffusion script, and options for handling pose-specific parameters.</span>
+<span class="sd">    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate RFdiffusion into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Authors</span>
+<span class="sd">-------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0    </span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># general imports</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="c1"># dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="c1"># custom</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+<span class="kn">import</span> <span class="nn">protflow.config</span>
+<span class="kn">from</span> <span class="nn">protflow.residues</span> <span class="kn">import</span> <span class="n">ResidueSelection</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">col_in_df</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">RunnerOutput</span>
+
+
+<div class="viewcode-block" id="RFdiffusion">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.RFdiffusion">[docs]</a>
+<span class="k">class</span> <span class="nc">RFdiffusion</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    RFdiffusion Class</span>
+<span class="sd">    =================</span>
+
+<span class="sd">    The `RFdiffusion` class is a specialized class designed to facilitate the execution of RFdiffusion within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with RFdiffusion processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `RFdiffusion` class manages all aspects of running RFdiffusion simulations. It handles the configuration of necessary scripts and executables, prepares the environment for diffusion processes, and executes the diffusion commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to RFdiffusion scripts and Python executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of RFdiffusion commands with support for multiple diffusions.</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">        - Updating motifs based on RFdiffusion outputs and remapping residue selections.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `RFdiffusion` class, configured to run RFdiffusion processes and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">        - TypeError: If motifs are not of the expected type.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `RFdiffusion` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from rfdiffusion import RFdiffusion</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the RFdiffusion class</span>
+<span class="sd">        rfdiffusion = RFdiffusion()</span>
+
+<span class="sd">        # Run the diffusion process</span>
+<span class="sd">        results = rfdiffusion.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            num_diffusions=3,</span>
+<span class="sd">            options=&quot;inference.num_designs=10&quot;,</span>
+<span class="sd">            pose_options=[&quot;inference.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the diffusion process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The RFdiffusion class is intended for researchers and developers who need to perform RFdiffusion simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="RFdiffusion.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.RFdiffusion.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">script_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">RFDIFFUSION_SCRIPT_PATH</span><span class="p">,</span> <span class="n">python_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">RFDIFFUSION_PYTHON_PATH</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the RFdiffusion class.</span>
+
+<span class="sd">        This constructor sets up the necessary paths to the RFdiffusion script and Python executable, and initializes the job starter. The paths are configured using default values from the ProtFlow configuration, but they can be manually set if required. However, manual setting is generally not recommended due to the potential for misconfiguration.</span>
+
+<span class="sd">        Detailed Description</span>
+<span class="sd">        --------------------</span>
+<span class="sd">        The `__init__` method initializes the RFdiffusion class by setting up essential paths and configurations. It ensures that the paths to the RFdiffusion script and Python executable are correctly set, and it initializes the job starter object. This setup is crucial for the proper execution of RFdiffusion processes within the ProtFlow framework.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        script_path (str, optional): The path to the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`protflow.config.RFDIFFUSION_SCRIPT_PATH`).</span>
+<span class="sd">        python_path (str, optional): The path to the Python executable used to run the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`protflow.config.RFDIFFUSION_PYTHON_PATH`).</span>
+<span class="sd">        jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. If not provided, the default is `None`.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If the provided paths are invalid or if there are issues with the configuration.</span>
+<span class="sd">        </span>
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to initialize the RFdiffusion class:</span>
+
+<span class="sd">        .. code-block:: python</span>
+<span class="sd">                </span>
+<span class="sd">            from protflow.jobstarters import JobStarter</span>
+<span class="sd">            from rfdiffusion import RFdiffusion</span>
+
+<span class="sd">            # Initialize the RFdiffusion class</span>
+<span class="sd">            rfdiffusion = RFdiffusion()</span>
+
+<span class="sd">            # Initialize with custom paths</span>
+<span class="sd">            custom_rfdiffusion = RFdiffusion(</span>
+<span class="sd">                script_path=&quot;/path/to/custom/rfdiffusion_script.py&quot;,</span>
+<span class="sd">                python_path=&quot;/path/to/custom/python&quot;</span>
+<span class="sd">            )</span>
+
+<span class="sd">            # Initialize with a job starter</span>
+<span class="sd">            jobstarter = JobStarter()</span>
+<span class="sd">            rfdiffusion_with_jobstarter = RFdiffusion(jobstarter=jobstarter)</span>
+
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">        - **Path Configuration:** The paths to the RFdiffusion script and Python executable are critical for the correct functioning of the class. It is recommended to use the default paths provided by the ProtFlow configuration unless there is a specific need to customize them.</span>
+<span class="sd">        - **JobStarter Integration:** The JobStarter object is used to manage job execution, ensuring that RFdiffusion processes are handled efficiently. If a JobStarter is not provided, the class will operate without it, but it is recommended to use one for better job management.</span>
+
+<span class="sd">        This method is designed for initializing the RFdiffusion class with the necessary configurations, making it ready for executing RFdiffusion processes within the ProtFlow framework.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">script_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_path</span><span class="p">(</span><span class="n">script_path</span><span class="p">,</span> <span class="s2">&quot;RFDIFFUSION_SCRIPT_PATH&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_path</span><span class="p">(</span><span class="n">python_path</span><span class="p">,</span> <span class="s2">&quot;RFDIFFUSION_PYTHON_PATH&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;rfdiffusion.py&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;rfdiffusion.py&quot;</span>
+
+<div class="viewcode-block" id="RFdiffusion.run">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.RFdiffusion.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">num_diffusions</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">multiplex_poses</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">update_motifs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RunnerOutput</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute the RFdiffusion process with given poses and jobstarter configuration.</span>
+
+<span class="sd">        This method sets up and runs the RFdiffusion process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+<span class="sd">            num_diffusions (int, optional): The number of diffusions to run for each input pose. Defaults to 1.</span>
+<span class="sd">            options (str, optional): Additional options for the RFdiffusion script. Defaults to None.</span>
+<span class="sd">            pose_options (list[str], optional): A list of pose-specific options for the RFdiffusion script. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+<span class="sd">            multiplex_poses (int, optional): If specified, create multiple copies of poses to fully utilize parallel computing. Defaults to None.</span>
+<span class="sd">            update_motifs (list[str], optional): A list of motifs to update based on the RFdiffusion outputs. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RFdiffusion process.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the method.</span>
+<span class="sd">            TypeError: If motifs are not of the expected type.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `run` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from rfdiffusion import RFdiffusion</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the RFdiffusion class</span>
+<span class="sd">                rfdiffusion = RFdiffusion()</span>
+
+<span class="sd">                # Run the diffusion process</span>
+<span class="sd">                results = rfdiffusion.run(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    num_diffusions=3,</span>
+<span class="sd">                    options=&quot;inference.num_designs=10&quot;,</span>
+<span class="sd">                    pose_options=[&quot;inference.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(results)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed.</span>
+<span class="sd">            - **Output Management:** The method handles the collection and processing of output data, ensuring that results are organized and accessible for further analysis.</span>
+<span class="sd">            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the diffusion process to their specific needs.</span>
+
+<span class="sd">        This method is designed to streamline the execution of RFdiffusion processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze diffusion simulations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># setup runner</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="c1"># setup runner-specific directories</span>
+        <span class="n">pdb_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;output_pdbs&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">pdb_dir</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Look for output-file in pdb-dir. If output is present and correct, then skip diffusion step.</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;rfdiffusion_scores.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">scores</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">update_motifs</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">remap_motifs</span><span class="p">(</span>
+                <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+                <span class="n">motifs</span> <span class="o">=</span> <span class="n">update_motifs</span><span class="p">,</span>
+                <span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">poses</span>
+
+        <span class="c1"># in case overwrite is set, overwrite previous results.</span>
+        <span class="k">if</span> <span class="n">overwrite</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">scorefile</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">scorefile</span><span class="p">):</span> <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">scorefile</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">pdb</span> <span class="ow">in</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pdb_dir</span><span class="si">}</span><span class="s2">/*pdb&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">trb</span> <span class="o">:=</span> <span class="n">pdb</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.pdb&quot;</span><span class="p">,</span> <span class="s2">&quot;.trb&quot;</span><span class="p">)):</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">trb</span><span class="p">)</span>
+                    <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">pdb</span><span class="p">)</span>
+
+        <span class="c1"># parse options and pose_options:</span>
+        <span class="n">pose_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_pose_options</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+
+        <span class="c1"># handling of empty poses DataFrame.</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">pose_options</span><span class="p">:</span>
+            <span class="c1"># if no poses are set, but pose_options are provided, create as many jobs as pose_options. output_pdbs must be specified in pose options!</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_opts</span><span class="o">=</span><span class="n">pose_option</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="n">num_diffusions</span><span class="o">=</span><span class="n">num_diffusions</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose_option</span> <span class="ow">in</span> <span class="n">pose_options</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">pose_options</span><span class="p">:</span>
+            <span class="c1"># if neither poses nor pose_options exist: write n=max_cores commands with generic output name.</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_opts</span><span class="o">=</span><span class="s2">&quot;inference.output_prefix=&quot;</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;diff_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">),</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="n">num_diffusions</span><span class="o">=</span><span class="n">num_diffusions</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span><span class="p">)]</span>
+        <span class="k">elif</span> <span class="n">multiplex_poses</span><span class="p">:</span>
+            <span class="c1"># create multiple copies (specified by multiplex variable) of poses to fully utilize parallel computing:</span>
+            <span class="n">poses</span><span class="o">.</span><span class="n">duplicate_poses</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_input_pdbs/&quot;</span><span class="p">,</span> <span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">pose_opts</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="n">num_diffusions</span><span class="o">=</span><span class="n">num_diffusions</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">pose_opts</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">pose_options</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># write rfdiffusion cmds</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="n">pose_opts</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="n">num_diffusions</span><span class="o">=</span><span class="n">num_diffusions</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">pose_opts</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">pose_options</span><span class="p">)]</span>
+
+        <span class="c1"># diffuse</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span><span class="o">=</span><span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span><span class="o">=</span><span class="s2">&quot;rfdiffusion&quot;</span><span class="p">,</span>
+            <span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">output_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># collect RFdiffusion outputs</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collect_scores</span><span class="p">(</span><span class="n">work_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">rename_pdbs</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving scores of </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> at </span><span class="si">{</span><span class="n">scorefile</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="c1"># update residue mappings for stored motifs</span>
+        <span class="n">poses</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">update_motifs</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">remap_motifs</span><span class="p">(</span>
+                <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+                <span class="n">motifs</span> <span class="o">=</span> <span class="n">update_motifs</span><span class="p">,</span>
+                <span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">poses</span></div>
+
+
+<div class="viewcode-block" id="RFdiffusion.remap_motifs">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.RFdiffusion.remap_motifs">[docs]</a>
+    <span class="k">def</span> <span class="nf">remap_motifs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">motifs</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Updates ResidueSelection type motifs in poses.df when given prefix of RFdiffusion run.</span>
+
+<span class="sd">        This method updates the residue mappings of specified motifs in the poses DataFrame based on the RFdiffusion outputs. It ensures that the motifs are correctly mapped to the new residue indices as generated by the diffusion process.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures and associated data.</span>
+<span class="sd">            motifs (list): A list of motif columns to update in the poses DataFrame.</span>
+<span class="sd">            prefix (str): The prefix used to identify the relevant columns in the poses DataFrame from the RFdiffusion outputs.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If the motifs are not of the expected type ResidueSelection.</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">        - **Motif Update:** The method ensures that the specified motifs in the poses DataFrame are updated with the new residue mappings from the RFdiffusion outputs.</span>
+<span class="sd">        - **Residue Mapping:** The method uses the reference and halogenated residue indices generated by RFdiffusion to update the motifs.</span>
+<span class="sd">        - **Integration:** This method integrates seamlessly with the RFdiffusion workflow, ensuring that motifs are correctly remapped after diffusion processes.</span>
+
+<span class="sd">        This method is designed to update the residue mappings of motifs in the poses DataFrame, facilitating accurate representation of the protein structures after RFdiffusion processes.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">motifs</span> <span class="o">=</span> <span class="n">prep_motif_input</span><span class="p">(</span><span class="n">motifs</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">motif_col</span> <span class="ow">in</span> <span class="n">motifs</span><span class="p">:</span>
+            <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">motif_col</span><span class="p">]</span> <span class="o">=</span> <span class="n">update_motif_res_mapping</span><span class="p">(</span>
+                <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">motif_col</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span>
+                <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_con_ref_pdb_idx&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span>
+                <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_con_hal_pdb_idx&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+            <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RFdiffusion.write_cmd">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.RFdiffusion.write_cmd">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_cmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">pose_opts</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">num_diffusions</span><span class="p">:</span> <span class="nb">int</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Construct the command to run the RFdiffusion process.</span>
+
+<span class="sd">        This method constructs the command string required to execute the RFdiffusion process. It combines the specified options and pose-specific options, ensuring that all necessary parameters are included.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose (str): The path to the input pose file.</span>
+<span class="sd">            options (str): General options for the RFdiffusion script.</span>
+<span class="sd">            pose_opts (str): Pose-specific options for the RFdiffusion script.</span>
+<span class="sd">            output_dir (str): The directory where output files will be saved.</span>
+<span class="sd">            num_diffusions (int, optional): The number of diffusions to run for each input pose. Defaults to 1.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The constructed command string to execute the RFdiffusion process.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the provided options or pose_opts are invalid.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Construct a command for RFdiffusion:</span>
+<span class="sd">            </span>
+<span class="sd">            .. code-block:: python</span>
+<span class="sd">                </span>
+<span class="sd">                cmd = rfdiffusion.write_cmd(&quot;input.pdb&quot;, &quot;inference.num_designs=10&quot;, &quot;inference.input_pdb=&#39;input.pdb&#39;&quot;, &quot;/output&quot;, 3)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Option Parsing:** The method parses both general and pose-specific options, ensuring that they are correctly formatted and included in the command string.</span>
+<span class="sd">            - **Command Construction:** The constructed command string includes the path to the RFdiffusion script, the specified options, and the output directory.</span>
+<span class="sd">            - **Default Values:** Default values for unspecified options, such as `inference.num_designs`, are included to ensure the command string is complete.</span>
+
+<span class="sd">        This method is designed to create a fully-formed command string for running RFdiffusion, making it easier to execute diffusion processes with the desired parameters.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># parse description:</span>
+        <span class="k">if</span> <span class="n">pose</span><span class="p">:</span>
+            <span class="n">desc</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pose</span><span class="p">))[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># parse options:</span>
+        <span class="n">start_opts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_rfdiffusion_opts</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_opts</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="s2">&quot;inference.input_pdb&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">start_opts</span> <span class="ow">and</span> <span class="n">pose</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span> <span class="c1"># if no pose present, ignore input_pdb</span>
+            <span class="n">start_opts</span><span class="p">[</span><span class="s2">&quot;inference.input_pdb&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">pose</span>
+        <span class="k">if</span> <span class="s2">&quot;inference.num_designs&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">start_opts</span><span class="p">:</span>
+            <span class="n">start_opts</span><span class="p">[</span><span class="s2">&quot;inference.num_designs&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">num_diffusions</span>
+        <span class="k">if</span> <span class="s2">&quot;inference.output_prefix&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">start_opts</span><span class="p">:</span>
+            <span class="n">start_opts</span><span class="p">[</span><span class="s2">&quot;inference.output_prefix&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">desc</span><span class="p">)</span>
+
+        <span class="n">opts_str</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">k</span><span class="si">}</span><span class="s2">=</span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">start_opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span>
+
+        <span class="c1"># return cmd</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">python_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">script_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">opts_str</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="RFdiffusion.parse_rfdiffusion_opts">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.RFdiffusion.parse_rfdiffusion_opts">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_rfdiffusion_opts</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parse and combine general and pose-specific RFdiffusion options into a dictionary.</span>
+
+<span class="sd">        This method splits and processes both general options and pose-specific options, combining them into a single dictionary. Pose-specific options will overwrite general options if there are conflicts.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            options (str): General options for the RFdiffusion script.</span>
+<span class="sd">            pose_options (str): Pose-specific options for the RFdiffusion script.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict: A dictionary containing the combined options, with pose-specific options taking precedence over general options.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `parse_rfdiffusion_opts` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                options = &quot;inference.num_designs=10 inference.use_gpu=True&quot;</span>
+<span class="sd">                pose_options = &quot;inference.input_pdb=&#39;input.pdb&#39; inference.num_designs=5&quot;</span>
+<span class="sd">                parsed_opts = rfdiffusion.parse_rfdiffusion_opts(options, pose_options)</span>
+<span class="sd">                # parsed_opts will be:</span>
+<span class="sd">                # {&#39;inference.num_designs&#39;: &#39;5&#39;, &#39;inference.use_gpu&#39;: &#39;True&#39;, &#39;inference.input_pdb&#39;: &quot;&#39;input.pdb&#39;&quot;}</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Option Splitting:** The method uses regular expressions to split the options string into individual option entries, ensuring that options within quotes are not split incorrectly.</span>
+<span class="sd">            - **Option Overwriting:** By adding pose-specific options after general options, the method ensures that pose-specific options can overwrite general options if necessary.</span>
+
+<span class="sd">        This method is designed to create a consolidated dictionary of options for the RFdiffusion script, facilitating the construction of command strings with the appropriate parameters.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">re_split_rfdiffusion_opts</span><span class="p">(</span><span class="n">command</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">command</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[]</span>
+            <span class="k">return</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\s+(?=(?:[^&#39;]*&#39;[^&#39;]*&#39;)*[^&#39;]*$)&quot;</span><span class="p">,</span> <span class="n">command</span><span class="p">)</span>
+
+        <span class="n">splitstr</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">re_split_rfdiffusion_opts</span><span class="p">(</span><span class="n">options</span><span class="p">)</span> <span class="o">+</span> <span class="n">re_split_rfdiffusion_opts</span><span class="p">(</span><span class="n">pose_options</span><span class="p">)</span> <span class="k">if</span> <span class="n">x</span><span class="p">]</span> <span class="c1"># adding pose_opts after options makes sure that pose_opts overwrites options!</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]:</span> <span class="s2">&quot;=&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">)[</span><span class="mi">1</span><span class="p">:])</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">splitstr</span><span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="RFdiffusion.collect_scores">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.RFdiffusion.collect_scores">[docs]</a>
+    <span class="k">def</span> <span class="nf">collect_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rename_pdbs</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collect scores from RFdiffusion output files.</span>
+
+<span class="sd">        This method collects scores from .trb files generated by RFdiffusion into a single pandas DataFrame. It also optionally renames the output .pdb files based on the diffusion process.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            work_dir (str): The working directory where RFdiffusion output files are stored.</span>
+<span class="sd">            rename_pdbs (bool, optional): If True, rename the .pdb files based on the new descriptions. Defaults to True.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: A DataFrame containing the collected scores from the RFdiffusion output.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If no .pdb files are found in the specified directory.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `collect_scores` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                work_dir = &quot;/path/to/output&quot;</span>
+<span class="sd">                scores_df = rfdiffusion.collect_scores(work_dir, rename_pdbs=True)</span>
+<span class="sd">                # scores_df will contain the combined scores from the RFdiffusion output files</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Score Collection:** The method iterates over .pdb files in the specified directory, collecting corresponding .trb files and concatenating their scores into a DataFrame.</span>
+<span class="sd">            - **File Renaming:** If `rename_pdbs` is set to True, the method renames the .pdb files based on new descriptions to ensure unique identification.</span>
+<span class="sd">            - **DataFrame Structure:** The resulting DataFrame includes relevant score information, and columns are renamed appropriately if files are renamed.</span>
+
+<span class="sd">        This method is designed to streamline the collection and organization of RFdiffusion output scores, facilitating further analysis and processing.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># collect scores from .trb-files into one pandas DataFrame:</span>
+        <span class="n">pdb_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;output_pdbs&quot;</span><span class="p">)</span>
+        <span class="n">pl</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pdb_dir</span><span class="si">}</span><span class="s2">/*.pdb&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pl</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No .pdb files were found in the diffusion output direcotry </span><span class="si">{</span><span class="n">pdb_dir</span><span class="si">}</span><span class="s2">. RFDiffusion might have crashed (check inpainting error-log), or the path might be wrong!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># collect rfdiffusion scores into a DataFrame:</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pdb</span> <span class="ow">in</span> <span class="n">pl</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">trb</span> <span class="o">:=</span> <span class="n">pdb</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.pdb&quot;</span><span class="p">,</span> <span class="s2">&quot;.trb&quot;</span><span class="p">)):</span>
+                <span class="n">scores</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">parse_diffusion_trbfile</span><span class="p">(</span><span class="n">trb</span><span class="p">))</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
+
+        <span class="c1"># rename pdbs if option is set:</span>
+        <span class="k">if</span> <span class="n">rename_pdbs</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">scores</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s2">&quot;new_description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;_&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">desc</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="s2">&quot;_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">desc</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span> <span class="k">for</span> <span class="n">desc</span> <span class="ow">in</span> <span class="n">scores</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]]</span>
+            <span class="n">scores</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s2">&quot;new_loc&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">loc</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">old_desc</span><span class="p">,</span> <span class="n">new_desc</span><span class="p">)</span> <span class="k">for</span> <span class="n">loc</span><span class="p">,</span> <span class="n">old_desc</span><span class="p">,</span> <span class="n">new_desc</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">scores</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">]),</span> <span class="nb">list</span><span class="p">(</span><span class="n">scores</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]),</span> <span class="nb">list</span><span class="p">(</span><span class="n">scores</span><span class="p">[</span><span class="s2">&quot;new_description&quot;</span><span class="p">]))]</span>
+
+            <span class="c1"># rename all diffusion outputfiles according to new indeces:</span>
+            <span class="n">_</span> <span class="o">=</span> <span class="p">[[</span><span class="n">os</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">f</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">old_desc</span><span class="p">,</span> <span class="n">new_desc</span><span class="p">))</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pdb_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">old_desc</span><span class="si">}</span><span class="s2">.*&quot;</span><span class="p">)]</span> <span class="k">for</span> <span class="n">old_desc</span><span class="p">,</span> <span class="n">new_desc</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">scores</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]),</span> <span class="nb">list</span><span class="p">(</span><span class="n">scores</span><span class="p">[</span><span class="s2">&quot;new_description&quot;</span><span class="p">]))]</span>
+
+            <span class="c1"># Collect information of path to .pdb files into DataFrame under &#39;location&#39; column</span>
+            <span class="n">scores</span> <span class="o">=</span> <span class="n">scores</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;new_loc&quot;</span><span class="p">:</span> <span class="s2">&quot;location&quot;</span><span class="p">})</span>
+            <span class="n">scores</span> <span class="o">=</span> <span class="n">scores</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;new_description&quot;</span><span class="p">:</span> <span class="s2">&quot;description&quot;</span><span class="p">})</span>
+
+        <span class="n">scores</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">scores</span></div>
+</div>
+
+
+<div class="viewcode-block" id="parse_diffusion_trbfile">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.parse_diffusion_trbfile">[docs]</a>
+<span class="k">def</span> <span class="nf">parse_diffusion_trbfile</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parse a .trb file from RFdiffusion and extract relevant scores into a pandas DataFrame.</span>
+
+<span class="sd">    This method reads a .trb file generated by RFdiffusion, extracts relevant scoring information, and organizes it into a DataFrame. The extracted information includes pLDDT scores, residue indices, and metadata.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        path (str): The path to the .trb file.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        pd.DataFrame: A DataFrame containing the extracted scores and metadata from the .trb file.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the provided file path does not end with .trb.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Here is an example of how to use the `parse_diffusion_trbfile` method:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            path = &quot;/path/to/output.trb&quot;</span>
+<span class="sd">            scores_df = rfdiffusion.parse_diffusion_trbfile(path)</span>
+<span class="sd">            # scores_df will contain the extracted scores and metadata</span>
+
+<span class="sd">    Further Details:</span>
+<span class="sd">        - **File Reading:** The method uses numpy to load the .trb file and allows for pickled objects.</span>
+<span class="sd">        - **Score Extraction:** Extracted scores include mean pLDDT, per-residue pLDDT, and other relevant metrics.</span>
+<span class="sd">        - **Metadata Collection:** Metadata such as file location, description, and input PDB are included in the DataFrame.</span>
+
+<span class="sd">    This method is designed to parse and organize the data from RFdiffusion .trb files, making it easier to analyze the results.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># read trbfile:</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.trb&quot;</span><span class="p">):</span> <span class="n">data_dict</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">allow_pickle</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;only .trb-files can be passed into parse_inpainting_trbfile. &lt;trbfile&gt;: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># calc mean_plddt:</span>
+    <span class="n">sd</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">last_plddts</span> <span class="o">=</span> <span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;plddt&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">sd</span><span class="p">[</span><span class="s2">&quot;plddt&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="nb">sum</span><span class="p">(</span><span class="n">last_plddts</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">last_plddts</span><span class="p">)]</span>
+    <span class="n">sd</span><span class="p">[</span><span class="s2">&quot;perres_plddt&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">last_plddts</span><span class="p">]</span>
+
+    <span class="c1"># instantiate scoresdict and start collecting:</span>
+    <span class="n">scoreterms</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;con_hal_pdb_idx&quot;</span><span class="p">,</span> <span class="s2">&quot;con_ref_pdb_idx&quot;</span><span class="p">,</span> <span class="s2">&quot;sampled_mask&quot;</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">st</span> <span class="ow">in</span> <span class="n">scoreterms</span><span class="p">:</span>
+        <span class="n">sd</span><span class="p">[</span><span class="n">st</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">data_dict</span><span class="p">[</span><span class="n">st</span><span class="p">]]</span>
+
+    <span class="c1"># collect metadata</span>
+    <span class="n">sd</span><span class="p">[</span><span class="s2">&quot;location&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.trb&quot;</span><span class="p">,</span> <span class="s2">&quot;.pdb&quot;</span><span class="p">)</span>
+    <span class="n">sd</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.trb&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">sd</span><span class="p">[</span><span class="s2">&quot;input_pdb&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_dict</span><span class="p">[</span><span class="s2">&quot;config&quot;</span><span class="p">][</span><span class="s2">&quot;inference&quot;</span><span class="p">][</span><span class="s2">&quot;input_pdb&quot;</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">sd</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="prep_motif_input">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.prep_motif_input">[docs]</a>
+<span class="k">def</span> <span class="nf">prep_motif_input</span><span class="p">(</span><span class="n">motif</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Ensure motif input is a list and validate that motifs are present in the DataFrame.</span>
+
+<span class="sd">    This method checks if the given motif is a string or a list, and ensures it is returned as a list. It also validates that the specified motifs are present as columns in the provided DataFrame.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        motif (Any): The motif or list of motifs to validate and process.</span>
+<span class="sd">        df (pd.DataFrame): The DataFrame in which to check for the presence of the motifs.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list[str]: A list of motif column names.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If any of the specified motifs are not present in the DataFrame.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Here is an example of how to use the `prep_motif_input` function:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            df = pd.DataFrame({&quot;motif1&quot;: [1, 2, 3], &quot;motif2&quot;: [4, 5, 6]})</span>
+<span class="sd">            motif = &quot;motif1&quot;</span>
+<span class="sd">            motifs_list = rfdiffusion.prep_motif_input(motif, df)</span>
+<span class="sd">            # motifs_list will be: [&quot;motif1&quot;]</span>
+
+<span class="sd">    Further Details:</span>
+<span class="sd">        - **Motif Handling:** The method ensures that even a single motif string is converted into a list to standardize processing.</span>
+<span class="sd">        - **Validation:** It checks that each motif in the list is a column in the provided DataFrame, raising an error if any are missing.</span>
+
+<span class="sd">    This function is designed to prepare and validate motif inputs for further processing in the RFdiffusion workflow.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># ambivalence to singular or multiple motif cols</span>
+    <span class="n">motifs</span> <span class="o">=</span> <span class="p">[</span><span class="n">motif</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">motif</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">motif</span>
+
+    <span class="c1"># clear</span>
+    <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">motifs</span><span class="p">:</span>
+        <span class="n">col_in_df</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">motifs</span></div>
+
+
+<div class="viewcode-block" id="update_motif_res_mapping">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.update_motif_res_mapping">[docs]</a>
+<span class="k">def</span> <span class="nf">update_motif_res_mapping</span><span class="p">(</span><span class="n">motif_l</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ResidueSelection</span><span class="p">],</span> <span class="n">con_ref_idx</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">con_hal_idx</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Update motifs in motif_l based on con_ref_idx and con_hal_idx.</span>
+
+<span class="sd">    This method updates the residue mappings of motifs in the provided list based on the reference and halogenated residue indices from RFdiffusion outputs.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        motif_l (list[ResidueSelection]): A list of ResidueSelection objects representing the motifs to be updated.</span>
+<span class="sd">        con_ref_idx (list): A list of reference residue indices from the RFdiffusion outputs.</span>
+<span class="sd">        con_hal_idx (list): A list of halogenated residue indices from the RFdiffusion outputs.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list: A list of updated ResidueSelection objects with new residue mappings.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If any element in motif_l is not of type ResidueSelection.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Here is an example of how to use the `update_motif_res_mapping` method:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            motif_l = [ResidueSelection([&quot;A:10&quot;, &quot;A:20&quot;]), ResidueSelection([&quot;B:30&quot;, &quot;B:40&quot;])]</span>
+<span class="sd">            con_ref_idx = [(&quot;A&quot;, 10), (&quot;A&quot;, 20)]</span>
+<span class="sd">            con_hal_idx = [(&quot;A&quot;, 11), (&quot;A&quot;, 21)]</span>
+<span class="sd">            updated_motifs = rfdiffusion.update_motif_res_mapping(motif_l, con_ref_idx, con_hal_idx)</span>
+<span class="sd">            # updated_motifs will contain the updated ResidueSelection objects</span>
+
+<span class="sd">    Further Details:</span>
+<span class="sd">        - **Residue Mapping:** The method sets up a mapping dictionary from reference to halogenated residue indices.</span>
+<span class="sd">        - **Motif Update:** Each motif in the input list is updated according to the new residue mappings and returned as a new ResidueSelection object.</span>
+
+<span class="sd">    This method is designed to update residue selections in motifs based on the outputs from RFdiffusion, facilitating accurate downstream analysis and interpretation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">output_motif_l</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">motif</span><span class="p">,</span> <span class="n">ref_idx</span><span class="p">,</span> <span class="n">hal_idx</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">motif_l</span><span class="p">,</span> <span class="n">con_ref_idx</span><span class="p">,</span> <span class="n">con_hal_idx</span><span class="p">):</span>
+        <span class="c1"># error handling</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">motif</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Individual motifs must be of type ResidueSelection. Create ResidueSelection objects out of your motifs.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># setup mapping from rfdiffusion outputs:</span>
+        <span class="n">exchange_dict</span> <span class="o">=</span> <span class="n">get_residue_mapping</span><span class="p">(</span><span class="n">ref_idx</span><span class="p">,</span> <span class="n">hal_idx</span><span class="p">)</span>
+
+        <span class="c1"># exchange and return</span>
+        <span class="n">exchanged_motif</span> <span class="o">=</span> <span class="p">[</span><span class="n">exchange_dict</span><span class="p">[</span><span class="n">residue</span><span class="p">]</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">motif</span><span class="o">.</span><span class="n">residues</span><span class="p">]</span>
+        <span class="n">output_motif_l</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ResidueSelection</span><span class="p">(</span><span class="n">exchanged_motif</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">output_motif_l</span></div>
+
+
+<div class="viewcode-block" id="get_residue_mapping">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.rfdiffusion.get_residue_mapping">[docs]</a>
+<span class="k">def</span> <span class="nf">get_residue_mapping</span><span class="p">(</span><span class="n">con_ref_idx</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">con_hal_idx</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a residue mapping dictionary from RFdiffusion outputs.</span>
+
+<span class="sd">    This method creates a mapping dictionary that maps old residue indices (from con_ref_idx) to new residue indices (from con_hal_idx).</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        con_ref_idx (list): A list of reference residue indices from the RFdiffusion outputs, where each element is a tuple of (chain, residue_id).</span>
+<span class="sd">        con_hal_idx (list): A list of halogenated residue indices from the RFdiffusion outputs, where each element is a tuple of (chain, residue_id).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict: A dictionary where keys are tuples of (chain, residue_id) from con_ref_idx and values are tuples of (chain, residue_id) from con_hal_idx.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Here is an example of how to use the `get_residue_mapping` method:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            con_ref_idx = [(&quot;A&quot;, 10), (&quot;A&quot;, 20)]</span>
+<span class="sd">            con_hal_idx = [(&quot;A&quot;, 11), (&quot;A&quot;, 21)]</span>
+<span class="sd">            residue_mapping = rfdiffusion.get_residue_mapping(con_ref_idx, con_hal_idx)</span>
+<span class="sd">            # residue_mapping will be: {(&quot;A&quot;, 10): (&quot;A&quot;, 11), (&quot;A&quot;, 20): (&quot;A&quot;, 21)}</span>
+
+<span class="sd">    Further Details:</span>
+<span class="sd">        - **Mapping Creation:** The method pairs each element in con_ref_idx with the corresponding element in con_hal_idx to create the mapping.</span>
+<span class="sd">        - **Usage:** This mapping is useful for updating residue selections based on RFdiffusion outputs.</span>
+
+<span class="sd">    This method is designed to facilitate the creation of residue mappings for updating motifs or other residue-based selections.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">{(</span><span class="n">chain</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">res_id</span><span class="p">)):</span> <span class="n">hal</span> <span class="k">for</span> <span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">res_id</span><span class="p">),</span> <span class="n">hal</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">con_ref_idx</span><span class="p">,</span> <span class="n">con_hal_idx</span><span class="p">)}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

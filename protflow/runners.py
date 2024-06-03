@@ -1,4 +1,43 @@
-'''Module Containing python runners'''
+'''
+runners module
+==============
+
+This module provides functionality for handling the interaction between runners and poses in protein data processing workflows.
+
+It includes classes and utility functions to:
+
+- Manage the output from runner processes.
+- Define abstract runner interfaces.
+- Parse and manage command-line options and flags for runner processes.
+
+Dependencies:
+-------------
+
+- builtins: logging, os, re
+- pandas
+- protflow.poses: Poses, get_format, FORMAT_STORAGE_DICT
+- protflow.jobstarters: JobStarter
+
+Overview:
+---------
+
+The `runners` module is designed to facilitate the integration of various runner processes with protein pose data, ensuring
+consistent data formatting, error handling, and integration of results into the Poses class. Utility functions provided in
+this module support the parsing and handling of command-line options and flags, making it easier to configure and execute
+runner processes in a flexible manner.
+
+Notes
+-----
+This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.
+
+Author
+------
+Markus Braun, Adrian Tripp
+
+Version
+-------
+0.1.0
+'''
 # builtins
 import logging
 import os
@@ -12,7 +51,33 @@ from protflow.poses import Poses, get_format, FORMAT_STORAGE_DICT
 from protflow.jobstarters import JobStarter
 
 class RunnerOutput:
-    '''RunnerOutput class handles how protein data is passed between Runners and Poses classes.'''
+    """
+    RunnerOutput class
+    ==================
+
+    The `RunnerOutput` class handles how protein data is passed between `Runner` and `Poses` classes. It ensures the correct
+    formatting of results and facilitates the integration of runner outputs into the Poses data structure.
+
+    Parameters
+    ----------
+    poses : Poses
+        An instance of the Poses class.
+    results : pandas.DataFrame
+        A DataFrame containing the results to be checked and formatted. The DataFrame must contain 'description' and 'location' columns.
+    prefix : str
+        A prefix to be added to the results columns.
+    index_layers : int, optional
+        Number of index layers to remove from the 'description' column (default is 0).
+    index_sep : str, optional
+        Separator used in the index (default is "_").
+
+    Methods
+    -------
+    check_data_formatting(results: pd.DataFrame)
+        Checks if the input DataFrame has the correct format. It must contain 'description' and 'location' columns.
+    return_poses()
+        Integrates the output of a runner into a Poses class by merging the formatted runner output into `Poses.df` and returns the updated Poses instance.
+    """
     def __init__(self, poses: Poses, results: pd.DataFrame, prefix: str, index_layers: int = 0, index_sep: str = "_"):
         self.results = self.check_data_formatting(results)
 
@@ -27,9 +92,24 @@ class RunnerOutput:
         self.prefix = prefix
 
     def check_data_formatting(self, results: pd.DataFrame):
-        '''Checks if the input DataFrame has the correct format.
-        Needs to contain 'description' and 'location' columns.
-        '''
+        """
+        Checks if the input DataFrame has the correct format.
+
+        Parameters
+        ----------
+        results : pandas.DataFrame
+            The input DataFrame to be checked. It must contain 'description' and 'location' columns.
+
+        Returns
+        -------
+        pandas.DataFrame
+            The validated and formatted DataFrame.
+
+        Raises
+        ------
+        ValueError
+            If the input DataFrame does not contain the required columns or if the 'description' column does not match the 'location' column.
+        """
         def extract_description(path):
             return os.path.splitext(os.path.basename(path))[0]
 
@@ -41,9 +121,21 @@ class RunnerOutput:
         return results
 
     def return_poses(self):
-        '''
-        This method is intended to be used to integrate the output of a runner into a Poses class.
-        Adds Output of a Runner class formatted in RunnerOutput into Poses.df. Returns Poses class.'''
+        """
+        Integrates the output of a runner into a Poses class.
+
+        This method adds the output of a Runner class formatted in RunnerOutput into `Poses.df` and returns the updated Poses instance.
+
+        Returns
+        -------
+        Poses
+            The updated Poses instance with the integrated runner output.
+
+        Raises
+        ------
+        ValueError
+            If merging DataFrames fails due to no overlap between `Poses.df['poses_description']` and `results[new_df_col]` or if some rows in `results[new_df_col]` were not found in `Poses.df['poses_description']`.
+        """
         startlen = len(self.results.index)
 
         # check for duplicate columns
@@ -79,16 +171,112 @@ class RunnerOutput:
         return self.poses
 
 class Runner:
-    '''Abstract Runner baseclass handling interface between Runners and Poses.'''
+    """
+    Abstract Runner base class
+    ==========================
+
+    The `Runner` class provides an abstract base for defining runners that handle the interface between runner processes and the Poses class.
+    It includes methods for running jobs, checking paths, verifying prefixes, preparing pose options, and managing job setup and score files.
+
+    Examples
+    --------
+    To create a custom runner, subclass `Runner` and implement the abstract methods:
+
+    >>> class MyRunner(Runner):
+    >>>     def __str__(self):
+    >>>         return "MyRunner"
+    >>>
+    >>>     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -> RunnerOutput:
+    >>>         # Custom implementation for running jobs
+    >>>         pass
+
+    Example usage:
+
+    >>> my_runner = MyRunner()
+    >>> poses = Poses()
+    >>> jobstarter = JobStarter()
+    >>> runner_output = my_runner.run(poses, "example_prefix", jobstarter)
+    """
+
     def __str__(self):
+        """
+        Abstract method to provide the name of the runner.
+
+        This method should be overridden in subclasses to return the name of the runner.
+
+        Raises
+        ------
+        NotImplementedError
+            If the method is not overridden in the subclass.
+
+        Examples
+        --------
+        >>> class MyRunner(Runner):
+        >>>     def __str__(self):
+        >>>         return "MyRunner"
+        """
         raise NotImplementedError(f"Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
 
     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -> RunnerOutput:
-        '''method that interacts with Poses to run jobs and send Poses the scores.'''
+        """
+        Abstract method to run jobs and send scores to Poses.
+
+        This method should be overridden in subclasses to define the job execution logic and integrate the results into the Poses class.
+
+        Parameters
+        ----------
+        poses : Poses
+            An instance of the Poses class to be processed.
+        prefix : str
+            Prefix to be added to the results columns.
+        jobstarter : JobStarter
+            An instance of the JobStarter class to handle job execution.
+
+        Returns
+        -------
+        RunnerOutput
+            An instance of the RunnerOutput class containing the processed results.
+
+        Raises
+        ------
+        NotImplementedError
+            If the method is not overridden in the subclass.
+
+        Examples
+        --------
+        >>> class MyRunner(Runner):
+        >>>     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -> RunnerOutput:
+        >>>         # Custom implementation for running jobs
+        >>>         pass
+        """
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
 
     def search_path(self, input_path: str, path_name: str) -> str:
-        '''Checks if a given path exists (is not None) and if it exists on the local filesystem. If so, returns path, otherwise raises Error.'''
+        """
+        Checks if a given path exists and is valid.
+
+        Parameters
+        ----------
+        input_path : str
+            The path to be checked.
+        path_name : str
+            The name associated with the path, used for error messages.
+
+        Returns
+        -------
+        str
+            The validated path.
+
+        Raises
+        ------
+        ValueError
+            If the path is not set or does not exist on the local filesystem.
+
+        Examples
+        --------
+        >>> runner = MyRunner()
+        >>> valid_path = runner.search_path("/path/to/file", "example_path")
+        """
         if not input_path:
             raise ValueError(f"Path for {path_name} not set: {input_path}. Set the path uner {path_name} in protflow's config.py file.")
         if not os.path.isfile(input_path):
@@ -96,12 +284,57 @@ class Runner:
         return input_path
 
     def check_for_prefix(self, prefix: str, poses: "Poses") -> None:
-        '''Checks if a column already exists in the poses DataFrame.'''
+        """
+        Checks if a column with the given prefix already exists in the Poses DataFrame.
+
+        Parameters
+        ----------
+        prefix : str
+            The prefix to be checked.
+        poses : Poses
+            An instance of the Poses class whose DataFrame will be checked.
+
+        Raises
+        ------
+        KeyError
+            If a column with the given prefix already exists in the Poses DataFrame.
+
+        Examples
+        --------
+        >>> runner = MyRunner()
+        >>> poses = Poses()
+        >>> runner.check_for_prefix("example_prefix", poses)
+        """
         if f"{prefix}_location" in poses.df.columns or f"{prefix}_description" in poses.df.columns:
             raise KeyError(f"Column {prefix} found in Poses DataFrame! Pick different Prefix!")
 
     def prep_pose_options(self, poses: Poses, pose_options: list[str] = None) -> list:
-        '''Checks if pose_options are of the same length as poses, if pose_options are provided, '''
+        """
+        Prepares pose options, ensuring they are of the same length as the poses.
+
+        Parameters
+        ----------
+        poses : Poses
+            An instance of the Poses class.
+        pose_options : list[str], optional
+            A list of pose options to be prepared. If not provided, an empty list will be used.
+
+        Returns
+        -------
+        list
+            A list of prepared pose options.
+
+        Raises
+        ------
+        ValueError
+            If the length of pose_options does not match the length of poses.
+
+        Examples
+        --------
+        >>> runner = MyRunner()
+        >>> poses = Poses()
+        >>> prepared_options = runner.prep_pose_options(poses, ["option1", "option2"])
+        """
         # if pose_options is str, look up pose_options from poses.df
         if isinstance(pose_options, str):
             col_in_df(poses.df, pose_options)
@@ -119,12 +352,43 @@ class Runner:
         return pose_options
 
     def generic_run_setup(self, poses: Poses, prefix:str, jobstarters: list[JobStarter], make_work_dir: bool = True) -> tuple[str, JobStarter]:
-        '''Generic setup method to prepare for a .run() method.
-        Checks if prefix exists in poses.df, sets up a jobstarter and creates the working_directory.
-        Returns path to work_dir.
+        """
+        Sets up the runner's working directory and jobstarter.
 
-        Order of jobstarters in :jobstarter: parameter is:
-            [Runner.run(jobstarter), Runner.jobstarter, poses.default_jobstarter]'''
+        Checks if the prefix exists in poses.df, sets up a jobstarter, and creates the working directory if necessary.
+
+        Parameters
+        ----------
+        poses : Poses
+            An instance of the Poses class.
+        prefix : str
+            The prefix to be used for the setup.
+        jobstarters : list[JobStarter]
+            A list of JobStarter instances to choose from.
+        make_work_dir : bool, optional
+            Whether to create the working directory if it does not exist (default is True).
+
+        Note: Order of jobstarters in :jobstarter: parameter is: [Runner.run(jobstarter), Runner.jobstarter, poses.default_jobstarter]
+    
+        Returns
+        -------
+        tuple[str, JobStarter]
+            A tuple containing the path to the working directory and the selected JobStarter instance.
+
+        Raises
+        ------
+        ValueError
+            If no valid JobStarter is set.
+
+        Examples
+        --------
+        >>> runner = MyRunner()
+        >>> poses = Poses()
+        >>> jobstarters = [JobStarter(), JobStarter(), JobStarter()]
+        >>> work_dir, jobstarter = runner.generic_run_setup(poses, "example_prefix", jobstarters)
+
+        """
+
         # check for prefix
         self.check_for_prefix(prefix, poses)
 
@@ -141,7 +405,26 @@ class Runner:
         return work_dir, jobstarter
 
     def check_for_existing_scorefile(self, scorefile: str, overwrite: bool = False) -> pd.DataFrame:
-        '''Checks if a scorefile exists and returns DataFrame if overwrite is False. Otherwise returns None'''
+        """
+        Checks if a scorefile exists and returns it as a DataFrame if overwrite is False.
+
+        Parameters
+        ----------
+        scorefile : str
+            The path to the scorefile.
+        overwrite : bool, optional
+            Whether to overwrite the scorefile if it exists (default is False).
+
+        Returns
+        -------
+        pandas.DataFrame
+            The scorefile as a DataFrame if it exists and overwrite is False. None otherwise.
+
+        Examples
+        --------
+        >>> runner = MyRunner()
+        >>> scores_df = runner.check_for_existing_scorefile("/path/to/scorefile.csv")
+        """
         # check if scorefile exists if overwrite is False
         if os.path.isfile(scorefile) and not overwrite:
             # pick method to import scorefile
@@ -149,7 +432,27 @@ class Runner:
             return scores
 
     def save_runner_scorefile(self, scores: pd.DataFrame, scorefile: str) -> None:
-        '''Stores runner's scorefile based on the format specified at the scorefile extension.'''
+        """
+        Saves the runner's scorefile based on the file extension format.
+
+        Parameters
+        ----------
+        scores : pandas.DataFrame
+            The DataFrame containing the scores to be saved.
+        scorefile : str
+            The path to the scorefile to be saved.
+
+        Raises
+        ------
+        KeyError
+            If the file extension format is not recognized.
+
+        Examples
+        --------
+        >>> runner = MyRunner()
+        >>> scores_df = pd.DataFrame({'score': [1, 2, 3]})
+        >>> runner.save_runner_scorefile(scores_df, "/path/to/scorefile.csv")
+        """
         # extract file extension from scorefile
         storage_method = os.path.splitext(scorefile)[1][1:]
 
@@ -193,12 +496,72 @@ def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[di
     return opts, flags
 
 def col_in_df(df:pd.DataFrame, column:str):
-    '''Checks if column exists in DataFrame and returns KeyError if not.'''
+    """
+    Checks if a column exists in a DataFrame.
+
+    This function verifies whether a specified column is present in the given DataFrame.
+    If the column is not found, it raises a KeyError.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        The DataFrame to be checked.
+    column : str
+        The name of the column to be verified.
+
+    Raises
+    ------
+    KeyError
+        If the specified column is not found in the DataFrame.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> df = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
+    >>> col_in_df(df, 'A')  # No error raised
+    >>> col_in_df(df, 'C')  # Raises KeyError
+    Traceback (most recent call last):
+        ...
+    KeyError: 'Could not find C in poses dataframe! Are you sure you provided the right column name?'
+    """
     if not column in df.columns:
         raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
 
 def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
-    '''parses split options '''
+    """
+    Parses options and flags from an input string.
+
+    This function splits an input string into options and flags based on a specified separator.
+    Options are key-value pairs, while flags are standalone keys without values.
+
+    Parameters
+    ----------
+    options_str : str
+        The input string containing options and flags to be parsed.
+    sep : str, optional
+        The separator used to distinguish different options and flags (default is "--").
+
+    Returns
+    -------
+    tuple[dict, set]
+        A tuple containing a dictionary of options and a set of flags.
+
+    Examples
+    --------
+    >>> options_str = "--width 800 --height 600 --verbose"
+    >>> opts, flags = expand_options_flags(options_str)
+    >>> print(opts)
+    {'width': '800', 'height': '600'}
+    >>> print(flags)
+    {'verbose'}
+
+    >>> options_str = "--color=blue --debug --timeout=30"
+    >>> opts, flags = expand_options_flags(options_str)
+    >>> print(opts)
+    {'color': 'blue', 'timeout': '30'}
+    >>> print(flags)
+    {'debug'}
+    """
     if not options_str:
         return {}, []
 
@@ -219,7 +582,40 @@ def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
     return opts, set(flags)
 
 def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,set]:
-    '''Uses Regex to split stuff'''
+    """
+    Parses options and flags from an input string using regular expressions.
+
+    This function uses regular expressions to split an input string into options and flags. 
+    It ensures that separators within quotes are not split.
+
+    Parameters
+    ----------
+    options_str : str
+        The input string containing options and flags to be parsed.
+    sep : str, optional
+        The separator used to distinguish different options and flags (default is "--").
+
+    Returns
+    -------
+    tuple[dict, set]
+        A tuple containing a dictionary of options and a set of flags.
+
+    Examples
+    --------
+    >>> options_str = '--width 800 --height 600 --verbose'
+    >>> opts, flags = regex_expand_options_flags(options_str)
+    >>> print(opts)
+    {'width': '800', 'height': '600'}
+    >>> print(flags)
+    {'verbose'}
+
+    >>> options_str = '--color="dark blue" --debug --timeout=30'
+    >>> opts, flags = regex_expand_options_flags(options_str)
+    >>> print(opts)
+    {'color': 'dark blue', 'timeout': '30'}
+    >>> print(flags)
+    {'debug'}
+    """
     if options_str is None:
         return dict(), set()
     # Regex to split the command line at the separator which is not inside quotes
@@ -242,7 +638,37 @@ def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,
     return opts, set(flags)
 
 def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
-    '''Converts options dict and flags list into one string'''
+    """
+    Converts options dictionary and flags list into a single string.
+
+    This function combines a dictionary of options and a list of flags into a single command-line style string.
+
+    Parameters
+    ----------
+    options : dict
+        A dictionary of options, where keys are option names and values are option values.
+    flags : list
+        A list of flags (standalone options without values).
+    sep : str, optional
+        The separator used to distinguish different options and flags (default is "--").
+
+    Returns
+    -------
+    str
+        A string representation of the combined options and flags.
+
+    Examples
+    --------
+    >>> options = {'width': '800', 'height': '600'}
+    >>> flags = ['verbose', 'debug']
+    >>> options_flags_to_string(options, flags)
+    " --width=800 --height=600 --verbose --debug"
+
+    >>> options = {'color': 'dark blue', 'timeout': '30'}
+    >>> flags = ['force']
+    >>> options_flags_to_string(options, flags)
+    " --color='dark blue' --timeout=30 --force"
+    """
     def value_in_quotes(value) -> str:
         '''Makes sure that split commandline options are passed in quotes: --option='quoted list of args' '''
         if len(str(value).split(" ")) > 1:

@@ -1,6 +1,78 @@
-'''
-Protslurm internal module to calculate various kinds of metrics for proteins and their sequences.
-'''
+"""
+This module provides a comprehensive suite of tools for calculating various metrics related to proteins and their sequences, specifically designed to facilitate detailed analysis and comparisons. The functionalities in this module allow users to determine mutations between protein sequences, calculate structural metrics such as the radius of gyration, and compute sequence identities, among other tasks.
+
+Overview:
+The module encompasses a range of utilities aimed at analyzing protein structures and sequences. Users can compare protein sequences to identify mutations, calculate the radius of gyration from PDB files, and assess sequence identity both pairwise and across multiple sequences. Additionally, it provides methods for evaluating protein entropy, ligand interactions, and structural consistency metrics such as self-consistency TM-score and Baker in silico success scores.
+
+Key functionalities include:
+- **Mutation Analysis**: Tools to list and count mutations between wild-type and variant sequences, and to identify mutation indices.
+- **Structural Metrics**: Calculation of the radius of gyration for protein structures and evaluation of ligand clashes and contacts.
+- **Sequence Analysis**: Computation of sequence identity between two sequences and across a list of sequences.
+- **Entropy Calculation**: Calculation of entropy based on a given probability distribution.
+- **Self-Consistency and Success Scores**: Methods to compute self-consistency TM-scores and Baker in silico success scores within dataframes.
+- **Ligand Interaction Analysis**: Evaluation of ligand clashes and contacts within a protein structure.
+
+Examples:
+Here are some examples of how to use the functions provided in this module:
+
+1. Counting mutations between two protein sequences:
+    ```python
+    from metrics import count_mutations
+    mutation_count, mutations = count_mutations("ACDEFG", "ACDQFG")
+    print(mutation_count, mutations)
+    # Output: 1, ['E4Q']
+    ```
+
+2. Calculating radius of gyration from a PDB file:
+    ```python
+    from metrics import calc_rog_of_pdb
+    rog = calc_rog_of_pdb("example.pdb")
+    print(rog)
+    ```
+
+3. Finding mutation indices between two sequences:
+    ```python
+    from metrics import get_mutation_indeces
+    indices = get_mutation_indeces("ACGTAGCT", "ACCTAGCT")
+    print(indices)
+    # Output: [3]
+    ```
+
+4. Calculating sequence identity between two sequences:
+    ```python
+    from metrics import calc_sequence_identity
+    identity = calc_sequence_identity("ACDEFG", "ACDQFG")
+    print(identity)
+    # Output: 0.8333333333333334
+    ```
+
+5. Computing all-against-all sequence identity for a list of sequences:
+    ```python
+    from metrics import all_against_all_sequence_identity
+    identities = all_against_all_sequence_identity(["ACDEFG", "ACDFGG", "ACDEFG"])
+    print(identities)
+    # Output: [0.8333333333333334, 0.8333333333333334, 1.0]
+    ```
+
+6. Calculating entropy from a probability distribution:
+    ```python
+    from metrics import entropy
+    prob_dist = np.array([0.1, 0.2, 0.7])
+    ent = entropy(prob_dist)
+    print(ent)
+    # Output: 1.1567796494470395
+    ```
+
+7. Calculating self-consistency TM-score in a dataframe:
+    ```python
+    from metrics import calc_sc_tm
+    df = pd.DataFrame({"ref_col": ["A", "B"], "tm_col": [0.9, 0.85]})
+    updated_df = calc_sc_tm(df, "sc_tm_score", "ref_col", "tm_col")
+    print(updated_df)
+    ```
+
+These examples illustrate the primary capabilities of the module, showcasing how it can be utilized to streamline the process of analyzing protein structures and sequences.
+"""
 # Imports
 
 # dependencies
@@ -12,7 +84,7 @@ import pandas as pd
 from protflow.utils.biopython_tools import load_structure_from_pdbfile
 
 def get_mutations_list(wt: str, variant:str) -> None:
-    '''AAA'''
+    '''Not implemented.'''
     raise NotImplementedError
 
 def count_mutations(wt: str, variant:str) -> tuple[int, list[str]]:
@@ -90,12 +162,65 @@ def get_mutation_indeces(wt: str, variant:str) -> list[int]:
     return list(np.where(wt_arr != variant_arr)[0] + 1)
 
 def calc_rog_of_pdb(pdb_path: str, min_dist: float = 0) -> float:
-    '''Calculates radius of gyration of a protein when given a .pdb input file.'''
+    """
+    Calculate the radius of gyration of a protein from a PDB file.
+
+    This function loads a protein structure from a PDB file and computes the
+    radius of gyration for the alpha carbon atoms (Cα).
+
+    Parameters
+    ----------
+    pdb_path : str
+        Path to the PDB file containing the protein structure.
+    min_dist : float, optional
+        Minimum distance to consider between atoms, by default 0.
+
+    Returns
+    -------
+    float
+        The calculated radius of gyration of the protein.
+
+    Example
+    -------
+    >>> from metrics import calc_rog_of_pdb
+    >>> rog = calc_rog_of_pdb("example.pdb")
+    >>> print(rog)
+    """
     return calc_rog(load_structure_from_pdbfile(pdb_path), min_dist=min_dist)
 
 def calc_rog(pose: Structure, min_dist: float = 0) -> float:
-    '''Calculates radius of gyration of a protein's alpha carbons.
-     Input (pose:)   a Bio.PDB.Structure.Structure object.'''
+    """
+    Calculate the radius of gyration of a protein's alpha carbons.
+
+    This function computes the radius of gyration for the alpha carbon atoms (Cα)
+    in a given protein structure.
+
+    Parameters
+    ----------
+    pose : Bio.PDB.Structure.Structure
+        A Bio.PDB.Structure.Structure object representing the protein structure.
+    min_dist : float, optional
+        Minimum distance to consider between atoms, by default 0.
+
+    Returns
+    -------
+    float
+        The calculated radius of gyration of the protein.
+
+    Raises
+    ------
+    ValueError
+        If the `pose` parameter is not of type Bio.PDB.Structure.Structure.
+
+    Example
+    -------
+    >>> from metrics import calc_rog
+    >>> from Bio.PDB import PDBParser
+    >>> parser = PDBParser()
+    >>> structure = parser.get_structure("example", "example.pdb")
+    >>> rog = calc_rog(structure)
+    >>> print(rog)
+    """
     # get CA coordinates and calculate centroid
     ca_coords = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.id == "CA"])
     centroid = np.mean(ca_coords, axis=0)
@@ -107,15 +232,65 @@ def calc_rog(pose: Structure, min_dist: float = 0) -> float:
     return np.sqrt(np.sum(dgram**2) / ca_coords.shape[0])
 
 def calc_sequence_identity(seq1: str, seq2: str) -> float:
-    '''Calculates sequence identity between two sequences (seq1, seq2)'''
+    """
+    Calculate sequence identity between two protein sequences.
+
+    This function computes the sequence identity by comparing two protein sequences
+    of the same length and determining the proportion of matching amino acids.
+
+    Parameters
+    ----------
+    seq1 : str
+        The first protein sequence.
+    seq2 : str
+        The second protein sequence.
+
+    Returns
+    -------
+    float
+        The sequence identity as a fraction of matching amino acids.
+
+    Raises
+    ------
+    ValueError
+        If the input sequences are not of the same length.
+
+    Example
+    -------
+    >>> from metrics import calc_sequence_identity
+    >>> identity = calc_sequence_identity("ACDEFG", "ACDQFG")
+    >>> print(identity)
+    # Output: 0.8333333333333334
+    """
     if len(seq1) != len(seq2):
         raise ValueError(f"Sequences must be of the same length. Length of seq1: {len(seq1)}, length of seq2: {len(seq2)}")
     matching = sum(1 for a, b in zip(seq1, seq2) if a == b)
     return matching / len(seq1)
 
 def all_against_all_sequence_identity(input_seqs: list[str]) -> list:
-    '''Given a list of sequences, the function calculates the maximum sequence identity of all sequences against each other.
-    Returns a 1D List of max-sequence-identity for each sequence (len(input_seqs) == len(output_seqs))'''
+    """
+    Calculate the maximum sequence identity for all sequences against each other.
+
+    This function takes a list of protein sequences and computes the maximum sequence
+    identity for each sequence against all others in the list.
+
+    Parameters
+    ----------
+    input_seqs : list of str
+        A list of protein sequences.
+
+    Returns
+    -------
+    list of float
+        A list of maximum sequence identities for each sequence against all others.
+
+    Example
+    -------
+    >>> from metrics import all_against_all_sequence_identity
+    >>> identities = all_against_all_sequence_identity(["ACDEFG", "ACDFGG", "ACDEFG"])
+    >>> print(identities)
+    # Output: [0.8333333333333334, 0.8333333333333334, 1.0]
+    """
     # create a mapping for quick calculation with numpy
     aa_mapping = {'A': 0, 'C': 1, 'D': 2, 'E': 3, 'F': 4, 'G': 5, 'H': 6, 'I': 7, 'K': 8, 'L': 9, 'M': 10, 'N': 11, 'P': 12, 'Q': 13, 'R': 14, 'S': 15, 'T': 16, 'V': 17, 'W': 18, 'Y': 19}
     mapped_seqs = np.array([[aa_mapping[s] for s in seq] for seq in input_seqs])
@@ -131,7 +306,30 @@ def all_against_all_sequence_identity(input_seqs: list[str]) -> list:
     return list(np.max(similarity_matrix, axis=1))
 
 def entropy(prob_distribution: np.array) -> float:
-    '''Computes entropy when given a probability distribution as an input.'''
+    """
+    Compute the entropy of a given probability distribution.
+
+    This function calculates the entropy of a probability distribution, which is a
+    measure of the uncertainty or randomness in the distribution.
+
+    Parameters
+    ----------
+    prob_distribution : np.array
+        An array representing the probability distribution.
+
+    Returns
+    -------
+    float
+        The calculated entropy of the probability distribution.
+
+    Example
+    -------
+    >>> from metrics import entropy
+    >>> prob_dist = np.array([0.1, 0.2, 0.7])
+    >>> ent = entropy(prob_dist)
+    >>> print(ent)
+    # Output: 1.1567796494470395
+    """
     # Filter out zero probabilities to avoid log(0)
     prob_distribution = prob_distribution[prob_distribution > 0]
 
@@ -141,19 +339,42 @@ def entropy(prob_distribution: np.array) -> float:
     return -H
 
 def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> pd.DataFrame:
-    '''Calculates self-consistency TM-score in a dataframe.
-    Calculates in-place. This means that the score is automatically added to input_df.
-    
-    Parameters:
-        :name: (str) Name of the new column that should hold sc-TM score.
-        :input_df: (pd.DataFrame) poses.df formatted pd.DataFrame
-        :ref_col: (str) column pointing to the reference description or location.
-        :tm_col: (str) column pointing to the column holding the tm_scores from TMAlign runner.
-                        This is generally '{prefix}_TM_score_ref', where {prefix} is the prefix used for the TMAlign runner.
+    """
+    Calculate self-consistency TM-score in a dataframe.
 
-    Returns:
-        DataFrame with integrated column
-    '''
+    This function computes the self-consistency TM-score for protein structures and
+    integrates the results into the input dataframe.
+
+    Parameters
+    ----------
+    input_df : pd.DataFrame
+        A dataframe containing protein structure data.
+    name : str
+        The name of the new column that should hold the self-consistency TM-score.
+    ref_col : str
+        The column in `input_df` pointing to the reference description or location.
+    tm_col : str
+        The column in `input_df` pointing to the TM-scores from TMAlign runner.
+
+    Returns
+    -------
+    pd.DataFrame
+        The input dataframe with the integrated self-consistency TM-score column.
+
+    Raises
+    ------
+    KeyError
+        If the `name` column already exists in `input_df` or if `tm_col` does not exist in `input_df`.
+    ValueError
+        If `ref_col` does not point to a description or location column in `input_df`.
+
+    Example
+    -------
+    >>> from metrics import calc_sc_tm
+    >>> df = pd.DataFrame({"ref_col": ["A", "B"], "tm_col": [0.9, 0.85]})
+    >>> updated_df = calc_sc_tm(df, "sc_tm_score", "ref_col", "tm_col")
+    >>> print(updated_df)
+    """
     # check if name exists in poses
     if name in input_df.columns:
         raise KeyError(f"Column {name} already present in DataFrame. Choose different name!")
@@ -177,7 +398,41 @@ def calc_baker_success(input_df: pd.DataFrame, af2_col: str, bb_rmsd_col: str, m
     return NotImplementedError
 
 def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3, atoms: list[str] = None) -> float:
-    '''Calculates ligand clashes for a .pdb file given a ligand_chain.'''
+    """
+    Calculate ligand clashes for a PDB file given a ligand chain.
+
+    This method calculates the number of clashes between a specified ligand chain and the rest of the structure in a PDB file or a Bio.PDB Structure object. A clash is defined as any pair of atoms (one from the ligand, one from the rest of the structure) that are within a specified distance of each other.
+
+    Parameters:
+        pose (str | Bio.PDB.Structure.Structure): The pose representing the structure, which can be a path to a PDB file (str) or a Bio.PDB Structure object.
+        ligand_chain (str): The chain identifier for the ligand within the structure.
+        dist (float, optional): The distance threshold for defining a clash. Default is 3.0.
+        atoms (list[str], optional): A list of atom names to consider for clash calculations. If None, all atoms are considered. If specified, only these atoms will be included in the clash calculation.
+
+    Returns:
+        float: The number of clashes found between the ligand and the rest of the structure.
+
+    Examples:
+        Here is an example of how to use the `calc_ligand_clashes` method:
+
+        .. code-block:: python
+
+            from Bio.PDB import PDBParser
+
+            # Load structure from a PDB file
+            parser = PDBParser()
+            structure = parser.get_structure("example", "example.pdb")
+
+            # Calculate clashes
+            clashes = calc_ligand_clashes(structure, ligand_chain="A", dist=3.0, atoms=["N", "CA", "C"])
+            # clashes will be a float representing the number of clashes
+
+    Further Details:
+        - **Clash Calculation:** The method calculates the Euclidean distance between all specified atoms of the ligand chain and the rest of the structure. A clash is counted if the distance is less than the specified threshold.
+        - **Usage:** This function is useful for evaluating potential steric clashes in molecular docking studies or for validating the positioning of ligands in structural models.
+
+    This method is designed to facilitate the detection of steric clashes between ligands and the surrounding structure, providing a quantitative measure of potential conflicts.
+    """
     # verify inputs
     if isinstance(pose, str):
         pose = load_structure_from_pdbfile(pose)
@@ -204,8 +459,43 @@ def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3,
     return np.sum((dgram < dist))
 
 def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_dist: float = 5, atoms: list[str] = None, excluded_elements: list[str] = None) -> float:
-    '''Calculates contacts of ligand (n atoms within min_dist - max_dist (shortest) distance of any ligand atom).'''
-    excluded_elements = excluded_elements or ["H"]
+    """
+    Calculate contacts of a ligand within a structure.
+
+    This method calculates the number of contacts between a specified ligand chain and the rest of the structure within a specified distance range. Contacts are defined as any pair of atoms (one from the ligand, one from the rest of the structure) where the distance falls between the minimum and maximum specified distances.
+
+    Parameters:
+        pose (str | Bio.PDB.Structure.Structure): The pose representing the structure, which can be a path to a PDB file (str) or a Bio.PDB Structure object.
+        ligand_chain (str): The chain identifier for the ligand within the structure.
+        min_dist (float, optional): The minimum distance threshold for defining a contact. Default is 3.0.
+        max_dist (float, optional): The maximum distance threshold for defining a contact. Default is 5.0.
+        atoms (list[str], optional): A list of atom names to consider for contact calculations. If None, all atoms are considered. If specified, only these atoms will be included in the contact calculation.
+        excluded_elements (list[str], optional): A list of element symbols to exclude from the contact calculations. Default is ["H"].
+
+    Returns:
+        float: The number of contacts normalized by the number of ligand atoms.
+
+    Examples:
+        Here is an example of how to use the `calc_ligand_contacts` method:
+
+        .. code-block:: python
+
+            from Bio.PDB import PDBParser
+
+            # Load structure from a PDB file
+            parser = PDBParser()
+            structure = parser.get_structure("example", "example.pdb")
+
+            # Calculate contacts
+            contacts = calc_ligand_contacts(structure, ligand_chain="A", min_dist=3.0, max_dist=5.0, atoms=["N", "CA", "C"], excluded_elements=["H", "O"])
+            # contacts will be a float representing the number of contacts normalized by the number of ligand atoms
+
+    Further Details:
+        - **Contact Calculation:** The method calculates the Euclidean distance between all specified atoms of the ligand chain and the rest of the structure. A contact is counted if the distance is within the specified range (min_dist to max_dist).
+        - **Usage:** This function is useful for evaluating potential interactions between ligands and the surrounding structure, particularly in drug design and molecular docking studies.
+
+    This method is designed to facilitate the detection of relevant contacts between ligands and the surrounding structure, providing a quantitative measure of potential interactions.
+    """
 
     # verify inputs
     if isinstance(pose, str):

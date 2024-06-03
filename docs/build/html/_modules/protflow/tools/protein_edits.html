@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.tools.protein_edits &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.tools.protein_edits</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.tools.protein_edits</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">ProteinEdits Module</span>
+<span class="sd">===================</span>
+
+<span class="sd">This module provides the functionality to handle various protein editing tasks within the ProtFlow framework. It offers tools to add and remove protein chains, add sequences to proteins, and multimerize sequences in a structured and automated manner.</span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `protein_edits` module contains classes and methods designed to perform common protein editing operations. The `ChainAdder` class provides methods for adding chains to protein structures, including functionality for superimposing chains based on motifs or existing chains. The `ChainRemover` class allows for the removal of specified chains from protein structures. Additionally, methods for adding sequences to proteins and creating multimers from sequences are included, streamlining the process of preparing protein structures for further analysis.</span>
+
+<span class="sd">The module integrates seamlessly with the ProtFlow ecosystem, leveraging shared configurations, job management capabilities, and data structures to provide a cohesive user experience. It supports automatic setup and execution of jobs, handling of input and output files, and robust error handling and logging.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create instances of the `ChainAdder` or `ChainRemover` classes and invoke their respective methods with appropriate parameters. The module handles the configuration, execution, and result collection processes, allowing users to focus on interpreting the results.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `ChainAdder` and `ChainRemover` classes within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from protein_edits import ChainAdder, ChainRemover</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the ChainAdder class</span>
+<span class="sd">    chain_adder = ChainAdder(jobstarter=jobstarter)</span>
+
+<span class="sd">    # Add a chain to the poses</span>
+<span class="sd">    added_chains = chain_adder.add_chain(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        ref_col=&quot;reference_column&quot;,</span>
+<span class="sd">        copy_chain=&quot;A&quot;,</span>
+<span class="sd">        jobstarter=jobstarter,</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Initialize the ChainRemover class</span>
+<span class="sd">    chain_remover = ChainRemover(jobstarter=jobstarter)</span>
+
+<span class="sd">    # Remove a chain from the poses</span>
+<span class="sd">    removed_chains = chain_remover.remove_chains(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_2&quot;,</span>
+<span class="sd">        chains=[&quot;A&quot;],</span>
+<span class="sd">        jobstarter=jobstarter,</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(added_chains)</span>
+<span class="sd">    print(removed_chains)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">- Edge Cases: The module handles various edge cases, such as missing chain specifications and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the process.</span>
+<span class="sd">- Customizability: Users can customize the processes through multiple parameters, including the chain to add or remove, sequence details for adding sequences, and the number of protomers for multimerization.</span>
+<span class="sd">- Integration: The module integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate protein editing tasks into their computational workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Author</span>
+<span class="sd">------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># imports</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="c1"># dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="c1"># customs</span>
+<span class="kn">from</span> <span class="nn">protflow</span> <span class="kn">import</span> <span class="n">jobstarters</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.residues</span> <span class="kn">import</span> <span class="n">ResidueSelection</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">col_in_df</span>
+<span class="kn">from</span> <span class="nn">protflow.config</span> <span class="kn">import</span> <span class="n">PROTFLOW_ENV</span>
+<span class="kn">from</span> <span class="nn">protflow.config</span> <span class="kn">import</span> <span class="n">AUXILIARY_RUNNER_SCRIPTS_DIR</span>
+<span class="kn">from</span> <span class="nn">protflow.utils.utils</span> <span class="kn">import</span> <span class="n">parse_fasta_to_dict</span>
+
+<div class="viewcode-block" id="ChainAdder">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainAdder">[docs]</a>
+<span class="k">class</span> <span class="nc">ChainAdder</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ChainAdder Class</span>
+<span class="sd">    ================</span>
+
+<span class="sd">    The `ChainAdder` class is a specialized class designed to facilitate the addition of chains to protein structures within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with chain addition processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `ChainAdder` class manages all aspects of adding chains to protein structures. It configures necessary scripts and executables, prepares the environment for the addition processes, and executes the required commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to chain addition scripts and Python executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of chain addition commands with support for superimposition on motifs or existing chains.</span>
+<span class="sd">        - Collecting and processing output data into a structured format.</span>
+<span class="sd">        - Providing methods for adding sequences to proteins and creating multimers from sequences.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `ChainAdder` class, configured to add chains to protein structures and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">        - TypeError: If motifs or chains are not of the expected type.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `ChainAdder` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from protein_edits import ChainAdder</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the ChainAdder class</span>
+<span class="sd">        chain_adder = ChainAdder(jobstarter=jobstarter)</span>
+
+<span class="sd">        # Add a chain to the poses</span>
+<span class="sd">        added_chains = chain_adder.add_chain(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">            ref_col=&quot;reference_column&quot;,</span>
+<span class="sd">            copy_chain=&quot;A&quot;,</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(added_chains)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class handles various edge cases, such as missing chain specifications and the need to overwrite previous results.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the chain addition process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The ChainAdder class is intended for researchers and developers who need to add chains to protein structures as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="ChainAdder.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainAdder.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default_python</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROTFLOW_ENV</span><span class="p">,</span> <span class="s2">&quot;python3&quot;</span><span class="p">),</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the ChainAdder class.</span>
+
+<span class="sd">        This method sets up the ChainAdder class by configuring the path to the default Python executable and </span>
+<span class="sd">        initializing the job starter. The ChainAdder class is used to add chains to protein structures within </span>
+<span class="sd">        the ProtFlow framework.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        default_python : str, optional</span>
+<span class="sd">            The path to the default Python executable, by default `os.path.join(PROTFLOW_ENV, &quot;python3&quot;)`.</span>
+<span class="sd">        jobstarter : JobStarter, optional</span>
+<span class="sd">            An instance of the JobStarter class to manage job execution, by default None.</span>
+
+<span class="sd">        Attributes</span>
+<span class="sd">        ----------</span>
+<span class="sd">        python : str</span>
+<span class="sd">            Path to the Python executable used for running scripts.</span>
+<span class="sd">        jobstarter : JobStarter</span>
+<span class="sd">            An instance of the JobStarter class to manage job execution.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to initialize the ChainAdder class:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            from protflow.jobstarters import JobStarter</span>
+<span class="sd">            from protein_edits import ChainAdder</span>
+
+<span class="sd">            # Initialize the ChainAdder class</span>
+<span class="sd">            jobstarter = JobStarter()</span>
+<span class="sd">            chain_adder = ChainAdder(jobstarter=jobstarter)</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        The ChainAdder class depends on the ProtFlow environment being properly configured. Ensure that the </span>
+<span class="sd">        `PROTFLOW_ENV` and necessary scripts are correctly set up before using this class.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        FileNotFoundError</span>
+<span class="sd">            If the specified Python executable is not found.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_path</span><span class="p">(</span><span class="n">default_python</span><span class="p">,</span> <span class="s2">&quot;PROTFLOW_ENV&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;chain_adder&quot;</span>
+
+    <span class="c1">################ Methods #########################</span>
+<div class="viewcode-block" id="ChainAdder.run">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainAdder.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;.run() not implemented for ChainAdder class. Use methods like: .add_chain() or .superimpose_add_chain() instead!!!&#39;&#39;&#39;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="ChainAdder.add_chain">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainAdder.add_chain">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_chain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">copy_chain</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Poses</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a chain to the poses.</span>
+
+<span class="sd">        This method adds a specified chain to the protein structures in `poses` by using the `superimpose_add_chain` method without any superimposition, effectively copying the chain as-is.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            ref_col (str): The column in the poses DataFrame that references the structures to be used.</span>
+<span class="sd">            copy_chain (str): The chain identifier to copy.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Poses: An updated Poses object with the new chain added.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">            TypeError: If invalid argument types are provided to the methods.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize and use the `add_chain` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from protein_edits import ChainAdder</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the ChainAdder class</span>
+<span class="sd">                chain_adder = ChainAdder(jobstarter=jobstarter)</span>
+
+<span class="sd">                # Add a chain to the poses</span>
+<span class="sd">                added_chains = chain_adder.add_chain(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    ref_col=&quot;reference_column&quot;,</span>
+<span class="sd">                    copy_chain=&quot;A&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(added_chains)</span>
+
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">        - **Method Simplicity:** This method uses `superimpose_add_chain` without specifying any superimposition parameters, making it a straightforward way to add chains without the complexity of superimposition.</span>
+<span class="sd">        - **Path Configuration:** Ensure the paths to the scripts and executables are correctly configured as per ProtFlow setup. Using default paths is recommended unless customization is necessary.</span>
+<span class="sd">        - **JobStarter Integration:** The JobStarter object is used to manage job execution, ensuring processes are handled efficiently. If a JobStarter is not provided, the method will not operate without it.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># run superimpose without specifying anything to superimpose on (will not superimpose)</span>
+        <span class="n">chains_added</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">superimpose_add_chain</span><span class="p">(</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">ref_col</span><span class="o">=</span><span class="n">ref_col</span><span class="p">,</span>
+            <span class="n">copy_chain</span><span class="o">=</span><span class="n">copy_chain</span><span class="p">,</span>
+            <span class="n">jobstarter</span><span class="o">=</span><span class="n">jobstarter</span><span class="p">,</span>
+            <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">chains_added</span></div>
+
+
+<div class="viewcode-block" id="ChainAdder.superimpose_add_chain">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainAdder.superimpose_add_chain">[docs]</a>
+    <span class="k">def</span> <span class="nf">superimpose_add_chain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">copy_chain</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">target_motif</span><span class="p">:</span> <span class="n">ResidueSelection</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">reference_motif</span><span class="p">:</span> <span class="n">ResidueSelection</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">target_chains</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">reference_chains</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Poses</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a protein chain after superimposition on a motif or chain.</span>
+
+<span class="sd">        This method adds a chain to the protein structures in `poses` by superimposing it on a specified motif or chain. </span>
+<span class="sd">        It sets up and executes the necessary scripts, handles the environment configuration, and processes the output.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            ref_col (str): The column in the poses DataFrame that references the structures to be used.</span>
+<span class="sd">            copy_chain (str): The chain identifier to copy.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.</span>
+<span class="sd">            target_motif (ResidueSelection, optional): The target motif for superimposition. Defaults to None.</span>
+<span class="sd">            reference_motif (ResidueSelection, optional): The reference motif for superimposition. Defaults to None.</span>
+<span class="sd">            target_chains (list, optional): A list of target chains for superimposition. Defaults to None.</span>
+<span class="sd">            reference_chains (list, optional): A list of reference chains for superimposition. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Poses: An updated Poses object with the new chain added.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If both motifs and chains are specified for superimposition.</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            TypeError: If invalid argument types are provided to the methods.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize and use the `superimpose_add_chain` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from protein_edits import ChainAdder</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the ChainAdder class</span>
+<span class="sd">                chain_adder = ChainAdder(jobstarter=jobstarter)</span>
+
+<span class="sd">                # Add a chain to the poses</span>
+<span class="sd">                added_chains = chain_adder.superimpose_add_chain(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    ref_col=&quot;reference_column&quot;,</span>
+<span class="sd">                    copy_chain=&quot;A&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(added_chains)</span>
+
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">        - **Path Configuration:** Ensure the paths to the scripts and executables are correctly configured as per ProtFlow setup. Using default paths is recommended unless customization is necessary.</span>
+<span class="sd">        - **JobStarter Integration:** The JobStarter object is used to manage job execution, ensuring processes are handled efficiently. If a JobStarter is not provided, the method will not operate without it.</span>
+<span class="sd">        </span>
+<span class="sd">        Notes:</span>
+<span class="sd">            This method ensures robust error handling and logging for easier debugging and verification of the process.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># sanity (motif and chain superimposition at the same time is not possible)</span>
+        <span class="k">def</span> <span class="nf">output_exists</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">poses</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;checks if output of copying chains exists&#39;&#39;&#39;</span>
+            <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">((</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">pose</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]))</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()))</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">target_motif</span> <span class="ow">or</span> <span class="n">reference_motif</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">target_chains</span> <span class="ow">or</span> <span class="n">reference_chains</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Either motif or chains can be specified for superimposition, but never both at the same time! Decide whether to superimpose over a selected chain or a selected motif.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># runner setup</span>
+        <span class="n">script_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">AUXILIARY_RUNNER_SCRIPTS_DIR</span><span class="si">}</span><span class="s2">/add_chains_batch.py&quot;</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span> <span class="o">=</span> <span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="c1"># check for outputs</span>
+        <span class="k">if</span> <span class="n">output_exists</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">poses</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">poses</span><span class="o">.</span><span class="n">change_poses_dir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># setup motif args (extra function)</span>
+        <span class="n">input_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_setup_superimposition_args</span><span class="p">(</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+            <span class="n">ref_col</span> <span class="o">=</span> <span class="n">ref_col</span><span class="p">,</span>
+            <span class="n">copy_chain</span> <span class="o">=</span> <span class="n">copy_chain</span><span class="p">,</span>
+            <span class="n">target_motif</span> <span class="o">=</span> <span class="n">target_motif</span><span class="p">,</span>
+            <span class="n">reference_motif</span> <span class="o">=</span> <span class="n">reference_motif</span><span class="p">,</span>
+            <span class="n">target_chains</span> <span class="o">=</span> <span class="n">target_chains</span><span class="p">,</span>
+            <span class="n">reference_chains</span> <span class="o">=</span> <span class="n">reference_chains</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># split input_dict into subdicts</span>
+        <span class="n">split_sublists</span> <span class="o">=</span> <span class="n">jobstarters</span><span class="o">.</span><span class="n">split_list</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">input_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span> <span class="n">n_sublists</span><span class="o">=</span><span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span><span class="p">)</span>
+        <span class="n">subdicts</span> <span class="o">=</span> <span class="p">[{</span><span class="n">target</span><span class="p">:</span> <span class="n">input_dict</span><span class="p">[</span><span class="n">target</span><span class="p">]</span> <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">sublist</span><span class="p">}</span> <span class="k">for</span> <span class="n">sublist</span> <span class="ow">in</span> <span class="n">split_sublists</span><span class="p">]</span>
+
+        <span class="c1"># write n=max_cores input_json files for add_chains_batch.py</span>
+        <span class="n">json_files</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">subdict</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">subdicts</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">opts_json_p</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/add_chain_input_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">.json&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">opts_json_p</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">subdict</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">json_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">opts_json_p</span><span class="p">)</span>
+
+        <span class="c1"># start add_chains_batch.py</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">python</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">script_path</span><span class="si">}</span><span class="s2"> --input_json </span><span class="si">{</span><span class="n">json_f</span><span class="si">}</span><span class="s2"> --output_dir </span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">json_f</span> <span class="ow">in</span> <span class="n">json_files</span><span class="p">]</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;add_chains_</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">wait</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">work_dir</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">poses</span><span class="o">.</span><span class="n">change_poses_dir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_setup_superimposition_args</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">copy_chain</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">target_motif</span><span class="p">:</span> <span class="n">ResidueSelection</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">reference_motif</span><span class="p">:</span> <span class="n">ResidueSelection</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">target_chains</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">reference_chains</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Prepares motif and chain specifications for superimposer setup.</span>
+<span class="sd">        Returns dictionary (dict) that holds the kwargs for superimposition: {&#39;target_motif&#39;: [target_motif_list], ...}&#39;&#39;&#39;</span>
+        <span class="c1"># safety</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">target_motif</span> <span class="ow">or</span> <span class="n">reference_motif</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">target_chains</span> <span class="ow">or</span> <span class="n">reference_chains</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Either motif or chains can be specified for superimposition, but not both!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># setup copy_chain and reference_pdb in output:</span>
+        <span class="n">col_in_df</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">)</span>
+        <span class="n">copy_chain_l</span> <span class="o">=</span> <span class="n">setup_chain_list</span><span class="p">(</span><span class="n">copy_chain</span><span class="p">,</span> <span class="n">poses</span><span class="p">)</span>
+        <span class="n">out_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pose</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]:</span> <span class="p">{</span><span class="s2">&quot;copy_chain&quot;</span><span class="p">:</span> <span class="n">chain</span><span class="p">,</span> <span class="s2">&quot;reference_pdb&quot;</span><span class="p">:</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">pose</span><span class="p">[</span><span class="n">ref_col</span><span class="p">])}</span> <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">chain</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">copy_chain_l</span><span class="p">)}</span>
+        <span class="c1">#out_dict = {&#39;target_motif&#39;: None, &#39;reference_motif&#39;: None, &#39;target_chains&#39;: None, &#39;reference_chains&#39;: None}</span>
+
+        <span class="c1"># if nothing is specified, return nothing.</span>
+        <span class="k">if</span> <span class="nb">all</span> <span class="p">((</span><span class="n">opt</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">for</span> <span class="n">opt</span> <span class="ow">in</span> <span class="p">[</span><span class="n">reference_motif</span><span class="p">,</span> <span class="n">target_motif</span><span class="p">,</span> <span class="n">reference_chains</span><span class="p">,</span> <span class="n">target_chains</span><span class="p">])):</span>
+            <span class="k">return</span> <span class="n">out_dict</span>
+
+        <span class="c1"># setup motif definitions</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">target_motif</span> <span class="ow">or</span> <span class="n">reference_motif</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">:</span>
+                <span class="n">out_dict</span><span class="p">[</span><span class="n">pose</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]][</span><span class="s1">&#39;target_motif&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_motif</span><span class="p">(</span><span class="n">target_motif</span> <span class="ow">or</span> <span class="n">reference_motif</span><span class="p">,</span> <span class="n">pose</span><span class="p">)</span>
+                <span class="n">out_dict</span><span class="p">[</span><span class="n">pose</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]][</span><span class="s1">&#39;reference_motif&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_motif</span><span class="p">(</span><span class="n">reference_motif</span> <span class="ow">or</span> <span class="n">target_motif</span><span class="p">,</span> <span class="n">pose</span><span class="p">)</span>
+
+        <span class="c1"># setup chains definitions</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">target_chains</span> <span class="ow">or</span> <span class="n">reference_chains</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">:</span>
+                <span class="n">out_dict</span><span class="p">[</span><span class="n">pose</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]][</span><span class="s2">&quot;target_chains&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parse_chain</span><span class="p">(</span><span class="n">target_chains</span> <span class="ow">or</span> <span class="n">reference_chains</span><span class="p">,</span> <span class="n">pose</span><span class="p">)</span>
+                <span class="n">out_dict</span><span class="p">[</span><span class="n">pose</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]][</span><span class="s2">&quot;reference_chains&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">parse_chain</span><span class="p">(</span><span class="n">reference_chains</span> <span class="ow">or</span> <span class="n">target_chains</span><span class="p">,</span> <span class="n">pose</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">out_dict</span>
+
+<div class="viewcode-block" id="ChainAdder.parse_motif">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainAdder.parse_motif">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_motif</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">motif</span><span class="p">:</span> <span class="n">ResidueSelection</span><span class="o">|</span><span class="nb">str</span><span class="p">,</span> <span class="n">pose</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set up motif from target_motif input.</span>
+
+<span class="sd">        This method converts a given motif, either a `ResidueSelection` object or a string, into a string format suitable for further processing. </span>
+<span class="sd">        If the motif is a string, it checks if it is a column in the `pose` DataFrame and assumes it points to a `ResidueSelection` object.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            motif (ResidueSelection | str): The motif to be parsed. It can be either a `ResidueSelection` object or a string.</span>
+<span class="sd">            pose (pd.Series): A row from the poses DataFrame that contains information about the protein structure.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The motif in string format.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the motif is a string but not a column in the `poses.df` DataFrame.</span>
+<span class="sd">            TypeError: If the motif is neither a `ResidueSelection` object nor a string.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `parse_motif` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.residues import ResidueSelection</span>
+<span class="sd">                from protein_edits import ChainAdder</span>
+<span class="sd">                import pandas as pd</span>
+
+<span class="sd">                # Initialize the ChainAdder class</span>
+<span class="sd">                chain_adder = ChainAdder()</span>
+
+<span class="sd">                # Example pose DataFrame row</span>
+<span class="sd">                pose = pd.Series({&#39;motif_column&#39;: ResidueSelection(...)})</span>
+
+<span class="sd">                # Parse a ResidueSelection object</span>
+<span class="sd">                motif = ResidueSelection(...)</span>
+<span class="sd">                motif_str = chain_adder.parse_motif(motif, pose)</span>
+
+<span class="sd">                # Parse a string that is a column in the pose DataFrame</span>
+<span class="sd">                motif_str = chain_adder.parse_motif(&#39;motif_column&#39;, pose)</span>
+
+<span class="sd">                # Access the result</span>
+<span class="sd">                print(motif_str)</span>
+
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">        - **ResidueSelection Handling:** The method directly converts a `ResidueSelection` object to its string representation using its `to_string` method.</span>
+<span class="sd">        - **String Handling:** If a string is provided, the method checks if it is a column in the `pose` DataFrame that points to a `ResidueSelection` object, converting it to a string.</span>
+<span class="sd">        - **Error Handling:** The method raises appropriate errors if the input is not of the expected type or if the string does not correspond to a valid column in the DataFrame.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">motif</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">motif</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">motif</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">motif</span> <span class="ow">in</span> <span class="n">pose</span><span class="p">:</span>
+                <span class="c1"># assumes motif is a column in pose (row in poses.df) that points to a ResidueSelection object</span>
+                <span class="k">return</span> <span class="n">pose</span><span class="p">[</span><span class="n">motif</span><span class="p">]</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupportet parameter type for motif: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">motif</span><span class="p">)</span><span class="si">}</span><span class="s2"> - Only ResidueSelection or str allowed!&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ChainAdder.add_sequence">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainAdder.add_sequence">[docs]</a>
+    <span class="k">def</span> <span class="nf">add_sequence</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">seq</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">seq_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">sep</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;:&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Add a sequence to the poses in .fa format.</span>
+
+<span class="sd">        This method appends a specified sequence to the protein sequences in the `poses` object. The sequence can be </span>
+<span class="sd">        provided directly or specified through a column in the `poses` DataFrame. The updated sequences are saved </span>
+<span class="sd">        in .fa format in a specified directory.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            seq (str, optional): The sequence to be added. If specified, `seq_col` must be None. Defaults to None.</span>
+<span class="sd">            seq_col (str, optional): The column in the poses DataFrame that contains the sequences to be added. </span>
+<span class="sd">                                    If specified, `seq` must be None. Defaults to None.</span>
+<span class="sd">            sep (str, optional): The separator to be used between the original and new sequences. Defaults to &quot;:&quot;.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If poses are not in .fa or .fasta format, if both `seq` and `seq_col` are specified, </span>
+<span class="sd">                        or if neither `seq` nor `seq_col` is specified.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `add_sequence` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protein_edits import ChainAdder</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+
+<span class="sd">                # Initialize the ChainAdder class</span>
+<span class="sd">                chain_adder = ChainAdder()</span>
+
+<span class="sd">                # Add a sequence to the poses</span>
+<span class="sd">                chain_adder.add_sequence(</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    seq=&quot;ATCGATCGATCG&quot;,</span>
+<span class="sd">                    sep=&quot;:&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">        - **File Format:** The method checks that all poses are in .fa or .fasta format and raises an error if not.</span>
+<span class="sd">        - **Sequence Input:** Either `seq` or `seq_col` must be specified to provide the sequence to be added. </span>
+<span class="sd">                            The method ensures that both are not specified simultaneously.</span>
+<span class="sd">        - **Output Directory:** The method creates an output directory if it does not exist and saves the updated </span>
+<span class="sd">                                sequences in this directory.</span>
+<span class="sd">        - **DataFrame Update:** The `poses` DataFrame is updated to reflect the new locations of the modified sequences.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">check_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.fa&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">pose</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.fasta&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses must be .fasta files (.fa also fine)!&quot;</span><span class="p">)</span>
+        <span class="n">out_dir</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/prefix/&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">out_dir</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># prep seq input</span>
+        <span class="k">if</span> <span class="n">seq</span> <span class="ow">and</span> <span class="n">seq_col</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Either :seq: or :seq_col: can be passed to specify a sequence, but not both!&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">seq</span><span class="p">:</span>
+            <span class="n">seqs</span> <span class="o">=</span> <span class="p">[</span><span class="n">seq</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">seq_col</span><span class="p">:</span>
+            <span class="n">col_in_df</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">seq_col</span><span class="p">)</span>
+            <span class="n">seqs</span> <span class="o">=</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">seq_col</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;One of the parameters :seq: :seq_col: has to be passed to specify the sequence to add.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># separator (add sequence, or add protomer?)</span>
+        <span class="n">sep</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">sep</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">sep</span>
+
+        <span class="c1"># iterate over poses and add in sequence</span>
+        <span class="n">new_poses</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">seq_</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">seqs</span><span class="p">):</span>
+            <span class="c1"># read fasta and add sequence.</span>
+            <span class="n">desc</span><span class="p">,</span> <span class="n">orig_seq</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">parse_fasta_to_dict</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">orig_seq</span> <span class="o">+=</span> <span class="n">sep</span> <span class="o">+</span> <span class="n">seq_</span>
+
+            <span class="c1"># store at new location</span>
+            <span class="n">out_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">out_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2">.fa&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&gt;</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">orig_seq</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">new_poses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">out_path</span><span class="p">)</span>
+
+        <span class="c1"># update poses.df[&#39;poses&#39;] to new location</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">change_poses_dir</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ChainAdder.multimerize">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainAdder.multimerize">[docs]</a>
+    <span class="k">def</span> <span class="nf">multimerize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">n_protomers</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">sep</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;:&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create multimers from the sequences in .fa files.</span>
+
+<span class="sd">        This method takes .fa files from the `poses` object and creates multimers by repeating the sequence a specified number of times.</span>
+<span class="sd">        The updated sequences are saved in .fa format in a specified directory.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            n_protomers (int): The number of protomers in the final .fa file.</span>
+<span class="sd">            sep (str, optional): The separator to be used between the original and new sequences. Defaults to &quot;:&quot;.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If poses are not in .fa or .fasta format.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `multimerize` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protein_edits import ChainAdder</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+
+<span class="sd">                # Initialize the ChainAdder class</span>
+<span class="sd">                chain_adder = ChainAdder()</span>
+
+<span class="sd">                # Multimerize the sequences in the poses</span>
+<span class="sd">                chain_adder.multimerize(</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    n_protomers=3,</span>
+<span class="sd">                    sep=&quot;:&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">        - **File Format:** The method checks that all poses are in .fa or .fasta format and raises an error if not.</span>
+<span class="sd">        - **Protomers Specification:** The `n_protomers` parameter specifies the number of times the sequence should be repeated to form a multimer.</span>
+<span class="sd">        - **Output Directory:** The method creates an output directory if it does not exist and saves the updated sequences in this directory.</span>
+<span class="sd">        - **DataFrame Update:** The `poses` DataFrame is updated to reflect the new locations of the modified sequences.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># setup directory and function</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">check_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">pose</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.fa&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">pose</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.fasta&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses must be .fasta files (.fa also fine)!&quot;</span><span class="p">)</span>
+        <span class="n">out_dir</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/prefix/&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">out_dir</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># iterate over poses and add in sequence</span>
+        <span class="n">new_poses</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">():</span>
+            <span class="c1"># read fasta and add sequence.</span>
+            <span class="n">desc</span><span class="p">,</span> <span class="n">orig_seq</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">parse_fasta_to_dict</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">orig_seq</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">sep</span><span class="si">}{</span><span class="n">orig_seq</span><span class="si">}</span><span class="s2">&quot;</span> <span class="o">*</span> <span class="p">(</span><span class="n">n_protomers</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+            <span class="c1"># store at new location</span>
+            <span class="n">out_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">out_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2">.fa&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&gt;</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">orig_seq</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">new_poses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">out_path</span><span class="p">)</span>
+
+        <span class="c1"># update poses.df[&#39;poses&#39;] to new location</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">change_poses_dir</span><span class="p">(</span><span class="n">out_dir</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="setup_chain_list">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.setup_chain_list">[docs]</a>
+<span class="k">def</span> <span class="nf">setup_chain_list</span><span class="p">(</span><span class="n">chain_arg</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Set up chains for add_chains_batch.py.</span>
+
+<span class="sd">    This function configures the list of chains to be used in the `add_chains_batch.py` script based on the provided `chain_arg`.</span>
+<span class="sd">    It supports specifying a single chain, a column in the `poses` DataFrame, or a list of chains.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">        chain_arg (str or list[str]): The chain specification. It can be a single chain identifier (e.g., &#39;A&#39;), </span>
+<span class="sd">                                      the name of a column in the `poses` DataFrame where the chains are listed, </span>
+<span class="sd">                                      or a list of chain identifiers.</span>
+<span class="sd">        poses (Poses): The Poses object containing the protein structures.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list[str]: A list of chain identifiers to be used in `add_chains_batch.py`.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the `chain_arg` value is inappropriate, such as when the specified column does not exist in the DataFrame </span>
+<span class="sd">                    or the length of the list does not match the number of poses.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        Here is an example of how to use the `setup_chain_list` function:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            from protflow.poses import Poses</span>
+<span class="sd">            from protein_edits import setup_chain_list</span>
+
+<span class="sd">            # Create instances of necessary classes</span>
+<span class="sd">            poses = Poses()</span>
+
+<span class="sd">            # Set up a single chain</span>
+<span class="sd">            chain_list = setup_chain_list(&#39;A&#39;, poses)</span>
+<span class="sd">            print(chain_list)</span>
+
+<span class="sd">            # Set up chains from a column in the poses DataFrame</span>
+<span class="sd">            chain_list = setup_chain_list(&#39;chain_col&#39;, poses)</span>
+<span class="sd">            print(chain_list)</span>
+
+<span class="sd">            # Set up chains from a list</span>
+<span class="sd">            chain_list = setup_chain_list([&#39;A&#39;, &#39;B&#39;, &#39;C&#39;], poses)</span>
+<span class="sd">            print(chain_list)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">    - **Single Chain Identifier:** If a single chain identifier (e.g., &#39;A&#39;) is provided, it is used for all poses.</span>
+<span class="sd">    - **DataFrame Column:** If the name of a column in the `poses` DataFrame is provided, the function extracts the chain identifiers </span>
+<span class="sd">                           from that column for each pose.</span>
+<span class="sd">    - **List of Chains:** If a list of chain identifiers is provided, it must match the length of the `poses` DataFrame. </span>
+<span class="sd">                           The function raises an error if this condition is not met.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chain_arg</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">chain_arg</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">chain_arg</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">pose</span><span class="p">[</span><span class="n">chain_arg</span><span class="p">]</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chain_arg</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">chain_arg</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">chain_arg</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Inappropriate value for parameter :chain_arg:. Specify the chain (e.g. &#39;A&#39;), the column where the chains are listed (e.g. &#39;chain_col&#39;) or give a list of chains the same length as poses.df (e.g. [&#39;A&#39;, ...])&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="parse_chain">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.parse_chain">[docs]</a>
+<span class="k">def</span> <span class="nf">parse_chain</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">pose</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;Sets up chain for add_chains_batch.py&#39;&#39;&#39;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">chain</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">pose</span><span class="p">[</span><span class="n">chain</span><span class="p">]</span>
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Inappropriate parameter type for parameter :chain: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span><span class="si">}</span><span class="s2">. Only :str: allowed!&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ChainRemover">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainRemover">[docs]</a>
+<span class="k">class</span> <span class="nc">ChainRemover</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ChainRemover Class</span>
+<span class="sd">    ==================</span>
+
+<span class="sd">    The `ChainRemover` class is a specialized class designed to facilitate the removal of chains from protein structures within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with chain removal processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `ChainRemover` class manages all aspects of removing chains from protein structures. It configures necessary scripts and executables, prepares the environment for the removal processes, and executes the required commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to chain removal scripts and Python executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of chain removal commands with support for batch processing.</span>
+<span class="sd">        - Collecting and processing output data into a structured format.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `ChainRemover` class, configured to remove chains from protein structures and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `ChainRemover` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from protein_edits import ChainRemover</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the ChainRemover class</span>
+<span class="sd">        chain_remover = ChainRemover(jobstarter=jobstarter)</span>
+
+<span class="sd">        # Remove a chain from the poses</span>
+<span class="sd">        removed_chains = chain_remover.remove_chains(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_2&quot;,</span>
+<span class="sd">            chains=[&quot;A&quot;],</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(removed_chains)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class handles various edge cases, such as missing chain specifications and the need to overwrite previous results.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the chain removal process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The ChainRemover class is intended for researchers and developers who need to remove chains from protein structures as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="ChainRemover.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainRemover.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">default_python</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROTFLOW_ENV</span><span class="p">,</span> <span class="s2">&quot;python3&quot;</span><span class="p">),</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the ChainRemover class.</span>
+
+<span class="sd">        This method sets up the ChainRemover class by configuring the path to the default Python executable and </span>
+<span class="sd">        initializing the job starter. The ChainRemover class is used to remove chains from protein structures within </span>
+<span class="sd">        the ProtFlow framework.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            default_python (str, optional): The path to the default Python executable. Defaults to `os.path.join(PROTFLOW_ENV, &quot;python3&quot;)`.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.</span>
+
+<span class="sd">        Attributes:</span>
+<span class="sd">            python (str): Path to the Python executable used for running scripts.</span>
+<span class="sd">            jobstarter (JobStarter): An instance of the JobStarter class to manage job execution.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize the ChainRemover class:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from protein_edits import ChainRemover</span>
+
+<span class="sd">                # Initialize the ChainRemover class</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+<span class="sd">                chain_remover = ChainRemover(jobstarter=jobstarter)</span>
+
+<span class="sd">        Notes:</span>
+<span class="sd">            The ChainRemover class depends on the ProtFlow environment being properly configured. Ensure that the </span>
+<span class="sd">            `PROTFLOW_ENV` and necessary scripts are correctly set up before using this class.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If the specified Python executable is not found.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_path</span><span class="p">(</span><span class="n">default_python</span><span class="p">,</span> <span class="s2">&quot;PROTFLOW_ENV&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;chain_remover&quot;</span>
+
+    <span class="c1">#################################### METHODS #######################################</span>
+<div class="viewcode-block" id="ChainRemover.run">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainRemover.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;.run() method is not implemented in this class. Use .remove_chains() instead!!!&#39;&#39;&#39;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="ChainRemover.remove_chains">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_edits.ChainRemover.remove_chains">[docs]</a>
+    <span class="k">def</span> <span class="nf">remove_chains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Remove chains from the poses.</span>
+
+<span class="sd">        This method removes specified chains from the protein structures in the `poses` object. It sets up and executes the necessary scripts, </span>
+<span class="sd">        handles the environment configuration, and processes the output.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            chains (list, optional): A list of chains to be removed. If specified, each chain in the list will be removed from the poses. Defaults to None.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Poses: An updated Poses object with the specified chains removed.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the methods.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize and use the `remove_chains` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from protein_edits import ChainRemover</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the ChainRemover class</span>
+<span class="sd">                chain_remover = ChainRemover(jobstarter=jobstarter)</span>
+
+<span class="sd">                # Remove chains from the poses</span>
+<span class="sd">                removed_chains = chain_remover.remove_chains(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_2&quot;,</span>
+<span class="sd">                    chains=[&quot;A&quot;],</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(removed_chains)</span>
+
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">        - **Output Checking:** The method checks if the output already exists and whether it should be overwritten, ensuring no redundant processing.</span>
+<span class="sd">        - **Chain Setup:** Chains can be specified as a list, a column in the `poses` DataFrame, or as a single chain identifier for all poses.</span>
+<span class="sd">        - **Batch Processing:** The method supports batch processing, splitting the inputs into sublists to optimize resource usage during execution.</span>
+<span class="sd">        - **Path Configuration:** Ensure the paths to the scripts and executables are correctly configured as per ProtFlow setup. Using default paths is recommended unless customization is necessary.</span>
+<span class="sd">        - **JobStarter Integration:** The JobStarter object is used to manage job execution, ensuring processes are handled efficiently. If a JobStarter is not provided, the method will operate without it, but using one is recommended for better job management.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">output_exists</span><span class="p">(</span><span class="n">work_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">files_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;checks if output of copying chains exists&#39;&#39;&#39;</span>
+            <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">fn</span><span class="p">)</span> <span class="k">for</span> <span class="n">fn</span> <span class="ow">in</span> <span class="n">files_list</span><span class="p">)</span>
+
+        <span class="c1"># setup runner</span>
+        <span class="n">script_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">AUXILIARY_RUNNER_SCRIPTS_DIR</span><span class="si">}</span><span class="s2">/remove_chains_batch.py&quot;</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span> <span class="o">=</span> <span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="c1"># define location of new poses:</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_location&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pose</span><span class="p">))</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()]</span>
+
+        <span class="c1"># check if output is present</span>
+        <span class="k">if</span> <span class="n">output_exists</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_location&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">())</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">poses</span><span class="o">.</span><span class="n">change_poses_dir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># setup chains</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">chains</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">chain_list</span> <span class="o">=</span> <span class="p">[[</span><span class="n">chains</span><span class="p">]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">check_for_prefix</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="n">poses</span><span class="p">)</span>
+                <span class="n">chain_list</span> <span class="o">=</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">chains</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">chain_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">chains</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+
+        <span class="c1"># batch inputs to max_cores</span>
+        <span class="n">input_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pose</span><span class="p">:</span> <span class="n">chain</span> <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">chain</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">chain_list</span><span class="p">)}</span>
+        <span class="n">split_sublists</span> <span class="o">=</span> <span class="n">jobstarters</span><span class="o">.</span><span class="n">split_list</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">input_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span> <span class="n">n_sublists</span><span class="o">=</span><span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span><span class="p">)</span>
+        <span class="n">subdicts</span> <span class="o">=</span> <span class="p">[{</span><span class="n">target</span><span class="p">:</span> <span class="n">input_dict</span><span class="p">[</span><span class="n">target</span><span class="p">]</span> <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">sublist</span><span class="p">}</span> <span class="k">for</span> <span class="n">sublist</span> <span class="ow">in</span> <span class="n">split_sublists</span><span class="p">]</span>
+
+        <span class="c1"># write cmds</span>
+        <span class="n">json_files</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">subdict</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">subdicts</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">opts_json_p</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/remove_chain_input_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">.json&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">opts_json_p</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">subdict</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">json_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">opts_json_p</span><span class="p">)</span>
+
+        <span class="c1"># start remove_chains_batch.py</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">python</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">script_path</span><span class="si">}</span><span class="s2"> --input_json </span><span class="si">{</span><span class="n">json_f</span><span class="si">}</span><span class="s2"> --output_dir </span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">json_f</span> <span class="ow">in</span> <span class="n">json_files</span><span class="p">]</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;remove_chains_</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">wait</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">work_dir</span>
+        <span class="p">)</span>
+
+        <span class="c1"># reset poses location and return</span>
+        <span class="k">return</span> <span class="n">poses</span><span class="o">.</span><span class="n">change_poses_dir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">copy</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,4 +1,83 @@
-'''Module to handle general edits to proteins, for example, adding or removing chains or ligands.'''
+"""
+ProteinEdits Module
+===================
+
+This module provides the functionality to handle various protein editing tasks within the ProtFlow framework. It offers tools to add and remove protein chains, add sequences to proteins, and multimerize sequences in a structured and automated manner.
+
+Detailed Description
+--------------------
+The `protein_edits` module contains classes and methods designed to perform common protein editing operations. The `ChainAdder` class provides methods for adding chains to protein structures, including functionality for superimposing chains based on motifs or existing chains. The `ChainRemover` class allows for the removal of specified chains from protein structures. Additionally, methods for adding sequences to proteins and creating multimers from sequences are included, streamlining the process of preparing protein structures for further analysis.
+
+The module integrates seamlessly with the ProtFlow ecosystem, leveraging shared configurations, job management capabilities, and data structures to provide a cohesive user experience. It supports automatic setup and execution of jobs, handling of input and output files, and robust error handling and logging.
+
+Usage
+-----
+To use this module, create instances of the `ChainAdder` or `ChainRemover` classes and invoke their respective methods with appropriate parameters. The module handles the configuration, execution, and result collection processes, allowing users to focus on interpreting the results.
+
+Examples
+--------
+Here is an example of how to initialize and use the `ChainAdder` and `ChainRemover` classes within a ProtFlow pipeline:
+
+.. code-block:: python
+
+    from protflow.poses import Poses
+    from protflow.jobstarters import JobStarter
+    from protein_edits import ChainAdder, ChainRemover
+
+    # Create instances of necessary classes
+    poses = Poses()
+    jobstarter = JobStarter()
+
+    # Initialize the ChainAdder class
+    chain_adder = ChainAdder(jobstarter=jobstarter)
+
+    # Add a chain to the poses
+    added_chains = chain_adder.add_chain(
+        poses=poses,
+        prefix="experiment_1",
+        ref_col="reference_column",
+        copy_chain="A",
+        jobstarter=jobstarter,
+        overwrite=True
+    )
+
+    # Initialize the ChainRemover class
+    chain_remover = ChainRemover(jobstarter=jobstarter)
+
+    # Remove a chain from the poses
+    removed_chains = chain_remover.remove_chains(
+        poses=poses,
+        prefix="experiment_2",
+        chains=["A"],
+        jobstarter=jobstarter,
+        overwrite=True
+    )
+
+    # Access and process the results
+    print(added_chains)
+    print(removed_chains)
+
+Further Details
+---------------
+- Edge Cases: The module handles various edge cases, such as missing chain specifications and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the process.
+- Customizability: Users can customize the processes through multiple parameters, including the chain to add or remove, sequence details for adding sequences, and the number of protomers for multimerization.
+- Integration: The module integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.
+
+This module is intended for researchers and developers who need to incorporate protein editing tasks into their computational workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.
+
+Notes
+-----
+This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.
+
+Author
+------
+Markus Braun, Adrian Tripp
+
+Version
+-------
+0.1.0
+"""
+
 # imports
 import json
 import os
@@ -17,8 +96,116 @@ from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR
 from protflow.utils.utils import parse_fasta_to_dict
 
 class ChainAdder(Runner):
-    '''Adds chains into proteins.'''
+    """
+    ChainAdder Class
+    ================
+
+    The `ChainAdder` class is a specialized class designed to facilitate the addition of chains to protein structures within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with chain addition processes.
+
+    Detailed Description
+    --------------------
+    The `ChainAdder` class manages all aspects of adding chains to protein structures. It configures necessary scripts and executables, prepares the environment for the addition processes, and executes the required commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
+
+    Key functionalities include:
+        - Setting up paths to chain addition scripts and Python executables.
+        - Configuring job starter options, either automatically or manually.
+        - Handling the execution of chain addition commands with support for superimposition on motifs or existing chains.
+        - Collecting and processing output data into a structured format.
+        - Providing methods for adding sequences to proteins and creating multimers from sequences.
+
+    Returns
+    -------
+    An instance of the `ChainAdder` class, configured to add chains to protein structures and handle outputs efficiently.
+
+    Raises
+    ------
+        - FileNotFoundError: If required files or directories are not found during the execution process.
+        - ValueError: If invalid arguments are provided to the methods.
+        - TypeError: If motifs or chains are not of the expected type.
+
+    Examples
+    --------
+    Here is an example of how to initialize and use the `ChainAdder` class:
+
+    .. code-block:: python
+
+        from protflow.poses import Poses
+        from protflow.jobstarters import JobStarter
+        from protein_edits import ChainAdder
+
+        # Create instances of necessary classes
+        poses = Poses()
+        jobstarter = JobStarter()
+
+        # Initialize the ChainAdder class
+        chain_adder = ChainAdder(jobstarter=jobstarter)
+
+        # Add a chain to the poses
+        added_chains = chain_adder.add_chain(
+            poses=poses,
+            prefix="experiment_1",
+            ref_col="reference_column",
+            copy_chain="A",
+            jobstarter=jobstarter,
+            overwrite=True
+        )
+
+        # Access and process the results
+        print(added_chains)
+
+    Further Details
+    ---------------
+        - Edge Cases: The class handles various edge cases, such as missing chain specifications and the need to overwrite previous results.
+        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the chain addition process to their specific needs.
+        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
+
+    The ChainAdder class is intended for researchers and developers who need to add chains to protein structures as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+    """
     def __init__(self, default_python=os.path.join(PROTFLOW_ENV, "python3"), jobstarter: JobStarter = None):
+        """
+        Initialize the ChainAdder class.
+
+        This method sets up the ChainAdder class by configuring the path to the default Python executable and 
+        initializing the job starter. The ChainAdder class is used to add chains to protein structures within 
+        the ProtFlow framework.
+
+        Parameters
+        ----------
+        default_python : str, optional
+            The path to the default Python executable, by default `os.path.join(PROTFLOW_ENV, "python3")`.
+        jobstarter : JobStarter, optional
+            An instance of the JobStarter class to manage job execution, by default None.
+
+        Attributes
+        ----------
+        python : str
+            Path to the Python executable used for running scripts.
+        jobstarter : JobStarter
+            An instance of the JobStarter class to manage job execution.
+
+        Examples
+        --------
+        Here is an example of how to initialize the ChainAdder class:
+
+        .. code-block:: python
+
+            from protflow.jobstarters import JobStarter
+            from protein_edits import ChainAdder
+
+            # Initialize the ChainAdder class
+            jobstarter = JobStarter()
+            chain_adder = ChainAdder(jobstarter=jobstarter)
+
+        Notes
+        -----
+        The ChainAdder class depends on the ProtFlow environment being properly configured. Ensure that the 
+        `PROTFLOW_ENV` and necessary scripts are correctly set up before using this class.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the specified Python executable is not found.
+        """
         self.python = self.search_path(default_python, "PROTFLOW_ENV")
         self.jobstarter = jobstarter
 
@@ -27,10 +214,66 @@ class ChainAdder(Runner):
 
     ################ Methods #########################
     def run(self, poses, prefix, jobstarter):
+        '''.run() not implemented for ChainAdder class. Use methods like: .add_chain() or .superimpose_add_chain() instead!!!'''
         raise NotImplementedError
 
     def add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
-        '''Simple method to add a chain into poses.'''
+        """
+        Add a chain to the poses.
+
+        This method adds a specified chain to the protein structures in `poses` by using the `superimpose_add_chain` method without any superimposition, effectively copying the chain as-is.
+
+        Parameters:
+            poses (Poses): The Poses object containing the protein structures.
+            prefix (str): A prefix used to name and organize the output files.
+            ref_col (str): The column in the poses DataFrame that references the structures to be used.
+            copy_chain (str): The chain identifier to copy.
+            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
+            overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.
+
+        Returns:
+            Poses: An updated Poses object with the new chain added.
+
+        Raises:
+            FileNotFoundError: If required files or directories are not found during the execution process.
+            ValueError: If invalid arguments are provided to the methods.
+            TypeError: If invalid argument types are provided to the methods.
+
+        Examples:
+            Here is an example of how to initialize and use the `add_chain` method:
+
+            .. code-block:: python
+
+                from protflow.poses import Poses
+                from protflow.jobstarters import JobStarter
+                from protein_edits import ChainAdder
+
+                # Create instances of necessary classes
+                poses = Poses()
+                jobstarter = JobStarter()
+
+                # Initialize the ChainAdder class
+                chain_adder = ChainAdder(jobstarter=jobstarter)
+
+                # Add a chain to the poses
+                added_chains = chain_adder.add_chain(
+                    poses=poses,
+                    prefix="experiment_1",
+                    ref_col="reference_column",
+                    copy_chain="A",
+                    jobstarter=jobstarter,
+                    overwrite=True
+                )
+
+                # Access and process the results
+                print(added_chains)
+
+        Further Details
+        ---------------
+        - **Method Simplicity:** This method uses `superimpose_add_chain` without specifying any superimposition parameters, making it a straightforward way to add chains without the complexity of superimposition.
+        - **Path Configuration:** Ensure the paths to the scripts and executables are correctly configured as per ProtFlow setup. Using default paths is recommended unless customization is necessary.
+        - **JobStarter Integration:** The JobStarter object is used to manage job execution, ensuring processes are handled efficiently. If a JobStarter is not provided, the method will not operate without it.
+        """
         # run superimpose without specifying anything to superimpose on (will not superimpose)
         chains_added = self.superimpose_add_chain(
             poses = poses,
@@ -43,7 +286,69 @@ class ChainAdder(Runner):
         return chains_added
 
     def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None, overwrite: bool = False) -> Poses:
-        '''Method to add a protein chain after superimposition on a motif / chain.'''
+        """
+        Add a protein chain after superimposition on a motif or chain.
+
+        This method adds a chain to the protein structures in `poses` by superimposing it on a specified motif or chain. 
+        It sets up and executes the necessary scripts, handles the environment configuration, and processes the output.
+
+        Parameters:
+            poses (Poses): The Poses object containing the protein structures.
+            prefix (str): A prefix used to name and organize the output files.
+            ref_col (str): The column in the poses DataFrame that references the structures to be used.
+            copy_chain (str): The chain identifier to copy.
+            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
+            target_motif (ResidueSelection, optional): The target motif for superimposition. Defaults to None.
+            reference_motif (ResidueSelection, optional): The reference motif for superimposition. Defaults to None.
+            target_chains (list, optional): A list of target chains for superimposition. Defaults to None.
+            reference_chains (list, optional): A list of reference chains for superimposition. Defaults to None.
+            overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.
+
+        Returns:
+            Poses: An updated Poses object with the new chain added.
+
+        Raises:
+            ValueError: If both motifs and chains are specified for superimposition.
+            FileNotFoundError: If required files or directories are not found during the execution process.
+            TypeError: If invalid argument types are provided to the methods.
+
+        Examples:
+            Here is an example of how to initialize and use the `superimpose_add_chain` method:
+
+            .. code-block:: python
+
+                from protflow.poses import Poses
+                from protflow.jobstarters import JobStarter
+                from protein_edits import ChainAdder
+
+                # Create instances of necessary classes
+                poses = Poses()
+                jobstarter = JobStarter()
+
+                # Initialize the ChainAdder class
+                chain_adder = ChainAdder(jobstarter=jobstarter)
+
+                # Add a chain to the poses
+                added_chains = chain_adder.superimpose_add_chain(
+                    poses=poses,
+                    prefix="experiment_1",
+                    ref_col="reference_column",
+                    copy_chain="A",
+                    jobstarter=jobstarter,
+                    overwrite=True
+                )
+
+                # Access and process the results
+                print(added_chains)
+
+        Further Details
+        ---------------
+        - **Path Configuration:** Ensure the paths to the scripts and executables are correctly configured as per ProtFlow setup. Using default paths is recommended unless customization is necessary.
+        - **JobStarter Integration:** The JobStarter object is used to manage job execution, ensuring processes are handled efficiently. If a JobStarter is not provided, the method will not operate without it.
+        
+        Notes:
+            This method ensures robust error handling and logging for easier debugging and verification of the process.
+        """
         # sanity (motif and chain superimposition at the same time is not possible)
         def output_exists(work_dir, poses):
             '''checks if output of copying chains exists'''
@@ -65,7 +370,7 @@ class ChainAdder(Runner):
             return poses.change_poses_dir(work_dir, copy=False)
 
         # setup motif args (extra function)
-        input_dict = self.setup_superimposition_args(
+        input_dict = self._setup_superimposition_args(
             poses = poses,
             ref_col = ref_col,
             copy_chain = copy_chain,
@@ -98,7 +403,7 @@ class ChainAdder(Runner):
 
         return poses.change_poses_dir(work_dir, copy=False)
 
-    def setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None) -> dict:
+    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None) -> dict:
         '''Prepares motif and chain specifications for superimposer setup.
         Returns dictionary (dict) that holds the kwargs for superimposition: {'target_motif': [target_motif_list], ...}'''
         # safety
@@ -130,7 +435,54 @@ class ChainAdder(Runner):
         return out_dict
 
     def parse_motif(self, motif: ResidueSelection|str, pose: pd.Series) -> str:
-        '''Sets up motif from target_motif input.'''
+        """
+        Set up motif from target_motif input.
+
+        This method converts a given motif, either a `ResidueSelection` object or a string, into a string format suitable for further processing. 
+        If the motif is a string, it checks if it is a column in the `pose` DataFrame and assumes it points to a `ResidueSelection` object.
+
+        Parameters:
+            motif (ResidueSelection | str): The motif to be parsed. It can be either a `ResidueSelection` object or a string.
+            pose (pd.Series): A row from the poses DataFrame that contains information about the protein structure.
+
+        Returns:
+            str: The motif in string format.
+
+        Raises:
+            ValueError: If the motif is a string but not a column in the `poses.df` DataFrame.
+            TypeError: If the motif is neither a `ResidueSelection` object nor a string.
+
+        Examples:
+            Here is an example of how to use the `parse_motif` method:
+
+            .. code-block:: python
+
+                from protflow.residues import ResidueSelection
+                from protein_edits import ChainAdder
+                import pandas as pd
+
+                # Initialize the ChainAdder class
+                chain_adder = ChainAdder()
+
+                # Example pose DataFrame row
+                pose = pd.Series({'motif_column': ResidueSelection(...)})
+
+                # Parse a ResidueSelection object
+                motif = ResidueSelection(...)
+                motif_str = chain_adder.parse_motif(motif, pose)
+
+                # Parse a string that is a column in the pose DataFrame
+                motif_str = chain_adder.parse_motif('motif_column', pose)
+
+                # Access the result
+                print(motif_str)
+
+        Further Details
+        ---------------
+        - **ResidueSelection Handling:** The method directly converts a `ResidueSelection` object to its string representation using its `to_string` method.
+        - **String Handling:** If a string is provided, the method checks if it is a column in the `pose` DataFrame that points to a `ResidueSelection` object, converting it to a string.
+        - **Error Handling:** The method raises appropriate errors if the input is not of the expected type or if the string does not correspond to a valid column in the DataFrame.
+        """
         if isinstance(motif, ResidueSelection):
             return motif.to_string()
         if isinstance(motif, str):
@@ -141,7 +493,56 @@ class ChainAdder(Runner):
         raise TypeError(f"Unsupportet parameter type for motif: {type(motif)} - Only ResidueSelection or str allowed!")
 
     def add_sequence(self, prefix: str, poses: Poses, seq: str = None, seq_col: str = None, sep: str = ":") -> None:
-        '''Adds Sequence to pose in .fa format.'''
+        """
+        Add a sequence to the poses in .fa format.
+
+        This method appends a specified sequence to the protein sequences in the `poses` object. The sequence can be 
+        provided directly or specified through a column in the `poses` DataFrame. The updated sequences are saved 
+        in .fa format in a specified directory.
+
+        Parameters:
+            prefix (str): A prefix used to name and organize the output files.
+            poses (Poses): The Poses object containing the protein structures.
+            seq (str, optional): The sequence to be added. If specified, `seq_col` must be None. Defaults to None.
+            seq_col (str, optional): The column in the poses DataFrame that contains the sequences to be added. 
+                                    If specified, `seq` must be None. Defaults to None.
+            sep (str, optional): The separator to be used between the original and new sequences. Defaults to ":".
+
+        Raises:
+            ValueError: If poses are not in .fa or .fasta format, if both `seq` and `seq_col` are specified, 
+                        or if neither `seq` nor `seq_col` is specified.
+
+        Examples:
+            Here is an example of how to use the `add_sequence` method:
+
+            .. code-block:: python
+
+                from protflow.poses import Poses
+                from protein_edits import ChainAdder
+
+                # Create instances of necessary classes
+                poses = Poses()
+
+                # Initialize the ChainAdder class
+                chain_adder = ChainAdder()
+
+                # Add a sequence to the poses
+                chain_adder.add_sequence(
+                    prefix="experiment_1",
+                    poses=poses,
+                    seq="ATCGATCGATCG",
+                    sep=":"
+                )
+
+        Further Details
+        ---------------
+        - **File Format:** The method checks that all poses are in .fa or .fasta format and raises an error if not.
+        - **Sequence Input:** Either `seq` or `seq_col` must be specified to provide the sequence to be added. 
+                            The method ensures that both are not specified simultaneously.
+        - **Output Directory:** The method creates an output directory if it does not exist and saves the updated 
+                                sequences in this directory.
+        - **DataFrame Update:** The `poses` DataFrame is updated to reflect the new locations of the modified sequences.
+        """
         poses.check_prefix(prefix)
         if not all(pose.endswith(".fa") or pose.endswith(".fasta") for pose in poses.poses_list()):
             raise ValueError(f"Poses must be .fasta files (.fa also fine)!")
@@ -180,8 +581,50 @@ class ChainAdder(Runner):
         poses.change_poses_dir(out_dir, copy=False)
 
     def multimerize(self, prefix: str, poses: Poses, n_protomers: int, sep: str = ":") -> None:
-        '''Takes .fa files from poses and makes multimers out of the sequences.
-        :n_protomers: (int) specifies the number of protomers in the final .fa file.'''
+        """
+        Create multimers from the sequences in .fa files.
+
+        This method takes .fa files from the `poses` object and creates multimers by repeating the sequence a specified number of times.
+        The updated sequences are saved in .fa format in a specified directory.
+
+        Parameters:
+            prefix (str): A prefix used to name and organize the output files.
+            poses (Poses): The Poses object containing the protein structures.
+            n_protomers (int): The number of protomers in the final .fa file.
+            sep (str, optional): The separator to be used between the original and new sequences. Defaults to ":".
+
+        Raises:
+            ValueError: If poses are not in .fa or .fasta format.
+
+        Examples:
+            Here is an example of how to use the `multimerize` method:
+
+            .. code-block:: python
+
+                from protflow.poses import Poses
+                from protein_edits import ChainAdder
+
+                # Create instances of necessary classes
+                poses = Poses()
+
+                # Initialize the ChainAdder class
+                chain_adder = ChainAdder()
+
+                # Multimerize the sequences in the poses
+                chain_adder.multimerize(
+                    prefix="experiment_1",
+                    poses=poses,
+                    n_protomers=3,
+                    sep=":"
+                )
+
+        Further Details
+        ---------------
+        - **File Format:** The method checks that all poses are in .fa or .fasta format and raises an error if not.
+        - **Protomers Specification:** The `n_protomers` parameter specifies the number of times the sequence should be repeated to form a multimer.
+        - **Output Directory:** The method creates an output directory if it does not exist and saves the updated sequences in this directory.
+        - **DataFrame Update:** The `poses` DataFrame is updated to reflect the new locations of the modified sequences.
+        """
         # setup directory and function
         poses.check_prefix(prefix)
         if not all(pose.endswith(".fa") or pose.endswith(".fasta") for pose in poses.poses_list()):
@@ -207,7 +650,56 @@ class ChainAdder(Runner):
         poses.change_poses_dir(out_dir, copy=False)
 
 def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
-    '''Sets up chains for add_chains_batch.py'''
+    """
+    Set up chains for add_chains_batch.py.
+
+    This function configures the list of chains to be used in the `add_chains_batch.py` script based on the provided `chain_arg`.
+    It supports specifying a single chain, a column in the `poses` DataFrame, or a list of chains.
+
+    Parameters:
+        chain_arg (str or list[str]): The chain specification. It can be a single chain identifier (e.g., 'A'), 
+                                      the name of a column in the `poses` DataFrame where the chains are listed, 
+                                      or a list of chain identifiers.
+        poses (Poses): The Poses object containing the protein structures.
+
+    Returns:
+        list[str]: A list of chain identifiers to be used in `add_chains_batch.py`.
+
+    Raises:
+        ValueError: If the `chain_arg` value is inappropriate, such as when the specified column does not exist in the DataFrame 
+                    or the length of the list does not match the number of poses.
+
+    Examples:
+        Here is an example of how to use the `setup_chain_list` function:
+
+        .. code-block:: python
+
+            from protflow.poses import Poses
+            from protein_edits import setup_chain_list
+
+            # Create instances of necessary classes
+            poses = Poses()
+
+            # Set up a single chain
+            chain_list = setup_chain_list('A', poses)
+            print(chain_list)
+
+            # Set up chains from a column in the poses DataFrame
+            chain_list = setup_chain_list('chain_col', poses)
+            print(chain_list)
+
+            # Set up chains from a list
+            chain_list = setup_chain_list(['A', 'B', 'C'], poses)
+            print(chain_list)
+
+    Further Details
+    ---------------
+    - **Single Chain Identifier:** If a single chain identifier (e.g., 'A') is provided, it is used for all poses.
+    - **DataFrame Column:** If the name of a column in the `poses` DataFrame is provided, the function extracts the chain identifiers 
+                           from that column for each pose.
+    - **List of Chains:** If a list of chain identifiers is provided, it must match the length of the `poses` DataFrame. 
+                           The function raises an error if this condition is not met.
+    """
     if isinstance(chain_arg, str):
         if len(chain_arg) == 1:
             return [chain_arg for _ in poses]
@@ -224,8 +716,103 @@ def parse_chain(chain, pose: pd.Series) -> str:
     raise TypeError(f"Inappropriate parameter type for parameter :chain: {type(chain)}. Only :str: allowed!")
 
 class ChainRemover(Runner):
-    '''Remove chains from poses.'''
+    """
+    ChainRemover Class
+    ==================
+
+    The `ChainRemover` class is a specialized class designed to facilitate the removal of chains from protein structures within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with chain removal processes.
+
+    Detailed Description
+    --------------------
+    The `ChainRemover` class manages all aspects of removing chains from protein structures. It configures necessary scripts and executables, prepares the environment for the removal processes, and executes the required commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
+
+    Key functionalities include:
+        - Setting up paths to chain removal scripts and Python executables.
+        - Configuring job starter options, either automatically or manually.
+        - Handling the execution of chain removal commands with support for batch processing.
+        - Collecting and processing output data into a structured format.
+
+    Returns
+    -------
+    An instance of the `ChainRemover` class, configured to remove chains from protein structures and handle outputs efficiently.
+
+    Raises
+    ------
+        - FileNotFoundError: If required files or directories are not found during the execution process.
+        - ValueError: If invalid arguments are provided to the methods.
+
+    Examples
+    --------
+    Here is an example of how to initialize and use the `ChainRemover` class:
+
+    .. code-block:: python
+
+        from protflow.poses import Poses
+        from protflow.jobstarters import JobStarter
+        from protein_edits import ChainRemover
+
+        # Create instances of necessary classes
+        poses = Poses()
+        jobstarter = JobStarter()
+
+        # Initialize the ChainRemover class
+        chain_remover = ChainRemover(jobstarter=jobstarter)
+
+        # Remove a chain from the poses
+        removed_chains = chain_remover.remove_chains(
+            poses=poses,
+            prefix="experiment_2",
+            chains=["A"],
+            jobstarter=jobstarter,
+            overwrite=True
+        )
+
+        # Access and process the results
+        print(removed_chains)
+
+    Further Details
+    ---------------
+        - Edge Cases: The class handles various edge cases, such as missing chain specifications and the need to overwrite previous results.
+        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the chain removal process to their specific needs.
+        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
+
+    The ChainRemover class is intended for researchers and developers who need to remove chains from protein structures as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+    """
     def __init__(self, default_python=os.path.join(PROTFLOW_ENV, "python3"), jobstarter: JobStarter = None):
+        """
+        Initialize the ChainRemover class.
+
+        This method sets up the ChainRemover class by configuring the path to the default Python executable and 
+        initializing the job starter. The ChainRemover class is used to remove chains from protein structures within 
+        the ProtFlow framework.
+
+        Parameters:
+            default_python (str, optional): The path to the default Python executable. Defaults to `os.path.join(PROTFLOW_ENV, "python3")`.
+            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
+
+        Attributes:
+            python (str): Path to the Python executable used for running scripts.
+            jobstarter (JobStarter): An instance of the JobStarter class to manage job execution.
+
+        Examples:
+            Here is an example of how to initialize the ChainRemover class:
+
+            .. code-block:: python
+
+                from protflow.jobstarters import JobStarter
+                from protein_edits import ChainRemover
+
+                # Initialize the ChainRemover class
+                jobstarter = JobStarter()
+                chain_remover = ChainRemover(jobstarter=jobstarter)
+
+        Notes:
+            The ChainRemover class depends on the ProtFlow environment being properly configured. Ensure that the 
+            `PROTFLOW_ENV` and necessary scripts are correctly set up before using this class.
+
+        Raises:
+            FileNotFoundError: If the specified Python executable is not found.
+        """
         self.python = self.search_path(default_python, "PROTFLOW_ENV")
         self.jobstarter = jobstarter
 
@@ -234,10 +821,66 @@ class ChainRemover(Runner):
 
     #################################### METHODS #######################################
     def run(self, poses, prefix, jobstarter):
+        '''.run() method is not implemented in this class. Use .remove_chains() instead!!!'''
         raise NotImplementedError
 
     def remove_chains(self, poses: Poses, prefix: str, chains: list = None, jobstarter: JobStarter = None, overwrite: bool = False):
-        '''Removes chains from poses.'''
+        """
+        Remove chains from the poses.
+
+        This method removes specified chains from the protein structures in the `poses` object. It sets up and executes the necessary scripts, 
+        handles the environment configuration, and processes the output.
+
+        Parameters:
+            poses (Poses): The Poses object containing the protein structures.
+            prefix (str): A prefix used to name and organize the output files.
+            chains (list, optional): A list of chains to be removed. If specified, each chain in the list will be removed from the poses. Defaults to None.
+            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
+            overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.
+
+        Returns:
+            Poses: An updated Poses object with the specified chains removed.
+
+        Raises:
+            FileNotFoundError: If required files or directories are not found during the execution process.
+            ValueError: If invalid arguments are provided to the methods.
+
+        Examples:
+            Here is an example of how to initialize and use the `remove_chains` method:
+
+            .. code-block:: python
+
+                from protflow.poses import Poses
+                from protflow.jobstarters import JobStarter
+                from protein_edits import ChainRemover
+
+                # Create instances of necessary classes
+                poses = Poses()
+                jobstarter = JobStarter()
+
+                # Initialize the ChainRemover class
+                chain_remover = ChainRemover(jobstarter=jobstarter)
+
+                # Remove chains from the poses
+                removed_chains = chain_remover.remove_chains(
+                    poses=poses,
+                    prefix="experiment_2",
+                    chains=["A"],
+                    jobstarter=jobstarter,
+                    overwrite=True
+                )
+
+                # Access and process the results
+                print(removed_chains)
+
+        Further Details
+        ---------------
+        - **Output Checking:** The method checks if the output already exists and whether it should be overwritten, ensuring no redundant processing.
+        - **Chain Setup:** Chains can be specified as a list, a column in the `poses` DataFrame, or as a single chain identifier for all poses.
+        - **Batch Processing:** The method supports batch processing, splitting the inputs into sublists to optimize resource usage during execution.
+        - **Path Configuration:** Ensure the paths to the scripts and executables are correctly configured as per ProtFlow setup. Using default paths is recommended unless customization is necessary.
+        - **JobStarter Integration:** The JobStarter object is used to manage job execution, ensuring processes are handled efficiently. If a JobStarter is not provided, the method will operate without it, but using one is recommended for better job management.
+        """
         def output_exists(work_dir: str, files_list: list[str]) -> bool:
             '''checks if output of copying chains exists'''
             return os.path.isdir(work_dir) and all(os.path.isfile(fn) for fn in files_list)

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.tools.residue_selectors &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.tools.residue_selectors</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.tools.residue_selectors</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Module to select residues in a Poses class and add the resulting motif into Poses.df.</span>
+
+<span class="sd">This module provides the functionality to select specific residues from protein structures </span>
+<span class="sd">represented as Poses objects. It includes various selector classes that allow for different </span>
+<span class="sd">criteria of residue selection, such as by chain or based on existing residue selections.</span>
+
+<span class="sd">Classes:</span>
+<span class="sd">    - ResidueSelector: Abstract base class for all residue selectors.</span>
+<span class="sd">    - ChainSelector: Selects all residues of specified chains.</span>
+<span class="sd">    - TrueSelector: Selects all residues of a pose.</span>
+<span class="sd">    - NotSelector: Selects all residues except those specified by a residue selection.</span>
+
+<span class="sd">Dependencies:</span>
+<span class="sd">    - protflow.residues</span>
+<span class="sd">    - protflow.poses</span>
+<span class="sd">    - protflow.utils.biopython_tools</span>
+
+<span class="sd">Examples:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    # Example usage of ChainSelector</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    chain_selector = ChainSelector(poses=poses, chain=&#39;A&#39;)</span>
+<span class="sd">    chain_selector.select(prefix=&#39;selected_chain_A&#39;)</span>
+
+<span class="sd">    # Example usage of TrueSelector</span>
+<span class="sd">    true_selector = TrueSelector(poses=poses)</span>
+<span class="sd">    true_selector.select(prefix=&#39;all_residues&#39;)</span>
+
+<span class="sd">    # Example usage of NotSelector</span>
+<span class="sd">    residue_selection = ResidueSelection([&#39;A1&#39;, &#39;A2&#39;])</span>
+<span class="sd">    not_selector = NotSelector(poses=poses, residue_selection=residue_selection)</span>
+<span class="sd">    not_selector.select(prefix=&#39;not_selected&#39;)</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Author</span>
+<span class="sd">------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0    </span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># customs</span>
+<span class="kn">import</span> <span class="nn">protflow.residues</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.residues</span> <span class="kn">import</span> <span class="n">ResidueSelection</span>
+<span class="kn">from</span> <span class="nn">protflow.utils.biopython_tools</span> <span class="kn">import</span> <span class="n">load_structure_from_pdbfile</span>
+
+<div class="viewcode-block" id="ResidueSelector">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ResidueSelector">[docs]</a>
+<span class="k">class</span> <span class="nc">ResidueSelector</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Abstract base class for ResidueSelectors.</span>
+
+<span class="sd">    All ResidueSelector classes must implement a select() method that selects residues from Poses.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="ResidueSelector.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ResidueSelector.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the ResidueSelector with an optional Poses object.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            poses = Poses()</span>
+<span class="sd">            selector = ResidueSelector(poses=poses)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_poses</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ResidueSelector.set_poses">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ResidueSelector.set_poses">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets the poses for the ResidueSelector class.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If the poses parameter is not of type Poses.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            poses = Poses()</span>
+<span class="sd">            selector.set_poses(poses=poses)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">Poses</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Parameter :poses: must be of type Poses. type(poses) = </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span></div>
+
+
+<div class="viewcode-block" id="ResidueSelector.select">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ResidueSelector.select">[docs]</a>
+    <span class="k">def</span> <span class="nf">select</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract method to select residues in poses.</span>
+
+<span class="sd">        This method must be implemented by subclasses. The selected residues will be added as</span>
+<span class="sd">        ResidueSelection objects under the column `prefix` in `Poses.df`.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            prefix (str): The name of the column that will be added to Poses.df. Poses.df[prefix] holds the selected Residues as a ResidueSelection object.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: If the method is not implemented by a subclass.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; class MySelector(ResidueSelector):</span>
+<span class="sd">            ...     def select(self, prefix):</span>
+<span class="sd">            ...         # implementation here</span>
+<span class="sd">            ...         pass</span>
+<span class="sd">            &gt;&gt;&gt; selector = MySelector(poses=poses)</span>
+<span class="sd">            &gt;&gt;&gt; selector.select(prefix=&#39;selected_residues&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+
+
+<div class="viewcode-block" id="ResidueSelector.select_single">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ResidueSelector.select_single">[docs]</a>
+    <span class="k">def</span> <span class="nf">select_single</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResidueSelection</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Abstract method to select residues for a single pose.</span>
+
+<span class="sd">        This method must be implemented by subclasses. It returns a ResidueSelection that contains the selected residues of the pose.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ResidueSelection: The selected residues of the pose.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            NotImplementedError: If the method is not implemented by a subclass.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; class MySelector(ResidueSelector):</span>
+<span class="sd">            ...     def select_single(self, *args):</span>
+<span class="sd">            ...         # implementation here</span>
+<span class="sd">            ...         return ResidueSelection()</span>
+<span class="sd">            &gt;&gt;&gt; selector = MySelector(poses=poses)</span>
+<span class="sd">            &gt;&gt;&gt; selection = selector.select_single()</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+</div>
+
+
+<div class="viewcode-block" id="ChainSelector">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ChainSelector">[docs]</a>
+<span class="k">class</span> <span class="nc">ChainSelector</span><span class="p">(</span><span class="n">ResidueSelector</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Selects all residues of a given chain in Poses.</span>
+
+<span class="sd">    This class extends ResidueSelector to allow selection of residues based on specific chains</span>
+<span class="sd">    from the protein structures contained in a Poses object.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">        chains (list[str]): A list of chain identifiers to select residues from.</span>
+<span class="sd">        chain (str): A single chain identifier to select residues from.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="ChainSelector.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ChainSelector.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the ChainSelector with optional Poses object and chain(s).</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+<span class="sd">            chain (list, optional): A single chain identifier. Defaults to None.</span>
+<span class="sd">            chains (list, optional): A list of chain identifiers. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If both chain and chains are provided.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; poses = Poses()</span>
+<span class="sd">            &gt;&gt;&gt; selector = ChainSelector(poses=poses, chain=&#39;A&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">chain</span> <span class="ow">and</span> <span class="n">chains</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Either chain, or chains can be set, but not both. chain: </span><span class="si">{</span><span class="n">chain</span><span class="si">}</span><span class="s2">, chains: </span><span class="si">{</span><span class="n">chains</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_chains</span><span class="p">(</span><span class="n">chains</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_chain</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="ChainSelector.set_chains">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ChainSelector.set_chains">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_chains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets chains for the select() method.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            chains (list[str], optional): A list of chain identifiers to select residues from. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If chains is not a list of single-character strings.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selector.set_chains(chains=[&#39;A&#39;, &#39;B&#39;])</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">chains</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chains</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Parameter :chains: must be a list containing the chains to select as single characters, e.g. chains=[&#39;A&#39;, &#39;C&#39;]&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">chain</span> <span class="ow">in</span> <span class="n">chains</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Parameter :chains: must be a list containing the chains to select as single characters, e.g. chains=[&#39;A&#39;, &#39;C&#39;]&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">chains</span> <span class="o">=</span> <span class="n">chains</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">chain</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="ChainSelector.set_chain">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ChainSelector.set_chain">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_chain</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets a single chain for the select() method.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            chain (str, optional): A single chain identifier. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If chain is not a single-character string.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selector.set_chain(chain=&#39;A&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">chain</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chain</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">chain</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Parameter :chain: must be a string of a single character denoting the chain that should be selected. e.g. chain=&#39;B&#39; &quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">chain</span> <span class="o">=</span> <span class="n">chain</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">chains</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="ChainSelector.select">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ChainSelector.select">[docs]</a>
+    <span class="k">def</span> <span class="nf">select</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Selects all residues of a given chain for all poses in a Poses object.</span>
+
+<span class="sd">        Selected residues are added as ResidueSelection objects under the column `prefix` in Poses.df.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            prefix (str): The name of the column that will be added to Poses.df.</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+<span class="sd">            chain (str, optional): A single chain identifier. Defaults to None.</span>
+<span class="sd">            chains (list[str], optional): A list of chain identifiers. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no poses are provided or set in the instance.</span>
+<span class="sd">            ValueError: If both chain and chains are provided.</span>
+<span class="sd">            KeyError: If specified chains are not present in the pose.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selector.select(prefix=&#39;selected_chain_A&#39;, chain=&#39;A&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">check_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+
+        <span class="c1"># prep inputs</span>
+        <span class="n">chains</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_chain_input</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">chains</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">poses</span> <span class="o">:=</span> <span class="n">poses</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># select Residues</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">prefix</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">select_single</span><span class="p">(</span><span class="n">pose_path</span><span class="o">=</span><span class="n">pose</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()]</span></div>
+
+
+<div class="viewcode-block" id="ChainSelector.select_single">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ChainSelector.select_single">[docs]</a>
+    <span class="k">def</span> <span class="nf">select_single</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ResidueSelection</span><span class="p">:</span> <span class="c1"># pylint: disable=W0221</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Selects residues of a given chain of poses and returns them as a ResidueSelection object.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose_path (str): The file path to the pose structure.</span>
+<span class="sd">            chains (list[str]): A list of chain identifiers.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ResidueSelection: The selected residues of the pose.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If specified chains are not present in the pose.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selection = selector.select_single(pose_path=&#39;path/to/pose.pdb&#39;, chains=[&#39;A&#39;])</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pose</span> <span class="o">=</span> <span class="n">load_structure_from_pdbfile</span><span class="p">(</span><span class="n">pose_path</span><span class="p">)</span>
+
+        <span class="c1"># check if chain is in chains:</span>
+        <span class="n">pose_chains</span> <span class="o">=</span> <span class="p">[</span><span class="n">chain</span><span class="o">.</span><span class="n">id</span> <span class="k">for</span> <span class="n">chain</span> <span class="ow">in</span> <span class="n">pose</span><span class="o">.</span><span class="n">get_chains</span><span class="p">()]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">chain</span> <span class="ow">in</span> <span class="n">pose_chains</span> <span class="k">for</span> <span class="n">chain</span> <span class="ow">in</span> <span class="n">chains</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Some of your specified chains </span><span class="si">{</span><span class="n">chains</span><span class="si">}</span><span class="s2"> are not present in the pose. chains of pose: </span><span class="si">{</span><span class="n">pose_chains</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># for all chain in chains collect resis</span>
+        <span class="n">residues</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">chain</span> <span class="ow">in</span> <span class="n">chains</span><span class="p">:</span>
+            <span class="n">resis</span> <span class="o">=</span> <span class="n">pose</span><span class="p">[</span><span class="n">chain</span><span class="p">]</span><span class="o">.</span><span class="n">get_residues</span><span class="p">()</span>
+            <span class="n">residues</span> <span class="o">+=</span> <span class="n">resis</span>
+
+        <span class="c1"># convert selected Biopython residues to ResidueSelection object and return</span>
+        <span class="k">return</span> <span class="n">ResidueSelection</span><span class="p">([</span><span class="n">residue</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">id</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">residue</span><span class="o">.</span><span class="n">id</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">residues</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="ChainSelector.prep_chain_input">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.ChainSelector.prep_chain_input">[docs]</a>
+    <span class="k">def</span> <span class="nf">prep_chain_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chain</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepares chain input for chain selection.</span>
+
+<span class="sd">        This method ensures that method parameters take precedence over class attributes.</span>
+<span class="sd">        This means that ChainSelector.select(chain=&quot;A&quot;) has higher priority than ChainSelector(chain=&quot;C&quot;).</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            chain (str, optional): A single chain identifier. Defaults to None.</span>
+<span class="sd">            chains (list[str], optional): A list of chain identifiers. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[str]: The list of chain identifiers to use for selection.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If both chain and chains are provided.</span>
+<span class="sd">            ValueError: If both self.chain and self.chains are set.</span>
+<span class="sd">            ValueError: If no chain identifiers are set.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; chains = selector.prep_chain_input(chain=&#39;A&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># error handling</span>
+        <span class="k">if</span> <span class="n">chain</span> <span class="ow">and</span> <span class="n">chains</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Either chain, or chains can be set, but not both. chain: </span><span class="si">{</span><span class="n">chain</span><span class="si">}</span><span class="s2">, chains: </span><span class="si">{</span><span class="n">chains</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">chain</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">chains</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Either chain, or chains can be set, but not both. chain: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">chain</span><span class="si">}</span><span class="s2">, chains: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">chains</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="ow">not</span> <span class="n">param</span> <span class="k">for</span> <span class="n">param</span> <span class="ow">in</span> <span class="p">[</span><span class="n">chain</span><span class="p">,</span> <span class="n">chains</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">chain</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">chains</span><span class="p">]):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set one of parameters :chain: or :chains: to select a chain with ChainSelector!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># handle priorities (method parameters over class parameters)</span>
+        <span class="n">class_chains</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">chains</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">chains</span> <span class="k">else</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">chain</span><span class="p">]</span>
+        <span class="n">method_chains</span> <span class="o">=</span> <span class="n">chains</span> <span class="k">if</span> <span class="n">chains</span> <span class="k">else</span> <span class="p">[</span><span class="n">chain</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">method_chains</span> <span class="ow">or</span> <span class="n">class_chains</span></div>
+</div>
+
+
+<div class="viewcode-block" id="TrueSelector">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.TrueSelector">[docs]</a>
+<span class="k">class</span> <span class="nc">TrueSelector</span><span class="p">(</span><span class="n">ResidueSelector</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ResidueSelector that selects all residues of a pose.</span>
+
+<span class="sd">    This class extends ResidueSelector to select all residues from each pose in a Poses object.</span>
+<span class="sd">    It adds the selected residues as ResidueSelection objects under a specified column in Poses.df.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="TrueSelector.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.TrueSelector.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the TrueSelector with an optional Poses object.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; poses = Poses()</span>
+<span class="sd">            &gt;&gt;&gt; selector = TrueSelector(poses=poses)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TrueSelector.select">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.TrueSelector.select">[docs]</a>
+    <span class="k">def</span> <span class="nf">select</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Selects all residues of a given pose for all poses in a Poses object.</span>
+
+<span class="sd">        Selected residues are added as ResidueSelection objects under the column `prefix` in Poses.df.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            prefix (str): The name of the column that will be added to Poses.df.</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no poses are provided or set in the instance.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selector.select(prefix=&#39;all_residues&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># prep inputs and run</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">poses</span> <span class="o">:=</span> <span class="n">poses</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.&quot;</span><span class="p">)</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">check_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">prefix</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">select_single</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()]</span></div>
+
+
+<div class="viewcode-block" id="TrueSelector.select_single">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.TrueSelector.select_single">[docs]</a>
+    <span class="k">def</span> <span class="nf">select_single</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResidueSelection</span><span class="p">:</span> <span class="c1"># pylint: disable=W0221</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Selects all residues in a single pose and returns them as a ResidueSelection object.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose_path (str): The file path to the pose structure.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ResidueSelection: The selected residues of the pose.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selection = selector.select_single(pose_path=&#39;path/to/pose.pdb&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pose</span> <span class="o">=</span> <span class="n">load_structure_from_pdbfile</span><span class="p">(</span><span class="n">pose_path</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ResidueSelection</span><span class="p">([</span><span class="n">residue</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">id</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">residue</span><span class="o">.</span><span class="n">id</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">pose</span><span class="o">.</span><span class="n">get_residues</span><span class="p">()])</span></div>
+</div>
+
+
+<div class="viewcode-block" id="NotSelector">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.NotSelector">[docs]</a>
+<span class="k">class</span> <span class="nc">NotSelector</span><span class="p">(</span><span class="n">ResidueSelector</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ResidueSelector that selects all residues except the ones specified by a residue selection.</span>
+
+<span class="sd">    This class extends ResidueSelector to exclude specified residues from selection. </span>
+<span class="sd">    The excluded residues can be provided either as a ResidueSelection object or </span>
+<span class="sd">    as a contig string.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="NotSelector.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.NotSelector.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">residue_selection</span><span class="p">:</span> <span class="n">ResidueSelection</span><span class="o">|</span><span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">contig</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the NotSelector with optional Poses object and exclusion criteria.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+<span class="sd">            residue_selection (ResidueSelection|str, optional): The residues to be excluded from selection. Can be a ResidueSelection object or a string. Defaults to None.</span>
+<span class="sd">            contig (str, optional): A string specifying the residues to be excluded in a contig format. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If both residue_selection and contig are provided.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; poses = Poses()</span>
+<span class="sd">            &gt;&gt;&gt; residue_selection = ResidueSelection([&#39;A1&#39;, &#39;A2&#39;])</span>
+<span class="sd">            &gt;&gt;&gt; selector = NotSelector(poses=poses, residue_selection=residue_selection)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">residue_selection</span> <span class="ow">and</span> <span class="n">contig</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;NotSelector Class cannot be initialized with both parameters :contig: or :residue_selection: set.</span><span class="se">\n</span><span class="s2"> Either choose a residue_selection, or give the residue selectio as a contig, but not both.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_residue_selection</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_contig</span><span class="p">(</span><span class="n">contig</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NotSelector.set_residue_selection">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.NotSelector.set_residue_selection">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_residue_selection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">residue_selection</span><span class="p">:</span> <span class="n">ResidueSelection</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets the residue_selection attribute for the NotSelector class.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            residue_selection (ResidueSelection, optional): The residues to be excluded from selection. Defaults to None.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; residue_selection = ResidueSelection([&#39;A1&#39;, &#39;A2&#39;])</span>
+<span class="sd">            &gt;&gt;&gt; selector.set_residue_selection(residue_selection=residue_selection)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">residue_selection</span><span class="p">:</span>
+            <span class="n">residue_selection</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">residue_selection</span> <span class="o">=</span> <span class="n">residue_selection</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">contig</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="NotSelector.set_contig">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.NotSelector.set_contig">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_contig</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">contig</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets the contig attribute for the NotSelector class.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            contig (str): A string specifying the residues to be excluded in a contig format.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If contig is not a string.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selector.set_contig(contig=&#39;A1-7,A25-109,B45-50,C1,C3,C5&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">contig</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Contig must be of type str. E.g.: contig=&#39;A1-7,A25-109,B45-50,C1,C3,C5&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">contig</span> <span class="o">=</span> <span class="n">contig</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">residue_selection</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="NotSelector.prep_residue_selection">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.NotSelector.prep_residue_selection">[docs]</a>
+    <span class="k">def</span> <span class="nf">prep_residue_selection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">residue_selection</span><span class="p">:</span> <span class="n">ResidueSelection</span><span class="o">|</span><span class="nb">str</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ResidueSelection</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Prepares the residue_selection parameter for the select() function.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            residue_selection (ResidueSelection|str): The residues to be excluded from selection. Can be a ResidueSelection object or a string.</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[ResidueSelection]: A list of ResidueSelection objects for each pose.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If the residue_selection parameter is not of a supported type.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; residue_selection_list = selector.prep_residue_selection(residue_selection=&#39;selected_residues&#39;, poses=poses)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">poses</span><span class="o">.</span><span class="n">check_prefix</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">poses</span><span class="p">[</span><span class="n">residue_selection</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">residue_selection</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported argument type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">)</span><span class="si">}</span><span class="s2"> for NotSelector.select(). Only ResidueSelection or &#39;str&#39; (column in poses.df) are allowed.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NotSelector.select">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.NotSelector.select">[docs]</a>
+    <span class="k">def</span> <span class="nf">select</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">residue_selection</span><span class="p">:</span> <span class="n">ResidueSelection</span><span class="o">|</span><span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">contig</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Selects all residues except the ones specified in residue_selection or by contig.</span>
+
+<span class="sd">        The parameter residue_selection can be either a ResidueSelection object or a string pointing to a column in the poses.df that contains ResidueSelection objects.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            prefix (str): The name of the column that will be added to Poses.df.</span>
+<span class="sd">            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.</span>
+<span class="sd">            residue_selection (ResidueSelection|str, optional): The residues to be excluded from selection. Defaults to None.</span>
+<span class="sd">            contig (str, optional): A string specifying the residues to be excluded in a contig format. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no poses are provided or set in the instance.</span>
+<span class="sd">            ValueError: If both residue_selection and contig are provided.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selector.select(prefix=&#39;not_selected&#39;, residue_selection=&#39;selected_residues&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># error handling</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">poses</span> <span class="o">:=</span> <span class="n">poses</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">residue_selection</span> <span class="ow">and</span> <span class="n">contig</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;NotSelector Class cannot be initialized with both parameters :contig: or :residue_selection: set.</span><span class="se">\n</span><span class="s2"> Either choose a residue_selection, or give the residue selectio as a contig, but not both.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># prep inputs and run</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">check_prefix</span><span class="p">(</span><span class="n">prefix</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">contig</span><span class="p">:</span>
+            <span class="n">residue_selection</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">residues</span><span class="o">.</span><span class="n">from_contig</span><span class="p">(</span><span class="n">input_contig</span><span class="o">=</span><span class="n">contig</span><span class="p">)</span>
+
+        <span class="c1"># prep residue_selection</span>
+        <span class="n">residue_selection_list</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_residue_selection</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">,</span> <span class="n">poses</span><span class="p">)</span>
+
+        <span class="c1"># select</span>
+        <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">prefix</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">select_single</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">res_sel</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">res_sel</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">residue_selection_list</span><span class="p">)]</span></div>
+
+
+<div class="viewcode-block" id="NotSelector.select_single">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.residue_selectors.NotSelector.select_single">[docs]</a>
+    <span class="k">def</span> <span class="nf">select_single</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">residue_selection</span><span class="p">:</span> <span class="n">ResidueSelection</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResidueSelection</span><span class="p">:</span> <span class="c1"># pylint: disable=W0221</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Selects all residues except the ones specified in residue_selection or by contig.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose_path (str): The file path to the pose structure.</span>
+<span class="sd">            residue_selection (ResidueSelection): The residues to be excluded from selection.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ResidueSelection: The selected residues of the pose.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; selection = selector.select_single(pose_path=&#39;path/to/pose.pdb&#39;, residue_selection=residue_selection)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">pose</span> <span class="o">=</span> <span class="n">load_structure_from_pdbfile</span><span class="p">(</span><span class="n">pose_path</span><span class="p">)</span>
+
+        <span class="c1"># load all residues form the pose</span>
+        <span class="n">all_res</span> <span class="o">=</span> <span class="n">ResidueSelection</span><span class="p">([</span><span class="n">residue</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">id</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">residue</span><span class="o">.</span><span class="n">id</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">pose</span><span class="o">.</span><span class="n">get_residues</span><span class="p">()])</span>
+
+        <span class="c1"># select not_selection:</span>
+        <span class="k">return</span> <span class="n">all_res</span> <span class="o">-</span> <span class="n">residue_selection</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

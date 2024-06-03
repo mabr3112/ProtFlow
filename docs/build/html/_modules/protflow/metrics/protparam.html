@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.metrics.protparam &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.metrics.protparam</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.metrics.protparam</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">ProtParam Module</span>
+<span class="sd">================</span>
+
+<span class="sd">This module provides the functionality to integrate ProtParam calculations within the ProtFlow framework. It offers tools to compute various protein sequence features using the BioPython `Bio.SeqUtils.ProtParam` module, handling inputs and outputs efficiently, and processing the resulting data in a structured and automated manner.</span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `ProtParam` class encapsulates the functionality necessary to execute ProtParam calculations. It manages the configuration of paths to essential scripts and Python executables, sets up the environment, and handles the execution of parameter calculations. It also includes methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.</span>
+<span class="sd">The module is designed to streamline the integration of ProtParam into larger computational workflows. It supports the automatic setup of job parameters, execution of ProtParam commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create an instance of the `ProtParam` class and invoke its `run` method with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the ProtParam process is provided through various parameters, allowing for customized runs tailored to specific research needs.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `ProtParam` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from protparam import ProtParam</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the ProtParam class</span>
+<span class="sd">    protparam = ProtParam()</span>
+
+<span class="sd">    # Run the ProtParam calculation process</span>
+<span class="sd">    results = protparam.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        seq_col=None,</span>
+<span class="sd">        pH=7,</span>
+<span class="sd">        overwrite=True,</span>
+<span class="sd">        jobstarter=jobstarter</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the ProtParam process.</span>
+<span class="sd">    - Customizability: Users can customize the ProtParam process through multiple parameters, including the pH for determining protein total charge, specific options for the ProtParam script, and options for handling pose-specific parameters.</span>
+<span class="sd">    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate ProtParam calculations into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Authors</span>
+<span class="sd">-------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># import general</span>
+<span class="kn">import</span> <span class="nn">os</span>
+
+<span class="c1"># import dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="c1"># import customs</span>
+<span class="kn">from</span> <span class="nn">protflow.config</span> <span class="kn">import</span> <span class="n">PROTFLOW_ENV</span>
+<span class="kn">from</span> <span class="nn">protflow.config</span> <span class="kn">import</span> <span class="n">AUXILIARY_RUNNER_SCRIPTS_DIR</span> <span class="k">as</span> <span class="n">script_dir</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">RunnerOutput</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+<span class="kn">from</span> <span class="nn">protflow.utils.biopython_tools</span> <span class="kn">import</span> <span class="n">get_sequence_from_pose</span><span class="p">,</span> <span class="n">load_sequence_from_fasta</span><span class="p">,</span> <span class="n">load_structure_from_pdbfile</span>
+
+<div class="viewcode-block" id="ProtParam">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.protparam.ProtParam">[docs]</a>
+<span class="k">class</span> <span class="nc">ProtParam</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    Class handling the calculation of protparams from sequence using the BioPython Bio.SeqUtils.ProtParam module</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+<div class="viewcode-block" id="ProtParam.__init__">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.protparam.ProtParam.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">default_python</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROTFLOW_ENV</span><span class="p">,</span> <span class="s2">&quot;python3&quot;</span><span class="p">)):</span> <span class="c1"># pylint: disable=W0102</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the ProtParam class.</span>
+
+<span class="sd">        This constructor sets up the necessary environment for running ProtParam calculations. It initializes the job starter and sets the path to the Python executable within the ProtFlow environment.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        jobstarter : str, optional</span>
+<span class="sd">            The job starter to be used for executing ProtParam commands. If not provided, it defaults to None.</span>
+<span class="sd">        default_python : str, optional</span>
+<span class="sd">            The path to the Python executable within the ProtFlow environment. The default value is constructed using the PROTFLOW_ENV environment variable.</span>
+
+<span class="sd">        Attributes</span>
+<span class="sd">        ----------</span>
+<span class="sd">        jobstarter : str</span>
+<span class="sd">            Stores the job starter to be used for executing ProtParam commands.</span>
+<span class="sd">        python : str</span>
+<span class="sd">            The path to the Python executable within the ProtFlow environment.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        FileNotFoundError</span>
+<span class="sd">            If the default Python executable is not found in the specified path.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to initialize the `ProtParam` class:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            from protparam import ProtParam</span>
+
+<span class="sd">            # Initialize the ProtParam class with default settings</span>
+<span class="sd">            protparam = ProtParam()</span>
+
+<span class="sd">            # Initialize the ProtParam class with a specific job starter</span>
+<span class="sd">            custom_jobstarter = &quot;my_custom_jobstarter&quot;</span>
+<span class="sd">            protparam = ProtParam(jobstarter=custom_jobstarter)</span>
+
+<span class="sd">        The `__init__` method ensures that the ProtParam class is ready to perform protein sequence parameter calculations within the ProtFlow framework, setting up the environment and configurations necessary for successful execution.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_path</span><span class="p">(</span><span class="n">default_python</span><span class="p">,</span> <span class="s2">&quot;PROTFLOW_ENV&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;protparam.py&quot;</span>
+
+    <span class="c1">########################## Calculations ################################################</span>
+<div class="viewcode-block" id="ProtParam.run">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.protparam.ProtParam.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">seq_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pH</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">7</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        ProtParam Class</span>
+<span class="sd">        ===============</span>
+
+<span class="sd">        The `ProtParam` class is a specialized class designed to facilitate the calculation of protein sequence parameters within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with ProtParam calculations.</span>
+
+<span class="sd">        Detailed Description</span>
+<span class="sd">        --------------------</span>
+<span class="sd">        The `ProtParam` class manages all aspects of running ProtParam calculations. It handles the configuration of necessary scripts and executables, prepares the environment for sequence feature calculations, and executes the ProtParam commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">        Key functionalities include:</span>
+<span class="sd">            - Setting up paths to ProtParam scripts and Python executables.</span>
+<span class="sd">            - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">            - Handling the execution of ProtParam commands with support for various input types.</span>
+<span class="sd">            - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">            - Customizing the sequence feature calculations based on user-defined parameters such as pH.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        An instance of the `ProtParam` class, configured to run ProtParam calculations and handle outputs efficiently.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">            - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">            - TypeError: If the input poses are not of the expected type.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to initialize and use the `ProtParam` class:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            from protflow.poses import Poses</span>
+<span class="sd">            from protflow.jobstarters import JobStarter</span>
+<span class="sd">            from protparam import ProtParam</span>
+
+<span class="sd">            # Create instances of necessary classes</span>
+<span class="sd">            poses = Poses()</span>
+<span class="sd">            jobstarter = JobStarter()</span>
+
+<span class="sd">            # Initialize the ProtParam class</span>
+<span class="sd">            protparam = ProtParam()</span>
+
+<span class="sd">            # Run the ProtParam calculation process</span>
+<span class="sd">            results = protparam.run(</span>
+<span class="sd">                poses=poses,</span>
+<span class="sd">                prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                seq_col=None,</span>
+<span class="sd">                pH=7,</span>
+<span class="sd">                overwrite=True,</span>
+<span class="sd">                jobstarter=jobstarter</span>
+<span class="sd">            )</span>
+
+<span class="sd">            # Access and process the results</span>
+<span class="sd">            print(results)</span>
+
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">            - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">            - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the ProtParam calculations to their specific needs.</span>
+<span class="sd">            - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">        The ProtParam class is intended for researchers and developers who need to perform ProtParam calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_protparam.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">scores</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">seq_col</span><span class="p">:</span>
+            <span class="c1"># check poses file extension</span>
+            <span class="n">pose_type</span> <span class="o">=</span> <span class="n">poses</span><span class="o">.</span><span class="n">determine_pose_type</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pose_type</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses must be of a single type, not </span><span class="si">{</span><span class="n">pose_type</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pose_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;.fa&quot;</span><span class="p">,</span> <span class="s2">&quot;.fasta&quot;</span><span class="p">,</span> <span class="s2">&quot;.pdb&quot;</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses must be of type &#39;.fa&#39;, &#39;.fasta&#39; or &#39;.pdb&#39;, not </span><span class="si">{</span><span class="n">pose_type</span><span class="si">}</span><span class="s2">!&quot;</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">pose_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;.fa&quot;</span><span class="p">,</span> <span class="s2">&quot;.fasta&quot;</span><span class="p">]:</span>
+                <span class="c1"># directly use fasta files as input</span>
+                <span class="c1"># TODO: this assumes that it is a single entry fasta file (as it should be!)</span>
+                <span class="n">seqs</span> <span class="o">=</span> <span class="p">[</span><span class="n">load_sequence_from_fasta</span><span class="p">(</span><span class="n">fasta</span><span class="o">=</span><span class="n">pose</span><span class="p">,</span> <span class="n">return_multiple_entries</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">seq</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()]</span>     
+            <span class="k">elif</span> <span class="n">pose_type</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;.pdb&quot;</span><span class="p">:</span>
+                <span class="c1"># extract sequences from pdbs</span>
+                <span class="n">seqs</span> <span class="o">=</span> <span class="p">[</span><span class="n">get_sequence_from_pose</span><span class="p">(</span><span class="n">load_structure_from_pdbfile</span><span class="p">(</span><span class="n">path_to_pdb</span><span class="o">=</span><span class="n">pose</span><span class="p">))</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># if not running on poses but on arbitrary sequences, get the sequences from the dataframe</span>
+            <span class="n">seqs</span> <span class="o">=</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">seq_col</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+
+        <span class="n">names</span> <span class="o">=</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses_description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+
+        <span class="n">input_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">names</span><span class="p">,</span> <span class="s2">&quot;sequence&quot;</span><span class="p">:</span> <span class="n">seqs</span><span class="p">})</span>
+
+        <span class="n">num_json_files</span> <span class="o">=</span> <span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span>
+        <span class="k">if</span> <span class="n">num_json_files</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_df</span><span class="o">.</span><span class="n">index</span><span class="p">):</span>
+            <span class="n">num_json_files</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span>
+
+        <span class="n">json_files</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># create multiple input dataframes to run in parallel</span>
+        <span class="k">if</span> <span class="n">num_json_files</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">df</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="n">input_df</span><span class="p">,</span> <span class="n">num_json_files</span><span class="p">)):</span>
+                <span class="n">name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;input_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">.json&quot;</span><span class="p">)</span>
+                <span class="n">df</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+                <span class="n">json_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;input_1.json&quot;</span><span class="p">)</span>
+            <span class="n">input_df</span><span class="o">.</span><span class="n">to_json</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">json_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="c1"># write commands</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">json</span> <span class="ow">in</span> <span class="n">json_files</span><span class="p">:</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">python</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">script_dir</span><span class="si">}</span><span class="s2">/run_protparam.py --input_json </span><span class="si">{</span><span class="n">json</span><span class="si">}</span><span class="s2"> --output_path </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">json</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">_out.json --pH </span><span class="si">{</span><span class="n">pH</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># run command</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span> <span class="o">=</span> <span class="s2">&quot;protparam&quot;</span><span class="p">,</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">work_dir</span>
+        <span class="p">)</span>
+
+        <span class="c1"># collect scores</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">json</span> <span class="ow">in</span> <span class="n">json_files</span><span class="p">:</span>
+            <span class="n">scores</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">read_json</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">json</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">_out.json&quot;</span><span class="p">))</span>
+
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">scores</span><span class="p">)</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">scores</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[[</span><span class="s1">&#39;poses&#39;</span><span class="p">,</span> <span class="s1">&#39;poses_description&#39;</span><span class="p">]],</span> <span class="n">left_on</span><span class="o">=</span><span class="s2">&quot;description&quot;</span><span class="p">,</span> <span class="n">right_on</span><span class="o">=</span><span class="s2">&quot;poses_description&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s1">&#39;poses_description&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">scores</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;poses&quot;</span><span class="p">:</span> <span class="s2">&quot;location&quot;</span><span class="p">})</span>
+
+        <span class="c1"># write output scorefile</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="c1"># create standardised output for poses class:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

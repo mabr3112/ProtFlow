@@ -31,3 +31,6 @@ Add the paths of your tool's python evironments and their scripts into this file
 # Overview
 ![protflow_organigramm drawio (1)](https://github.com/TecnomaLaser/ProtFlow/assets/45593003/3842712a-2399-4e3c-9c90-1525ad6b6690)
 
+# Documentation
+ProtFlow is documented with read-the-docs and sphinx. The documentation can be found here:
+https://protflow.readthedocs.io/en/latest/

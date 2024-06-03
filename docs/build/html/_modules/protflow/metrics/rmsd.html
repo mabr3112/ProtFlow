@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.metrics.rmsd &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.metrics.rmsd</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.metrics.rmsd</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">RMSD Module</span>
+<span class="sd">===========</span>
+
+<span class="sd">This module provides the functionality to calculate Root Mean Square Deviation (RMSD) values for protein structures within the ProtFlow framework. It offers tools to run RMSD calculations, handle inputs and outputs, and process the resulting data in a structured and automated manner.</span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `BackboneRMSD` and `MotifRMSD` classes encapsulate the functionality necessary to execute RMSD calculations. These classes manage the configuration of paths to essential scripts and Python executables, set up the environment, and handle the execution of RMSD calculations. They also include methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.</span>
+
+<span class="sd">The module is designed to streamline the integration of RMSD calculations into larger computational workflows. It supports the automatic setup of job parameters, execution of RMSD commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create an instance of the `BackboneRMSD` or `MotifRMSD` class and invoke their `run` methods with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the RMSD calculation process is provided through various parameters, allowing for customized runs tailored to specific research needs.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `BackboneRMSD` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from rmsd import BackboneRMSD</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the BackboneRMSD class</span>
+<span class="sd">    backbone_rmsd = BackboneRMSD()</span>
+
+<span class="sd">    # Run the RMSD calculation</span>
+<span class="sd">    results = backbone_rmsd.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        jobstarter=jobstarter,</span>
+<span class="sd">        ref_col=&quot;reference&quot;,</span>
+<span class="sd">        chains=[&quot;A&quot;, &quot;B&quot;],</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the RMSD calculation process.</span>
+<span class="sd">    - Customizability: Users can customize the RMSD calculation process through multiple parameters, including the specific atoms and chains to be used in the calculation, as well as jobstarter configurations.</span>
+<span class="sd">    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate RMSD calculations into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Author</span>
+<span class="sd">------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># import general</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Any</span>
+
+<span class="c1"># import dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">protflow</span>
+
+<span class="c1"># import customs</span>
+<span class="kn">from</span> <span class="nn">protflow.config</span> <span class="kn">import</span> <span class="n">PROTFLOW_ENV</span>
+<span class="kn">from</span> <span class="nn">protflow.config</span> <span class="kn">import</span> <span class="n">AUXILIARY_RUNNER_SCRIPTS_DIR</span> <span class="k">as</span> <span class="n">script_dir</span>
+<span class="kn">from</span> <span class="nn">protflow.residues</span> <span class="kn">import</span> <span class="n">ResidueSelection</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">RunnerOutput</span><span class="p">,</span> <span class="n">col_in_df</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span><span class="p">,</span> <span class="n">split_list</span>
+
+<div class="viewcode-block" id="BackboneRMSD">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.BackboneRMSD">[docs]</a>
+<span class="k">class</span> <span class="nc">BackboneRMSD</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    BackboneRMSD Class</span>
+<span class="sd">    ==================</span>
+
+<span class="sd">    The `BackboneRMSD` class is a specialized class designed to facilitate the calculation of backbone RMSD values within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with RMSD calculations.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `BackboneRMSD` class manages all aspects of calculating RMSD for protein backbones. It handles the configuration of necessary scripts and executables, prepares the environment for RMSD calculations, and executes the commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to RMSD calculation scripts and Python executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of RMSD commands with support for different atoms and chains.</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">        - Managing overwrite options and handling existing score files.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `BackboneRMSD` class, configured to run RMSD calculations and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">        - TypeError: If atoms or chains are not of the expected type.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `BackboneRMSD` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from rmsd import BackboneRMSD</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = LocalJobStarter(max_cores=4)</span>
+
+<span class="sd">        # Initialize the BackboneRMSD class</span>
+<span class="sd">        backbone_rmsd = BackboneRMSD()</span>
+
+<span class="sd">        # Run the RMSD calculation</span>
+<span class="sd">        results = backbone_rmsd.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            ref_col=&quot;reference_location&quot;,</span>
+<span class="sd">            chains=[&quot;A&quot;, &quot;B&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the RMSD calculation process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="BackboneRMSD.__init__">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.BackboneRMSD.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">atoms</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;CA&quot;</span><span class="p">],</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span> <span class="c1"># pylint: disable=W0102</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the BackboneRMSD class.</span>
+
+<span class="sd">        This constructor sets up the BackboneRMSD instance with default or provided parameters. It configures the reference column, atoms, chains, jobstarter, and overwrite options for RMSD calculations.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.</span>
+<span class="sd">            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to [&quot;CA&quot;].</span>
+<span class="sd">            chains (list[str], optional): The list of chain names to calculate RMSD over. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+<span class="sd">            jobstarter (str, optional): The jobstarter configuration for running the RMSD calculations. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize the BackboneRMSD class:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rmsd import BackboneRMSD</span>
+
+<span class="sd">                # Initialize the BackboneRMSD class with default parameters</span>
+<span class="sd">                backbone_rmsd = BackboneRMSD()</span>
+
+<span class="sd">                # Initialize the BackboneRMSD class with custom parameters</span>
+<span class="sd">                backbone_rmsd = BackboneRMSD(ref_col=&quot;reference&quot;, atoms=[&quot;CA&quot;, &quot;CB&quot;], chains=[&quot;A&quot;, &quot;B&quot;], overwrite=True, jobstarter=&quot;custom_starter&quot;)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Default Values:** If no parameters are provided, the class initializes with default values suitable for basic RMSD calculations.</span>
+<span class="sd">            - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.</span>
+<span class="sd">            - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_ref_col</span><span class="p">(</span><span class="n">ref_col</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_atoms</span><span class="p">(</span><span class="n">atoms</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_chains</span><span class="p">(</span><span class="n">chains</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_jobstarter</span><span class="p">(</span><span class="n">jobstarter</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">overwrite</span> <span class="o">=</span> <span class="n">overwrite</span></div>
+
+
+    <span class="c1">########################## Input ################################################</span>
+<div class="viewcode-block" id="BackboneRMSD.set_ref_col">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.BackboneRMSD.set_ref_col">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_ref_col</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the reference column for RMSD calculations.</span>
+
+<span class="sd">        This method sets the default reference column to be used in the RMSD calculation process.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            ref_col (str): The reference column for RMSD calculations.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ref_col is not of type string.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `set_ref_col` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rmsd import BackboneRMSD</span>
+
+<span class="sd">                # Initialize the BackboneRMSD class</span>
+<span class="sd">                backbone_rmsd = BackboneRMSD()</span>
+
+<span class="sd">                # Set the reference column</span>
+<span class="sd">                backbone_rmsd.set_ref_col(&quot;reference&quot;)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Usage:** The reference column is used to identify which column in the input data contains the reference structures for RMSD calculation.</span>
+<span class="sd">            - **Validation:** The method includes validation to ensure that the reference column is of the correct type.</span>
+<span class="sd">            - **Integration:** The reference column set by this method is used by other methods in the class to perform RMSD calculations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_col</span> <span class="o">=</span> <span class="n">ref_col</span></div>
+
+
+<div class="viewcode-block" id="BackboneRMSD.set_atoms">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.BackboneRMSD.set_atoms">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_atoms</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">atoms</span><span class="p">:</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the atoms for RMSD calculations.</span>
+
+<span class="sd">        This method sets the list of atom names to calculate RMSD over. If &quot;all&quot; is provided, all atoms will be considered.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            atoms (list[str]): The list of atom names to calculate RMSD over.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If atoms is not a list of strings.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `set_atoms` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rmsd import BackboneRMSD</span>
+
+<span class="sd">                # Initialize the BackboneRMSD class</span>
+<span class="sd">                backbone_rmsd = BackboneRMSD()</span>
+
+<span class="sd">                # Set the atoms for RMSD calculation</span>
+<span class="sd">                backbone_rmsd.set_atoms([&quot;CA&quot;, &quot;CB&quot;])</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Usage:** The list of atoms specifies which atoms in the protein backbone will be considered during RMSD calculations.</span>
+<span class="sd">            - **Validation:** The method includes validation to ensure that the atoms parameter is a list of strings, representing valid atom names.</span>
+<span class="sd">            - **Flexibility:** Users can specify any set of atoms or choose to include all atoms by setting the parameter to &quot;all&quot;.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">atoms</span> <span class="o">==</span> <span class="s2">&quot;all&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">atoms</span> <span class="o">=</span> <span class="s2">&quot;all&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">atoms</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">((</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">atom</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">atom</span> <span class="ow">in</span> <span class="n">atoms</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atoms needs to be a list, atom names (list elements) must be string.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">atoms</span> <span class="o">=</span> <span class="n">atoms</span></div>
+
+
+<div class="viewcode-block" id="BackboneRMSD.set_chains">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.BackboneRMSD.set_chains">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_chains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the chains for RMSD calculations.</span>
+
+<span class="sd">        This method sets the list of chain names to calculate RMSD over. It ensures that the provided chains parameter is a list of strings or a single string representing chain names.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            chains (list[str] or str): The list of chain names or a single chain name to calculate RMSD over.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If chains is not a list of strings or a single string.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `set_chains` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rmsd import BackboneRMSD</span>
+
+<span class="sd">                # Initialize the BackboneRMSD class</span>
+<span class="sd">                backbone_rmsd = BackboneRMSD()</span>
+
+<span class="sd">                # Set the chains for RMSD calculation</span>
+<span class="sd">                backbone_rmsd.set_chains([&quot;A&quot;, &quot;B&quot;])</span>
+
+<span class="sd">                # Alternatively, set a single chain</span>
+<span class="sd">                backbone_rmsd.set_chains(&quot;A&quot;)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Usage:** The chains parameter specifies which chains in the protein structure will be considered during RMSD calculations.</span>
+<span class="sd">            - **Validation:** The method includes validation to ensure that the chains parameter is either a list of strings or a single string, representing valid chain names.</span>
+<span class="sd">            - **Flexibility:** Users can specify multiple chains as a list or a single chain as a string, providing flexibility in how the RMSD calculations are configured.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">chains</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chains</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">chains</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chains</span> <span class="o">=</span> <span class="p">[</span><span class="n">chains</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">((</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">chain</span> <span class="ow">in</span> <span class="n">chains</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Chains needs to be a list, chain names (list elements) must be string.&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">chains</span> <span class="o">=</span> <span class="n">chains</span></div>
+
+
+<div class="viewcode-block" id="BackboneRMSD.set_jobstarter">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.BackboneRMSD.set_jobstarter">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_jobstarter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the jobstarter configuration for the BackboneRMSD runner.</span>
+
+<span class="sd">        This method sets the jobstarter configuration to be used in the RMSD calculation process.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            jobstarter (JobStarter): The jobstarter configuration for running the RMSD calculations.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If jobstarter is not of type JobStarter.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `set_jobstarter` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rmsd import BackboneRMSD</span>
+
+<span class="sd">                # Initialize the BackboneRMSD class</span>
+<span class="sd">                backbone_rmsd = BackboneRMSD()</span>
+
+<span class="sd">                # Set the jobstarter configuration</span>
+<span class="sd">                backbone_rmsd.set_jobstarter(&quot;custom_starter&quot;)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Usage:** The jobstarter configuration specifies how the RMSD calculations will be managed and executed, particularly in HPC environments.</span>
+<span class="sd">            - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.</span>
+<span class="sd">            - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">JobStarter</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">jobstarter</span><span class="p">)</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span></div>
+
+
+    <span class="c1">########################## Calculations ################################################</span>
+<div class="viewcode-block" id="BackboneRMSD.run">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.BackboneRMSD.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate the backbone RMSD for given poses and jobstarter configuration.</span>
+
+<span class="sd">        This method sets up and runs the RMSD calculation process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+<span class="sd">            chains (list[str], optional): A list of chain names to calculate RMSD over. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the method.</span>
+<span class="sd">            TypeError: If chains are not of the expected type.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `run` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from rmsd import BackboneRMSD</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = LocalJobStarter(max_cores=4)</span>
+
+<span class="sd">                # Initialize the BackboneRMSD class</span>
+<span class="sd">                backbone_rmsd = BackboneRMSD()</span>
+
+<span class="sd">                # Run the RMSD calculation</span>
+<span class="sd">                results = backbone_rmsd.run(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    ref_col=&quot;reference&quot;,</span>
+<span class="sd">                    chains=[&quot;A&quot;, &quot;B&quot;],</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(results)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It supports splitting poses into sublists for parallel processing.</span>
+<span class="sd">            - **Input Handling:** The method prepares input JSON files for each sublist of poses and constructs commands for running RMSD calculations using BioPython.</span>
+<span class="sd">            - **Output Management:** The method handles the collection and processing of output data from multiple score files, concatenating them into a single DataFrame and saving the results.</span>
+<span class="sd">            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the RMSD calculation process to their specific needs, including specifying atoms and chains for RMSD calculations.</span>
+
+<span class="sd">        This method is designed to streamline the execution of backbone RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze RMSD calculations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># if self.atoms is all, calculate Allatom RMSD.</span>
+
+        <span class="c1"># prep variables</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="n">ref_col</span> <span class="o">=</span> <span class="n">ref_col</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_col</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_rmsd.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># check if RMSD was calculated if overwrite was not set.</span>
+        <span class="n">overwrite</span> <span class="o">=</span> <span class="n">overwrite</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">overwrite</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">output_df</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">output_df</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+
+        <span class="c1"># split poses into number of max_cores lists</span>
+        <span class="n">num_json_files</span> <span class="o">=</span> <span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span>
+        <span class="n">pose_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]):</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">ref_col</span><span class="p">])</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">}</span>
+        <span class="n">pose_sublists</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">jobstarters</span><span class="o">.</span><span class="n">split_list</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">n_sublists</span><span class="o">=</span><span class="n">num_json_files</span><span class="p">)</span>
+
+        <span class="c1"># setup inputs to calc_rmsd.py</span>
+        <span class="n">json_files</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">scorefiles</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">sublist</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pose_sublists</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># create json dict:</span>
+            <span class="n">json_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pose</span><span class="p">:</span> <span class="n">pose_dict</span><span class="p">[</span><span class="n">pose</span><span class="p">]</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">sublist</span><span class="p">}</span>
+
+            <span class="c1"># write to file</span>
+            <span class="n">json_file</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/rmsd_input_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="si">}</span><span class="s2">.json&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">json_file</span><span class="p">,</span> <span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">json_dict</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">json_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">json_file</span><span class="p">)</span>
+
+            <span class="c1"># write scorefile and cmd</span>
+            <span class="n">scorefiles</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sf</span> <span class="o">:=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/rmsd_input_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="si">}</span><span class="s2">_scores.json&quot;</span><span class="p">))</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROTFLOW_ENV</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;python3&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">script_dir</span><span class="si">}</span><span class="s2">/calc_rmsd.py --input_json </span><span class="si">{</span><span class="n">json_file</span><span class="si">}</span><span class="s2"> --output_path </span><span class="si">{</span><span class="n">sf</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># add options to cmds:</span>
+        <span class="n">chains</span> <span class="o">=</span> <span class="n">chains</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">chains</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">atoms</span><span class="p">:</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="n">cmd</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot; --atoms=&#39;</span><span class="si">{</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">atoms</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span> <span class="k">for</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">cmds</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">chains</span><span class="p">:</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="n">cmd</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot; --chains=&#39;</span><span class="si">{</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">chains</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span> <span class="k">for</span> <span class="n">cmd</span> <span class="ow">in</span> <span class="n">cmds</span><span class="p">]</span>
+
+        <span class="c1"># run command</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span> <span class="o">=</span> <span class="s2">&quot;backbone_rmsd&quot;</span><span class="p">,</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">work_dir</span>
+        <span class="p">)</span>
+
+        <span class="c1"># collect individual DataFrames into one</span>
+        <span class="n">output_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">pd</span><span class="o">.</span><span class="n">read_json</span><span class="p">(</span><span class="n">sf</span><span class="p">)</span> <span class="k">for</span> <span class="n">sf</span> <span class="ow">in</span> <span class="n">scorefiles</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">output_df</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="c1"># create standardised output for poses class:</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+            <span class="n">results</span> <span class="o">=</span> <span class="n">output_df</span><span class="p">,</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="BackboneRMSD.calc_all_atom_rmsd">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.BackboneRMSD.calc_all_atom_rmsd">[docs]</a>
+    <span class="k">def</span> <span class="nf">calc_all_atom_rmsd</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Method to calculate all-atom RMSD between poses&#39;&#39;&#39;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+</div>
+
+
+<div class="viewcode-block" id="MotifRMSD">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD">[docs]</a>
+<span class="k">class</span> <span class="nc">MotifRMSD</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    MotifRMSD Class</span>
+<span class="sd">    ===============</span>
+
+<span class="sd">    The `MotifRMSD` class is a specialized class designed to facilitate the calculation of RMSD values for specific motifs within protein structures in the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with motif-specific RMSD calculations.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `MotifRMSD` class manages all aspects of calculating RMSD for specified motifs within protein structures. It handles the configuration of necessary scripts and executables, prepares the environment for RMSD calculations, and executes the commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to motif RMSD calculation scripts and Python executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of RMSD commands with support for various motifs and chains.</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">        - Managing overwrite options and handling existing score files.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `MotifRMSD` class, configured to run motif RMSD calculations and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">        - TypeError: If motifs or chains are not of the expected type.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `MotifRMSD` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from rmsd import MotifRMSD</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the MotifRMSD class</span>
+<span class="sd">        motif_rmsd = MotifRMSD()</span>
+
+<span class="sd">        # Run the motif RMSD calculation</span>
+<span class="sd">        results = motif_rmsd.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_2&quot;,</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            ref_col=&quot;reference&quot;,</span>
+<span class="sd">            ref_motif=&quot;motif_A&quot;,</span>
+<span class="sd">            target_motif=&quot;motif_B&quot;,</span>
+<span class="sd">            atoms=[&quot;CA&quot;, &quot;CB&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the motif RMSD calculation process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The MotifRMSD class is intended for researchers and developers who need to perform RMSD calculations for specific motifs as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="MotifRMSD.__init__">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">target_motif</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ref_motif</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">target_chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ref_chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the MotifRMSD class.</span>
+
+<span class="sd">        This constructor sets up the MotifRMSD instance with default or provided parameters. It configures the reference column, target motif, reference motif, target chains, reference chains, jobstarter, and overwrite options for RMSD calculations.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.</span>
+<span class="sd">            target_motif (str, optional): The target motif for RMSD calculations. Defaults to None.</span>
+<span class="sd">            ref_motif (str, optional): The reference motif for RMSD calculations. Defaults to None.</span>
+<span class="sd">            target_chains (list[str], optional): The list of chain names for the target motif. Defaults to None.</span>
+<span class="sd">            ref_chains (list[str], optional): The list of chain names for the reference motif. Defaults to None.</span>
+<span class="sd">            jobstarter (JobStarter, optional): The jobstarter configuration for running the RMSD calculations. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize the MotifRMSD class:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rmsd import MotifRMSD</span>
+
+<span class="sd">                # Initialize the MotifRMSD class with default parameters</span>
+<span class="sd">                motif_rmsd = MotifRMSD()</span>
+
+<span class="sd">                # Initialize the MotifRMSD class with custom parameters</span>
+<span class="sd">                motif_rmsd = MotifRMSD(</span>
+<span class="sd">                    ref_col=&quot;reference&quot;,</span>
+<span class="sd">                    target_motif=&quot;motif_A&quot;,</span>
+<span class="sd">                    ref_motif=&quot;motif_B&quot;,</span>
+<span class="sd">                    target_chains=[&quot;A&quot;],</span>
+<span class="sd">                    ref_chains=[&quot;B&quot;],</span>
+<span class="sd">                    jobstarter=JobStarter(),</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Default Values:** If no parameters are provided, the class initializes with default values suitable for basic motif-specific RMSD calculations.</span>
+<span class="sd">            - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.</span>
+<span class="sd">            - **Custom Configuration:** Users can customize the motif RMSD calculation process by providing specific values for the reference column, target motif, reference motif, target chains, reference chains, jobstarter, and overwrite option.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1">#TODO implement MotifRMSD calculation based on Chain input (Should work now with a ChainSelector)!</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_jobstarter</span><span class="p">(</span><span class="n">jobstarter</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">overwrite</span> <span class="o">=</span> <span class="n">overwrite</span>
+
+        <span class="c1"># motif settings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_ref_col</span><span class="p">(</span><span class="n">ref_col</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_target_motif</span><span class="p">(</span><span class="n">target_motif</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_ref_motif</span><span class="p">(</span><span class="n">ref_motif</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_target_chains</span><span class="p">(</span><span class="n">target_chains</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_ref_chains</span><span class="p">(</span><span class="n">ref_chains</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;Heavyatom motif rmsd calculator&quot;</span>
+
+<div class="viewcode-block" id="MotifRMSD.set_ref_col">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.set_ref_col">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_ref_col</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the reference column for RMSD calculations.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            col (str): The reference column name.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_col</span> <span class="o">=</span> <span class="n">col</span></div>
+
+
+<div class="viewcode-block" id="MotifRMSD.set_target_motif">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.set_target_motif">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_target_motif</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">motif</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Method to set target motif. :motif: has to be string and should be a column name in poses.df that will be passed to the .run() function&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_motif</span> <span class="o">=</span> <span class="n">motif</span></div>
+
+
+<div class="viewcode-block" id="MotifRMSD.set_ref_motif">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.set_ref_motif">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_ref_motif</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">motif</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Method to set reference motif. :motif: has to be string and should be a column name in poses.df that will be passed to the .run() function&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_motif</span> <span class="o">=</span> <span class="n">motif</span></div>
+
+
+<div class="viewcode-block" id="MotifRMSD.set_jobstarter">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.set_jobstarter">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_jobstarter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the jobstarter configuration for the MotifRMSD runner.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            jobstarter (JobStarter): The jobstarter configuration.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If jobstarter is not of type JobStarter.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">JobStarter</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">jobstarter</span><span class="p">)</span><span class="si">}</span><span class="s2"> for parameter :jobstarter:. Has to be of type JobStarter!&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="MotifRMSD.set_target_chains">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.set_target_chains">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_target_chains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the target chains for RMSD calculations.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            chains (list[str]): The list of target chain names.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">target_chains</span> <span class="o">=</span> <span class="n">chains</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">chains</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="MotifRMSD.set_ref_chains">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.set_ref_chains">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_ref_chains</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">chains</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set the reference chains for RMSD calculations.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            chains (list[str]): The list of reference chain names.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ref_chains</span> <span class="o">=</span> <span class="n">chains</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">chains</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">chains</span><span class="p">]</span></div>
+
+
+    <span class="c1">################################################# Calcs ################################################</span>
+<div class="viewcode-block" id="MotifRMSD.run">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">ref_motif</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">target_motif</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">atoms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Calculate the motif-specific RMSD for given poses and jobstarter configuration.</span>
+
+<span class="sd">        This method sets up and runs the motif-specific RMSD calculation process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+<span class="sd">            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.</span>
+<span class="sd">            ref_motif (Any, optional): The reference motif for RMSD calculations. Defaults to None.</span>
+<span class="sd">            target_motif (Any, optional): The target motif for RMSD calculations. Defaults to None.</span>
+<span class="sd">            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the method.</span>
+<span class="sd">            TypeError: If motifs or atoms are not of the expected type.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `run` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from rmsd import MotifRMSD</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the MotifRMSD class</span>
+<span class="sd">                motif_rmsd = MotifRMSD()</span>
+
+<span class="sd">                # Run the motif RMSD calculation</span>
+<span class="sd">                results = motif_rmsd.run(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_2&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    ref_col=&quot;reference&quot;,</span>
+<span class="sd">                    ref_motif=&quot;motif_A&quot;,</span>
+<span class="sd">                    target_motif=&quot;motif_B&quot;,</span>
+<span class="sd">                    atoms=[&quot;CA&quot;, &quot;CB&quot;],</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(results)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It supports splitting poses into sublists for parallel processing.</span>
+<span class="sd">            - **Input Handling:** The method prepares input JSON files for each sublist of poses and constructs commands for running motif-specific RMSD calculations.</span>
+<span class="sd">            - **Output Management:** The method handles the collection and processing of output data from multiple score files, concatenating them into a single DataFrame and saving the results.</span>
+<span class="sd">            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the motif RMSD calculation process to their specific needs, including specifying reference and target motifs, as well as atoms for RMSD calculations.</span>
+
+<span class="sd">        This method is designed to streamline the execution of motif-specific RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze motif-specific RMSD calculations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># prep inputs</span>
+        <span class="n">ref_col</span> <span class="o">=</span> <span class="n">ref_col</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_col</span>
+        <span class="n">ref_motif</span> <span class="o">=</span> <span class="n">ref_motif</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_motif</span>
+        <span class="n">target_motif</span> <span class="o">=</span> <span class="n">target_motif</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_motif</span>
+
+        <span class="c1"># setup runner</span>
+        <span class="n">script_path</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">script_dir</span><span class="si">}</span><span class="s2">/calc_heavyatom_rmsd_batch.py&quot;</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span> <span class="o">=</span> <span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="c1"># check if script exists</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">script_path</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Cannot find script &#39;calc_heavyatom_rmsd_batch.py&#39; at specified directory: &#39;</span><span class="si">{</span><span class="n">script_dir</span><span class="si">}</span><span class="s2">&#39;. Set path to &#39;/PATH/protflow/tools/runners_auxiliary_scripts/&#39; for variable AUXILIARY_RUNNER_SCRIPTS_DIR in config.py file.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># check if outputs are present</span>
+        <span class="n">overwrite</span> <span class="o">=</span> <span class="n">overwrite</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">overwrite</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_rmsds.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">rmsd_df</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">rmsd_df</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+
+        <span class="c1"># setup full input dict, batch later</span>
+        <span class="n">input_dict</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup_input_dict</span><span class="p">(</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+            <span class="n">ref_col</span> <span class="o">=</span> <span class="n">ref_col</span><span class="p">,</span>
+            <span class="n">ref_motif</span> <span class="o">=</span> <span class="n">ref_motif</span><span class="p">,</span>
+            <span class="n">target_motif</span> <span class="o">=</span> <span class="n">target_motif</span>
+        <span class="p">)</span>
+
+        <span class="c1"># split input_dict into subdicts</span>
+        <span class="n">split_sublists</span> <span class="o">=</span> <span class="n">split_list</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">input_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()),</span> <span class="n">n_sublists</span><span class="o">=</span><span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span><span class="p">)</span>
+        <span class="n">subdicts</span> <span class="o">=</span> <span class="p">[{</span><span class="n">target</span><span class="p">:</span> <span class="n">input_dict</span><span class="p">[</span><span class="n">target</span><span class="p">]</span> <span class="k">for</span> <span class="n">target</span> <span class="ow">in</span> <span class="n">sublist</span><span class="p">}</span> <span class="k">for</span> <span class="n">sublist</span> <span class="ow">in</span> <span class="n">split_sublists</span><span class="p">]</span>
+
+        <span class="c1"># write n=max_cores input_json files for add_chains_batch.py</span>
+        <span class="n">json_files</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">output_files</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">subdict</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">subdicts</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># setup input_json file for every batch</span>
+            <span class="n">opts_json_p</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/rmsd_input_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">.json&quot;</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">opts_json_p</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">subdict</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span>
+            <span class="n">json_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">opts_json_p</span><span class="p">)</span>
+            <span class="n">output_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/rmsd_output_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">.json&quot;</span><span class="p">)</span>
+
+        <span class="c1"># setup atoms option</span>
+        <span class="n">atoms_str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">atoms</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">&quot;--atoms &#39;</span><span class="si">{</span><span class="s1">&#39;,&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">atoms</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+
+        <span class="c1"># start add_chains_batch.py</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">PROTFLOW_ENV</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;python3&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">script_path</span><span class="si">}</span><span class="s2"> --input_json </span><span class="si">{</span><span class="n">json_f</span><span class="si">}</span><span class="s2"> --output_path </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">atoms_str</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">json_f</span><span class="p">,</span> <span class="n">output_path</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">json_files</span><span class="p">,</span> <span class="n">output_files</span><span class="p">)]</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span> <span class="o">=</span> <span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span> <span class="o">=</span> <span class="n">prefix</span><span class="p">,</span>
+            <span class="n">wait</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+            <span class="n">output_path</span> <span class="o">=</span> <span class="n">work_dir</span>
+        <span class="p">)</span>
+
+        <span class="c1"># collect outputs</span>
+        <span class="n">rmsd_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">pd</span><span class="o">.</span><span class="n">read_json</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span> <span class="k">for</span> <span class="n">output_path</span> <span class="ow">in</span> <span class="n">output_files</span><span class="p">])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">rmsd_df</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="n">outputs</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span>
+            <span class="n">poses</span> <span class="o">=</span> <span class="n">poses</span><span class="p">,</span>
+            <span class="n">results</span> <span class="o">=</span> <span class="n">rmsd_df</span><span class="p">,</span>
+            <span class="n">prefix</span> <span class="o">=</span> <span class="n">prefix</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">outputs</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="MotifRMSD.setup_input_dict">
+<a class="viewcode-back" href="../../../protflow.metrics.html#protflow.metrics.rmsd.MotifRMSD.setup_input_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">setup_input_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref_motif</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">target_motif</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Set up the input dictionary for motif RMSD calculations.</span>
+
+<span class="sd">        This method prepares a dictionary that can be written to a JSON file and used as input for the motif RMSD calculation script. The dictionary contains mappings of poses to reference PDB files, target motifs, and reference motifs.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            ref_col (str): The reference column for RMSD calculations.</span>
+<span class="sd">            ref_motif (Any, optional): The reference motif for RMSD calculations. Defaults to None.</span>
+<span class="sd">            target_motif (Any, optional): The target motif for RMSD calculations. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict: A dictionary structured for input to the motif RMSD calculation script.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            TypeError: If ref_motif or target_motif is not of the expected type.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `setup_input_dict` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from rmsd import MotifRMSD</span>
+<span class="sd">                from protflow.poses import Poses</span>
+
+<span class="sd">                # Initialize the MotifRMSD class</span>
+<span class="sd">                motif_rmsd = MotifRMSD()</span>
+
+<span class="sd">                # Create a Poses object</span>
+<span class="sd">                poses = Poses()</span>
+
+<span class="sd">                # Set up the input dictionary for RMSD calculations</span>
+<span class="sd">                input_dict = motif_rmsd.setup_input_dict(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    ref_col=&quot;reference&quot;,</span>
+<span class="sd">                    ref_motif=&quot;motif_A&quot;,</span>
+<span class="sd">                    target_motif=&quot;motif_B&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Print the input dictionary</span>
+<span class="sd">                print(input_dict)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Dictionary Structure:** The input dictionary maps each pose to its reference PDB file, target motif, and reference motif.</span>
+<span class="sd">            - **Parameter Handling:** The method handles different types of inputs for motifs, ensuring that they are correctly formatted for the RMSD calculation script.</span>
+<span class="sd">            - **Integration:** The input dictionary prepared by this method is used by the `run` method to execute motif RMSD calculations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">setup_ref_col</span><span class="p">(</span><span class="n">ref_col</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+            <span class="n">col_in_df</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">ref_col</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">ref_col</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+
+        <span class="k">def</span> <span class="nf">setup_motif</span><span class="p">(</span><span class="n">motif</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">motif</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="c1"># if motif points to column in DataFrame, get residues.</span>
+                <span class="n">col_in_df</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">motif</span><span class="p">)</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">residue_selection</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">residue_selection</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">)</span> <span class="k">else</span> <span class="n">residue_selection</span> <span class="k">for</span> <span class="n">residue_selection</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">motif</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()]</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">motif</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">):</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">motif</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupportet parameter type for motif: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">motif</span><span class="p">)</span><span class="si">}</span><span class="s2">. Either provide a string that points to a column in poses.df containing the motifs, or pass a ResidueSelection object.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># use class default if parameters were not set and setup parameters:</span>
+        <span class="n">ref_l</span> <span class="o">=</span> <span class="n">setup_ref_col</span><span class="p">(</span><span class="n">ref_col</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_col</span><span class="p">,</span> <span class="n">poses</span><span class="p">)</span>
+        <span class="n">ref_motif_l</span> <span class="o">=</span> <span class="n">setup_motif</span><span class="p">(</span><span class="n">ref_motif</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">ref_motif</span><span class="p">,</span> <span class="n">poses</span><span class="p">)</span>
+        <span class="n">target_motif_l</span> <span class="o">=</span> <span class="n">setup_motif</span><span class="p">(</span><span class="n">target_motif</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">target_motif</span><span class="p">,</span> <span class="n">poses</span><span class="p">)</span>
+
+        <span class="c1"># construct rmsd_input_dict:</span>
+        <span class="n">rmsd_input_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">pose</span><span class="p">:</span> <span class="p">{}</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()}</span>
+        <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">ref</span><span class="p">,</span> <span class="n">ref_motif_</span><span class="p">,</span> <span class="n">target_motif_</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">ref_l</span><span class="p">,</span> <span class="n">ref_motif_l</span><span class="p">,</span> <span class="n">target_motif_l</span><span class="p">):</span>
+            <span class="n">rmsd_input_dict</span><span class="p">[</span><span class="n">pose</span><span class="p">][</span><span class="s2">&quot;ref_pdb&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">ref</span><span class="p">)</span>
+            <span class="n">rmsd_input_dict</span><span class="p">[</span><span class="n">pose</span><span class="p">][</span><span class="s2">&quot;target_motif&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_motif_</span>
+            <span class="n">rmsd_input_dict</span><span class="p">[</span><span class="n">pose</span><span class="p">][</span><span class="s2">&quot;reference_motif&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">ref_motif_</span>
+
+        <span class="k">return</span> <span class="n">rmsd_input_dict</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

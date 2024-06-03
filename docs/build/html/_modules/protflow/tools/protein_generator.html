@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.tools.protein_generator &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.tools.protein_generator</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.tools.protein_generator</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">ProteinGenerator Module</span>
+<span class="sd">=======================</span>
+
+<span class="sd">This module provides the functionality to integrate the protein generation process within the ProtFlow framework. It offers tools to run the protein_generator script, handle its inputs and outputs, and process the resulting data in a structured and automated manner.</span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `ProteinGenerator` class encapsulates the functionality necessary to run protein_generator as described in the publication. It manages the configuration of paths to essential scripts and Python executables, sets up the environment, and handles the execution of protein generation processes. It also includes methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.</span>
+
+<span class="sd">The module is designed to streamline the integration of protein generation into larger computational workflows. It supports the automatic setup of job parameters, execution of protein generator commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create an instance of the `ProteinGenerator` class and invoke its `run` method with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the protein generation process is provided through various parameters, allowing for customized runs tailored to specific research needs.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `ProteinGenerator` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from protein_generator import ProteinGenerator</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the ProteinGenerator class</span>
+<span class="sd">    protein_generator = ProteinGenerator()</span>
+
+<span class="sd">    # Run the protein generation process</span>
+<span class="sd">    results = protein_generator.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        jobstarter=jobstarter,</span>
+<span class="sd">        options=&quot;generation.num_proteins=10&quot;,</span>
+<span class="sd">        pose_options=[&quot;generation.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the protein generation process.</span>
+<span class="sd">    - Customizability: Users can customize the protein generation process through multiple parameters, including the number of generated proteins, specific options for the protein generator script, and options for handling pose-specific parameters.</span>
+<span class="sd">    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate protein generation into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Author</span>
+<span class="sd">------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># general imports</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="c1"># dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="c1"># custom</span>
+<span class="kn">import</span> <span class="nn">protflow.config</span>
+<span class="kn">import</span> <span class="nn">protflow.jobstarters</span>
+<span class="kn">import</span> <span class="nn">protflow.tools</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">RunnerOutput</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+
+<div class="viewcode-block" id="ProteinGenerator">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_generator.ProteinGenerator">[docs]</a>
+<span class="k">class</span> <span class="nc">ProteinGenerator</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ProteinGenerator Class</span>
+<span class="sd">    ======================</span>
+
+<span class="sd">    The `ProteinGenerator` class is a specialized class designed to facilitate the execution of protein generation within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with protein generation processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `ProteinGenerator` class manages all aspects of running protein generation simulations. It handles the configuration of necessary scripts and executables, prepares the environment for protein generation processes, and executes the generation commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to protein generation scripts and Python executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of protein generation commands with support for multiple generation runs.</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">        - Ensuring robust error handling and logging for easier debugging and verification of the generation process.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `ProteinGenerator` class, configured to run protein generation processes and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">        - TypeError: If the types of arguments are not as expected.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `ProteinGenerator` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from protein_generator import ProteinGenerator</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the ProteinGenerator class</span>
+<span class="sd">        protein_generator = ProteinGenerator()</span>
+
+<span class="sd">        # Run the protein generation process</span>
+<span class="sd">        results = protein_generator.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            options=&quot;generation.num_proteins=10&quot;,</span>
+<span class="sd">            pose_options=[&quot;generation.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the protein generation process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The ProteinGenerator class is intended for researchers and developers who need to perform protein generation as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="ProteinGenerator.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_generator.ProteinGenerator.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">script_path</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">PROTEIN_GENERATOR_SCRIPT_PATH</span><span class="p">,</span> <span class="n">python_path</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">PROTEIN_GENERATOR_PYTHON_PATH</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span><span class="n">JobStarter</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initialize the ProteinGenerator class with paths to the necessary scripts and Python executable.</span>
+
+<span class="sd">        This constructor sets up the `ProteinGenerator` class, configuring the paths to the protein generator script and the Python executable. It also sets the jobstarter and initializes essential attributes for the class.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            script_path (str, optional): The path to the protein generator script. Defaults to the value set in protflow.config.PROTEIN_GENERATOR_SCRIPT_PATH.</span>
+<span class="sd">            python_path (str, optional): The path to the Python executable. Defaults to the value set in protflow.config.PROTEIN_GENERATOR_PYTHON_PATH.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no script_path is provided or set in the configuration.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to initialize the `ProteinGenerator` class:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from protein_generator import ProteinGenerator</span>
+
+<span class="sd">                # Initialize the JobStarter class</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the ProteinGenerator class</span>
+<span class="sd">                protein_generator = ProteinGenerator(</span>
+<span class="sd">                    script_path=&quot;/path/to/protein_generator.py&quot;,</span>
+<span class="sd">                    python_path=&quot;/path/to/python&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter</span>
+<span class="sd">                )</span>
+
+<span class="sd">                print(protein_generator)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Script Path:** The path to the protein generator script is a critical configuration that needs to be set either through the parameter or the configuration file.</span>
+<span class="sd">            - **Python Path:** The path to the Python executable is necessary for running the script and should be set accordingly.</span>
+<span class="sd">            - **JobStarter:** If provided, the JobStarter instance is used to manage job execution, otherwise it can be set later.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">script_path</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No path is set for </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2">. Set the path in the config.py file under PROTEIN_GENERATOR_SCRIPT_PATH.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">script_path</span> <span class="o">=</span> <span class="n">script_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python_path</span> <span class="o">=</span> <span class="n">python_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;protein_generator.py&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span> <span class="o">=</span> <span class="mi">1</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;protein_generator.py&quot;</span>
+
+<div class="viewcode-block" id="ProteinGenerator.run">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_generator.ProteinGenerator.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span><span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span><span class="n">JobStarter</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span><span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RunnerOutput</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute protein_generator with given poses and jobstarter configuration.</span>
+<span class="sd">        This method sets up and runs protein_generator using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            jobstarter (JobStarter): An instance of the JobStarter class, which manages job execution.</span>
+<span class="sd">            options (str, optional): Additional options for the protein generation script. Defaults to None.</span>
+<span class="sd">            pose_options (list[str], optional): A list of pose-specific options for the protein generation script. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the protein generation process.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the method.</span>
+<span class="sd">            TypeError: If pose_options are not of the expected type.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `run` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from protein_generator import ProteinGenerator</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the ProteinGenerator class</span>
+<span class="sd">                protein_generator = ProteinGenerator()</span>
+
+<span class="sd">                # Run the protein generation process</span>
+<span class="sd">                results = protein_generator.run(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    options=&quot;generation.num_proteins=10&quot;,</span>
+<span class="sd">                    pose_options=[&quot;generation.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(results)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed.</span>
+<span class="sd">            - **Output Management:** The method handles the collection and processing of output data, ensuring that results are organized and accessible for further analysis.</span>
+<span class="sd">            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor protein_generator to their specific needs.</span>
+
+<span class="sd">        This method is designed to streamline the execution of protein generation processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein generation simulations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># setup runner</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="c1"># setup protein_generator specific directories:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">((</span><span class="n">pdb_dir</span> <span class="o">:=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/output_pdbs/&quot;</span><span class="p">)):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Look for output-file in pdb-dir. If output is present and correct, then skip protein_generator.</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;protein_generator_scores.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">scores</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+
+        <span class="c1"># parse_options and pose_options:</span>
+        <span class="n">pose_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_pose_options</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+
+        <span class="c1"># write protein generator cmds:</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="o">=</span><span class="n">pose_opts</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">pose_opts</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)]</span>
+
+        <span class="c1"># run</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span><span class="o">=</span><span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span><span class="o">=</span><span class="s2">&quot;protein_generator&quot;</span><span class="p">,</span>
+            <span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">output_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pdb_dir</span><span class="si">}</span><span class="s2">/&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># collect scores</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collect_scores</span><span class="p">(</span><span class="n">scores_dir</span><span class="o">=</span><span class="n">pdb_dir</span><span class="p">)</span>
+
+        <span class="c1"># write scorefile</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving scores of </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2"> at </span><span class="si">{</span><span class="n">scorefile</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span> <span class="nf">_safecheck_pose_options</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span><span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;Checks if pose_options are of the same length as poses, if now pose_options are provided, &#39;&#39;&#39;</span>
+        <span class="c1"># safety check (pose_options must have the same length as poses)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pose_options</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pose_options</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Arguments &lt;poses&gt; and &lt;pose_options&gt; for RFDiffusion must be of the same length. There might be an error with your pose_options argument!</span><span class="se">\n</span><span class="s2">len(poses) = </span><span class="si">{</span><span class="n">poses</span><span class="si">}</span><span class="se">\n</span><span class="s2">len(pose_options) = </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">pose_options</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">pose_options</span>
+        <span class="k">elif</span> <span class="n">pose_options</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># make sure an empty list is passed as pose_options!</span>
+            <span class="k">return</span> <span class="p">[</span><span class="s2">&quot;&quot;</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported type for pose_options: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">pose_options</span><span class="p">)</span><span class="si">}</span><span class="s2">. pose_options must be of type [list, None]&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="ProteinGenerator.write_cmd">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_generator.ProteinGenerator.write_cmd">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_cmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span><span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Write the command to run the protein_generator.py script with specified options and pose configurations.</span>
+
+<span class="sd">        This method constructs the command string necessary to execute the protein generator script, incorporating specified options and pose-specific parameters. The generated command can be used to run the protein generation process in a computational environment.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose_path (str): The file path to the input pose.</span>
+<span class="sd">            output_dir (str): The directory where output files will be stored.</span>
+<span class="sd">            options (str): Additional options for the protein generator script.</span>
+<span class="sd">            pose_options (str): Specific options for the protein generator script related to the pose.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The constructed command string to execute the protein generator script.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `write_cmd` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protein_generator import ProteinGenerator</span>
+
+<span class="sd">                # Initialize the ProteinGenerator class</span>
+<span class="sd">                protein_generator = ProteinGenerator(</span>
+<span class="sd">                    script_path=&quot;/path/to/protein_generator.py&quot;,</span>
+<span class="sd">                    python_path=&quot;/path/to/python&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Construct the command string</span>
+<span class="sd">                cmd = protein_generator.write_cmd(</span>
+<span class="sd">                    pose_path=&quot;input_poses/pose1.pdb&quot;,</span>
+<span class="sd">                    output_dir=&quot;output_directory&quot;,</span>
+<span class="sd">                    options=&quot;generation.num_proteins=10&quot;,</span>
+<span class="sd">                    pose_options=&quot;generation.input_pdb=&#39;input.pdb&#39;&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                print(cmd)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Command Construction:** The method parses the input pose path to derive a description and combines it with provided options and flags to construct a command string.</span>
+<span class="sd">            - **Options Parsing:** The options and pose_options parameters are parsed into a format compatible with the protein generator script.</span>
+<span class="sd">            - **Output Directory:** The output directory is specified to ensure that generated files are stored in the appropriate location.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># parse description</span>
+        <span class="n">desc</span> <span class="o">=</span> <span class="n">pose_path</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">lsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;--</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span>
+        <span class="n">flags</span> <span class="o">=</span> <span class="s2">&quot; --&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">python_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">script_path</span><span class="si">}</span><span class="s2"> --out </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">desc</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">opts</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">flags</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="ProteinGenerator.collect_scores">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_generator.ProteinGenerator.collect_scores">[docs]</a>
+    <span class="k">def</span> <span class="nf">collect_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">scores_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collect scores from the protein_generator output directory.</span>
+
+<span class="sd">        This method reads the output .pdb files generated by the protein generator and parses the corresponding .trb files into a pandas DataFrame. It consolidates the scores from multiple files into a single DataFrame for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            scores_dir (str): The directory where the output files from the protein generator are stored.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: A DataFrame containing the collected scores from the protein generator output files.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If no .pdb files are found in the specified output directory, indicating a possible issue with the protein generator execution or an incorrect path.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `collect_scores` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protein_generator import ProteinGenerator</span>
+
+<span class="sd">                # Initialize the ProteinGenerator class</span>
+<span class="sd">                protein_generator = ProteinGenerator()</span>
+
+<span class="sd">                # Collect scores from the output directory</span>
+<span class="sd">                scores_df = protein_generator.collect_scores(scores_dir=&quot;output_directory&quot;)</span>
+
+<span class="sd">                print(scores_df)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **File Reading:** The method reads all .pdb files from the specified directory. If no .pdb files are found, a FileNotFoundError is raised.</span>
+<span class="sd">            - **Data Parsing:** The method parses the corresponding .trb files for each .pdb file, converting them into pandas DataFrames and concatenating them into a single DataFrame.</span>
+<span class="sd">            - **Output Organization:** The resulting DataFrame is organized and returned for further analysis, with all scores consolidated from the multiple output files.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># read .pdb files</span>
+        <span class="n">pl</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">scores_dir</span><span class="si">}</span><span class="s2">/*.pdb&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pl</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No .pdb files were found in the output directory of protein_generator </span><span class="si">{</span><span class="n">scores_dir</span><span class="si">}</span><span class="s2">. protein_generator might have crashed (check output log), or path might be wrong!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># parse .trb-files into DataFrames</span>
+        <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="bp">self</span><span class="o">.</span><span class="n">parse_trbfile</span><span class="p">(</span><span class="n">p</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.pdb&quot;</span><span class="p">,</span> <span class="s2">&quot;.trb&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">pl</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="ProteinGenerator.parse_trbfile">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.protein_generator.ProteinGenerator.parse_trbfile">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_trbfile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">trbfile</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Read a protein_generator output .trb file and parse the scores into a pandas DataFrame.</span>
+
+<span class="sd">        This method reads the specified .trb file, extracts relevant data, and organizes it into a pandas DataFrame. The data includes scores and various attributes related to the protein generation process.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            trbfile (str): The file path to the .trb file generated by the protein generator.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: A DataFrame containing parsed scores and attributes from the .trb file.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `parse_trbfile` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protein_generator import ProteinGenerator</span>
+
+<span class="sd">                # Initialize the ProteinGenerator class</span>
+<span class="sd">                protein_generator = ProteinGenerator()</span>
+
+<span class="sd">                # Parse the .trb file</span>
+<span class="sd">                df = protein_generator.parse_trbfile(trbfile=&quot;output_directory/sample.trb&quot;)</span>
+
+<span class="sd">                print(df)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **File Reading:** The method uses numpy to load the .trb file, which is expected to be in a specific format.</span>
+<span class="sd">            - **Data Extraction:** The method extracts various pieces of information from the .trb file, including description, location, lddt scores, sequence, and contigs.</span>
+<span class="sd">            - **Data Formatting:** The extracted data is organized into a dictionary and converted into a pandas DataFrame for ease of use in further analysis.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">trb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">trbfile</span><span class="p">,</span> <span class="n">allow_pickle</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># expand collected data if needed:</span>
+        <span class="n">data_dict</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="n">trbfile</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.trb&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;location&quot;</span><span class="p">:</span> <span class="n">trbfile</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;trb&quot;</span><span class="p">,</span> <span class="s2">&quot;pdb&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;lddt&quot;</span><span class="p">:</span> <span class="p">[</span><span class="nb">sum</span><span class="p">(</span><span class="n">trb</span><span class="p">[</span><span class="s2">&quot;lddt&quot;</span><span class="p">])</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">trb</span><span class="p">[</span><span class="s2">&quot;lddt&quot;</span><span class="p">])],</span>
+            <span class="s2">&quot;perres_lddt&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">trb</span><span class="p">[</span><span class="s2">&quot;lddt&quot;</span><span class="p">]],</span>
+            <span class="s2">&quot;sequence&quot;</span><span class="p">:</span> <span class="n">trb</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">][</span><span class="s2">&quot;sequence&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;contigs&quot;</span><span class="p">:</span> <span class="n">trb</span><span class="p">[</span><span class="s2">&quot;args&quot;</span><span class="p">][</span><span class="s2">&quot;contigs&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;inpaint_str&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">trb</span><span class="p">[</span><span class="s2">&quot;inpaint_str&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()],</span>
+            <span class="s2">&quot;inpaint_seq&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">trb</span><span class="p">[</span><span class="s2">&quot;inpaint_seq&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span><span class="o">.</span><span class="n">tolist</span><span class="p">()]</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">data_dict</span><span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.poses &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.poses</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.poses</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">poses</span>
+<span class="sd">=====</span>
+
+<span class="sd">The &#39;poses&#39; module in the ProtFlow package is designed for running protein design tools, managing, and manipulating protein data. </span>
+
+<span class="sd">This module primarily focuses on handling proteins and their associated data represented as Pandas DataFrames. </span>
+<span class="sd">It provides functionalities to parse, store, and manipulate protein data in various file formats, aiding in the management of complex protein study workflows. </span>
+
+<span class="sd">Key Features</span>
+<span class="sd">------------</span>
+<span class="sd">- Parsing protein data from different sources and formats.</span>
+<span class="sd">- Storing and retrieving protein data in multiple file formats like JSON, CSV, Pickle, Feather, and Parquet.</span>
+<span class="sd">- Integration with the ProtFlow package for managing compute jobs, facilitating the handling of protein data in distributed computing environments.</span>
+<span class="sd">- Advanced data manipulation capabilities, including merging and prefixing data from various sources.</span>
+
+<span class="sd">Classes</span>
+<span class="sd">-------</span>
+<span class="sd">- Poses: A central class for storing and handling protein data frames. It supports various operations like setting up work directories, parsing protein data, and integrating outputs from different runners.</span>
+
+<span class="sd">Dependencies</span>
+<span class="sd">------------</span>
+<span class="sd">- pandas: Used for DataFrame operations.</span>
+<span class="sd">- protflow: Required for job management.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">Example of how to use the Poses class for managing protein data:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from poses import Poses</span>
+
+<span class="sd">    poses_instance = Poses(poses=my_protein_data, work_dir=&#39;path/to/work_dir&#39;)</span>
+<span class="sd">    # Further operations using poses_instance</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in SLURM environments.</span>
+
+<span class="sd">Author</span>
+<span class="sd">------</span>
+<span class="sd">Markus Braun</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Union</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="c1"># dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">Bio.PDB</span>
+
+<span class="c1"># customs</span>
+<span class="kn">from</span> <span class="nn">protflow</span> <span class="kn">import</span> <span class="n">jobstarters</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+<span class="kn">from</span> <span class="nn">protflow.residues</span> <span class="kn">import</span> <span class="n">ResidueSelection</span>
+<span class="kn">from</span> <span class="nn">protflow.utils.utils</span> <span class="kn">import</span> <span class="n">parse_fasta_to_dict</span>
+<span class="kn">from</span> <span class="nn">protflow.utils.biopython_tools</span> <span class="kn">import</span> <span class="n">load_structure_from_pdbfile</span><span class="p">,</span> <span class="n">get_sequence_from_pose</span>
+<span class="kn">import</span> <span class="nn">protflow.utils.plotting</span> <span class="k">as</span> <span class="nn">plots</span>
+
+<span class="n">FORMAT_STORAGE_DICT</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;json&quot;</span><span class="p">:</span> <span class="s2">&quot;to_json&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;csv&quot;</span><span class="p">:</span> <span class="s2">&quot;to_csv&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;pickle&quot;</span><span class="p">:</span> <span class="s2">&quot;to_pickle&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;feather&quot;</span><span class="p">:</span> <span class="s2">&quot;to_feather&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;parquet&quot;</span><span class="p">:</span> <span class="s2">&quot;to_parquet&quot;</span>
+<span class="p">}</span>
+
+<div class="viewcode-block" id="Poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses">[docs]</a>
+<span class="k">class</span> <span class="nc">Poses</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A class for storing and handling protein data frames.</span>
+
+<span class="sd">    The Poses class manages protein data using Pandas DataFrames, providing functionalities</span>
+<span class="sd">    to set up working directories, parse protein data, and integrate outputs from different</span>
+<span class="sd">    runners. It supports various operations for manipulating and filtering protein data.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    poses : list, optional</span>
+<span class="sd">        List of initial poses to be managed by the Poses class. Default is None.</span>
+<span class="sd">    work_dir : str, optional</span>
+<span class="sd">        Path to the working directory. Default is None.</span>
+<span class="sd">    storage_format : str, optional</span>
+<span class="sd">        Format for storing the poses DataFrame. Default is &quot;json&quot;.</span>
+<span class="sd">    glob_suffix : str, optional</span>
+<span class="sd">        Suffix for glob pattern matching if poses is a directory path. Default is None.</span>
+<span class="sd">    jobstarter : JobStarter, optional</span>
+<span class="sd">        JobStarter instance for managing job submissions. Default is jobstarters.SbatchArrayJobstarter().</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pandas.DataFrame</span>
+<span class="sd">        DataFrame to store and manage protein poses.</span>
+<span class="sd">    work_dir : str</span>
+<span class="sd">        Path to the working directory.</span>
+<span class="sd">    storage_format : str</span>
+<span class="sd">        Format for storing the poses DataFrame.</span>
+<span class="sd">    scorefile : str</span>
+<span class="sd">        Path to the scorefile where poses DataFrame will be stored.</span>
+<span class="sd">    default_jobstarter : JobStarter</span>
+<span class="sd">        JobStarter instance for managing job submissions.</span>
+<span class="sd">    motifs : list</span>
+<span class="sd">        List of motif columns.</span>
+
+<span class="sd">    Methods</span>
+<span class="sd">    -------</span>
+<span class="sd">    set_scorefile(work_dir: str) -&gt; None</span>
+<span class="sd">        Sets the scorefile attribute for the Poses class.</span>
+<span class="sd">    set_storage_format(storage_format: str) -&gt; None</span>
+<span class="sd">        Sets the storage format for the poses DataFrame.</span>
+<span class="sd">    set_work_dir(work_dir: str, set_scorefile: bool = True) -&gt; None</span>
+<span class="sd">        Sets up the working directory for the Poses class.</span>
+<span class="sd">    set_logger() -&gt; None</span>
+<span class="sd">        Sets the logger for the Poses class.</span>
+<span class="sd">    set_jobstarter(jobstarter: JobStarter) -&gt; None</span>
+<span class="sd">        Sets the JobStarter attribute for the Poses class.</span>
+<span class="sd">    change_poses_dir(poses_dir: str, copy: bool = False, overwrite: bool = False) -&gt; &quot;Poses&quot;</span>
+<span class="sd">        Changes the location of current poses.</span>
+<span class="sd">    parse_poses(poses: Union[list, str] = None, glob_suffix: str = None) -&gt; list</span>
+<span class="sd">        Parses the input poses, which can be a directory path, a file path, or a list of file paths.</span>
+<span class="sd">    parse_descriptions(poses: list = None) -&gt; list</span>
+<span class="sd">        Parses descriptions (names) of poses from a list of pose paths.</span>
+<span class="sd">    set_poses(poses: list = None, glob_suffix: str = None) -&gt; None</span>
+<span class="sd">        Sets up poses from either a list or a string.</span>
+<span class="sd">    check_prefix(prefix: str) -&gt; None</span>
+<span class="sd">        Checks if the prefix is available in the poses DataFrame.</span>
+<span class="sd">    check_poses_df_integrity(df: pandas.DataFrame) -&gt; pandas.DataFrame</span>
+<span class="sd">        Checks if mandatory columns are present in the poses DataFrame.</span>
+<span class="sd">    split_multiline_fasta(path: str, encoding: str = &quot;UTF-8&quot;) -&gt; list[str]</span>
+<span class="sd">        Splits multiline FASTA input files.</span>
+<span class="sd">    determine_pose_type(pose_col: str = None) -&gt; list</span>
+<span class="sd">        Checks the file extensions of poses and returns a list of extensions.</span>
+<span class="sd">    load_poses(poses_path: str) -&gt; &quot;Poses&quot;</span>
+<span class="sd">        Loads Poses class from a stored DataFrame.</span>
+<span class="sd">    save_scores(out_path: str = None, out_format: str = None) -&gt; None</span>
+<span class="sd">        Saves the poses DataFrame as a scorefile.</span>
+<span class="sd">    save_poses(out_path: str, poses_col: str = &quot;poses&quot;, overwrite: bool = True) -&gt; None</span>
+<span class="sd">        Saves current poses from the poses DataFrame to the specified path.</span>
+<span class="sd">    poses_list() -&gt; list</span>
+<span class="sd">        Returns the current poses from the DataFrame as a list.</span>
+<span class="sd">    get_pose(pose_description: str) -&gt; Bio.PDB.Structure.Structure</span>
+<span class="sd">        Loads a singular pose from the DataFrame.</span>
+<span class="sd">    duplicate_poses(output_dir: str, n_duplicates: int) -&gt; None</span>
+<span class="sd">        Creates pose duplicates with added index layers.</span>
+<span class="sd">    reset_poses(new_poses_col: str = &#39;input_poses&#39;, force_reset_df: bool = False) -&gt; None</span>
+<span class="sd">        Resets poses to the poses in the specified column and updates the DataFrame.</span>
+<span class="sd">    set_motif(motif_col: str) -&gt; None</span>
+<span class="sd">        Sets a motif attribute to be accessed by runners.</span>
+<span class="sd">    convert_pdb_to_fasta(prefix: str, update_poses: bool = False, chain_sep: str = &quot;:&quot;) -&gt; None</span>
+<span class="sd">        Converts PDB files to FASTA files and optionally updates poses.</span>
+<span class="sd">    filter_poses_by_rank(n: float, score_col: str, remove_layers = None, layer_col = &quot;poses_description&quot;, sep = &quot;_&quot;, ascending = True, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -&gt; &quot;Poses&quot;</span>
+<span class="sd">        Filters poses by a specified score term down to a fraction or a total number of poses.</span>
+<span class="sd">    filter_poses_by_value(score_col: str, value, operator: str, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -&gt; &quot;Poses&quot;</span>
+<span class="sd">        Filters poses by a specified score column according to the provided value and operator.</span>
+<span class="sd">    calculate_composite_score(name: str, scoreterms: list[str], weights: list[float], plot: bool = False, scale_output: bool = False) -&gt; &quot;Poses&quot;</span>
+<span class="sd">        Combines multiple score columns by weighted addition and scales the result.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1">############################################# SETUP #########################################</span>
+<div class="viewcode-block" id="Poses.__init__">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">storage_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="n">glob_suffix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="n">jobstarters</span><span class="o">.</span><span class="n">SbatchArrayJobstarter</span><span class="p">()):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the Poses class.</span>
+
+<span class="sd">        Sets up the initial attributes, working directory, storage format, and job starter for managing protein data.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses : list, optional</span>
+<span class="sd">            List of initial poses to be managed by the Poses class. Default is None.</span>
+<span class="sd">        work_dir : str, optional</span>
+<span class="sd">            Path to the working directory. Default is None.</span>
+<span class="sd">        storage_format : str, optional</span>
+<span class="sd">            Format for storing the poses DataFrame. Default is &quot;json&quot;.</span>
+<span class="sd">        glob_suffix : str, optional</span>
+<span class="sd">            Suffix for glob pattern matching if poses is a directory path. Default is None.</span>
+<span class="sd">        jobstarter : JobStarter, optional</span>
+<span class="sd">            JobStarter instance for managing job submissions. Default is jobstarters.SbatchArrayJobstarter().</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_work_dir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">set_scorefile</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_poses</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">glob_suffix</span><span class="o">=</span><span class="n">glob_suffix</span><span class="p">)</span>
+
+        <span class="c1"># setup poses.storage_format and poses.scorefile.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_storage_format</span><span class="p">(</span><span class="n">storage_format</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_scorefile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span><span class="p">)</span>
+
+        <span class="c1"># setup jobstarter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">default_jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span>
+
+        <span class="c1"># set other empty attributes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">motifs</span> <span class="o">=</span> <span class="p">[]</span></div>
+
+
+<div class="viewcode-block" id="Poses.__iter__">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.__iter__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Iterates over the rows of the poses DataFrame.</span>
+
+<span class="sd">        Yields</span>
+<span class="sd">        ------</span>
+<span class="sd">        pandas.Series</span>
+<span class="sd">            A row of the poses DataFrame.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">row</span></div>
+
+
+<div class="viewcode-block" id="Poses.__len__">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.__len__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the number of poses in the DataFrame.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        int</span>
+<span class="sd">            The number of poses.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">)</span></div>
+
+
+    <span class="c1">############################################# SETUP METHODS #########################################</span>
+<div class="viewcode-block" id="Poses.set_scorefile">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.set_scorefile">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_scorefile</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets the scorefile attribute for the Poses class.</span>
+
+<span class="sd">        The scorefile is the path where the poses DataFrame will be stored.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        work_dir : str</span>
+<span class="sd">            The working directory where the scorefile will be saved. If not provided, </span>
+<span class="sd">            the scorefile will be stored in the current directory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># if no work_dir is set, store scores in current directory.</span>
+        <span class="n">scorefile_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">work_dir</span><span class="p">))</span> <span class="k">if</span> <span class="n">work_dir</span> <span class="k">else</span> <span class="s2">&quot;./poses&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scorefile</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">scorefile_path</span><span class="si">}</span><span class="s2">_scores.</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="Poses.set_storage_format">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.set_storage_format">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_storage_format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">storage_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets the storage format for the poses DataFrame.</span>
+
+<span class="sd">        The poses DataFrame is stored in the specified format using the save_scores() method.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        storage_format : str</span>
+<span class="sd">            The format in which the poses DataFrame will be stored. Must be one of the formats </span>
+<span class="sd">            available in FORMAT_STORAGE_DICT.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If the specified format is not available.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">storage_format</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">FORMAT_STORAGE_DICT</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Format </span><span class="si">{</span><span class="n">storage_format</span><span class="si">}</span><span class="s2"> not available. Format must be on of </span><span class="si">{</span><span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">FORMAT_STORAGE_DICT</span><span class="p">)]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">storage_format</span> <span class="o">=</span> <span class="n">storage_format</span> <span class="c1"># removed .lower() maybe there is a storage format that needs caps letters.</span></div>
+
+
+<div class="viewcode-block" id="Poses.set_work_dir">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.set_work_dir">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_work_dir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">set_scorefile</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets up the working directory for the Poses class.</span>
+
+<span class="sd">        Creates the working directory and common subdirectories if they do not already exist.</span>
+<span class="sd">        Optionally sets the scorefile.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        work_dir : str</span>
+<span class="sd">            The path to the working directory.</span>
+<span class="sd">        set_scorefile : bool, optional</span>
+<span class="sd">            Whether to set the scorefile. Default is True.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">set_dir</span><span class="p">(</span><span class="n">dir_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;Creates a directory inside of work_dir that has the name {dir_name}_dir. </span>
+<span class="sd">            Also sets an attribute self.{dir_name} that points to the directory.&#39;&#39;&#39;</span>
+            <span class="k">if</span> <span class="n">work_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="n">dir_</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">dir_name</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">dir_</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">dir_</span>
+
+        <span class="c1"># setup and create work_dir if it does not already exist</span>
+        <span class="k">if</span> <span class="n">work_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">work_dir</span><span class="p">):</span>
+            <span class="n">work_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">work_dir</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating directory </span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="n">work_dir</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span> <span class="o">=</span> <span class="n">work_dir</span>
+
+        <span class="c1"># setup common directories for workflows:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scores_dir</span> <span class="o">=</span> <span class="n">set_dir</span><span class="p">(</span><span class="s2">&quot;scores&quot;</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filter_dir</span> <span class="o">=</span> <span class="n">set_dir</span><span class="p">(</span><span class="s2">&quot;filter&quot;</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span> <span class="o">=</span> <span class="n">set_dir</span><span class="p">(</span><span class="s2">&quot;plots&quot;</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">)</span>
+
+        <span class="c1"># setup scorefile if option is provided (default: True)</span>
+        <span class="k">if</span> <span class="n">set_scorefile</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">set_scorefile</span><span class="p">(</span><span class="n">work_dir</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Poses.set_logger">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.set_logger">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_logger</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets the logger for the Poses class.</span>
+
+<span class="sd">        Writes log messages to a logfile in the working directory (if set) and prints logs to the screen.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Create a logger</span>
+        
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span><span class="p">:</span> <span class="n">logfile_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span><span class="p">)</span><span class="si">}</span><span class="s2">.log&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span> <span class="n">logfile_path</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># Configure the basic logging</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+            <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span>
+            <span class="nb">format</span><span class="o">=</span><span class="s1">&#39;</span><span class="si">%(asctime)s</span><span class="s1"> - </span><span class="si">%(name)s</span><span class="s1"> - </span><span class="si">%(levelname)s</span><span class="s1"> - </span><span class="si">%(message)s</span><span class="s1">&#39;</span><span class="p">,</span>
+            <span class="n">handlers</span><span class="o">=</span><span class="p">[</span><span class="n">logging</span><span class="o">.</span><span class="n">StreamHandler</span><span class="p">()]</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">logfile_path</span><span class="p">:</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">FileHandler</span><span class="p">(</span><span class="n">logfile_path</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Poses.set_jobstarter">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.set_jobstarter">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_jobstarter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets the JobStarter attribute for the Poses class.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        jobstarter : JobStarter</span>
+<span class="sd">            An instance of the JobStarter class to manage job submissions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">default_jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span></div>
+
+
+<div class="viewcode-block" id="Poses.change_poses_dir">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.change_poses_dir">[docs]</a>
+    <span class="k">def</span> <span class="nf">change_poses_dir</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">copy</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Poses&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Changes the location of current poses.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses_dir : str</span>
+<span class="sd">            The new directory where the poses will be located.</span>
+<span class="sd">        copy : bool, optional</span>
+<span class="sd">            Whether to copy the poses to the new directory. Default is False.</span>
+<span class="sd">        overwrite : bool, optional</span>
+<span class="sd">            Whether to overwrite existing files in the new directory. Default is False.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Poses</span>
+<span class="sd">            The updated Poses instance.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If the specified directory does not exist or the poses do not exist at the specified directory.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># define new poses:</span>
+        <span class="n">new_poses</span> <span class="o">=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">poses_dir</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pose</span><span class="p">))</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()]</span>
+
+        <span class="c1"># exchange with check if work_dir is a directory and the poses exist</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">copy</span><span class="p">:</span>
+            <span class="c1"># just change the name of the directory in the poses_df, don&#39;t copy the poses anywhere</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">poses_dir</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;:work_dir: has to be existing directory!&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">((</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">new_poses</span><span class="p">)):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses do not exist at specified directory. If you want to copy the poses there, set the parameter :copy: to True!&quot;</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># actually copy the poses to a new directory (for whatever reason)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">poses_dir</span><span class="p">):</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">poses_dir</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">overwrite</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">old_path</span><span class="p">,</span> <span class="n">new_path</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">new_poses</span><span class="p">):</span>
+                    <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">old_path</span><span class="p">,</span> <span class="n">new_path</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># if overwrite is False, check if the file exists first. This should save read/write speed.</span>
+                <span class="k">for</span> <span class="n">old_path</span><span class="p">,</span> <span class="n">new_path</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">poses_list</span><span class="p">(),</span> <span class="n">new_poses</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">new_path</span><span class="p">):</span>
+                        <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">old_path</span><span class="p">,</span> <span class="n">new_path</span><span class="p">)</span>
+
+        <span class="c1"># change path in self.df[&quot;poses&quot;] column</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_poses</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="Poses.parse_poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.parse_poses">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">glob_suffix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parses the input &#39;poses&#39; which can be a directory path, a file path, or a list of file paths.</span>
+
+<span class="sd">        If &#39;poses&#39; is a directory path and &#39;glob_suffix&#39; is provided, it will return a list of file paths</span>
+<span class="sd">        matching the glob pattern. If &#39;poses&#39; is a single file path, it returns a list containing just that file path.</span>
+<span class="sd">        If &#39;poses&#39; is a list of file paths, it verifies that each file exists and returns the list.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses : Union[list, str, None], optional</span>
+<span class="sd">            Input poses which could be a list of file paths, a single file path, or None. Default is None.</span>
+<span class="sd">        glob_suffix : str, optional</span>
+<span class="sd">            Suffix for glob pattern matching if &#39;poses&#39; is a directory path. Default is None.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list</span>
+<span class="sd">            A list of file paths.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        FileNotFoundError</span>
+<span class="sd">            If any of the files or patterns provided do not exist.</span>
+<span class="sd">        TypeError</span>
+<span class="sd">            If &#39;poses&#39; is neither a list, a string, nor None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">glob_suffix</span><span class="p">:</span>
+            <span class="n">parsed_poses</span> <span class="o">=</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">poses</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">glob_suffix</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">parsed_poses</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No </span><span class="si">{</span><span class="n">glob_suffix</span><span class="si">}</span><span class="s2"> files were found in </span><span class="si">{</span><span class="n">poses</span><span class="si">}</span><span class="s2">. Did you mean to glob? Was the path correct?&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">parsed_poses</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">glob_suffix</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">poses</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">poses</span><span class="si">}</span><span class="s2"> not found!&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">poses</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">((</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">)):</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Not all files listed in poses were found.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">poses</span>
+        <span class="k">if</span> <span class="n">poses</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized input type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span><span class="si">}</span><span class="s2"> for function parse_poses(). Allowed types: [list, str]&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Poses.parse_descriptions">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.parse_descriptions">[docs]</a>
+    <span class="k">def</span> <span class="nf">parse_descriptions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Parses descriptions (names) of poses from a list of pose paths.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses : list</span>
+<span class="sd">            List of pose paths.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list</span>
+<span class="sd">            List of parsed pose descriptions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">pose</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span><span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Poses.set_poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.set_poses">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">list</span><span class="p">,</span><span class="nb">str</span><span class="p">,</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">glob_suffix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets up poses from either a list, a string, or a Pandas DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses : Union[list, str, pd.DataFrame, None], optional</span>
+<span class="sd">            Poses to be managed. Can be either a list of poses, a path to a directory or file, </span>
+<span class="sd">            a path to a scorefile, or a Pandas DataFrame. Default is None.</span>
+<span class="sd">        glob_suffix : str, optional</span>
+<span class="sd">            Suffix for glob pattern matching if poses is a directory path. Default is None.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        None</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># if DataFrame is passed, load directly.</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_poses_df_integrity</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">([</span><span class="n">poses</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">ext</span><span class="p">)</span> <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;csv&#39;</span><span class="p">,</span> <span class="s1">&#39;json&#39;</span><span class="p">,</span> <span class="s1">&#39;parquet&#39;</span><span class="p">,</span> <span class="s1">&#39;pickle&#39;</span><span class="p">,</span> <span class="s1">&#39;feather&#39;</span><span class="p">]]):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">get_format</span><span class="p">(</span><span class="n">poses</span><span class="p">)(</span><span class="n">poses</span><span class="p">)</span>
+            <span class="c1"># importing .csv files results in the index column being read in as Unnamed: 0, it can be dropped</span>
+            <span class="k">if</span> <span class="s1">&#39;Unnamed: 0&#39;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s1">&#39;Unnamed: 0&#39;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_poses_df_integrity</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># if Poses are initialized freshly (with input poses as strings:)</span>
+        <span class="n">poses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_poses</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">glob_suffix</span><span class="o">=</span><span class="n">glob_suffix</span><span class="p">)</span>
+
+        <span class="c1"># handle multiline .fa inputs for poses!</span>
+        <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pose</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.fa&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">pose</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.fasta&quot;</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parse_fasta_to_dict</span><span class="p">(</span><span class="n">pose</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">poses</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span>
+                <span class="n">poses</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">split_multiline_fasta</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;input_poses&quot;</span><span class="p">:</span> <span class="n">poses</span><span class="p">,</span> <span class="s2">&quot;poses&quot;</span><span class="p">:</span> <span class="n">poses</span><span class="p">,</span> <span class="s2">&quot;poses_description&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_descriptions</span><span class="p">(</span><span class="n">poses</span><span class="p">)})</span>
+        <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="Poses.check_prefix">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.check_prefix">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_prefix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks if the prefix is available in the poses DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        prefix : str</span>
+<span class="sd">            The prefix to check.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If the prefix is already taken in the poses DataFrame.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_location&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_description&quot;</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Prefix </span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2"> is already taken in poses.df&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Poses.check_poses_df_integrity">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.check_poses_df_integrity">[docs]</a>
+    <span class="k">def</span> <span class="nf">check_poses_df_integrity</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks if mandatory columns are present in the poses DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        df : pd.DataFrame</span>
+<span class="sd">            The DataFrame to check.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        pd.DataFrame</span>
+<span class="sd">            The validated DataFrame.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If mandatory columns are missing.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;input_poses&quot;</span><span class="p">,</span> <span class="s2">&quot;poses&quot;</span><span class="p">,</span> <span class="s2">&quot;poses_description&quot;</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">cols</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Corrupted Format: DataFrame does not contain mandatory Poses column </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">df</span></div>
+
+
+<div class="viewcode-block" id="Poses.split_multiline_fasta">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.split_multiline_fasta">[docs]</a>
+    <span class="k">def</span> <span class="nf">split_multiline_fasta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Splits multiline FASTA input files.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        path : str</span>
+<span class="sd">            The path to the multiline FASTA file.</span>
+<span class="sd">        encoding : str, optional</span>
+<span class="sd">            The encoding of the FASTA file. Default is &quot;UTF-8&quot;.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list[str]</span>
+<span class="sd">            List of paths to individual FASTA files.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;work_dir&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># read multilie-fasta file and split into individual poses</span>
+        <span class="n">fasta_dict</span> <span class="o">=</span> <span class="n">parse_fasta_to_dict</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span>
+
+        <span class="c1"># prepare descriptions in fasta_dict for writing:</span>
+        <span class="n">symbols_to_replace</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;[\/\-\:\ \.\|\,]&quot;</span>
+        <span class="n">fasta_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="n">symbols_to_replace</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">description</span><span class="p">):</span> <span class="n">seq</span> <span class="k">for</span> <span class="n">description</span><span class="p">,</span> <span class="n">seq</span> <span class="ow">in</span> <span class="n">fasta_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="c1"># setup fasta directory self.work_dir/input_fastas_split/</span>
+        <span class="n">output_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/input_fastas_split/&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">output_dir</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># write individual poses in fasta directory:</span>
+        <span class="n">out_poses</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">description</span><span class="p">,</span> <span class="n">seq</span> <span class="ow">in</span> <span class="n">fasta_dict</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">fp</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s2">.fa&quot;</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># check if files are already there. If contents do not match, write the new fasta-file</span>
+                <span class="n">subfasta_dict</span> <span class="o">=</span> <span class="n">parse_fasta_to_dict</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span>
+                <span class="n">x_desc</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">subfasta_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">x_seq</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">subfasta_dict</span><span class="o">.</span><span class="n">values</span><span class="p">())[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="k">if</span> <span class="n">description</span> <span class="o">!=</span> <span class="n">x_desc</span> <span class="ow">or</span> <span class="n">seq</span> <span class="o">!=</span> <span class="n">x_seq</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">FileNotFoundError</span>
+
+            <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fp</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&gt;</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">seq</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># add fasta path to out_poses:</span>
+            <span class="n">out_poses</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fp</span><span class="p">)</span>
+
+        <span class="c1"># return list containing paths to .fa files as poses.</span>
+        <span class="k">return</span> <span class="n">out_poses</span></div>
+
+
+<div class="viewcode-block" id="Poses.determine_pose_type">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.determine_pose_type">[docs]</a>
+    <span class="k">def</span> <span class="nf">determine_pose_type</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Checks the file extensions of poses and returns a list of extensions.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        pose_col : str, optional</span>
+<span class="sd">            The column to check for file extensions. Default is &#39;poses&#39;.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list</span>
+<span class="sd">            List of unique file extensions.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">extract_extension</span><span class="p">(</span><span class="n">file_path</span><span class="p">):</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">splitext</span><span class="p">(</span><span class="n">file_path</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ext</span>
+
+        <span class="n">pose_col</span> <span class="o">=</span> <span class="n">pose_col</span> <span class="ow">or</span> <span class="s1">&#39;poses&#39;</span>
+
+        <span class="c1"># extract extensions and create a set containing only unique values</span>
+        <span class="n">ext</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">pose_col</span><span class="p">]</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">extract_extension</span><span class="p">)</span><span class="o">.</span><span class="n">to_list</span><span class="p">()))</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ext</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Multiple file extensions present in poses: </span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ext</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ext</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">ext</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not determine file extension from poses!&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses identified as </span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s2"> files&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">ext</span>
+        <span class="k">return</span> <span class="p">[]</span></div>
+
+
+    <span class="c1">############################################ Input Methods ######################################</span>
+<div class="viewcode-block" id="Poses.load_poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.load_poses">[docs]</a>
+    <span class="k">def</span> <span class="nf">load_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Poses&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Loads Poses class from a stored DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        poses_path : str</span>
+<span class="sd">            The path to the stored DataFrame.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Poses</span>
+<span class="sd">            The updated Poses instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># read format</span>
+        <span class="n">load_function</span> <span class="o">=</span> <span class="n">get_format</span><span class="p">(</span><span class="n">poses_path</span><span class="p">)</span>
+
+        <span class="c1"># load df from file:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_poses</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">load_function</span><span class="p">(</span><span class="n">poses_path</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+    <span class="c1">############################################ Output Methods ######################################</span>
+<div class="viewcode-block" id="Poses.save_scores">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.save_scores">[docs]</a>
+    <span class="k">def</span> <span class="nf">save_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">out_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">out_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves the poses DataFrame as a scorefile.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        out_path : str, optional</span>
+<span class="sd">            The path to save the scorefile. Default is None.</span>
+<span class="sd">        out_format : str, optional</span>
+<span class="sd">            The format to save the scorefile. Default is None.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># setup defaults</span>
+        <span class="n">out_path</span> <span class="o">=</span> <span class="n">out_path</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">scorefile</span>
+        <span class="n">out_format</span> <span class="o">=</span> <span class="n">out_format</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">storage_format</span>
+
+        <span class="c1"># make sure the filename conforms to format</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">out_path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;.</span><span class="si">{</span><span class="n">out_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">):</span>
+            <span class="n">out_path</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;.</span><span class="si">{</span><span class="n">out_format</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">save_method_name</span> <span class="o">:=</span> <span class="n">FORMAT_STORAGE_DICT</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">out_format</span><span class="o">.</span><span class="n">lower</span><span class="p">())):</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">save_method_name</span><span class="p">)(</span><span class="n">out_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Poses.save_poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.save_poses">[docs]</a>
+    <span class="k">def</span> <span class="nf">save_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">out_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">poses_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;poses&quot;</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Saves current poses from the poses DataFrame to the specified path.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        out_path : str</span>
+<span class="sd">            The path to save the poses.</span>
+<span class="sd">        poses_col : str, optional</span>
+<span class="sd">            The column containing the poses to save. Default is &quot;poses&quot;.</span>
+<span class="sd">        overwrite : bool, optional</span>
+<span class="sd">            Whether to overwrite existing files. Default is True.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">poses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">poses_col</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+        <span class="n">new_poses</span> <span class="o">=</span> <span class="p">[</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">pose</span><span class="p">))</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">poses</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">out_path</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">out_path</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># check if poses are already at out_path, skip if overwrite is set to False</span>
+        <span class="k">if</span> <span class="nb">all</span><span class="p">((</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">new_poses</span><span class="p">))</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">overwrite</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses already found at </span><span class="si">{</span><span class="n">out_path</span><span class="si">}</span><span class="s2"> and overwrite is set to &#39;False&#39;. Skipping save_poses.&quot;</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="c1"># save poses</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Storing poses from column </span><span class="si">{</span><span class="n">poses_col</span><span class="si">}</span><span class="s2"> at </span><span class="si">{</span><span class="n">out_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">new_pose</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">new_poses</span><span class="p">):</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">new_pose</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Poses.poses_list">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.poses_list">[docs]</a>
+    <span class="k">def</span> <span class="nf">poses_list</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the current poses from the DataFrame as a list.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list</span>
+<span class="sd">            List of current poses.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span></div>
+
+
+    <span class="c1">########################################## Operations ###############################################</span>
+<div class="viewcode-block" id="Poses.get_pose">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.get_pose">[docs]</a>
+    <span class="k">def</span> <span class="nf">get_pose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_description</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Bio</span><span class="o">.</span><span class="n">PDB</span><span class="o">.</span><span class="n">Structure</span><span class="o">.</span><span class="n">Structure</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Loads a singular pose from the DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        pose_description : str</span>
+<span class="sd">            The description of the pose to load.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Bio.PDB.Structure.Structure</span>
+<span class="sd">            The loaded pose.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If the pose is not found in the poses DataFrame.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">pose_description</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;poses_description&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pose </span><span class="si">{</span><span class="n">pose_description</span><span class="si">}</span><span class="s2"> not Found in Poses DataFrame!&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">load_structure_from_pdbfile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;poses_description&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">pose_description</span><span class="p">][</span><span class="s2">&quot;poses&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="Poses.duplicate_poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.duplicate_poses">[docs]</a>
+    <span class="k">def</span> <span class="nf">duplicate_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">n_duplicates</span><span class="p">:</span><span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates pose duplicates with added index layers.</span>
+
+<span class="sd">        This function is intended to be used when multiple processing units are needed with distinct inputs.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        output_dir : str</span>
+<span class="sd">            The directory to save the duplicated poses.</span>
+<span class="sd">        n_duplicates : int</span>
+<span class="sd">            The number of duplicates to create.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">insert_index_layer</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">sep</span><span class="p">:</span><span class="nb">str</span><span class="o">=</span><span class="s2">&quot;_&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;inserts index layer.&#39;&#39;&#39;</span>
+            <span class="n">filepath</span><span class="p">,</span> <span class="n">filename</span> <span class="o">=</span> <span class="n">pose</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">description</span><span class="p">,</span> <span class="n">ext</span> <span class="o">=</span> <span class="n">filename</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">description</span><span class="si">}{</span><span class="n">sep</span><span class="si">}{</span><span class="nb">str</span><span class="p">(</span><span class="n">n</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">ext</span><span class="si">}</span><span class="s2">&quot;</span>
+
+        <span class="c1"># define outputs:</span>
+        <span class="n">output_files</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="n">insert_index_layer</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;_&quot;</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">poses_list</span><span class="p">()</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_duplicates</span><span class="p">)]</span>
+        <span class="n">output_dict</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;temp_dp_select_col&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">file_path</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">output_files</span><span class="p">],</span>
+            <span class="s2">&quot;temp_dp_description&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">file_path</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">file_path</span> <span class="ow">in</span> <span class="n">output_files</span><span class="p">],</span>
+            <span class="s2">&quot;temp_dp_location&quot;</span><span class="p">:</span> <span class="n">output_files</span>
+        <span class="p">}</span>
+
+        <span class="c1"># merge DataFrames:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">output_dict</span><span class="p">),</span> <span class="n">left_on</span><span class="o">=</span><span class="s2">&quot;poses_description&quot;</span><span class="p">,</span> <span class="n">right_on</span><span class="o">=</span><span class="s2">&quot;temp_dp_select_col&quot;</span><span class="p">)</span>
+
+        <span class="c1"># drop select_col and reset index:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;temp_dp_select_col&quot;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># check if outputs exist:</span>
+        <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">pose</span><span class="p">[</span><span class="s2">&quot;temp_dp_location&quot;</span><span class="p">]):</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">pose</span><span class="p">[</span><span class="s2">&quot;pose&quot;</span><span class="p">],</span> <span class="n">pose</span><span class="p">[</span><span class="s2">&quot;temp_dp_location&quot;</span><span class="p">])</span>
+
+        <span class="c1"># reset poses and poses_description columns</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;temp_dp_location&quot;</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;poses_description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Poses.reset_poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.reset_poses">[docs]</a>
+    <span class="k">def</span> <span class="nf">reset_poses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_poses_col</span><span class="p">:</span> <span class="nb">str</span><span class="o">=</span><span class="s1">&#39;input_poses&#39;</span><span class="p">,</span> <span class="n">force_reset_df</span><span class="p">:</span> <span class="nb">bool</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Resets poses to the poses in the specified column and updates the DataFrame.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        new_poses_col : str, optional</span>
+<span class="sd">            The column containing the new poses. Default is &#39;input_poses&#39;.</span>
+<span class="sd">        force_reset_df : bool, optional</span>
+<span class="sd">            Whether to force reset the DataFrame if the number of unique poses differs. Default is False.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        RuntimeError</span>
+<span class="sd">            If the number of unique poses differs and force_reset_df is False.</span>
+<span class="sd">        &quot;&quot;&quot;</span>        
+        <span class="k">def</span> <span class="nf">unique_ordered_list</span><span class="p">(</span><span class="n">original_list</span><span class="p">):</span>
+            <span class="n">seen</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># Initialize an empty set to track seen elements</span>
+            <span class="n">unique_list</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">original_list</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">item</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>  <span class="c1"># Check membership in the set, which is O(1) (faster lookup in sets than in lists)</span>
+                    <span class="n">unique_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+                    <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>  <span class="c1"># Add the item to the set</span>
+            <span class="k">return</span> <span class="n">unique_list</span>
+
+        <span class="n">col_in_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">new_poses_col</span><span class="p">)</span>
+
+        <span class="n">new_poses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">new_poses_col</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()</span>
+        <span class="c1"># handle multiline .fa inputs for poses!</span>
+        <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="n">new_poses</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pose</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.fa&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">pose</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.fasta&quot;</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">parse_fasta_to_dict</span><span class="p">(</span><span class="n">pose</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">new_poses</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span>
+                <span class="n">new_poses</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">split_multiline_fasta</span><span class="p">(</span><span class="n">pose</span><span class="p">)</span>
+
+        <span class="c1"># create unique poses</span>
+        <span class="n">new_poses</span> <span class="o">=</span> <span class="n">unique_ordered_list</span><span class="p">(</span><span class="n">new_poses</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_poses</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">):</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Different number of new poses (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">new_poses</span><span class="p">)</span><span class="si">}</span><span class="s2">) than number of original poses (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span><span class="si">}</span><span class="s2">)!&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">force_reset_df</span><span class="p">:</span>
+                <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Resetting poses dataframe. Be aware of the consequences like possibly reading in false outputs when reusing prefixes!&quot;</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;input_poses&quot;</span><span class="p">:</span> <span class="n">new_poses</span><span class="p">,</span> <span class="s2">&quot;poses&quot;</span><span class="p">:</span> <span class="n">new_poses</span><span class="p">,</span> <span class="s2">&quot;poses_description&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_descriptions</span><span class="p">(</span><span class="n">new_poses</span><span class="p">)})</span>
+            <span class="k">else</span><span class="p">:</span> <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not preserve original dataframe. You can set &lt;force_reset_df&gt; if you want to delete it, but be aware of the consequences like possibly reading in false outputs when reusing prefixes!&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_poses</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses_description&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">parse_descriptions</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">())</span></div>
+
+
+<div class="viewcode-block" id="Poses.set_motif">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.set_motif">[docs]</a>
+    <span class="k">def</span> <span class="nf">set_motif</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">motif_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Sets a motif attribute to be accessed by runners.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        motif_col : str</span>
+<span class="sd">            The column containing the motif to set.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        TypeError</span>
+<span class="sd">            If the objects in &#39;motif_col&#39; are not of type ResidueSelection.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># check if motif_col exists. check if all entries in motif col are ResidueSelection objects.</span>
+        <span class="n">col_in_df</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">motif_col</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">([</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">motif</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">)</span> <span class="k">for</span> <span class="n">motif</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">motif_col</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()]):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Setting a motif requires the objects in &#39;motif_col&#39; to be of type ResidueSelection. Check documentation of protflow.residues module for how to create the object (it&#39;s simple).&quot;</span><span class="p">)</span>
+
+        <span class="c1"># set motif</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">motifs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">motif_col</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Poses.convert_pdb_to_fasta">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.convert_pdb_to_fasta">[docs]</a>
+    <span class="k">def</span> <span class="nf">convert_pdb_to_fasta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">update_poses</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">chain_sep</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;:&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts PDB files to FASTA files.</span>
+
+<span class="sd">        The converted FASTA files are stored in the specified prefix directory. Optionally updates poses.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        prefix : str</span>
+<span class="sd">            The prefix for the directory where FASTA files will be stored.</span>
+<span class="sd">        update_poses : bool, optional</span>
+<span class="sd">            Whether to update poses with the converted FASTA files. Default is False.</span>
+<span class="sd">        chain_sep : str, optional</span>
+<span class="sd">            Separator for chains in the FASTA file. Default is &quot;:&quot;.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        RuntimeError</span>
+<span class="sd">            If poses are not of type .pdb.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">determine_pose_type</span><span class="p">()</span> <span class="o">==</span> <span class="p">[</span><span class="s1">&#39;.pdb&#39;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Poses must be of type .pdb, not </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">determine_pose_type</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">fasta_dir</span> <span class="o">:=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s1">_fasta_location&#39;</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">seqs</span> <span class="o">=</span> <span class="p">[</span><span class="n">get_sequence_from_pose</span><span class="p">(</span><span class="n">load_structure_from_pdbfile</span><span class="p">(</span><span class="n">path_to_pdb</span><span class="o">=</span><span class="n">pose</span><span class="p">),</span> <span class="n">chain_sep</span><span class="o">=</span><span class="n">chain_sep</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">()]</span>
+
+        <span class="n">fasta_paths</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">seq</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses_description&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span> <span class="n">seqs</span><span class="p">):</span>
+            <span class="n">fasta_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">fasta_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">.fasta&#39;</span><span class="p">)</span>
+            <span class="n">fasta_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">fasta_path</span><span class="p">)</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fasta_path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&gt;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">seq</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s1">_fasta_location&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fasta_paths</span>
+        <span class="k">if</span> <span class="n">update_poses</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">fasta_paths</span></div>
+
+
+    <span class="c1">########################################## Filtering ###############################################</span>
+<div class="viewcode-block" id="Poses.filter_poses_by_rank">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.filter_poses_by_rank">[docs]</a>
+    <span class="k">def</span> <span class="nf">filter_poses_by_rank</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">score_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">remove_layers</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">layer_col</span> <span class="o">=</span> <span class="s2">&quot;poses_description&quot;</span><span class="p">,</span> <span class="n">sep</span> <span class="o">=</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">ascending</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">plot</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">storage_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Poses&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Filters poses by a specified score term down to a fraction or a total number of poses.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        n : float</span>
+<span class="sd">            The fraction (0 to 1) or total number of poses to retain after filtering.</span>
+<span class="sd">        score_col : str</span>
+<span class="sd">            The column containing the scores by which the poses should be filtered.</span>
+<span class="sd">        remove_layers : int, optional</span>
+<span class="sd">            Number of index layers to remove to reach parent pose. Default is None.</span>
+<span class="sd">        layer_col : str, optional</span>
+<span class="sd">            The column containing the names of the poses. Default is &quot;poses_description&quot;.</span>
+<span class="sd">        sep : str, optional</span>
+<span class="sd">            Separator for pose names in layer_col. Default is &quot;_&quot;.</span>
+<span class="sd">        ascending : bool, optional</span>
+<span class="sd">            Whether to filter in ascending order. Default is True.</span>
+<span class="sd">        prefix : str, optional</span>
+<span class="sd">            Prefix for saving the filter output. Default is None.</span>
+<span class="sd">        plot : bool, optional</span>
+<span class="sd">            Whether to plot filtered statistics. Default is False.</span>
+<span class="sd">        overwrite : bool, optional</span>
+<span class="sd">            Whether to overwrite existing filter output. Default is True.</span>
+<span class="sd">        storage_format : str, optional</span>
+<span class="sd">            Format to save the filter output. Default is None.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Poses</span>
+<span class="sd">            The updated Poses instance.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        AttributeError</span>
+<span class="sd">            If filter directory or plots directory is not set.</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If the specified storage format is not available.</span>
+<span class="sd">        RuntimeError</span>
+<span class="sd">            If prefix is not set but plotting is requested.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># define filter output if &lt;prefix&gt; is provided, make sure output directory exists</span>
+        <span class="k">if</span> <span class="n">prefix</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filter directory was not set! Did you set a working directory? work_dir can be set with Poses.set_work_dir() and sets up a filter_dir automatically.&quot;</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filter_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="c1"># make sure output format is available</span>
+            <span class="n">storage_format</span> <span class="o">=</span> <span class="n">storage_format</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">storage_format</span>
+            <span class="k">if</span> <span class="n">storage_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">FORMAT_STORAGE_DICT</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Format </span><span class="si">{</span><span class="n">storage_format</span><span class="si">}</span><span class="s2"> not available. Format must be on of </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">FORMAT_STORAGE_DICT</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># set filter output name</span>
+            <span class="n">output_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filter_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_filter.</span><span class="si">{</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># load previous filter output if it exists and &lt;overwrite&gt; = False, set poses_df as filtered dataframe and return filtered dataframe</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">overwrite</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">output_name</span><span class="p">):</span>
+                <span class="n">filter_df</span> <span class="o">=</span> <span class="n">get_format</span><span class="p">(</span><span class="n">output_name</span><span class="p">)(</span><span class="n">output_name</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">filter_df</span>
+                <span class="k">return</span> <span class="n">filter_df</span>
+
+        <span class="c1"># Filter df down to the number of poses specified with &lt;n&gt;</span>
+        <span class="n">orig_len</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">))</span>
+        <span class="n">filter_df</span> <span class="o">=</span> <span class="n">filter_dataframe_by_rank</span><span class="p">(</span><span class="n">df</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="n">score_col</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">remove_layers</span><span class="o">=</span><span class="n">remove_layers</span><span class="p">,</span> <span class="n">layer_col</span><span class="o">=</span><span class="n">layer_col</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="n">sep</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="n">ascending</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filtered poses from </span><span class="si">{</span><span class="n">orig_len</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">filter_df</span><span class="p">))</span><span class="si">}</span><span class="s2"> poses.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># save filtered dataframe if prefix is provided</span>
+        <span class="k">if</span> <span class="n">prefix</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving filter output to </span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="n">save_method_name</span> <span class="o">=</span> <span class="n">FORMAT_STORAGE_DICT</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">storage_format</span><span class="p">)</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">filter_df</span><span class="p">,</span> <span class="n">save_method_name</span><span class="p">)(</span><span class="n">output_name</span><span class="p">)</span>
+
+        <span class="c1"># create filter-plots if specified.</span>
+        <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">prefix</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&lt;prefix&gt; was not set, but is mandatory for plotting!&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Plots directory was not set! Did you set a working directory?&quot;</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="n">out_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_filter.png&quot;</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating filter plot at </span><span class="si">{</span><span class="n">out_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">score_col</span><span class="p">]</span>
+            <span class="n">plots</span><span class="o">.</span><span class="n">violinplot_multiple_cols_dfs</span><span class="p">(</span>
+                <span class="n">dfs</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">filter_df</span><span class="p">],</span>
+                <span class="n">df_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Before Filtering&quot;</span><span class="p">,</span> <span class="s2">&quot;After Filtering&quot;</span><span class="p">],</span>
+                <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                <span class="n">y_labels</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                <span class="n">out_path</span><span class="o">=</span><span class="n">out_path</span>
+            <span class="p">)</span>
+
+        <span class="c1"># update object attributs [df]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">filter_df</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filtering completed.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+<div class="viewcode-block" id="Poses.filter_poses_by_value">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.filter_poses_by_value">[docs]</a>
+    <span class="k">def</span> <span class="nf">filter_poses_by_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">score_col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">operator</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">plot</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">storage_format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Poses&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Filters poses by a specified score column according to the provided value and operator.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        score_col : str</span>
+<span class="sd">            The column containing the scores by which the poses should be filtered.</span>
+<span class="sd">        value : float or int</span>
+<span class="sd">            The value to filter by.</span>
+<span class="sd">        operator : str</span>
+<span class="sd">            The comparison operator. Supported operators are &#39;&gt;&#39;,&#39;&gt;=&#39;, &#39;&lt;&#39;, &#39;&lt;=&#39;, &#39;=&#39;, &#39;!=&#39;.</span>
+<span class="sd">        prefix : str, optional</span>
+<span class="sd">            Prefix for saving the filter output. Default is None.</span>
+<span class="sd">        plot : bool, optional</span>
+<span class="sd">            Whether to plot filtered statistics. Default is False.</span>
+<span class="sd">        overwrite : bool, optional</span>
+<span class="sd">            Whether to overwrite existing filter output. Default is True.</span>
+<span class="sd">        storage_format : str, optional</span>
+<span class="sd">            Format to save the filter output. Default is None.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Poses</span>
+<span class="sd">            The updated Poses instance.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        AttributeError</span>
+<span class="sd">            If filter directory or plots directory is not set.</span>
+<span class="sd">        KeyError</span>
+<span class="sd">            If the specified storage format is not available.</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If all poses are removed after filtering.</span>
+<span class="sd">        RuntimeError</span>
+<span class="sd">            If prefix is not set but plotting is requested.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filtering poses according to column </span><span class="si">{</span><span class="n">score_col</span><span class="si">}</span><span class="s2"> with operator </span><span class="si">{</span><span class="n">operator</span><span class="si">}</span><span class="s2"> and target value </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># define filter output if &lt;prefix&gt; is provided, make sure output directory exists</span>
+        <span class="k">if</span> <span class="n">prefix</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">filter_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filter directory was not set! Did you set a working directory?&quot;</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filter_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="c1"># make sure output format is available</span>
+            <span class="n">storage_format</span> <span class="o">=</span> <span class="n">storage_format</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">storage_format</span>
+            <span class="k">if</span> <span class="n">storage_format</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">FORMAT_STORAGE_DICT</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Format </span><span class="si">{</span><span class="n">storage_format</span><span class="si">}</span><span class="s2"> not available. Format must be one of </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">FORMAT_STORAGE_DICT</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># set filter output name</span>
+            <span class="n">output_name</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filter_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_filter.</span><span class="si">{</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># load previous filter output if it exists and &lt;overwrite&gt; = False, set poses_df as filtered dataframe and return filtered dataframe</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">overwrite</span> <span class="ow">and</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isfile</span><span class="p">(</span><span class="n">output_name</span><span class="p">):</span>
+                <span class="n">filter_df</span> <span class="o">=</span> <span class="n">get_format</span><span class="p">(</span><span class="n">output_name</span><span class="p">)(</span><span class="n">output_name</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">filter_df</span>
+                <span class="k">return</span> <span class="n">filter_df</span>
+
+        <span class="c1"># Filter df down to the number of poses specified with &lt;n&gt;</span>
+        <span class="n">orig_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">)</span>
+        <span class="n">filter_df</span> <span class="o">=</span> <span class="n">filter_dataframe_by_value</span><span class="p">(</span><span class="n">df</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">col</span><span class="o">=</span><span class="n">score_col</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">operator</span><span class="o">=</span><span class="n">operator</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># make sure there are still poses left in the Poses class.</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">filter_df</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;All poses removed from Poses object. No pose fullfills the filtering criterium </span><span class="si">{</span><span class="n">operator</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2"> for score </span><span class="si">{</span><span class="n">score_col</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filtered poses from </span><span class="si">{</span><span class="n">orig_len</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">filter_df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span><span class="si">}</span><span class="s2"> poses.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># save filtered dataframe if prefix is provided</span>
+        <span class="k">if</span> <span class="n">prefix</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saving filter output to </span><span class="si">{</span><span class="n">output_name</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="n">save_method_name</span> <span class="o">=</span> <span class="n">FORMAT_STORAGE_DICT</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">storage_format</span><span class="p">)</span>
+            <span class="nb">getattr</span><span class="p">(</span><span class="n">filter_df</span><span class="p">,</span> <span class="n">save_method_name</span><span class="p">)(</span><span class="n">output_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">prefix</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&lt;prefix&gt; was not set, but is mandatory for plotting!&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Plots directory was not set! Did you set a working directory?&quot;</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">out_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">prefix</span><span class="si">}</span><span class="s2">_filter.png&quot;</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating filter plot at </span><span class="si">{</span><span class="n">out_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">score_col</span><span class="p">]</span>
+            <span class="n">plots</span><span class="o">.</span><span class="n">violinplot_multiple_cols_dfs</span><span class="p">(</span>
+                <span class="n">dfs</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">filter_df</span><span class="p">],</span>
+                <span class="n">df_names</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;Before Filtering&quot;</span><span class="p">,</span> <span class="s2">&quot;After Filtering&quot;</span><span class="p">],</span>
+                <span class="n">cols</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                <span class="n">y_labels</span><span class="o">=</span><span class="n">cols</span><span class="p">,</span>
+                <span class="n">out_path</span><span class="o">=</span><span class="n">out_path</span>
+            <span class="p">)</span>
+
+        <span class="c1"># update object attributs [df]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span> <span class="o">=</span> <span class="n">filter_df</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Filtering completed.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span></div>
+
+
+    <span class="c1">########################################## Score manipulation ###############################################</span>
+<div class="viewcode-block" id="Poses.calculate_composite_score">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.Poses.calculate_composite_score">[docs]</a>
+    <span class="k">def</span> <span class="nf">calculate_composite_score</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">scoreterms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">weights</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">plot</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">scale_output</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Poses&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Combines multiple score columns by weighted addition.</span>
+
+<span class="sd">        Individual score terms will be normalized before combination. </span>
+
+<span class="sd">        The score will be scaled from 0 to 1, with 1 indicating the best score.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        name : str</span>
+<span class="sd">            The name of the column that will contain the composite score.</span>
+<span class="sd">        scoreterms : list[str]</span>
+<span class="sd">            List of score column names.</span>
+<span class="sd">        weights : list[float]</span>
+<span class="sd">            List of weights for each score column. Scores will be multiplied by their respective weights </span>
+<span class="sd">            before addition.</span>
+<span class="sd">        plot : bool, optional</span>
+<span class="sd">            Whether to plot the composite score statistics. Default is False.</span>
+<span class="sd">        scale_output : bool, optional</span>
+<span class="sd">            Whether to scale the output from 0 to 1. Default is False.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Poses</span>
+<span class="sd">            The updated Poses instance.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        AttributeError</span>
+<span class="sd">            If plots directory is not set.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating composite score </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> for scoreterms </span><span class="si">{</span><span class="n">scoreterms</span><span class="si">}</span><span class="s2"> with weights </span><span class="si">{</span><span class="n">weights</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># check if output column already exists in dataframe</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">:</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> already exists in poses dataframe! It will be overwritten!&quot;</span><span class="p">)</span>
+        <span class="c1"># calculate composite score</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">combine_dataframe_score_columns</span><span class="p">(</span><span class="n">df</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span> <span class="n">scoreterms</span><span class="o">=</span><span class="n">scoreterms</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">weights</span><span class="p">,</span> <span class="n">scale</span><span class="o">=</span><span class="n">scale_output</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">plot</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">AttributeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Plots directory was not set! Did you set a working directory?&quot;</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">out_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">plots_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_comp_score.png&quot;</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Creating composite score plot at </span><span class="si">{</span><span class="n">out_path</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="n">scoreterms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">plots</span><span class="o">.</span><span class="n">violinplot_multiple_cols</span><span class="p">(</span>
+                <span class="n">dataframe</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">df</span><span class="p">,</span>
+                <span class="n">cols</span><span class="o">=</span><span class="n">scoreterms</span><span class="p">,</span>
+                <span class="n">titles</span><span class="o">=</span><span class="n">scoreterms</span><span class="p">,</span>
+                <span class="n">y_labels</span><span class="o">=</span><span class="n">scoreterms</span><span class="p">,</span>
+                <span class="n">dims</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                <span class="n">out_path</span><span class="o">=</span><span class="n">out_path</span>
+            <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_scores</span><span class="p">()</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Composite score creation completed.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span></div>
+</div>
+
+
+<div class="viewcode-block" id="normalize_series">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.normalize_series">[docs]</a>
+<span class="k">def</span> <span class="nf">normalize_series</span><span class="p">(</span><span class="n">ser</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">,</span> <span class="n">scale</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Normalizes a pandas series by subtracting the median and dividing by the standard deviation.</span>
+
+<span class="sd">    If scale is True, the normalized values will be scaled from 0 to 1.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ser : pd.Series</span>
+<span class="sd">        The pandas series to normalize.</span>
+<span class="sd">    scale : bool, optional</span>
+<span class="sd">        Whether to scale the normalized values from 0 to 1. Default is False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pd.Series</span>
+<span class="sd">        The normalized (and optionally scaled) series.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If the series contains non-numeric values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ser</span> <span class="o">=</span> <span class="n">ser</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="c1"># calculate median and standard deviation</span>
+    <span class="n">median</span> <span class="o">=</span> <span class="n">ser</span><span class="o">.</span><span class="n">median</span><span class="p">()</span>
+    <span class="n">std</span> <span class="o">=</span> <span class="n">ser</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+    <span class="c1"># check if all values in &lt;score_col&gt; are the same, return 0 if yes</span>
+    <span class="k">if</span> <span class="n">ser</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">ser</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">ser</span>
+    <span class="c1"># normalize score by subtracting median and dividing by standard deviation</span>
+    <span class="n">ser</span> <span class="o">=</span> <span class="p">(</span><span class="n">ser</span> <span class="o">-</span> <span class="n">median</span><span class="p">)</span> <span class="o">/</span> <span class="n">std</span>
+    <span class="c1"># scale output to values between 0 and 1</span>
+    <span class="k">if</span> <span class="n">scale</span><span class="p">:</span>
+        <span class="n">ser</span> <span class="o">=</span> <span class="n">scale_series</span><span class="p">(</span><span class="n">ser</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ser</span></div>
+
+
+<div class="viewcode-block" id="scale_series">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.scale_series">[docs]</a>
+<span class="k">def</span> <span class="nf">scale_series</span><span class="p">(</span><span class="n">ser</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Scales a pandas series to values between 0 and 1.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ser : pd.Series</span>
+<span class="sd">        The pandas series to scale.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pd.Series</span>
+<span class="sd">        The scaled series.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If the series contains non-numeric values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ser</span> <span class="o">=</span> <span class="n">ser</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="c1"># check if all values in &lt;score_col&gt; are the same, set all values to 0 if yes as no scaling is possible</span>
+    <span class="k">if</span> <span class="n">ser</span><span class="o">.</span><span class="n">nunique</span><span class="p">()</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">ser</span><span class="p">[:]</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">ser</span>
+    <span class="c1"># scale series to values between 0 and 1</span>
+    <span class="n">factor</span> <span class="o">=</span> <span class="n">ser</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">ser</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
+    <span class="n">ser</span> <span class="o">=</span> <span class="n">ser</span> <span class="o">/</span> <span class="n">factor</span>
+    <span class="n">ser</span> <span class="o">=</span> <span class="n">ser</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">ser</span><span class="o">.</span><span class="n">max</span><span class="p">())</span>
+
+    <span class="k">return</span> <span class="n">ser</span></div>
+
+
+<div class="viewcode-block" id="combine_dataframe_score_columns">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.combine_dataframe_score_columns">[docs]</a>
+<span class="k">def</span> <span class="nf">combine_dataframe_score_columns</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">scoreterms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">weights</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span> <span class="n">scale</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Combines multiple score columns by weighted addition.</span>
+
+<span class="sd">    Individual score terms will be normalized before combination. If scale is set, returns a series of values</span>
+<span class="sd">    scaled from 0 to 1, with 1 indicating the best scoring.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pd.DataFrame</span>
+<span class="sd">        The input DataFrame containing the score columns.</span>
+<span class="sd">    scoreterms : list[str]</span>
+<span class="sd">        List of score column names.</span>
+<span class="sd">    weights : list[float]</span>
+<span class="sd">        List of weights for each score column. Scores will be multiplied by their respective weights </span>
+<span class="sd">        before addition.</span>
+<span class="sd">    scale : bool, optional</span>
+<span class="sd">        Whether to scale the combined scores from 0 to 1. Default is False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pd.Series</span>
+<span class="sd">        The combined (and optionally scaled) series.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If the number of score terms and weights are not equal or if any score column contains non-numeric values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">scoreterms</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of scoreterms (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">scoreterms</span><span class="p">)</span><span class="si">}</span><span class="s2">) and weights (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span><span class="si">}</span><span class="s2">) must be equal!&quot;</span><span class="p">)</span>
+
+    <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">scoreterms</span><span class="p">:</span>
+        <span class="c1"># check if column contains only floats or integers, raise an error otherwise</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">to_numeric</span><span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">errors</span><span class="o">=</span><span class="s1">&#39;coerce&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">isna</span><span class="p">()</span><span class="o">.</span><span class="n">any</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Column </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> must only contain float or integers!&quot;</span><span class="p">)</span>
+
+        <span class="c1"># normalize scoreterm</span>
+        <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">=</span> <span class="n">normalize_series</span><span class="p">(</span><span class="n">ser</span><span class="o">=</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">],</span> <span class="n">scale</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># combine weighted scores</span>
+    <span class="n">combined_col</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">((</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">*</span><span class="n">weight</span> <span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">weight</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">scoreterms</span><span class="p">,</span> <span class="n">weights</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">scale_series</span><span class="p">(</span><span class="n">combined_col</span><span class="p">)</span> <span class="k">if</span> <span class="n">scale</span> <span class="k">else</span> <span class="n">combined_col</span></div>
+
+
+<div class="viewcode-block" id="get_format">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.get_format">[docs]</a>
+<span class="k">def</span> <span class="nf">get_format</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reads the file path extension and returns the corresponding pandas loading function.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    path : str</span>
+<span class="sd">        The file path.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    function</span>
+<span class="sd">        The pandas function to load the specified file format.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">loading_function_dict</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;json&quot;</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_json</span><span class="p">,</span>
+        <span class="s2">&quot;csv&quot;</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">,</span>
+        <span class="s2">&quot;pickle&quot;</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_pickle</span><span class="p">,</span>
+        <span class="s2">&quot;feather&quot;</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_feather</span><span class="p">,</span>
+        <span class="s2">&quot;parquet&quot;</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_parquet</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="n">loading_function_dict</span><span class="p">[</span><span class="n">path</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span></div>
+
+
+<div class="viewcode-block" id="load_poses">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.load_poses">[docs]</a>
+<span class="k">def</span> <span class="nf">load_poses</span><span class="p">(</span><span class="n">poses_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Poses</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Loads Poses class from a stored DataFrame.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    poses_path : str</span>
+<span class="sd">        The path to the stored DataFrame.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Poses</span>
+<span class="sd">        The Poses instance with the loaded DataFrame.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">Poses</span><span class="p">()</span><span class="o">.</span><span class="n">load_poses</span><span class="p">(</span><span class="n">poses_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="col_in_df">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.col_in_df">[docs]</a>
+<span class="k">def</span> <span class="nf">col_in_df</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">column</span><span class="p">:</span> <span class="nb">str</span><span class="o">|</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Checks if a column or list of columns exists in a DataFrame.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pd.DataFrame</span>
+<span class="sd">        The DataFrame to check.</span>
+<span class="sd">    column : Union[str, list[str]]</span>
+<span class="sd">        The column or list of columns to check for existence.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    KeyError</span>
+<span class="sd">        If any of the specified columns are not found in the DataFrame.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">column</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">column</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not find </span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2"> in poses dataframe! Are you sure you provided the right column name?&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">column</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Could not find </span><span class="si">{</span><span class="n">column</span><span class="si">}</span><span class="s2"> in poses dataframe! Are you sure you provided the right column name?&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="filter_dataframe_by_rank">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.filter_dataframe_by_rank">[docs]</a>
+<span class="k">def</span> <span class="nf">filter_dataframe_by_rank</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">float</span><span class="o">|</span><span class="nb">int</span><span class="p">,</span> <span class="n">remove_layers</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">layer_col</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;poses_description&quot;</span><span class="p">,</span> <span class="n">sep</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="n">ascending</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filters a DataFrame based on rankings in a specified column.</span>
+
+<span class="sd">    The remove_layers option allows filtering based on groupings after removing index layers.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pd.DataFrame</span>
+<span class="sd">        The DataFrame to filter.</span>
+<span class="sd">    col : str</span>
+<span class="sd">        The column to filter by.</span>
+<span class="sd">    n : Union[float, int]</span>
+<span class="sd">        The fraction (0 to 1) or total number of rows to retain after filtering.</span>
+<span class="sd">    remove_layers : int, optional</span>
+<span class="sd">        Number of index layers to remove to reach parent pose. Default is None.</span>
+<span class="sd">    layer_col : str, optional</span>
+<span class="sd">        The column containing the names of the poses. Default is &quot;poses_description&quot;.</span>
+<span class="sd">    sep : str, optional</span>
+<span class="sd">        Separator for pose names in layer_col. Default is &quot;_&quot;.</span>
+<span class="sd">    ascending : bool, optional</span>
+<span class="sd">        Whether to filter in ascending order. Default is True.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pd.DataFrame</span>
+<span class="sd">        The filtered DataFrame.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If n is less than or equal to 0.</span>
+<span class="sd">    TypeError</span>
+<span class="sd">        If remove_layers is not an integer.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">determine_filter_n</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">        determines if n is a fraction or an integer and sets cutoff for dataframe filtering accordingly.</span>
+<span class="sd">        &#39;&#39;&#39;</span>
+        <span class="n">filter_n</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">filter_n</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">filter_n</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">*</span> <span class="n">filter_n</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">filter_n</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ERROR: Argument &lt;n&gt; of filter functions cannot be smaller than 0. It has to be positive number. If n &lt; 1, the top n fraction is taken from the DataFrame. if n &gt; 1, the top n rows are taken from the DataFrame&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">filter_n</span><span class="p">)</span>
+
+    <span class="c1"># make sure &lt;col&gt; exists columns in &lt;df&gt;</span>
+    <span class="n">col_in_df</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">col</span><span class="p">)</span>
+
+    <span class="c1"># if remove_layers is set, compile list of unique pose descriptions after removing one index layer:</span>
+    <span class="k">if</span> <span class="n">remove_layers</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">remove_layers</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ERROR: only value of type &#39;int&#39; allowed for remove_layers. You set it to </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">remove_layers</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># make sure &lt;layer_col&gt; exists in df</span>
+        <span class="n">col_in_df</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">layer_col</span><span class="p">)</span>
+
+        <span class="c1"># create temporary description column with removed index layers</span>
+        <span class="n">df</span><span class="p">[</span><span class="s2">&quot;tmp_layer_column&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">layer_col</span><span class="p">]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">sep</span><span class="p">)</span><span class="o">.</span><span class="n">str</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="o">*</span><span class="nb">int</span><span class="p">(</span><span class="n">remove_layers</span><span class="p">)]</span><span class="o">.</span><span class="n">str</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">sep</span><span class="p">)</span>
+
+        <span class="c1"># group by temporary description column, filter top n rows per group</span>
+        <span class="n">filtered</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">group_df</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">&quot;tmp_layer_column&quot;</span><span class="p">,</span> <span class="n">sort</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">filtered</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">group_df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="n">col</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="n">ascending</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="n">determine_filter_n</span><span class="p">(</span><span class="n">group_df</span><span class="p">,</span> <span class="n">n</span><span class="p">)))</span>
+        <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">filtered</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1">#drop temporary description column</span>
+        <span class="n">filtered_df</span><span class="o">.</span><span class="n">drop</span><span class="p">(</span><span class="s2">&quot;tmp_layer_column&quot;</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="n">by</span><span class="o">=</span><span class="n">col</span><span class="p">,</span> <span class="n">ascending</span><span class="o">=</span><span class="n">ascending</span><span class="p">)</span><span class="o">.</span><span class="n">head</span><span class="p">(</span><span class="n">determine_filter_n</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="n">filtered_df</span></div>
+
+
+
+<div class="viewcode-block" id="filter_dataframe_by_value">
+<a class="viewcode-back" href="../../protflow.html#protflow.poses.filter_dataframe_by_value">[docs]</a>
+<span class="k">def</span> <span class="nf">filter_dataframe_by_value</span><span class="p">(</span><span class="n">df</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">,</span> <span class="n">col</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">float</span><span class="o">|</span><span class="nb">int</span><span class="p">,</span> <span class="n">operator</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Filters a DataFrame based on a value and a comparison operator.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    df : pd.DataFrame</span>
+<span class="sd">        The DataFrame to filter.</span>
+<span class="sd">    col : str</span>
+<span class="sd">        The column to filter by.</span>
+<span class="sd">    value : Union[float, int]</span>
+<span class="sd">        The value to filter by.</span>
+<span class="sd">    operator : str</span>
+<span class="sd">        The comparison operator. Supported operators are &#39;&gt;&#39;,&#39;&gt;=&#39;, &#39;&lt;&#39;, &#39;&lt;=&#39;, &#39;=&#39;, &#39;!=&#39;.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    pd.DataFrame</span>
+<span class="sd">        The filtered DataFrame.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    KeyError</span>
+<span class="sd">        If the specified operator is not supported.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># make sure &lt;col&gt; exists columns in &lt;df&gt;</span>
+    <span class="n">col_in_df</span><span class="p">(</span><span class="n">df</span><span class="p">,</span> <span class="n">col</span><span class="p">)</span>
+
+    <span class="c1"># Define the comparison based on the operator</span>
+    <span class="k">if</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;&gt;&#39;</span><span class="p">:</span> <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;&gt;=&#39;</span><span class="p">:</span> <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;&lt;&#39;</span><span class="p">:</span> <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;&lt;=&#39;</span><span class="p">:</span> <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;=&#39;</span><span class="p">:</span> <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">==</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">operator</span> <span class="o">==</span> <span class="s1">&#39;!=&#39;</span><span class="p">:</span> <span class="n">filtered_df</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">!=</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="s2">&quot;Invalid operator. Supported operators are &#39;&gt;&#39;,&#39;&gt;=&#39;, &#39;&lt;&#39;, &#39;&lt;=&#39;, &#39;=&#39;, &#39;!=&#39;.&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">filtered_df</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

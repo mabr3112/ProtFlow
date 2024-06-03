@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.residues &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.residues</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.residues</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">residues</span>
+<span class="sd">========</span>
+
+<span class="sd">The `residues` module is a part of the `protflow` package and is designed to handle residue selection and related operations in protein structures. This module provides functionality to parse, manipulate, and convert residue selections in various formats, making it an essential tool for bioinformatics and computational biology workflows.</span>
+
+<span class="sd">The module includes the `ResidueSelection` class for representing and manipulating selections of residues, as well as various functions for parsing and converting residue selections.</span>
+
+<span class="sd">Classes</span>
+<span class="sd">-------</span>
+
+<span class="sd">- `ResidueSelection`</span>
+<span class="sd">    Represents a selection of residues with functionality for parsing, converting, and manipulating selections.</span>
+
+<span class="sd">Functions</span>
+<span class="sd">---------</span>
+
+<span class="sd">- `fast_parse_selection`</span>
+<span class="sd">    Fast parser for selections already in `ResidueSelection` format.</span>
+<span class="sd">- `parse_selection`</span>
+<span class="sd">    Parses a selection into `ResidueSelection` formatted selection.</span>
+<span class="sd">- `parse_residue`</span>
+<span class="sd">    Parses a single residue identifier into a tuple (chain, residue_index).</span>
+<span class="sd">- `residue_selection`</span>
+<span class="sd">    Creates a `ResidueSelection` from a selection of residues.</span>
+<span class="sd">- `from_dict`</span>
+<span class="sd">    Creates a `ResidueSelection` object from a dictionary specifying a motif.</span>
+<span class="sd">- `from_contig`</span>
+<span class="sd">    Creates a `ResidueSelection` object from a contig string.</span>
+<span class="sd">- `reduce_to_unique`</span>
+<span class="sd">    Reduces an input array to its unique elements while preserving order.</span>
+
+<span class="sd">Example Usage</span>
+<span class="sd">-------------</span>
+
+<span class="sd">Creating and manipulating `ResidueSelection` objects:</span>
+
+<span class="sd">.. code-block:: python</span>
+<span class="sd">    </span>
+<span class="sd">    from residues import ResidueSelection, from_dict, from_contig</span>
+
+<span class="sd">    # Create a ResidueSelection from a list</span>
+<span class="sd">    selection = ResidueSelection([&quot;A1&quot;, &quot;A2&quot;, &quot;B3&quot;])</span>
+
+<span class="sd">    # Convert to string</span>
+<span class="sd">    selection_str = selection.to_string()</span>
+<span class="sd">    print(selection_str)</span>
+<span class="sd">    # Output: A1, A2, B3</span>
+
+<span class="sd">    # Convert to dictionary</span>
+<span class="sd">    selection_dict = selection.to_dict()</span>
+<span class="sd">    print(selection_dict)</span>
+<span class="sd">    # Output: {&#39;A&#39;: [1, 2], &#39;B&#39;: [3]}</span>
+
+<span class="sd">    # Create a ResidueSelection from a dictionary</span>
+<span class="sd">    selection_from_dict = from_dict({&quot;A&quot;: [1, 2], &quot;B&quot;: [3]})</span>
+<span class="sd">    print(selection_from_dict.to_string())</span>
+<span class="sd">    # Output: A1, A2, B3</span>
+
+<span class="sd">    # Create a ResidueSelection from a contig string</span>
+<span class="sd">    selection_from_contig = from_contig(&quot;A1-A3, B5&quot;)</span>
+<span class="sd">    print(selection_from_contig.to_string())</span>
+<span class="sd">    # Output: A1, A2, A3, B5</span>
+
+<span class="sd">This module simplifies the process of handling residue selections in bioinformatics workflows, providing a consistent interface for different types of input and output formats.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># imports</span>
+<span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">OrderedDict</span>
+
+<div class="viewcode-block" id="ResidueSelection">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.ResidueSelection">[docs]</a>
+<span class="k">class</span> <span class="nc">ResidueSelection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ResidueSelection</span>
+<span class="sd">    ================</span>
+
+<span class="sd">    A class to represent selections of residues in protein structures. A selection of residues is represented </span>
+<span class="sd">    as a tuple with the hierarchy ((chain, residue_idx), ...).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    selection : list, optional</span>
+<span class="sd">        A list of residues in string format, e.g., [&quot;A1&quot;, &quot;A2&quot;, &quot;B3&quot;]. Default is None.</span>
+<span class="sd">    delim : str, optional</span>
+<span class="sd">        The delimiter used to parse the selection string. Default is &quot;,&quot;.</span>
+<span class="sd">    fast : bool, optional</span>
+<span class="sd">        If True, parses the selection without any type checking. Use when `selection` is already in </span>
+<span class="sd">        ResidueSelection format. Default is False.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    residues : tuple</span>
+<span class="sd">        A tuple representing the parsed residues selection.</span>
+
+<span class="sd">    Methods</span>
+<span class="sd">    -------</span>
+<span class="sd">    from_selection(selection) -&gt; &quot;ResidueSelection&quot;</span>
+<span class="sd">        Constructs a ResidueSelection instance from the provided selection.</span>
+<span class="sd">    </span>
+<span class="sd">    to_string(delim: str = &quot;,&quot;, ordering: str = None) -&gt; str</span>
+<span class="sd">        Converts the ResidueSelection to a string.</span>
+
+<span class="sd">    to_list(ordering: str = None) -&gt; list[str]</span>
+<span class="sd">        Converts the ResidueSelection to a list of strings.</span>
+
+<span class="sd">    to_dict() -&gt; dict</span>
+<span class="sd">        Converts the ResidueSelection to a dictionary. Note: This destroys the ordering of specific residues </span>
+<span class="sd">        on the same chain in a motif.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; from residues import ResidueSelection</span>
+<span class="sd">    &gt;&gt;&gt; selection = ResidueSelection([&quot;A1&quot;, &quot;A2&quot;, &quot;B3&quot;])</span>
+<span class="sd">    &gt;&gt;&gt; print(selection.to_string())</span>
+<span class="sd">    A1, A2, B3</span>
+<span class="sd">    &gt;&gt;&gt; print(selection.to_dict())</span>
+<span class="sd">    {&#39;A&#39;: [1, 2], &#39;B&#39;: [3]}</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">selection</span><span class="p">:</span> <span class="nb">list</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">delim</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="p">,</span> <span class="n">fast</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">residues</span> <span class="o">=</span> <span class="n">parse_selection</span><span class="p">(</span><span class="n">selection</span><span class="p">,</span> <span class="n">delim</span><span class="o">=</span><span class="n">delim</span><span class="p">,</span> <span class="n">fast</span><span class="o">=</span><span class="n">fast</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;, &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">chain</span><span class="si">}{</span><span class="nb">str</span><span class="p">(</span><span class="n">resi</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">chain</span><span class="p">,</span> <span class="n">resi</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">])</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">residues</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__add__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ResidueSelection</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">residues</span> <span class="o">+</span> <span class="p">(</span><span class="n">other</span> <span class="o">-</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="n">residues</span><span class="p">,</span> <span class="n">fast</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">NotImplemented</span>
+
+    <span class="k">def</span> <span class="fm">__sub__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">ResidueSelection</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">ResidueSelection</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">res</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">residues</span> <span class="k">if</span> <span class="n">res</span> <span class="ow">not</span> <span class="ow">in</span> <span class="nb">set</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">residues</span><span class="p">)),</span> <span class="n">fast</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">NotImplemented</span>
+
+    <span class="c1">####################################### INPUT ##############################################</span>
+<div class="viewcode-block" id="ResidueSelection.from_selection">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.ResidueSelection.from_selection">[docs]</a>
+    <span class="k">def</span> <span class="nf">from_selection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">selection</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;ResidueSelection&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Constructs a ResidueSelection instance from the provided selection.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        selection : list or str</span>
+<span class="sd">            The selection of residues to be parsed.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        ResidueSelection</span>
+<span class="sd">            A new ResidueSelection instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">residue_selection</span><span class="p">(</span><span class="n">selection</span><span class="p">)</span></div>
+
+
+    <span class="c1">####################################### OUTPUT #############################################</span>
+<div class="viewcode-block" id="ResidueSelection.to_string">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.ResidueSelection.to_string">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_string</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">delim</span><span class="p">:</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="p">,</span> <span class="n">ordering</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts the ResidueSelection to a string.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        delim : str, optional</span>
+<span class="sd">            The delimiter to use in the resulting string. Default is &quot;,&quot;.</span>
+<span class="sd">        ordering : str, optional</span>
+<span class="sd">            Specifies the ordering of the residues in the output string. Options are &quot;rosetta&quot; or &quot;pymol&quot;.</span>
+<span class="sd">            Default is None.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str</span>
+<span class="sd">            ResidueSelection object formatted as a string, separated by :delim:</span>
+<span class="sd">            ueSelection.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; selection = ResidueSelection([&quot;A1&quot;, &quot;A2&quot;, &quot;B3&quot;])</span>
+<span class="sd">        &gt;&gt;&gt; print(selection.to_string())</span>
+<span class="sd">        A1, A2, B3</span>
+<span class="sd">        &gt;&gt;&gt; print(selection.to_string(ordering=&quot;rosetta&quot;))</span>
+<span class="sd">        1A, 2A, 3B</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ordering</span> <span class="o">=</span> <span class="n">ordering</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ordering</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;rosetta&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">delim</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">+</span> <span class="n">chain</span> <span class="k">for</span> <span class="n">chain</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">ordering</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;pymol&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">delim</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">chain</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">chain</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">delim</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">chain</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">chain</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="ResidueSelection.to_list">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.ResidueSelection.to_list">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ordering</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts the ResidueSelection to a list of strings.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        ordering : str, optional</span>
+<span class="sd">            Specifies the ordering of the residues in the output list. Options are &quot;rosetta&quot; or &quot;pymol&quot;.</span>
+<span class="sd">            Default is None.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        list of str</span>
+<span class="sd">            The list representation of the ResidueSelection.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; selection = ResidueSelection([&quot;A1&quot;, &quot;A2&quot;, &quot;B3&quot;])</span>
+<span class="sd">        &gt;&gt;&gt; print(selection.to_list())</span>
+<span class="sd">        [&#39;A1&#39;, &#39;A2&#39;, &#39;B3&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; print(selection.to_list(ordering=&quot;rosetta&quot;))</span>
+<span class="sd">        [&#39;1A&#39;, &#39;2A&#39;, &#39;3B&#39;]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">ordering</span> <span class="o">=</span> <span class="n">ordering</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">ordering</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;rosetta&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">+</span> <span class="n">chain</span> <span class="k">for</span> <span class="n">chain</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">ordering</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;pymol&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">chain</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">chain</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">chain</span><span class="o">+</span><span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="k">for</span> <span class="n">chain</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="bp">self</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="ResidueSelection.to_dict">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.ResidueSelection.to_dict">[docs]</a>
+    <span class="k">def</span> <span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Converts the ResidueSelection to a dictionary. </span>
+
+<span class="sd">        Note</span>
+<span class="sd">        ----</span>
+<span class="sd">        Converting to a dictionary destroys the ordering of specific residues on the same chain in a motif.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        dict</span>
+<span class="sd">            A dictionary representation of the ResidueSelection with chains as keys and lists of residue </span>
+<span class="sd">            indices as values.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        &gt;&gt;&gt; selection = ResidueSelection([&quot;A1&quot;, &quot;A2&quot;, &quot;B3&quot;])</span>
+<span class="sd">        &gt;&gt;&gt; print(selection.to_dict())</span>
+<span class="sd">        {&#39;A&#39;: [1, 2], &#39;B&#39;: [3]}</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># collect list of chains and setup chains as dictionary keys</span>
+        <span class="n">chains</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">([</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">residues</span><span class="p">]))</span>
+        <span class="n">out_d</span> <span class="o">=</span> <span class="p">{</span><span class="n">chain</span><span class="p">:</span> <span class="p">[]</span> <span class="k">for</span> <span class="n">chain</span> <span class="ow">in</span> <span class="n">chains</span><span class="p">}</span>
+
+        <span class="c1"># aggregate all residues to the chains and return</span>
+        <span class="k">for</span> <span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">res_id</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">residues</span><span class="p">:</span>
+            <span class="n">out_d</span><span class="p">[</span><span class="n">chain</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">res_id</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">out_d</span></div>
+</div>
+
+
+<div class="viewcode-block" id="fast_parse_selection">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.fast_parse_selection">[docs]</a>
+<span class="k">def</span> <span class="nf">fast_parse_selection</span><span class="p">(</span><span class="n">input_selection</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Fast selection parser for pre-formatted selections.</span>
+
+<span class="sd">    This function is a fast parser for residue selections that are already in the `ResidueSelection` format.</span>
+<span class="sd">    It bypasses any additional type checking or parsing to improve performance when the input is guaranteed</span>
+<span class="sd">    to be correctly formatted.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_selection : tuple of tuple of (str, int)</span>
+<span class="sd">        A tuple of tuples where each inner tuple represents a residue with the format (chain, residue_index).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple of tuple of (str, int)</span>
+<span class="sd">        The input selection, unchanged.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; input_selection = ((&quot;A&quot;, 1), (&quot;B&quot;, 2), (&quot;C&quot;, 3))</span>
+<span class="sd">    &gt;&gt;&gt; fast_parse_selection(input_selection)</span>
+<span class="sd">    ((&#39;A&#39;, 1), (&#39;B&#39;, 2), (&#39;C&#39;, 3))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">input_selection</span></div>
+
+
+<div class="viewcode-block" id="parse_selection">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.parse_selection">[docs]</a>
+<span class="k">def</span> <span class="nf">parse_selection</span><span class="p">(</span><span class="n">input_selection</span><span class="p">,</span> <span class="n">delim</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="p">,</span> <span class="n">fast</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="nb">int</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parses a selection into ResidueSelection formatted selection.</span>
+
+<span class="sd">    This function takes a selection of residues in various formats and parses it into the `ResidueSelection` </span>
+<span class="sd">    format, which is a tuple of tuples. Each inner tuple represents a residue with the format (chain, residue_index).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_selection : str, list, or tuple</span>
+<span class="sd">        The selection of residues to be parsed. This can be:</span>
+<span class="sd">        - A string with residues separated by a delimiter.</span>
+<span class="sd">        - A list or tuple of residue strings.</span>
+<span class="sd">        - A list or tuple of lists/tuples, where each inner list/tuple represents a residue.</span>
+<span class="sd">    delim : str, optional</span>
+<span class="sd">        The delimiter used to split the input string if `input_selection` is a string. Default is &quot;,&quot;.</span>
+<span class="sd">    fast : bool, optional</span>
+<span class="sd">        If True, uses `fast_parse_selection` to bypass type checking and parsing for performance reasons.</span>
+<span class="sd">        Use when `input_selection` is already in the correct format. Default is False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple of tuple of (str, int)</span>
+<span class="sd">        A tuple of tuples where each inner tuple represents a residue in the format (chain, residue_index).</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    TypeError</span>
+<span class="sd">        If `input_selection` is not a supported type (str, list, or tuple).</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; parse_selection(&quot;A1, B2, C3&quot;)</span>
+<span class="sd">    ((&#39;A&#39;, 1), (&#39;B&#39;, 2), (&#39;C&#39;, 3))</span>
+
+<span class="sd">    &gt;&gt;&gt; parse_selection([&quot;A1&quot;, &quot;B2&quot;, &quot;C3&quot;])</span>
+<span class="sd">    ((&#39;A&#39;, 1), (&#39;B&#39;, 2), (&#39;C&#39;, 3))</span>
+
+<span class="sd">    &gt;&gt;&gt; parse_selection([[&quot;A&quot;, 1], [&quot;B&quot;, 2], [&quot;C&quot;, 3]])</span>
+<span class="sd">    ((&#39;A&#39;, 1), (&#39;B&#39;, 2), (&#39;C&#39;, 3))</span>
+
+<span class="sd">    &gt;&gt;&gt; parse_selection([(&quot;A&quot;, 1), (&quot;B&quot;, 2), (&quot;C&quot;, 3)], fast=True)</span>
+<span class="sd">    ((&#39;A&#39;, 1), (&#39;B&#39;, 2), (&#39;C&#39;, 3))</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">fast</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">fast_parse_selection</span><span class="p">(</span><span class="n">input_selection</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_selection</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">parse_residue</span><span class="p">(</span><span class="n">residue</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">input_selection</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">delim</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_selection</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">input_selection</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">residue</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">input_selection</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">parse_residue</span><span class="p">(</span><span class="n">residue</span><span class="p">)</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">input_selection</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">residue</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">residue</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">input_selection</span><span class="p">):</span>
+            <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">parse_residue</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">str</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">residue</span><span class="p">]))</span> <span class="k">for</span> <span class="n">residue</span> <span class="ow">in</span> <span class="n">input_selection</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported Input type for parameter &#39;input_selection&#39; </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">input_selection</span><span class="p">)</span><span class="si">}</span><span class="s2">. Only str and list allowed.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="parse_residue">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.parse_residue">[docs]</a>
+<span class="k">def</span> <span class="nf">parse_residue</span><span class="p">(</span><span class="n">residue_identifier</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Parses a single residue identifier into a tuple (chain, residue_index).</span>
+
+<span class="sd">    This function takes a residue identifier string and parses it into a tuple containing the chain identifier</span>
+<span class="sd">    and the residue index. It currently only supports single-letter chain identifiers.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    residue_identifier : str</span>
+<span class="sd">        A string representing the residue identifier. The format is expected to be either &quot;chain+residue_index&quot; </span>
+<span class="sd">        or &quot;residue_index+chain&quot;, where &quot;chain&quot; is a single letter and &quot;residue_index&quot; is an integer.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple of (str, int)</span>
+<span class="sd">        A tuple containing the chain identifier and the residue index.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; parse_residue(&quot;A123&quot;)</span>
+<span class="sd">    (&#39;A&#39;, 123)</span>
+
+<span class="sd">    &gt;&gt;&gt; parse_residue(&quot;123A&quot;)</span>
+<span class="sd">    (&#39;A&#39;, 123)</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - The function determines whether the chain identifier is at the beginning or the end of the string based </span>
+<span class="sd">      on whether the first character is a digit.</span>
+<span class="sd">    - Only single-letter chain identifiers are supported.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">chain_first</span> <span class="o">=</span> <span class="ow">not</span> <span class="n">residue_identifier</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">isdigit</span><span class="p">()</span>
+
+    <span class="c1"># assemble residue tuple</span>
+    <span class="n">chain</span> <span class="o">=</span> <span class="n">residue_identifier</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">chain_first</span> <span class="k">else</span> <span class="n">residue_identifier</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="n">residue_index</span> <span class="o">=</span> <span class="n">residue_identifier</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">if</span> <span class="n">chain_first</span> <span class="k">else</span> <span class="n">residue_identifier</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># Convert residue_index to int for accurate typing</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">residue_index</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="residue_selection">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.residue_selection">[docs]</a>
+<span class="k">def</span> <span class="nf">residue_selection</span><span class="p">(</span><span class="n">input_selection</span><span class="p">,</span> <span class="n">delim</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;,&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResidueSelection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a ResidueSelection from a selection of residues.</span>
+
+<span class="sd">    This function takes an input selection of residues in various formats and creates a `ResidueSelection` </span>
+<span class="sd">    object. The selection can be provided as a string, list, or tuple.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_selection : str, list, or tuple</span>
+<span class="sd">        The selection of residues to be parsed. This can be:</span>
+<span class="sd">            - A string with residues separated by a delimiter.</span>
+<span class="sd">            - A list or tuple of residue strings.</span>
+<span class="sd">            - A list or tuple of lists/tuples, where each inner list/tuple represents a residue.</span>
+<span class="sd">    delim : str, optional</span>
+<span class="sd">        The delimiter used to split the input string if `input_selection` is a string. Default is &quot;,&quot;.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ResidueSelection</span>
+<span class="sd">        An instance of the `ResidueSelection` class representing the parsed selection of residues.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; residue_selection(&quot;A1, B2, C3&quot;)</span>
+<span class="sd">    &lt;ResidueSelection object representing (&#39;A&#39;, 1), (&#39;B&#39;, 2), (&#39;C&#39;, 3)&gt;</span>
+
+<span class="sd">    &gt;&gt;&gt; residue_selection([&quot;A1&quot;, &quot;B2&quot;, &quot;C3&quot;])</span>
+<span class="sd">    &lt;ResidueSelection object representing (&#39;A&#39;, 1), (&#39;B&#39;, 2), (&#39;C&#39;, 3)&gt;</span>
+
+<span class="sd">    &gt;&gt;&gt; residue_selection([[&quot;A&quot;, 1], [&quot;B&quot;, 2], [&quot;C&quot;, 3]])</span>
+<span class="sd">    &lt;ResidueSelection object representing (&#39;A&#39;, 1), (&#39;B&#39;, 2), (&#39;C&#39;, 3)&gt;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">ResidueSelection</span><span class="p">(</span><span class="n">input_selection</span><span class="p">,</span> <span class="n">delim</span><span class="o">=</span><span class="n">delim</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="from_dict">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.from_dict">[docs]</a>
+<span class="k">def</span> <span class="nf">from_dict</span><span class="p">(</span><span class="n">input_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResidueSelection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a ResidueSelection object from a dictionary.</span>
+
+<span class="sd">    This function constructs a `ResidueSelection` instance from a dictionary where the keys represent </span>
+<span class="sd">    chain identifiers and the values are lists of residue indices. This format specifies a motif in the </span>
+<span class="sd">    following way: {chain: [residues], ...}.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_dict : dict</span>
+<span class="sd">        A dictionary specifying the motif. The keys are chain identifiers (str) and the values are lists </span>
+<span class="sd">        of residue indices (int).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ResidueSelection</span>
+<span class="sd">        An instance of the `ResidueSelection` class representing the parsed selection of residues.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; input_dict = {&quot;A&quot;: [1, 2], &quot;B&quot;: [3, 4]}</span>
+<span class="sd">    &gt;&gt;&gt; from_dict(input_dict)</span>
+<span class="sd">    &lt;ResidueSelection object representing (&#39;A&#39;, 1), (&#39;A&#39;, 2), (&#39;B&#39;, 3), (&#39;B&#39;, 4)&gt;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">ResidueSelection</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">chain</span><span class="si">}{</span><span class="n">resi</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">chain</span><span class="p">,</span> <span class="n">res_l</span> <span class="ow">in</span> <span class="n">input_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">for</span> <span class="n">resi</span> <span class="ow">in</span> <span class="n">res_l</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="from_contig">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.from_contig">[docs]</a>
+<span class="k">def</span> <span class="nf">from_contig</span><span class="p">(</span><span class="n">input_contig</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ResidueSelection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Creates a ResidueSelection object from a contig string.</span>
+
+<span class="sd">    This function constructs a `ResidueSelection` instance from a contig string. The contig string can specify </span>
+<span class="sd">    ranges of residues using a hyphen (-) to denote the range, with residues separated by commas (,). For example, </span>
+<span class="sd">    &quot;A1-A3, B5&quot; specifies residues A1, A2, A3, and B5.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_contig : str</span>
+<span class="sd">        A contig string specifying the residues. Ranges can be denoted using hyphens, and residues are separated </span>
+<span class="sd">        by commas.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    ResidueSelection</span>
+<span class="sd">        An instance of the `ResidueSelection` class representing the parsed selection of residues.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; from_contig(&quot;A1-A3, B5&quot;)</span>
+<span class="sd">    &lt;ResidueSelection object representing (&#39;A&#39;, 1), (&#39;A&#39;, 2), (&#39;A&#39;, 3), (&#39;B&#39;, 5)&gt;</span>
+
+<span class="sd">    &gt;&gt;&gt; from_contig(&quot;C1, C3-C5, D2&quot;)</span>
+<span class="sd">    &lt;ResidueSelection object representing (&#39;C&#39;, 1), (&#39;C&#39;, 3), (&#39;C&#39;, 4), (&#39;C&#39;, 5), (&#39;D&#39;, 2)&gt;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">sel</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">elements</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">input_contig</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">x</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">elements</span><span class="p">:</span>
+        <span class="n">subsplit</span> <span class="o">=</span> <span class="n">element</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">subsplit</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">sel</span> <span class="o">+=</span> <span class="p">[</span><span class="n">element</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">subsplit</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">:]),</span> <span class="nb">int</span><span class="p">(</span><span class="n">subsplit</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">+</span><span class="mi">1</span><span class="p">)]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sel</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">element</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">ResidueSelection</span><span class="p">(</span><span class="n">sel</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="reduce_to_unique">
+<a class="viewcode-back" href="../../protflow.html#protflow.residues.reduce_to_unique">[docs]</a>
+<span class="k">def</span> <span class="nf">reduce_to_unique</span><span class="p">(</span><span class="n">input_array</span><span class="p">:</span> <span class="nb">list</span><span class="o">|</span><span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="o">|</span><span class="nb">tuple</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reduces an input array to its unique elements while preserving order.</span>
+
+<span class="sd">    This function takes a list or tuple and returns a new list or tuple containing only the unique elements </span>
+<span class="sd">    from the input, with their original order preserved. The type of the returned collection matches the type </span>
+<span class="sd">    of the input.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    input_array : list or tuple</span>
+<span class="sd">        The input array from which to remove duplicate elements. The order of the elements is preserved.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    list or tuple</span>
+<span class="sd">        A new list or tuple containing only the unique elements from the input array, with the original order </span>
+<span class="sd">        preserved.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; reduce_to_unique([1, 2, 2, 3, 1])</span>
+<span class="sd">    [1, 2, 3]</span>
+
+<span class="sd">    &gt;&gt;&gt; reduce_to_unique((&quot;a&quot;, &quot;b&quot;, &quot;a&quot;, &quot;c&quot;, &quot;b&quot;))</span>
+<span class="sd">    (&#39;a&#39;, &#39;b&#39;, &#39;c&#39;)</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - The function uses `OrderedDict.fromkeys` to remove duplicates while preserving order.</span>
+<span class="sd">    - The returned collection is of the same type as the input (list or tuple).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="n">input_array</span><span class="p">)(</span><span class="n">OrderedDict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">input_array</span><span class="p">))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
