@@ -219,18 +219,21 @@ class AttnPacker(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
+        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
 
         # setup attnpacker specific dirs:
         pdb_dir = os.path.join(work_dir, 'output_pdbs')
         if not os.path.isdir(pdb_dir): os.makedirs(pdb_dir, exist_ok=True)
 
-        # Look for output-file in pdb-dir. If output is present and correct, then skip LigandMPNN.
+        # Look for output-file in pdb-dir. If output is present and correct, then skip attnpacker.
         scorefile = os.path.join(work_dir, f"attnpacker_scores.{poses.storage_format}")
 
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             if overwrite:
+                logging.warning(f"Removing previously generated scorefile at {scorefile}")
                 os.remove(scorefile)
             else:
+                logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
                 return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
 
         # parse options and pose_options:
@@ -248,10 +251,13 @@ class AttnPacker(Runner):
             output_path=f"{work_dir}/"
         )
 
-        logging.info(f"attnpacker.py finished, collecting scores.")
+        logging.info(f"{self} finished, collecting scores.")
         # TODO: this is not done gracefully, too lazy to fix atm
         scores = pd.read_csv(scorefile)
+        logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
+
+        logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 

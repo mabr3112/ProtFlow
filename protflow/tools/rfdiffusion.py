@@ -288,9 +288,12 @@ class RFdiffusion(Runner):
         if not os.path.isdir(pdb_dir):
             os.makedirs(pdb_dir, exist_ok=True)
 
+        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
+
         # Look for output-file in pdb-dir. If output is present and correct, then skip diffusion step.
         scorefile = os.path.join(work_dir, f"rfdiffusion_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
             if update_motifs:
                 self.remap_motifs(
@@ -343,11 +346,15 @@ class RFdiffusion(Runner):
         # update residue mappings for stored motifs
         poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
         if update_motifs:
+            logging.info(f"Updating residue motifs for {update_motifs}.")
             self.remap_motifs(
                 poses = poses,
                 motifs = update_motifs,
                 prefix = prefix
             )
+
+        logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
+
         return poses
 
     def remap_motifs(self, poses: Poses, motifs: list, prefix: str) -> None:

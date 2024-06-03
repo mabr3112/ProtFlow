@@ -265,9 +265,12 @@ class ProteinGenerator(Runner):
         if not os.path.isdir((pdb_dir := f"{work_dir}/output_pdbs/")):
             os.makedirs(pdb_dir, exist_ok=True)
 
+        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
+
         # Look for output-file in pdb-dir. If output is present and correct, then skip protein_generator.
         scorefile = os.path.join(work_dir, f"protein_generator_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
 
@@ -291,6 +294,8 @@ class ProteinGenerator(Runner):
         # write scorefile
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
+
+        logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
