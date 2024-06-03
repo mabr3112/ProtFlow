@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.tools.colabfold &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.tools.colabfold</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.tools.colabfold</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">ColabFold Module</span>
+<span class="sd">================</span>
+
+<span class="sd">This module provides functionality to integrate ColabFold within the ProtFlow framework, enabling the execution of AlphaFold2 runs on ColabFold. It includes tools to handle inputs, execute runs, and process outputs in a structured and automated manner.</span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `ColabFold` class encapsulates all necessary functionalities to run AlphaFold2 through ColabFold. It manages the configuration of essential scripts and paths, sets up the environment, and handles the execution of prediction processes. The class also includes methods for collecting and processing output data, ensuring the results are organized and accessible for further analysis within the ProtFlow ecosystem.</span>
+
+<span class="sd">This module streamlines the integration of ColabFold into larger computational workflows by supporting the automatic setup of job parameters, execution of ColabFold commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create an instance of the `ColabFold` class and invoke its `run` method with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the prediction process is provided through various parameters, allowing for customized runs tailored to specific research needs.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `ColabFold` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from colabfold import ColabFold</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = LocalJobStarter(max_cores=4)</span>
+
+<span class="sd">    # Initialize the ColabFold class</span>
+<span class="sd">    colabfold = ColabFold()</span>
+
+<span class="sd">    # Run the prediction process</span>
+<span class="sd">    results = colabfold.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        jobstarter=jobstarter,</span>
+<span class="sd">        options=&quot;--msa-mode single-sequence&quot;,</span>
+<span class="sd">        pose_options=None,</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">- **Edge Cases:** The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the prediction process.</span>
+<span class="sd">- **Customizability:** Users can customize the prediction process through multiple parameters, including the number of diffusions, specific options for the ColabFold script, and options for handling pose-specific parameters.</span>
+<span class="sd">- **Integration:** The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate ColabFold into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Authors</span>
+<span class="sd">-------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># general imports</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">glob</span> <span class="kn">import</span> <span class="n">glob</span>
+<span class="kn">import</span> <span class="nn">shutil</span>
+
+<span class="c1"># dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="c1"># custom</span>
+<span class="kn">import</span> <span class="nn">protflow.config</span>
+<span class="kn">import</span> <span class="nn">protflow.jobstarters</span>
+<span class="kn">import</span> <span class="nn">protflow.tools</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">RunnerOutput</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+
+<div class="viewcode-block" id="Colabfold">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.colabfold.Colabfold">[docs]</a>
+<span class="k">class</span> <span class="nc">Colabfold</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    ColabFold Class</span>
+<span class="sd">    ===============</span>
+
+<span class="sd">    The `ColabFold` class is a specialized class designed to facilitate the execution of AlphaFold2 within the ColabFold environment as part of the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with AlphaFold2 prediction processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `ColabFold` class manages all aspects of running AlphaFold2 predictions through ColabFold. It handles the configuration of necessary scripts and executables, prepares the environment for the prediction processes, and executes the prediction commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to ColabFold scripts and necessary directories.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of AlphaFold2 prediction commands with support for batch processing.</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">        - Managing input FASTA files and preparing them for prediction.</span>
+<span class="sd">        - Overwriting previous results if specified.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `ColabFold` class, configured to run AlphaFold2 prediction processes and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">        - TypeError: If pose options are not of the expected type.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `ColabFold` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from colabfold import ColabFold</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the ColabFold class</span>
+<span class="sd">        colabfold = ColabFold()</span>
+
+<span class="sd">        # Run the prediction process</span>
+<span class="sd">        results = colabfold.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            options=&quot;inference.num_designs=10&quot;,</span>
+<span class="sd">            pose_options=[&quot;inference.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the prediction process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The ColabFold class is intended for researchers and developers who need to perform AlphaFold2 predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="Colabfold.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.colabfold.Colabfold.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">script_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">COLABFOLD_SCRIPT_PATH</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        __init__ Method</span>
+<span class="sd">        ===============</span>
+
+<span class="sd">        The `__init__` method initializes an instance of the `ColabFold` class, setting up necessary configurations for running AlphaFold2 predictions through ColabFold within the ProtFlow framework.</span>
+
+<span class="sd">        Detailed Description</span>
+<span class="sd">        --------------------</span>
+<span class="sd">        This method sets up the paths to the ColabFold script and initializes default values for various attributes required for running predictions. It also allows for the optional configuration of a job starter.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            script_path (str, optional): The path to the ColabFold script. Defaults to `protflow.config.COLABFOLD_SCRIPT_PATH`.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the `JobStarter` class for managing job execution. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the `script_path` is not provided.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to initialize the `ColabFold` class:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            from colabfold import ColabFold</span>
+
+<span class="sd">            # Initialize the ColabFold class</span>
+<span class="sd">            colabfold = ColabFold(script_path=&#39;/path/to/colabfold.py&#39;, jobstarter=jobstarter)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">script_path</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;No path is set for </span><span class="si">{</span><span class="bp">self</span><span class="si">}</span><span class="s2">. Set the path in the config.py file under COLABFOLD_DIR_PATH.&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">script_path</span> <span class="o">=</span> <span class="n">script_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;colabfold.py&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;colabfold.py&quot;</span>
+
+<div class="viewcode-block" id="Colabfold.run">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.colabfold.Colabfold.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">return_top_n_poses</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RunnerOutput</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        run Method</span>
+<span class="sd">        ==========</span>
+
+<span class="sd">        The `run` method of the `ColabFold` class executes AlphaFold2 predictions using ColabFold within the ProtFlow framework. It manages the setup, execution, and result collection processes, providing a streamlined way to integrate AlphaFold2 predictions into larger computational workflows.</span>
+
+<span class="sd">        Detailed Description</span>
+<span class="sd">        --------------------</span>
+<span class="sd">        This method orchestrates the entire prediction process, from preparing input data and configuring the environment to running the prediction commands and collecting the results. The method supports batch processing of input FASTA files and handles various edge cases, such as overwriting existing results and managing job starter options.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+<span class="sd">            options (str, optional): Additional options for the AlphaFold2 prediction commands. Defaults to None.</span>
+<span class="sd">            pose_options (str, optional): Specific options for handling pose-related parameters during prediction. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, existing results will be overwritten. Defaults to False.</span>
+<span class="sd">            return_top_n_poses (int, optional): The number of top poses to return based on the prediction scores. Defaults to 1.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            RunnerOutput: An object containing the results of the AlphaFold2 predictions, organized in a pandas DataFrame.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">            TypeError: If pose options are not of the expected type.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to use the `run` method of the `ColabFold` class:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            from protflow.poses import Poses</span>
+<span class="sd">            from protflow.jobstarters import JobStarter</span>
+<span class="sd">            from colabfold import ColabFold</span>
+
+<span class="sd">            # Create instances of necessary classes</span>
+<span class="sd">            poses = Poses()</span>
+<span class="sd">            jobstarter = JobStarter()</span>
+
+<span class="sd">            # Initialize the ColabFold class</span>
+<span class="sd">            colabfold = ColabFold()</span>
+
+<span class="sd">            # Run the prediction process</span>
+<span class="sd">            results = colabfold.run(</span>
+<span class="sd">                poses=poses,</span>
+<span class="sd">                prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                jobstarter=jobstarter,</span>
+<span class="sd">                options=&quot;inference.num_designs=10&quot;,</span>
+<span class="sd">                pose_options=[&quot;inference.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">                overwrite=True</span>
+<span class="sd">            )</span>
+
+<span class="sd">            # Access and process the results</span>
+<span class="sd">            print(results)</span>
+<span class="sd">        </span>
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">            - **Batch Processing:** The method can handle large sets of input sequences by batching them into smaller groups, which helps in managing computational resources effectively.</span>
+<span class="sd">            - **Overwrite Handling:** If `overwrite` is set to True, the method will clean up previous results, ensuring that the new predictions do not get mixed up with old data.</span>
+<span class="sd">            - **Job Starter Configuration:** The method allows for flexible job management by accepting a `JobStarter` instance. If not provided, it uses the default job starter associated with the poses.</span>
+<span class="sd">            - **Score Collection:** The method gathers the prediction scores and relevant data into a pandas DataFrame, facilitating easy analysis and integration with other ProtFlow components.</span>
+<span class="sd">            - **Error Handling:** Robust error handling is incorporated to manage issues such as missing files or incorrect configurations, ensuring that the process can be debugged and verified efficiently.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># setup runner</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Look for output-file in pdb-dir. If output is present and correct, then skip Colabfold.</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;colabfold_scores.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">scores</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">output</span> <span class="o">=</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">output</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">overwrite</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">fasta_dir</span> <span class="o">:=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;input_fastas&quot;</span><span class="p">)):</span> <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">fasta_dir</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">af2_preds_dir</span> <span class="o">:=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;af2_preds&quot;</span><span class="p">)):</span> <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">af2_preds_dir</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">af2_pdb_dir</span> <span class="o">:=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;output_pdbs&quot;</span><span class="p">)):</span> <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">af2_pdb_dir</span><span class="p">)</span>
+
+        <span class="c1"># setup af2-specific directories:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">fasta_dir</span> <span class="o">:=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;input_fastas&quot;</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">af2_preds_dir</span> <span class="o">:=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;af2_preds&quot;</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">af2_pdb_dir</span> <span class="o">:=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;output_pdbs&quot;</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># setup input-fastas in batches (to speed up prediction times.), but only if no pose_options are provided!</span>
+        <span class="n">num_batches</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span> <span class="k">if</span> <span class="n">pose_options</span> <span class="k">else</span> <span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span>
+        <span class="n">pose_fastas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_fastas_for_prediction</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;poses&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span> <span class="n">fasta_dir</span><span class="o">=</span><span class="n">fasta_dir</span><span class="p">,</span> <span class="n">max_filenum</span><span class="o">=</span><span class="n">num_batches</span><span class="p">)</span>
+
+        <span class="c1"># prepare pose options</span>
+        <span class="n">pose_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_pose_options</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="o">=</span><span class="n">pose_options</span><span class="p">)</span>
+
+        <span class="c1"># write colabfold cmds:</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">pose_opt</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">pose_fastas</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">):</span>
+            <span class="n">cmds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">af2_preds_dir</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="o">=</span><span class="n">pose_opt</span><span class="p">))</span>
+
+        <span class="c1"># run</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Starting AF2 predictions of </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span><span class="si">}</span><span class="s2"> sequences on </span><span class="si">{</span><span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span><span class="si">}</span><span class="s2"> cores.&quot;</span><span class="p">)</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span><span class="o">=</span><span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span><span class="o">=</span><span class="s2">&quot;colabfold&quot;</span><span class="p">,</span>
+            <span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">output_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># collect scores</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Predictions finished, starting to collect scores.&quot;</span><span class="p">)</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">collect_scores</span><span class="p">(</span><span class="n">work_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">num_return_poses</span><span class="o">=</span><span class="n">return_top_n_poses</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="Colabfold.prep_fastas_for_prediction">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.colabfold.Colabfold.prep_fastas_for_prediction">[docs]</a>
+    <span class="k">def</span> <span class="nf">prep_fastas_for_prediction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">fasta_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">max_filenum</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        prep_fastas_for_prediction Method</span>
+<span class="sd">        =================================</span>
+
+<span class="sd">        The `prep_fastas_for_prediction` method prepares input FASTA files for AlphaFold2 predictions by splitting the input sequences into batches and writing them to files.</span>
+
+<span class="sd">        Detailed Description</span>
+<span class="sd">        --------------------</span>
+<span class="sd">        This method divides the input protein sequences into batches, which can help in managing computational resources effectively. It writes the batches into FASTA files stored in the specified directory.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (list[str]): List of paths to input FASTA files.</span>
+<span class="sd">            fasta_dir (str): Directory where the new FASTA files will be written.</span>
+<span class="sd">            max_filenum (int): Maximum number of FASTA files to write.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[str]: List of paths to the prepared FASTA files.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to use the `prep_fastas_for_prediction` method:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            # Prepare input FASTA files for prediction</span>
+<span class="sd">            fastas = colabfold.prep_fastas_for_prediction(poses=poses_list, fasta_dir=&#39;/path/to/fasta_dir&#39;, max_filenum=10)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">def</span> <span class="nf">mergefastas</span><span class="p">(</span><span class="n">files</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">replace</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">            Merges Fastas located in &lt;files&gt; into one single fasta-file called &lt;path&gt;</span>
+<span class="sd">            &#39;&#39;&#39;</span>
+            <span class="n">fastas</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">fp</span> <span class="ow">in</span> <span class="n">files</span><span class="p">:</span>
+                <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fp</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                    <span class="n">fastas</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">strip</span><span class="p">())</span>
+
+            <span class="k">if</span> <span class="n">replace</span><span class="p">:</span>
+                <span class="n">fastas</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">replace</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">replace</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">fastas</span><span class="p">]</span>
+
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;UTF-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+                <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">fastas</span><span class="p">))</span>
+
+            <span class="k">return</span> <span class="n">path</span>
+
+        <span class="c1"># determine how to split the poses into &lt;max_gpus&gt; fasta files:</span>
+        <span class="n">splitnum</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">max_filenum</span> <span class="k">else</span> <span class="n">max_filenum</span>
+        <span class="n">poses_split</span> <span class="o">=</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">array_split</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">splitnum</span><span class="p">))]</span>
+
+        <span class="c1"># Write fasta files according to the fasta_split determined above and then return:</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">mergefastas</span><span class="p">(</span><span class="n">files</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">fasta_dir</span><span class="si">}</span><span class="s2">/fasta_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">.fa&quot;</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span><span class="s2">&quot;:&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">poses</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">poses_split</span><span class="p">)]</span></div>
+
+
+
+<div class="viewcode-block" id="Colabfold.write_cmd">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.colabfold.Colabfold.write_cmd">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_cmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        write_cmd Method</span>
+<span class="sd">        ================</span>
+
+<span class="sd">        The `write_cmd` method constructs the command string necessary to run the ColabFold script with the specified options and input files.</span>
+
+<span class="sd">        Detailed Description</span>
+<span class="sd">        --------------------</span>
+<span class="sd">        This method generates the command string used to execute the ColabFold script. It incorporates various options and pose-specific parameters provided by the user.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose_path (str): Path to the input FASTA file.</span>
+<span class="sd">            output_dir (str): Directory where the prediction outputs will be stored.</span>
+<span class="sd">            options (str, optional): Additional options for the ColabFold script. Defaults to None.</span>
+<span class="sd">            pose_options (str, optional): Specific options for handling pose-related parameters. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The constructed command string.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            None</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to use the `write_cmd` method:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            # Write the command to run ColabFold</span>
+<span class="sd">            cmd = colabfold.write_cmd(pose_path=&#39;/path/to/pose.fa&#39;, output_dir=&#39;/path/to/output_dir&#39;, options=&#39;--num_designs=10&#39;, pose_options=&#39;--input_pdb=input.pdb&#39;)</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="o">=</span><span class="n">pose_options</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;--&quot;</span><span class="p">)</span>
+        <span class="n">opts</span> <span class="o">=</span> <span class="s2">&quot; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;--</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span>
+        <span class="n">flags</span> <span class="o">=</span> <span class="s2">&quot; --&quot;</span> <span class="o">+</span> <span class="s2">&quot; --&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">flags</span><span class="p">)</span> <span class="k">if</span> <span class="n">flags</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">script_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">opts</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">flags</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">pose_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2"> &quot;</span></div>
+
+
+<div class="viewcode-block" id="Colabfold.collect_scores">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.colabfold.Colabfold.collect_scores">[docs]</a>
+    <span class="k">def</span> <span class="nf">collect_scores</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">work_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">num_return_poses</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        collect_scores Method</span>
+<span class="sd">        =====================</span>
+
+<span class="sd">        The `collect_scores` method collects and processes the prediction scores from the ColabFold output, organizing them into a pandas DataFrame for further analysis.</span>
+
+<span class="sd">        Detailed Description</span>
+<span class="sd">        --------------------</span>
+<span class="sd">        This method gathers the prediction scores from the output files generated by ColabFold. It processes these scores and organizes them into a structured DataFrame, which includes various statistical measures.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            work_dir (str): The working directory where the ColabFold outputs are stored.</span>
+<span class="sd">            num_return_poses (int, optional): The number of top poses to return based on the prediction scores. Defaults to 1.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            pd.DataFrame: A DataFrame containing the collected and processed scores.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If no output files are found in the specified directory.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Here is an example of how to use the `collect_scores` method:</span>
+
+<span class="sd">        .. code-block:: python</span>
+
+<span class="sd">            # Collect and process the prediction scores</span>
+<span class="sd">            scores = colabfold.collect_scores(work_dir=&#39;/path/to/work_dir&#39;, num_return_poses=5)     </span>
+<span class="sd">        </span>
+<span class="sd">        Further Details</span>
+<span class="sd">        ---------------</span>
+<span class="sd">            - **JSON and PDB File Parsing:** The method identifies and parses JSON and PDB files generated by ColabFold, extracting relevant score information from these files.</span>
+<span class="sd">            - **Statistical Measures:** For each set of predictions, the method calculates various statistics, including mean pLDDT, max PAE, and PTM scores, organizing these measures into the DataFrame.</span>
+<span class="sd">            - **Rank and Description:** The scores are ranked and annotated with descriptions to help identify the top poses based on prediction quality.</span>
+<span class="sd">            - **File Handling:** The method includes robust file handling to ensure that only the relevant files are processed, and any existing files are correctly identified or overwritten as needed.</span>
+<span class="sd">            - **Pose Location:** The final DataFrame includes the file paths to the predicted PDB files, facilitating easy access for further analysis or visualization.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span> <span class="nf">get_json_files_of_description</span><span class="p">(</span><span class="n">description</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">input_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">sorted</span><span class="p">([</span><span class="n">filepath</span> <span class="k">for</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">input_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s2">*rank*.json&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s2">_scores_rank_..._.*_model_._seed_...\.json&quot;</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)])</span> <span class="c1"># pylint: disable=W1401</span>
+
+        <span class="k">def</span> <span class="nf">get_pdb_files_of_description</span><span class="p">(</span><span class="n">description</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">input_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">sorted</span><span class="p">([</span><span class="n">filepath</span> <span class="k">for</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">input_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s2">*rank*.pdb&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">description</span><span class="si">}</span><span class="s2">_.?.?relaxed_rank_..._.*_model_._seed_...\.pdb&quot;</span><span class="p">,</span> <span class="n">filepath</span><span class="p">)])</span> <span class="c1"># pylint: disable=W1401</span>
+
+        <span class="k">def</span> <span class="nf">get_json_pdb_tuples_from_description</span><span class="p">(</span><span class="n">description</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">input_dir</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;Collects af2-output scores.json and .pdb file for a given &#39;description&#39; as corresponding tuples (by sorting).&#39;&#39;&#39;</span>
+            <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">get_json_files_of_description</span><span class="p">(</span><span class="n">description</span><span class="p">,</span> <span class="n">input_dir</span><span class="p">),</span> <span class="n">get_pdb_files_of_description</span><span class="p">(</span><span class="n">description</span><span class="p">,</span> <span class="n">input_dir</span><span class="p">)))</span>
+
+        <span class="k">def</span> <span class="nf">calc_statistics_over_af2_models</span><span class="p">(</span><span class="n">index</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">input_tuple_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span><span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">            index: &quot;description&quot; (name) of the pose.</span>
+<span class="sd">            takes list of .json files from af2_predictions and collects scores (mean_plddt, max_plddt, etc.)</span>
+<span class="sd">            &#39;&#39;&#39;</span>
+            <span class="c1"># no statistics to calculate if only one model was used:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">input_tuple_list</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">input_tuple_list</span><span class="p">))</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">input_tuple_list</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">json_path</span><span class="p">,</span> <span class="n">input_pdb</span> <span class="o">=</span> <span class="n">input_tuple_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                <span class="n">df</span> <span class="o">=</span> <span class="n">summarize_af2_json</span><span class="p">(</span><span class="n">json_path</span><span class="p">,</span> <span class="n">input_pdb</span><span class="p">)</span>
+                <span class="n">df</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">index</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+                <span class="n">df</span><span class="p">[</span><span class="s2">&quot;rank&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="k">return</span> <span class="n">df</span>
+
+            <span class="c1"># otherwise collect scores from individual .json files of models for each input fasta into one DF</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">summarize_af2_json</span><span class="p">(</span><span class="n">json_path</span><span class="p">,</span> <span class="n">input_pdb</span><span class="p">)</span> <span class="k">for</span> <span class="p">(</span><span class="n">json_path</span><span class="p">,</span> <span class="n">input_pdb</span><span class="p">)</span> <span class="ow">in</span> <span class="n">input_tuple_list</span><span class="p">],</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">&quot;json_file&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="c1"># assign rank (for tracking) and extract &#39;description&#39;</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">&quot;rank&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="n">df</span><span class="p">[</span><span class="s2">&quot;description&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">index</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="o">.</span><span class="n">zfill</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">index</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+
+            <span class="c1"># calculate statistics</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;plddt&#39;</span><span class="p">,</span> <span class="s1">&#39;max_pae&#39;</span><span class="p">,</span> <span class="s1">&#39;ptm&#39;</span><span class="p">]:</span>
+                <span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;mean_</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+                <span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;std_</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()</span>
+                <span class="n">df</span><span class="p">[</span><span class="sa">f</span><span class="s2">&quot;top_</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="p">[</span><span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">df</span>
+
+        <span class="k">def</span> <span class="nf">summarize_af2_json</span><span class="p">(</span><span class="n">json_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">input_pdb</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
+<span class="w">            </span><span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">            Takes raw AF2_scores.json file and calculates mean pLDDT over the entire structure, also puts perresidue pLDDTs and paes in list.</span>
+<span class="sd">            </span>
+<span class="sd">            Returns pd.DataFrame</span>
+<span class="sd">            &#39;&#39;&#39;</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_json</span><span class="p">(</span><span class="n">json_path</span><span class="p">)</span>
+            <span class="n">means</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">numeric_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">to_frame</span><span class="p">()</span><span class="o">.</span><span class="n">T</span> <span class="c1"># pylint: disable=E1101</span>
+            <span class="n">means</span><span class="p">[</span><span class="s2">&quot;plddt_list&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;plddt&quot;</span><span class="p">]]</span>
+            <span class="n">means</span><span class="p">[</span><span class="s2">&quot;pae_list&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;pae&quot;</span><span class="p">]]</span>
+            <span class="n">means</span><span class="p">[</span><span class="s2">&quot;json_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">json_path</span>
+            <span class="n">means</span><span class="p">[</span><span class="s2">&quot;pdb_file&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_pdb</span>
+            <span class="k">return</span> <span class="n">means</span>
+
+        <span class="c1"># create pdb_dir</span>
+        <span class="n">pdb_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;output_pdbs&quot;</span><span class="p">)</span>
+        <span class="n">preds_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s2">&quot;af2_preds&quot;</span><span class="p">)</span>
+
+        <span class="c1"># collect all unique &#39;descriptions&#39; leading to predictions</span>
+        <span class="n">descriptions</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.done.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">preds_dir</span><span class="si">}</span><span class="s2">/*.done.txt&quot;</span><span class="p">)]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">descriptions</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ERROR: No AF2 prediction output found at </span><span class="si">{</span><span class="n">preds_dir</span><span class="si">}</span><span class="s2"> Are you sure it was the correct path?&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Collect all .json and corresponding .pdb files of each &#39;description&#39; into a dictionary. (This collects scores from all 5 models)</span>
+        <span class="n">scores_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">description</span><span class="p">:</span> <span class="n">get_json_pdb_tuples_from_description</span><span class="p">(</span><span class="n">description</span><span class="p">,</span> <span class="n">preds_dir</span><span class="p">)</span> <span class="k">for</span> <span class="n">description</span> <span class="ow">in</span> <span class="n">descriptions</span><span class="p">}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">scores_dict</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="s2">&quot;No .json files were matched to the AF2 output regex. Check AF2 run logs. Either AF2 crashed or the AF2 regex is outdated (check at function &#39;collect_af2_scores()&#39;&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Calculate statistics over prediction scores for each of the five models.</span>
+        <span class="n">scores_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">([</span><span class="n">calc_statistics_over_af2_models</span><span class="p">(</span><span class="n">description</span><span class="p">,</span> <span class="n">af2_output_tuple_list</span><span class="p">)</span> <span class="k">for</span> <span class="n">description</span><span class="p">,</span> <span class="n">af2_output_tuple_list</span> <span class="ow">in</span> <span class="n">scores_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()])</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Return only top n poses</span>
+        <span class="n">scores_df</span> <span class="o">=</span> <span class="n">scores_df</span><span class="p">[</span><span class="n">scores_df</span><span class="p">[</span><span class="s1">&#39;rank&#39;</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">num_return_poses</span><span class="p">]</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Copy poses to pdb_dir and store location in DataFrame</span>
+        <span class="n">scores_df</span><span class="o">.</span><span class="n">loc</span><span class="p">[:,</span> <span class="s2">&quot;location&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">shutil</span><span class="o">.</span><span class="n">copy</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;pdb_file&#39;</span><span class="p">],</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">row</span><span class="p">[</span><span class="s1">&#39;description&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.pdb&quot;</span><span class="p">))</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">scores_df</span><span class="o">.</span><span class="n">iterrows</span><span class="p">()]</span>
+        <span class="n">scores_df</span><span class="o">.</span><span class="n">drop</span><span class="p">([</span><span class="s1">&#39;pdb_file&#39;</span><span class="p">,</span> <span class="s1">&#39;json_file&#39;</span><span class="p">],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">scores_df</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

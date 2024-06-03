@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>protflow.tools.attnpacker &mdash; ProtFlow 1.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=8d563738"></script>
+        <script src="../../../_static/doctools.js?v=9a2dae69"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            ProtFlow
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../protflow.html">protflow package</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">ProtFlow</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">protflow.tools.attnpacker</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for protflow.tools.attnpacker</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">AttnPacker Module</span>
+<span class="sd">=================</span>
+
+<span class="sd">This module provides the functionality to integrate AttnPacker within the ProtFlow framework. It offers tools to run AttnPacker, handle its inputs and outputs, and process the resulting data in a structured and automated manner.</span>
+
+<span class="sd">Detailed Description</span>
+<span class="sd">--------------------</span>
+<span class="sd">The `AttnPacker` class encapsulates the functionality necessary to execute AttnPacker runs. It manages the configuration of paths to essential scripts and Python executables, sets up the environment, and handles the execution of packing processes. It also includes methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem. </span>
+<span class="sd">The module is designed to streamline the integration of AttnPacker into larger computational workflows. It supports the automatic setup of job parameters, execution of AttnPacker commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.</span>
+
+<span class="sd">Usage</span>
+<span class="sd">-----</span>
+<span class="sd">To use this module, create an instance of the `AttnPacker` class and invoke its `run` method with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the packing process is provided through various parameters, allowing for customized runs tailored to specific research needs.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">Here is an example of how to initialize and use the `AttnPacker` class within a ProtFlow pipeline:</span>
+
+<span class="sd">.. code-block:: python</span>
+
+<span class="sd">    from protflow.poses import Poses</span>
+<span class="sd">    from protflow.jobstarters import JobStarter</span>
+<span class="sd">    from attnpacker import AttnPacker</span>
+
+<span class="sd">    # Create instances of necessary classes</span>
+<span class="sd">    poses = Poses()</span>
+<span class="sd">    jobstarter = JobStarter()</span>
+
+<span class="sd">    # Initialize the AttnPacker class</span>
+<span class="sd">    attnpacker = AttnPacker()</span>
+
+<span class="sd">    # Run the packing process</span>
+<span class="sd">    results = attnpacker.run(</span>
+<span class="sd">        poses=poses,</span>
+<span class="sd">        prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">        jobstarter=jobstarter,</span>
+<span class="sd">        options=&quot;packing.num_designs=10&quot;,</span>
+<span class="sd">        pose_options=[&quot;packing.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">        overwrite=True</span>
+<span class="sd">    )</span>
+
+<span class="sd">    # Access and process the results</span>
+<span class="sd">    print(results)</span>
+
+<span class="sd">Further Details</span>
+<span class="sd">---------------</span>
+<span class="sd">    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the packing process.</span>
+<span class="sd">    - Customizability: Users can customize the packing process through multiple parameters, including the number of packings, specific options for the AttnPacker script, and options for handling pose-specific parameters.</span>
+<span class="sd">    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.</span>
+
+<span class="sd">This module is intended for researchers and developers who need to incorporate AttnPacker into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.</span>
+
+<span class="sd">Authors</span>
+<span class="sd">-------</span>
+<span class="sd">Markus Braun, Adrian Tripp</span>
+
+<span class="sd">Version</span>
+<span class="sd">-------</span>
+<span class="sd">0.1.0</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="c1"># general imports</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+
+<span class="c1"># dependencies</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+
+<span class="c1"># custom</span>
+<span class="kn">import</span> <span class="nn">protflow.config</span>
+<span class="kn">import</span> <span class="nn">protflow.jobstarters</span>
+<span class="kn">import</span> <span class="nn">protflow.tools</span>
+<span class="kn">from</span> <span class="nn">protflow.poses</span> <span class="kn">import</span> <span class="n">Poses</span>
+<span class="kn">from</span> <span class="nn">protflow.runners</span> <span class="kn">import</span> <span class="n">Runner</span><span class="p">,</span> <span class="n">RunnerOutput</span>
+<span class="kn">from</span> <span class="nn">protflow.jobstarters</span> <span class="kn">import</span> <span class="n">JobStarter</span>
+
+<div class="viewcode-block" id="AttnPacker">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.attnpacker.AttnPacker">[docs]</a>
+<span class="k">class</span> <span class="nc">AttnPacker</span><span class="p">(</span><span class="n">Runner</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    AttnPacker Class</span>
+<span class="sd">    ================</span>
+
+<span class="sd">    The `AttnPacker` class is a specialized class designed to facilitate the execution of AttnPacker within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with packing processes.</span>
+
+<span class="sd">    Detailed Description</span>
+<span class="sd">    --------------------</span>
+<span class="sd">    The `AttnPacker` class manages all aspects of running AttnPacker simulations. It handles the configuration of necessary scripts and executables, prepares the environment for packing processes, and executes the packing commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.</span>
+
+<span class="sd">    Key functionalities include:</span>
+<span class="sd">        - Setting up paths to AttnPacker scripts and Python executables.</span>
+<span class="sd">        - Configuring job starter options, either automatically or manually.</span>
+<span class="sd">        - Handling the execution of AttnPacker commands with support for multiple packings.</span>
+<span class="sd">        - Collecting and processing output data into a pandas DataFrame.</span>
+<span class="sd">        - Ensuring robust error handling and logging for easier debugging and verification.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    An instance of the `AttnPacker` class, configured to run AttnPacker processes and handle outputs efficiently.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">        - FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">        - ValueError: If invalid arguments are provided to the methods.</span>
+<span class="sd">        - KeyError: If forbidden options are included in the command parameters.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Here is an example of how to initialize and use the `AttnPacker` class:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        from protflow.poses import Poses</span>
+<span class="sd">        from protflow.jobstarters import JobStarter</span>
+<span class="sd">        from attnpacker import AttnPacker</span>
+
+<span class="sd">        # Create instances of necessary classes</span>
+<span class="sd">        poses = Poses()</span>
+<span class="sd">        jobstarter = JobStarter()</span>
+
+<span class="sd">        # Initialize the AttnPacker class</span>
+<span class="sd">        attnpacker = AttnPacker()</span>
+
+<span class="sd">        # Run the packing process</span>
+<span class="sd">        results = attnpacker.run(</span>
+<span class="sd">            poses=poses,</span>
+<span class="sd">            prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">            jobstarter=jobstarter,</span>
+<span class="sd">            options=&quot;packing.num_designs=10&quot;,</span>
+<span class="sd">            pose_options=[&quot;packing.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">            overwrite=True</span>
+<span class="sd">        )</span>
+
+<span class="sd">        # Access and process the results</span>
+<span class="sd">        print(results)</span>
+
+<span class="sd">    Further Details</span>
+<span class="sd">    ---------------</span>
+<span class="sd">        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.</span>
+<span class="sd">        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the packing process to their specific needs.</span>
+<span class="sd">        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.</span>
+
+<span class="sd">    The AttnPacker class is intended for researchers and developers who need to perform packing simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="AttnPacker.__init__">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.attnpacker.AttnPacker.__init__">[docs]</a>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">script_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">ATTNPACKER_DIR_PATH</span><span class="p">,</span> <span class="n">python_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">ATTNPACKER_PYTHON_PATH</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&#39;&#39;&#39;sbatch_options are set automatically, but can also be manually set. Manual setting is not recommended.&#39;&#39;&#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">script_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_path</span><span class="p">(</span><span class="n">script_path</span><span class="p">,</span> <span class="s2">&quot;ATTNPACKER_DIR_PATH&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">search_path</span><span class="p">(</span><span class="n">python_path</span><span class="p">,</span> <span class="s2">&quot;ATTNPACKER_PYTHON_PATH&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;attnpacker.py&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span> <span class="o">=</span> <span class="n">jobstarter</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span> <span class="o">=</span> <span class="mi">1</span></div>
+
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;attnpacker.py&quot;</span>
+
+<div class="viewcode-block" id="AttnPacker.run">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.attnpacker.AttnPacker.run">[docs]</a>
+    <span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">poses</span><span class="p">:</span> <span class="n">Poses</span><span class="p">,</span> <span class="n">prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">jobstarter</span><span class="p">:</span> <span class="n">JobStarter</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Poses</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Execute the AttnPacker process with given poses and jobstarter configuration.</span>
+
+<span class="sd">        This method sets up and runs the AttnPacker process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            poses (Poses): The Poses object containing the protein structures.</span>
+<span class="sd">            prefix (str): A prefix used to name and organize the output files.</span>
+<span class="sd">            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.</span>
+<span class="sd">            options (str, optional): Additional options for the AttnPacker script. Defaults to None.</span>
+<span class="sd">            pose_options (list[str], optional): A list of pose-specific options for the AttnPacker script. Defaults to None.</span>
+<span class="sd">            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Poses: An updated Poses object containing the processed poses and results of the AttnPacker process.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            FileNotFoundError: If required files or directories are not found during the execution process.</span>
+<span class="sd">            ValueError: If invalid arguments are provided to the method.</span>
+<span class="sd">            KeyError: If forbidden options are included in the command parameters.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `run` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from protflow.poses import Poses</span>
+<span class="sd">                from protflow.jobstarters import JobStarter</span>
+<span class="sd">                from attnpacker import AttnPacker</span>
+
+<span class="sd">                # Create instances of necessary classes</span>
+<span class="sd">                poses = Poses()</span>
+<span class="sd">                jobstarter = JobStarter()</span>
+
+<span class="sd">                # Initialize the AttnPacker class</span>
+<span class="sd">                attnpacker = AttnPacker()</span>
+
+<span class="sd">                # Run the packing process</span>
+<span class="sd">                results = attnpacker.run(</span>
+<span class="sd">                    poses=poses,</span>
+<span class="sd">                    prefix=&quot;experiment_1&quot;,</span>
+<span class="sd">                    jobstarter=jobstarter,</span>
+<span class="sd">                    options=&quot;packing.num_designs=10&quot;,</span>
+<span class="sd">                    pose_options=[&quot;packing.input_pdb=&#39;input.pdb&#39;&quot;],</span>
+<span class="sd">                    overwrite=True</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Access and process the results</span>
+<span class="sd">                print(results)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It sets up specific directories for output PDBs and checks for existing score files.</span>
+<span class="sd">            - **Output Management:** The method handles the collection and processing of output data, reading scores from a CSV file and organizing results into a structured DataFrame. It ensures that results are accessible for further analysis.</span>
+<span class="sd">            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the packing process to their specific needs. Users can specify additional options and pose-specific parameters for the AttnPacker script.</span>
+
+<span class="sd">        This method is designed to streamline the execution of AttnPacker processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze packing simulations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">work_dir</span><span class="p">,</span> <span class="n">jobstarter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">generic_run_setup</span><span class="p">(</span>
+            <span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span>
+            <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span>
+            <span class="n">jobstarters</span><span class="o">=</span><span class="p">[</span><span class="n">jobstarter</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">jobstarter</span><span class="p">,</span> <span class="n">poses</span><span class="o">.</span><span class="n">default_jobstarter</span><span class="p">]</span>
+        <span class="p">)</span>
+
+
+        <span class="c1"># setup attnpacker specific dirs:</span>
+        <span class="n">pdb_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="s1">&#39;output_pdbs&#39;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">isdir</span><span class="p">(</span><span class="n">pdb_dir</span><span class="p">):</span> <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">pdb_dir</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Look for output-file in pdb-dir. If output is present and correct, then skip LigandMPNN.</span>
+        <span class="n">scorefile</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">work_dir</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;attnpacker_scores.</span><span class="si">{</span><span class="n">poses</span><span class="o">.</span><span class="n">storage_format</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="p">(</span><span class="n">scores</span> <span class="o">:=</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_for_existing_scorefile</span><span class="p">(</span><span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">,</span> <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">))</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">overwrite</span><span class="p">:</span>
+                <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">scorefile</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span>
+
+        <span class="c1"># parse options and pose_options:</span>
+        <span class="n">pose_options</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">prep_pose_options</span><span class="p">(</span><span class="n">poses</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+
+        <span class="c1"># write attpacker cmds:</span>
+        <span class="n">cmds</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">write_cmd</span><span class="p">(</span><span class="n">pose</span><span class="p">,</span> <span class="n">output_dir</span><span class="o">=</span><span class="n">work_dir</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="o">=</span><span class="n">pose_opts</span><span class="p">)</span> <span class="k">for</span> <span class="n">pose</span><span class="p">,</span> <span class="n">pose_opts</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">poses</span><span class="o">.</span><span class="n">df</span><span class="p">[</span><span class="s2">&quot;poses&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">to_list</span><span class="p">(),</span> <span class="n">pose_options</span><span class="p">)]</span>
+
+        <span class="c1"># run:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Starting attnpacker.py on </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">poses</span><span class="p">)</span><span class="si">}</span><span class="s2"> poses with </span><span class="si">{</span><span class="n">jobstarter</span><span class="o">.</span><span class="n">max_cores</span><span class="si">}</span><span class="s2"> cores.&quot;</span><span class="p">)</span>
+        <span class="n">jobstarter</span><span class="o">.</span><span class="n">start</span><span class="p">(</span>
+            <span class="n">cmds</span><span class="o">=</span><span class="n">cmds</span><span class="p">,</span>
+            <span class="n">jobname</span><span class="o">=</span><span class="s2">&quot;attnpacker&quot;</span><span class="p">,</span>
+            <span class="n">wait</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">output_path</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">work_dir</span><span class="si">}</span><span class="s2">/&quot;</span>
+        <span class="p">)</span>
+
+        <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;attnpacker.py finished, collecting scores.&quot;</span><span class="p">)</span>
+        <span class="c1"># TODO: this is not done gracefully, too lazy to fix atm</span>
+        <span class="n">scores</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="n">scorefile</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_runner_scorefile</span><span class="p">(</span><span class="n">scores</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">scorefile</span><span class="o">=</span><span class="n">scorefile</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">RunnerOutput</span><span class="p">(</span><span class="n">poses</span><span class="o">=</span><span class="n">poses</span><span class="p">,</span> <span class="n">results</span><span class="o">=</span><span class="n">scores</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="n">prefix</span><span class="p">,</span> <span class="n">index_layers</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">index_layers</span><span class="p">)</span><span class="o">.</span><span class="n">return_poses</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AttnPacker.write_cmd">
+<a class="viewcode-back" href="../../../protflow.tools.html#protflow.tools.attnpacker.AttnPacker.write_cmd">[docs]</a>
+    <span class="k">def</span> <span class="nf">write_cmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pose_path</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">output_dir</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">options</span><span class="p">:</span><span class="nb">str</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">:</span><span class="nb">str</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Write the command to run the AttnPacker script for a given pose.</span>
+
+<span class="sd">        This method constructs the command line string necessary to execute the AttnPacker script for a given pose. It incorporates the specified options and pose-specific parameters, ensuring that the command is correctly formatted and includes all required arguments. It also checks for forbidden options to prevent conflicts.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            pose_path (str): The path to the input PDB file for the pose.</span>
+<span class="sd">            output_dir (str): The directory where output files will be stored.</span>
+<span class="sd">            options (str, optional): Additional options for the AttnPacker script. Defaults to None.</span>
+<span class="sd">            pose_options (str, optional): A list of pose-specific options for the AttnPacker script. Defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: The command line string to execute the AttnPacker script with the specified parameters.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If forbidden options are included in the command parameters.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            Here is an example of how to use the `write_cmd` method:</span>
+
+<span class="sd">            .. code-block:: python</span>
+
+<span class="sd">                from attnpacker import AttnPacker</span>
+
+<span class="sd">                # Initialize the AttnPacker class</span>
+<span class="sd">                attnpacker = AttnPacker()</span>
+
+<span class="sd">                # Define the input pose path and output directory</span>
+<span class="sd">                pose_path = &quot;input.pdb&quot;</span>
+<span class="sd">                output_dir = &quot;/path/to/output&quot;</span>
+
+<span class="sd">                # Write the command with additional options and pose-specific parameters</span>
+<span class="sd">                cmd = attnpacker.write_cmd(</span>
+<span class="sd">                    pose_path=pose_path,</span>
+<span class="sd">                    output_dir=output_dir,</span>
+<span class="sd">                    options=&quot;packing.num_designs=10&quot;,</span>
+<span class="sd">                    pose_options=&quot;packing.input_pdb=&#39;input.pdb&#39;&quot;</span>
+<span class="sd">                )</span>
+
+<span class="sd">                # Print the command</span>
+<span class="sd">                print(cmd)</span>
+
+<span class="sd">        Further Details:</span>
+<span class="sd">            - **Command Construction:** This method ensures that the command string is correctly constructed with all necessary arguments. It includes paths to the script directory, output directory, input PDB file, and score file, as well as any additional options.</span>
+<span class="sd">            - **Validation:** The method checks for forbidden options that could conflict with the required arguments, raising a KeyError if any are found. This helps ensure that the command is valid and will run correctly.</span>
+
+<span class="sd">        This method is designed to facilitate the execution of AttnPacker processes within the ProtConductor framework, providing a flexible and robust way to construct and run commands for packing simulations.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># check if interfering options were set</span>
+        <span class="n">forbidden_options</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;--attnpacker_dir&#39;</span><span class="p">,</span> <span class="s1">&#39;--output_dir&#39;</span><span class="p">,</span> <span class="s1">&#39;--input_pdb&#39;</span><span class="p">,</span> <span class="s1">&#39;--scorefile&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">options</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">_</span> <span class="ow">in</span> <span class="n">options</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">forbidden_options</span><span class="p">))</span> <span class="ow">or</span> <span class="p">(</span><span class="n">pose_options</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="n">_</span> <span class="ow">in</span> <span class="n">pose_options</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">forbidden_options</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Options and pose_options must not contain &#39;--attnpacker_dir&#39;, &#39;--output_dir&#39;, &#39;--input_pdb&#39; or &#39;--scorefile&#39;!&quot;</span><span class="p">)</span>
+
+        <span class="n">pdb_dir</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_dir</span><span class="p">,</span> <span class="s2">&quot;output_pdbs&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">options</span><span class="p">:</span>
+            <span class="n">options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">+</span> <span class="sa">f</span><span class="s2">&quot; --attnpacker_dir </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">script_path</span><span class="si">}</span><span class="s2"> --output_dir </span><span class="si">{</span><span class="n">pdb_dir</span><span class="si">}</span><span class="s2"> --input_pdb </span><span class="si">{</span><span class="n">pose_path</span><span class="si">}</span><span class="s2"> --scorefile </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/attnpacker_scores.csv&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">options</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;--attnpacker_dir </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">script_path</span><span class="si">}</span><span class="s2"> --output_dir </span><span class="si">{</span><span class="n">pdb_dir</span><span class="si">}</span><span class="s2"> --input_pdb </span><span class="si">{</span><span class="n">pose_path</span><span class="si">}</span><span class="s2"> --scorefile </span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s2">/attnpacker_scores.csv&quot;</span>
+
+        <span class="c1"># parse options</span>
+        <span class="n">opts</span><span class="p">,</span> <span class="n">flags</span> <span class="o">=</span> <span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">parse_generic_options</span><span class="p">(</span><span class="n">options</span><span class="p">,</span> <span class="n">pose_options</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">python_path</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">protflow</span><span class="o">.</span><span class="n">config</span><span class="o">.</span><span class="n">AUXILIARY_RUNNER_SCRIPTS_DIR</span><span class="si">}</span><span class="s2">/run_attnpacker.py </span><span class="si">{</span><span class="n">protflow</span><span class="o">.</span><span class="n">runners</span><span class="o">.</span><span class="n">options_flags_to_string</span><span class="p">(</span><span class="n">opts</span><span class="p">,</span><span class="w"> </span><span class="n">flags</span><span class="p">,</span><span class="w"> </span><span class="n">sep</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2024, Your Name.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

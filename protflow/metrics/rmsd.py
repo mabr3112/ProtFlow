@@ -1,4 +1,70 @@
-'''Runner Module to calculate RMSDs'''
+"""
+RMSD Module
+===========
+
+This module provides the functionality to calculate Root Mean Square Deviation (RMSD) values for protein structures within the ProtFlow framework. It offers tools to run RMSD calculations, handle inputs and outputs, and process the resulting data in a structured and automated manner.
+
+Detailed Description
+--------------------
+The `BackboneRMSD` and `MotifRMSD` classes encapsulate the functionality necessary to execute RMSD calculations. These classes manage the configuration of paths to essential scripts and Python executables, set up the environment, and handle the execution of RMSD calculations. They also include methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.
+
+The module is designed to streamline the integration of RMSD calculations into larger computational workflows. It supports the automatic setup of job parameters, execution of RMSD commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.
+
+Usage
+-----
+To use this module, create an instance of the `BackboneRMSD` or `MotifRMSD` class and invoke their `run` methods with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the RMSD calculation process is provided through various parameters, allowing for customized runs tailored to specific research needs.
+
+Examples
+--------
+Here is an example of how to initialize and use the `BackboneRMSD` class within a ProtFlow pipeline:
+
+.. code-block:: python
+
+    from protflow.poses import Poses
+    from protflow.jobstarters import JobStarter
+    from rmsd import BackboneRMSD
+
+    # Create instances of necessary classes
+    poses = Poses()
+    jobstarter = JobStarter()
+
+    # Initialize the BackboneRMSD class
+    backbone_rmsd = BackboneRMSD()
+
+    # Run the RMSD calculation
+    results = backbone_rmsd.run(
+        poses=poses,
+        prefix="experiment_1",
+        jobstarter=jobstarter,
+        ref_col="reference",
+        chains=["A", "B"],
+        overwrite=True
+    )
+
+    # Access and process the results
+    print(results)
+
+Further Details
+---------------
+    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the RMSD calculation process.
+    - Customizability: Users can customize the RMSD calculation process through multiple parameters, including the specific atoms and chains to be used in the calculation, as well as jobstarter configurations.
+    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.
+
+This module is intended for researchers and developers who need to incorporate RMSD calculations into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.
+
+Notes
+-----
+This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.
+
+Author
+------
+Markus Braun, Adrian Tripp
+
+Version
+-------
+0.1.0
+"""
+
 # import general
 import json
 import os
@@ -17,10 +83,105 @@ from protflow.poses import Poses
 from protflow.jobstarters import JobStarter, split_list
 
 class BackboneRMSD(Runner):
-    '''Class handling the calculation of Full-atom RMSDs as a runner.
-    By default calculates only CA backbone RMSD.
-    Uses BioPython for RMSD calculation'''
+    """
+    BackboneRMSD Class
+    ==================
+
+    The `BackboneRMSD` class is a specialized class designed to facilitate the calculation of backbone RMSD values within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with RMSD calculations.
+
+    Detailed Description
+    --------------------
+    The `BackboneRMSD` class manages all aspects of calculating RMSD for protein backbones. It handles the configuration of necessary scripts and executables, prepares the environment for RMSD calculations, and executes the commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
+
+    Key functionalities include:
+        - Setting up paths to RMSD calculation scripts and Python executables.
+        - Configuring job starter options, either automatically or manually.
+        - Handling the execution of RMSD commands with support for different atoms and chains.
+        - Collecting and processing output data into a pandas DataFrame.
+        - Managing overwrite options and handling existing score files.
+
+    Returns
+    -------
+    An instance of the `BackboneRMSD` class, configured to run RMSD calculations and handle outputs efficiently.
+
+    Raises
+    ------
+        - FileNotFoundError: If required files or directories are not found during the execution process.
+        - ValueError: If invalid arguments are provided to the methods.
+        - TypeError: If atoms or chains are not of the expected type.
+
+    Examples
+    --------
+    Here is an example of how to initialize and use the `BackboneRMSD` class:
+
+    .. code-block:: python
+
+        from protflow.poses import Poses
+        from protflow.jobstarters import JobStarter
+        from rmsd import BackboneRMSD
+
+        # Create instances of necessary classes
+        poses = Poses()
+        jobstarter = LocalJobStarter(max_cores=4)
+
+        # Initialize the BackboneRMSD class
+        backbone_rmsd = BackboneRMSD()
+
+        # Run the RMSD calculation
+        results = backbone_rmsd.run(
+            poses=poses,
+            prefix="experiment_1",
+            jobstarter=jobstarter,
+            ref_col="reference_location",
+            chains=["A", "B"],
+            overwrite=True
+        )
+
+        # Access and process the results
+        print(results)
+
+    Further Details
+    ---------------
+        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.
+        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the RMSD calculation process to their specific needs.
+        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
+
+    The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+    """
     def __init__(self, ref_col: str = None, atoms: list = ["CA"], chains: list[str] = None, overwrite: bool = False, jobstarter: str = None): # pylint: disable=W0102
+        """
+        Initialize the BackboneRMSD class.
+
+        This constructor sets up the BackboneRMSD instance with default or provided parameters. It configures the reference column, atoms, chains, jobstarter, and overwrite options for RMSD calculations.
+
+        Parameters:
+            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
+            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to ["CA"].
+            chains (list[str], optional): The list of chain names to calculate RMSD over. Defaults to None.
+            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
+            jobstarter (str, optional): The jobstarter configuration for running the RMSD calculations. Defaults to None.
+
+        Returns:
+            None
+
+        Examples:
+            Here is an example of how to initialize the BackboneRMSD class:
+
+            .. code-block:: python
+
+                from rmsd import BackboneRMSD
+
+                # Initialize the BackboneRMSD class with default parameters
+                backbone_rmsd = BackboneRMSD()
+
+                # Initialize the BackboneRMSD class with custom parameters
+                backbone_rmsd = BackboneRMSD(ref_col="reference", atoms=["CA", "CB"], chains=["A", "B"], overwrite=True, jobstarter="custom_starter")
+
+        Further Details:
+            - **Default Values:** If no parameters are provided, the class initializes with default values suitable for basic RMSD calculations.
+            - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
+            - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
+        """
         self.set_ref_col(ref_col)
         self.set_atoms(atoms)
         self.set_chains(chains)
@@ -29,11 +190,73 @@ class BackboneRMSD(Runner):
 
     ########################## Input ################################################
     def set_ref_col(self, ref_col: str) -> None:
-        '''Sets default ref_col for calc_rmsd() method.'''
+        """
+        Set the reference column for RMSD calculations.
+
+        This method sets the default reference column to be used in the RMSD calculation process.
+
+        Parameters:
+            ref_col (str): The reference column for RMSD calculations.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If ref_col is not of type string.
+
+        Examples:
+            Here is an example of how to use the `set_ref_col` method:
+
+            .. code-block:: python
+
+                from rmsd import BackboneRMSD
+
+                # Initialize the BackboneRMSD class
+                backbone_rmsd = BackboneRMSD()
+
+                # Set the reference column
+                backbone_rmsd.set_ref_col("reference")
+
+        Further Details:
+            - **Usage:** The reference column is used to identify which column in the input data contains the reference structures for RMSD calculation.
+            - **Validation:** The method includes validation to ensure that the reference column is of the correct type.
+            - **Integration:** The reference column set by this method is used by other methods in the class to perform RMSD calculations.
+        """
         self.ref_col = ref_col
 
     def set_atoms(self, atoms:list[str]) -> None:
-        '''Method to set the backbone atoms (list of atom names) to calculate RMSD over.'''
+        """
+        Set the atoms for RMSD calculations.
+
+        This method sets the list of atom names to calculate RMSD over. If "all" is provided, all atoms will be considered.
+
+        Parameters:
+            atoms (list[str]): The list of atom names to calculate RMSD over.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If atoms is not a list of strings.
+
+        Examples:
+            Here is an example of how to use the `set_atoms` method:
+
+            .. code-block:: python
+
+                from rmsd import BackboneRMSD
+
+                # Initialize the BackboneRMSD class
+                backbone_rmsd = BackboneRMSD()
+
+                # Set the atoms for RMSD calculation
+                backbone_rmsd.set_atoms(["CA", "CB"])
+
+        Further Details:
+            - **Usage:** The list of atoms specifies which atoms in the protein backbone will be considered during RMSD calculations.
+            - **Validation:** The method includes validation to ensure that the atoms parameter is a list of strings, representing valid atom names.
+            - **Flexibility:** Users can specify any set of atoms or choose to include all atoms by setting the parameter to "all".
+        """
         if atoms == "all":
             self.atoms = "all"
         if not isinstance(atoms, list) or not all((isinstance(atom, str) for atom in atoms)):
@@ -41,7 +264,41 @@ class BackboneRMSD(Runner):
         self.atoms = atoms
 
     def set_chains(self, chains:list[str]) -> None:
-        '''Method to set the chains (list of chain names) to calculate RMSD over.'''
+        """
+        Set the chains for RMSD calculations.
+
+        This method sets the list of chain names to calculate RMSD over. It ensures that the provided chains parameter is a list of strings or a single string representing chain names.
+
+        Parameters:
+            chains (list[str] or str): The list of chain names or a single chain name to calculate RMSD over.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If chains is not a list of strings or a single string.
+
+        Examples:
+            Here is an example of how to use the `set_chains` method:
+
+            .. code-block:: python
+
+                from rmsd import BackboneRMSD
+
+                # Initialize the BackboneRMSD class
+                backbone_rmsd = BackboneRMSD()
+
+                # Set the chains for RMSD calculation
+                backbone_rmsd.set_chains(["A", "B"])
+
+                # Alternatively, set a single chain
+                backbone_rmsd.set_chains("A")
+
+        Further Details:
+            - **Usage:** The chains parameter specifies which chains in the protein structure will be considered during RMSD calculations.
+            - **Validation:** The method includes validation to ensure that the chains parameter is either a list of strings or a single string, representing valid chain names.
+            - **Flexibility:** Users can specify multiple chains as a list or a single chain as a string, providing flexibility in how the RMSD calculations are configured.
+        """
         if chains is None:
             self.chains = None
         elif isinstance(chains, str) and len(chains) == 1:
@@ -51,13 +308,104 @@ class BackboneRMSD(Runner):
         else:
             self.chains = chains
 
-    def set_jobstarter(self, jobstarter: str) -> None:
-        '''Sets Jobstarter for BackboneRMSD runner.'''
-        self.jobstarter = jobstarter
+    def set_jobstarter(self, jobstarter: JobStarter) -> None:
+        """
+        Set the jobstarter configuration for the BackboneRMSD runner.
+
+        This method sets the jobstarter configuration to be used in the RMSD calculation process.
+
+        Parameters:
+            jobstarter (JobStarter): The jobstarter configuration for running the RMSD calculations.
+
+        Returns:
+            None
+
+        Raises:
+            TypeError: If jobstarter is not of type JobStarter.
+
+        Examples:
+            Here is an example of how to use the `set_jobstarter` method:
+
+            .. code-block:: python
+
+                from rmsd import BackboneRMSD
+
+                # Initialize the BackboneRMSD class
+                backbone_rmsd = BackboneRMSD()
+
+                # Set the jobstarter configuration
+                backbone_rmsd.set_jobstarter("custom_starter")
+
+        Further Details:
+            - **Usage:** The jobstarter configuration specifies how the RMSD calculations will be managed and executed, particularly in HPC environments.
+            - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
+            - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
+        """
+        if isinstance(jobstarter, JobStarter):
+            self.jobstarter = jobstarter
+        else:
+            raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
 
     ########################## Calculations ################################################
     def run(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None, overwrite: bool = False) -> None:
-        '''Calculates RMSD as specified.'''
+        """
+        Calculate the backbone RMSD for given poses and jobstarter configuration.
+
+        This method sets up and runs the RMSD calculation process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.
+
+        Parameters:
+            poses (Poses): The Poses object containing the protein structures.
+            prefix (str): A prefix used to name and organize the output files.
+            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
+            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
+            chains (list[str], optional): A list of chain names to calculate RMSD over. Defaults to None.
+            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
+
+        Returns:
+            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.
+
+        Raises:
+            FileNotFoundError: If required files or directories are not found during the execution process.
+            ValueError: If invalid arguments are provided to the method.
+            TypeError: If chains are not of the expected type.
+
+        Examples:
+            Here is an example of how to use the `run` method:
+
+            .. code-block:: python
+
+                from protflow.poses import Poses
+                from protflow.jobstarters import JobStarter
+                from rmsd import BackboneRMSD
+
+                # Create instances of necessary classes
+                poses = Poses()
+                jobstarter = LocalJobStarter(max_cores=4)
+
+                # Initialize the BackboneRMSD class
+                backbone_rmsd = BackboneRMSD()
+
+                # Run the RMSD calculation
+                results = backbone_rmsd.run(
+                    poses=poses,
+                    prefix="experiment_1",
+                    jobstarter=jobstarter,
+                    ref_col="reference",
+                    chains=["A", "B"],
+                    overwrite=True
+                )
+
+                # Access and process the results
+                print(results)
+
+        Further Details:
+            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It supports splitting poses into sublists for parallel processing.
+            - **Input Handling:** The method prepares input JSON files for each sublist of poses and constructs commands for running RMSD calculations using BioPython.
+            - **Output Management:** The method handles the collection and processing of output data from multiple score files, concatenating them into a single DataFrame and saving the results.
+            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the RMSD calculation process to their specific needs, including specifying atoms and chains for RMSD calculations.
+
+        This method is designed to streamline the execution of backbone RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze RMSD calculations.
+        """
         # if self.atoms is all, calculate Allatom RMSD.
 
         # prep variables
@@ -130,9 +478,118 @@ class BackboneRMSD(Runner):
         raise NotImplementedError
 
 class MotifRMSD(Runner):
-    '''Class handling'''
+    """
+    MotifRMSD Class
+    ===============
+
+    The `MotifRMSD` class is a specialized class designed to facilitate the calculation of RMSD values for specific motifs within protein structures in the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with motif-specific RMSD calculations.
+
+    Detailed Description
+    --------------------
+    The `MotifRMSD` class manages all aspects of calculating RMSD for specified motifs within protein structures. It handles the configuration of necessary scripts and executables, prepares the environment for RMSD calculations, and executes the commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
+
+    Key functionalities include:
+        - Setting up paths to motif RMSD calculation scripts and Python executables.
+        - Configuring job starter options, either automatically or manually.
+        - Handling the execution of RMSD commands with support for various motifs and chains.
+        - Collecting and processing output data into a pandas DataFrame.
+        - Managing overwrite options and handling existing score files.
+
+    Returns
+    -------
+    An instance of the `MotifRMSD` class, configured to run motif RMSD calculations and handle outputs efficiently.
+
+    Raises
+    ------
+        - FileNotFoundError: If required files or directories are not found during the execution process.
+        - ValueError: If invalid arguments are provided to the methods.
+        - TypeError: If motifs or chains are not of the expected type.
+
+    Examples
+    --------
+    Here is an example of how to initialize and use the `MotifRMSD` class:
+
+    .. code-block:: python
+
+        from protflow.poses import Poses
+        from protflow.jobstarters import JobStarter
+        from rmsd import MotifRMSD
+
+        # Create instances of necessary classes
+        poses = Poses()
+        jobstarter = JobStarter()
+
+        # Initialize the MotifRMSD class
+        motif_rmsd = MotifRMSD()
+
+        # Run the motif RMSD calculation
+        results = motif_rmsd.run(
+            poses=poses,
+            prefix="experiment_2",
+            jobstarter=jobstarter,
+            ref_col="reference",
+            ref_motif="motif_A",
+            target_motif="motif_B",
+            atoms=["CA", "CB"],
+            overwrite=True
+        )
+
+        # Access and process the results
+        print(results)
+
+    Further Details
+    ---------------
+        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.
+        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the motif RMSD calculation process to their specific needs.
+        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
+
+    The MotifRMSD class is intended for researchers and developers who need to perform RMSD calculations for specific motifs as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+    """
     def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, target_chains: list[str] = None, ref_chains: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False):
-        #TODO implement MotifRMSD calculation based on Chain input!
+        """
+        Initialize the MotifRMSD class.
+
+        This constructor sets up the MotifRMSD instance with default or provided parameters. It configures the reference column, target motif, reference motif, target chains, reference chains, jobstarter, and overwrite options for RMSD calculations.
+
+        Parameters:
+            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
+            target_motif (str, optional): The target motif for RMSD calculations. Defaults to None.
+            ref_motif (str, optional): The reference motif for RMSD calculations. Defaults to None.
+            target_chains (list[str], optional): The list of chain names for the target motif. Defaults to None.
+            ref_chains (list[str], optional): The list of chain names for the reference motif. Defaults to None.
+            jobstarter (JobStarter, optional): The jobstarter configuration for running the RMSD calculations. Defaults to None.
+            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
+
+        Returns:
+            None
+
+        Examples:
+            Here is an example of how to initialize the MotifRMSD class:
+
+            .. code-block:: python
+
+                from rmsd import MotifRMSD
+
+                # Initialize the MotifRMSD class with default parameters
+                motif_rmsd = MotifRMSD()
+
+                # Initialize the MotifRMSD class with custom parameters
+                motif_rmsd = MotifRMSD(
+                    ref_col="reference",
+                    target_motif="motif_A",
+                    ref_motif="motif_B",
+                    target_chains=["A"],
+                    ref_chains=["B"],
+                    jobstarter=JobStarter(),
+                    overwrite=True
+                )
+
+        Further Details:
+            - **Default Values:** If no parameters are provided, the class initializes with default values suitable for basic motif-specific RMSD calculations.
+            - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
+            - **Custom Configuration:** Users can customize the motif RMSD calculation process by providing specific values for the reference column, target motif, reference motif, target chains, reference chains, jobstarter, and overwrite option.
+        """
+        #TODO implement MotifRMSD calculation based on Chain input (Should work now with a ChainSelector)!
         self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
 
@@ -147,7 +604,12 @@ class MotifRMSD(Runner):
         return "Heavyatom motif rmsd calculator"
 
     def set_ref_col(self, col: str) -> None:
-        '''Sets reference col for .cal_rmsd() method.'''
+        """
+        Set the reference column for RMSD calculations.
+
+        Parameters:
+            col (str): The reference column name.
+        """
         self.ref_col = col
 
     def set_target_motif(self, motif: str) -> None:
@@ -159,22 +621,102 @@ class MotifRMSD(Runner):
         self.ref_motif = motif
 
     def set_jobstarter(self, jobstarter: str) -> None:
-        '''Sets Jobstarter for MotifRMSD runner.'''
-        self.jobstarter = jobstarter
+        """
+        Set the jobstarter configuration for the MotifRMSD runner.
+
+        Parameters:
+            jobstarter (JobStarter): The jobstarter configuration.
+
+        Raises:
+            ValueError: If jobstarter is not of type JobStarter.
+        """
+        if isinstance(jobstarter, JobStarter):
+            self.jobstarter = jobstarter
+        else:
+            raise ValueError(f"Unsupported type {type(jobstarter)} for parameter :jobstarter:. Has to be of type JobStarter!")
 
     def set_target_chains(self, chains: list[str]) -> None:
-        '''Sets target chains for MotifRMSD class.'''
+        """
+        Set the target chains for RMSD calculations.
+
+        Parameters:
+            chains (list[str]): The list of target chain names.
+        """
         self.target_chains = chains if isinstance(chains, list) else [chains]
 
     def set_ref_chains(self, chains: list[str]) -> None:
-        '''Sets reference chains for MotifRMSD class.'''
+        """
+        Set the reference chains for RMSD calculations.
+
+        Parameters:
+            chains (list[str]): The list of reference chain names.
+        """
         self.ref_chains = chains if isinstance(chains, list) else [chains]
 
     ################################################# Calcs ################################################
-
     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, atoms: list[str] = None, overwrite: bool = False):
-        '''Method to run Motif_rmsd calculation.
-        :atoms:     comma-separated list of atoms, eg.g CA, C, N'''
+        """
+        Calculate the motif-specific RMSD for given poses and jobstarter configuration.
+
+        This method sets up and runs the motif-specific RMSD calculation process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.
+
+        Parameters:
+            poses (Poses): The Poses object containing the protein structures.
+            prefix (str): A prefix used to name and organize the output files.
+            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
+            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
+            ref_motif (Any, optional): The reference motif for RMSD calculations. Defaults to None.
+            target_motif (Any, optional): The target motif for RMSD calculations. Defaults to None.
+            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to None.
+            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
+
+        Returns:
+            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.
+
+        Raises:
+            FileNotFoundError: If required files or directories are not found during the execution process.
+            ValueError: If invalid arguments are provided to the method.
+            TypeError: If motifs or atoms are not of the expected type.
+
+        Examples:
+            Here is an example of how to use the `run` method:
+
+            .. code-block:: python
+
+                from protflow.poses import Poses
+                from protflow.jobstarters import JobStarter
+                from rmsd import MotifRMSD
+
+                # Create instances of necessary classes
+                poses = Poses()
+                jobstarter = JobStarter()
+
+                # Initialize the MotifRMSD class
+                motif_rmsd = MotifRMSD()
+
+                # Run the motif RMSD calculation
+                results = motif_rmsd.run(
+                    poses=poses,
+                    prefix="experiment_2",
+                    jobstarter=jobstarter,
+                    ref_col="reference",
+                    ref_motif="motif_A",
+                    target_motif="motif_B",
+                    atoms=["CA", "CB"],
+                    overwrite=True
+                )
+
+                # Access and process the results
+                print(results)
+
+        Further Details:
+            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It supports splitting poses into sublists for parallel processing.
+            - **Input Handling:** The method prepares input JSON files for each sublist of poses and constructs commands for running motif-specific RMSD calculations.
+            - **Output Management:** The method handles the collection and processing of output data from multiple score files, concatenating them into a single DataFrame and saving the results.
+            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the motif RMSD calculation process to their specific needs, including specifying reference and target motifs, as well as atoms for RMSD calculations.
+
+        This method is designed to streamline the execution of motif-specific RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze motif-specific RMSD calculations.
+        """
         # prep inputs
         ref_col = ref_col or self.ref_col
         ref_motif = ref_motif or self.ref_motif
@@ -247,7 +789,53 @@ class MotifRMSD(Runner):
         return outputs.return_poses()
 
     def setup_input_dict(self, poses: Poses, ref_col: str, ref_motif: Any = None, target_motif: Any = None) -> dict:
-        '''Sets up dictionary that can be written down as .json file and used as an input to 'calc_heavyatom_rmsd_batch.py' '''
+        """
+        Set up the input dictionary for motif RMSD calculations.
+
+        This method prepares a dictionary that can be written to a JSON file and used as input for the motif RMSD calculation script. The dictionary contains mappings of poses to reference PDB files, target motifs, and reference motifs.
+
+        Parameters:
+            poses (Poses): The Poses object containing the protein structures.
+            ref_col (str): The reference column for RMSD calculations.
+            ref_motif (Any, optional): The reference motif for RMSD calculations. Defaults to None.
+            target_motif (Any, optional): The target motif for RMSD calculations. Defaults to None.
+
+        Returns:
+            dict: A dictionary structured for input to the motif RMSD calculation script.
+
+        Raises:
+            TypeError: If ref_motif or target_motif is not of the expected type.
+
+        Examples:
+            Here is an example of how to use the `setup_input_dict` method:
+
+            .. code-block:: python
+
+                from rmsd import MotifRMSD
+                from protflow.poses import Poses
+
+                # Initialize the MotifRMSD class
+                motif_rmsd = MotifRMSD()
+
+                # Create a Poses object
+                poses = Poses()
+
+                # Set up the input dictionary for RMSD calculations
+                input_dict = motif_rmsd.setup_input_dict(
+                    poses=poses,
+                    ref_col="reference",
+                    ref_motif="motif_A",
+                    target_motif="motif_B"
+                )
+
+                # Print the input dictionary
+                print(input_dict)
+
+        Further Details:
+            - **Dictionary Structure:** The input dictionary maps each pose to its reference PDB file, target motif, and reference motif.
+            - **Parameter Handling:** The method handles different types of inputs for motifs, ensuring that they are correctly formatted for the RMSD calculation script.
+            - **Integration:** The input dictionary prepared by this method is used by the `run` method to execute motif RMSD calculations.
+        """
         def setup_ref_col(ref_col: Any, poses: Poses) -> list:
             col_in_df(poses.df, ref_col)
             return poses.df[ref_col].to_list()
