@@ -251,7 +251,7 @@ class Runner:
         """
         raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
 
-    def search_path(self, input_path: str, path_name: str) -> str:
+    def search_path(self, input_path: str, path_name: str, is_dir: bool = False) -> str:
         """
         Checks if a given path exists and is valid.
 
@@ -279,7 +279,10 @@ class Runner:
         """
         if not input_path:
             raise ValueError(f"Path for {path_name} not set: {input_path}. Set the path uner {path_name} in protflow's config.py file.")
-        if not os.path.isfile(input_path):
+        if is_dir:
+            if not os.path.isidir(input_path):
+                raise ValueError(f":input_path: is not a directory: {input_path}")
+        elif not os.path.isfile(input_path):
             raise ValueError(f"Path set for {path_name} does not exist at {input_path}. Check correct filepath!")
         return input_path
 

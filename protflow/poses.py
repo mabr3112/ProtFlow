@@ -725,6 +725,8 @@ class Poses:
         """
         if f"{prefix}_location" in self.df.columns or f"{prefix}_description" in self.df.columns:
             raise KeyError(f"Prefix {prefix} is already taken in poses.df")
+        if "/" in prefix:
+            raise ValueError(f"Prefix must not contain a slash '/' as this will raise problems with runner directories")
 
     def check_poses_df_integrity(self, df: pd.DataFrame) -> pd.DataFrame:
         """
