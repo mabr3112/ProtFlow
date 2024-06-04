@@ -182,7 +182,7 @@ class Rosetta(Runner):
 
         This method ensures that the Rosetta class is correctly initialized with the necessary configurations to run Rosetta applications within the ProtFlow framework.
         """
-        self.script_path = self.search_path(script_path, "ROSETTA_BIN_PATH")
+        self.script_path = self.search_path(script_path, "ROSETTA_BIN_PATH", is_dir=True)
         self.name = "rosetta.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
