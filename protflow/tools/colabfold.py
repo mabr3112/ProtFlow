@@ -266,9 +266,12 @@ class Colabfold(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
+        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
+
         # Look for output-file in pdb-dir. If output is present and correct, then skip Colabfold.
         scorefile = os.path.join(work_dir, f"colabfold_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
         if overwrite:
@@ -305,8 +308,10 @@ class Colabfold(Runner):
         # collect scores
         logging.info(f"Predictions finished, starting to collect scores.")
         scores = self.collect_scores(work_dir=work_dir, num_return_poses=return_top_n_poses)
-
+        logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
+        
+        logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
