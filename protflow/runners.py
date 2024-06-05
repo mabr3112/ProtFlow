@@ -280,7 +280,7 @@ class Runner:
         if not input_path:
             raise ValueError(f"Path for {path_name} not set: {input_path}. Set the path uner {path_name} in protflow's config.py file.")
         if is_dir:
-            if not os.path.isidir(input_path):
+            if not os.path.isdir(input_path):
                 raise ValueError(f":input_path: is not a directory: {input_path}")
         elif not os.path.isfile(input_path):
             raise ValueError(f"Path set for {path_name} does not exist at {input_path}. Check correct filepath!")
