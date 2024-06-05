@@ -300,7 +300,7 @@ class ESMFold(Runner):
 
         # collect scores
         logging.info(f"Predictions finished, starting to collect scores.")
-        scores = self.collect_scores(work_dir=work_dir)
+        scores = collect_scores(work_dir=work_dir)
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -418,61 +418,61 @@ class ESMFold(Runner):
 
         return f"{self.python_path} {protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {protflow.runners.options_flags_to_string(opts, flags, sep='--')}"
 
-    def collect_scores(self, work_dir:str, scorefile:str) -> pd.DataFrame:
-        """
-        Collect and process the scores from ESMFold output.
+def collect_scores(work_dir:str) -> pd.DataFrame:
+    """
+    Collect and process the scores from ESMFold output.
 
-        This method collects the JSON and PDB output files from ESMFold predictions, processes the data, and organizes it into a pandas DataFrame.
+    This method collects the JSON and PDB output files from ESMFold predictions, processes the data, and organizes it into a pandas DataFrame.
 
-        Parameters:
-            work_dir (str): The working directory where ESMFold output files are stored.
-            scorefile (str): The path to the JSON file where the collected scores will be saved.
+    Parameters:
+        work_dir (str): The working directory where ESMFold output files are stored.
+        scorefile (str): The path to the JSON file where the collected scores will be saved.
 
-        Returns:
-            pd.DataFrame: A DataFrame containing the collected scores and corresponding file locations.
+    Returns:
+        pd.DataFrame: A DataFrame containing the collected scores and corresponding file locations.
 
-        Examples:
-            Here is an example of how to use the `collect_scores` method:
+    Examples:
+        Here is an example of how to use the `collect_scores` method:
 
-            .. code-block:: python
+        .. code-block:: python
 
-                from esmfold import ESMFold
+            from esmfold import ESMFold
 
-                # Initialize the ESMFold class
-                esmfold = ESMFold()
+            # Initialize the ESMFold class
+            esmfold = ESMFold()
 
-                # Collect scores from ESMFold output
-                scores_df = esmfold.collect_scores(
-                    work_dir="/path/to/work_dir",
-                    scorefile="/path/to/scorefile.json"
-                )
+            # Collect scores from ESMFold output
+            scores_df = esmfold.collect_scores(
+                work_dir="/path/to/work_dir",
+                scorefile="/path/to/scorefile.json"
+            )
 
-                # Access the collected scores
-                print(scores_df)
+            # Access the collected scores
+            print(scores_df)
 
-        Further Details:
-            - **Output Collection:** The method scans the working directory for JSON and PDB output files, reads the JSON files into a DataFrame, and merges it with the locations of the PDB files.
-            - **Data Organization:** The method organizes the collected data into a structured DataFrame, making it accessible for further analysis and ensuring that the scores are saved to the specified JSON file.
-            - **Output Management:** The method also ensures that the temporary directories and files used during the prediction process are cleaned up, maintaining a tidy working environment.
+    Further Details:
+        - **Output Collection:** The method scans the working directory for JSON and PDB output files, reads the JSON files into a DataFrame, and merges it with the locations of the PDB files.
+        - **Data Organization:** The method organizes the collected data into a structured DataFrame, making it accessible for further analysis and ensuring that the scores are saved to the specified JSON file.
+        - **Output Management:** The method also ensures that the temporary directories and files used during the prediction process are cleaned up, maintaining a tidy working environment.
 
-        This method is designed to streamline the collection and processing of ESMFold output data, ensuring that the results are organized and accessible for further analysis.
-        """
-        # collect all .json files
-        pdb_dir = os.path.join(work_dir, "esm_preds")
-        fl = glob(f"{pdb_dir}/fasta_*/*.json")
-        pl = glob(f"{pdb_dir}/fasta_*/*.pdb")
+    This method is designed to streamline the collection and processing of ESMFold output data, ensuring that the results are organized and accessible for further analysis.
+    """
+    # collect all .json files
+    pdb_dir = os.path.join(work_dir, "esm_preds")
+    fl = glob(f"{pdb_dir}/fasta_*/*.json")
+    pl = glob(f"{pdb_dir}/fasta_*/*.pdb")
 
-        output_dir = os.path.join(work_dir, 'output_pdbs')
-        os.makedirs(output_dir, exist_ok=True)
-        pl = [shutil.copy(pdb, output_dir) for pdb in pl]
-        # create dataframe containing new locations
-        df_pdb = pd.DataFrame({'location': pl, 'description': [os.path.splitext(os.path.basename(pdb))[0] for pdb in pl]})
+    output_dir = os.path.join(work_dir, 'output_pdbs')
+    os.makedirs(output_dir, exist_ok=True)
+    pl = [shutil.copy(pdb, output_dir) for pdb in pl]
+    # create dataframe containing new locations
+    df_pdb = pd.DataFrame({'location': pl, 'description': [os.path.splitext(os.path.basename(pdb))[0] for pdb in pl]})
 
-        # read the files, add origin column, and concatenate into single DataFrame:
-        df = pd.concat([pd.read_json(f) for f in fl]).reset_index(drop=True)
+    # read the files, add origin column, and concatenate into single DataFrame:
+    df = pd.concat([pd.read_json(f) for f in fl]).reset_index(drop=True)
 
-        # merge with df containing locations
-        df = df.merge(df_pdb, on='description')
-        shutil.rmtree(pdb_dir)
+    # merge with df containing locations
+    df = df.merge(df_pdb, on='description')
+    shutil.rmtree(pdb_dir)
 
-        return df
+    return df
