@@ -1134,6 +1134,42 @@ class Poses:
         if pose_description not in self.df["poses_description"]:
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
         return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
+    
+    def reindex_poses(self, prefix:str, remove_layers:int=None, force_reindex:bool=True, sep="_") -> None:
+        # TODO: doc strings, just copied from iterative refinement
+        '''
+        Removes <remove_layers> from poses and reindexes them.
+        '''
+
+        out_dir = os.path.join(self.work_dir, prefix)
+        os.makedirs(out_dir)
+        self.df[f"{prefix}_pre_reindexing_poses_description"] = self.df['poses_description']
+        self.df[f"{prefix}_pre_reindexing_poses"] = self.df['poses']
+
+        # create temporary description column with removed index layers
+        self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        self.df.sort_values(["tmp_layer_column", "poses_description"], inplace=True) # sort to make sure that all poses are in the same order after grouping
+
+        # group by temporary description column, reindex
+        descriptions = []
+        poses = []
+        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
+            group_df.reset_index(drop=True, inplace=True) # resetting index for subsequent iterrows, otherwise original index would be used
+            if len(group_df.index) > 1 and not force_reindex == True:
+                raise RuntimeError(f'Found multiple poses with same description after removing {remove_layers} layers. Description: {name}. Aborting because <force_reindex> is not True.')
+            for i, ser in group_df.iterrows():
+                ext = os.path.splitext(ser['poses'])[1]
+                descriptions.append(f"{ser['tmp_layer_column']}_{str(i).zfill(4)}")
+                poses.append(os.path.join(out_dir, f"{ser['poses_description']}{ext}"))
+        
+        # drop temporary description column
+        self.df.drop("temp_dp_select_col", inplace=True, axis=1)
+
+        for old_pose, new_pose in zip(self.df['poses'].to_list(), poses):
+            shutil.copy(old_pose, new_pose)
+        
+        self.df['poses_description'] = descriptions
+        self.df['poses'] = poses
 
     def duplicate_poses(self, output_dir:str, n_duplicates:int) -> None:
         """
