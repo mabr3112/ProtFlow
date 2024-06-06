@@ -347,7 +347,7 @@ class BackboneRMSD(Runner):
             raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None, overwrite: bool = False) -> None:
+    def run(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None, overwrite: bool = False) -> Poses:
         """
         Calculate the backbone RMSD for given poses and jobstarter configuration.
 

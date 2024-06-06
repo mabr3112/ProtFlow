@@ -120,7 +120,7 @@ class RunnerOutput:
             raise ValueError(f"'description' column does not match 'location' column in runner output dataframe!")
         return results
 
-    def return_poses(self):
+    def return_poses(self) -> Poses:
         """
         Integrates the output of a runner into a Poses class.
 
