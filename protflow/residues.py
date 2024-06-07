@@ -152,7 +152,7 @@ class ResidueSelection:
         return residue_selection(selection)
 
     ####################################### OUTPUT #############################################
-    def to_string(self, delim: None = ",", ordering: str = None) -> str:
+    def to_string(self, delim: str = ",", ordering: str = None) -> str:
         """
         Converts the ResidueSelection to a string.
 
