@@ -347,7 +347,7 @@ class BackboneRMSD(Runner):
             raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None, overwrite: bool = False) -> None:
+    def run(self, poses: Poses, prefix: str, ref_col: str = None, jobstarter: JobStarter = None, chains: list[str] = None, overwrite: bool = False) -> Poses:
         """
         Calculate the backbone RMSD for given poses and jobstarter configuration.
 
@@ -545,7 +545,7 @@ class MotifRMSD(Runner):
 
     The MotifRMSD class is intended for researchers and developers who need to perform RMSD calculations for specific motifs as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, target_chains: list[str] = None, ref_chains: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False):
+    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, target_chains: list[str] = None, ref_chains: list[str] = None, atoms: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False):
         """
         Initialize the MotifRMSD class.
 
@@ -599,6 +599,7 @@ class MotifRMSD(Runner):
         self.set_ref_motif(ref_motif)
         self.set_target_chains(target_chains)
         self.set_ref_chains(ref_chains)
+        self.set_atoms(atoms)
 
     def __str__(self):
         return "Heavyatom motif rmsd calculator"
@@ -611,6 +612,15 @@ class MotifRMSD(Runner):
             col (str): The reference column name.
         """
         self.ref_col = col
+
+    def set_atoms(self, atoms: list[str] = None) -> None:
+        """
+        Set the atoms used for superposition and RMSD calculations.
+
+        Parameters:
+            atoms (list[str]): The atoms used for superposition.
+        """
+        self.atoms = atoms
 
     def set_target_motif(self, motif: str) -> None:
         '''Method to set target motif. :motif: has to be string and should be a column name in poses.df that will be passed to the .run() function'''
@@ -765,6 +775,7 @@ class MotifRMSD(Runner):
             output_files.append(f"{work_dir}/rmsd_output_{str(i).zfill(4)}.json")
 
         # setup atoms option
+        atoms = atoms or self.atoms
         atoms_str = "" if atoms is None else f"--atoms '{','.join(atoms)}'"
 
         # start add_chains_batch.py
