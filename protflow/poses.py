@@ -1135,35 +1135,68 @@ class Poses:
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
         return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
     
-    def reindex_poses(self, prefix:str, remove_layers:int=None, force_reindex:bool=True, sep="_") -> None:
-        # TODO: doc strings, just copied from iterative refinement
-        '''
-        Removes <remove_layers> from poses and reindexes them.
-        '''
+    def reindex_poses(self, prefix:str, remove_layers:int=1, force_reindex:bool=False, sep:str="_") -> None:
+        # TODO: TESTING!!! I think it works a bit different now than before, because a new index layer is added automatically
+        """
+        Removes index layers from poses. Saves reindexed poses to an output directory.
+
+        Parameters
+        ----------
+        prefix : str
+            The directory where the duplicated poses will be saved and the prefix for the DataFrame columns containing the original paths and descriptions.
+        remove_layers : int, optional
+            The number of index layers to remove. 
+        force_reindex : bool, optional
+            Add index layer if poses with identical description after index layer removal are found.
+        sep : str, optional
+            The separator used to split the description column into layers.
+            
+        Further Details
+        ---------------
+        This method removes index layers from poses (_0001, 0002, etc). Subtracts the set number of layers from the description column and groups the poses accordingly.
+        If multiple poses with identical description after index layer removal are found and force_reindex is True, adds one index layer to all poses. 
+
+        Notes
+        -----
+        - The method creates the output directory if it does not exist.
+        - Raises a RuntimeError if multiple poses with identical description after index layer removal are found and force_reindex is False..
+
+        """
 
         out_dir = os.path.join(self.work_dir, prefix)
-        os.makedirs(out_dir)
+        os.makedirs(out_dir, exist_ok=True)
         self.df[f"{prefix}_pre_reindexing_poses_description"] = self.df['poses_description']
         self.df[f"{prefix}_pre_reindexing_poses"] = self.df['poses']
 
+        if remove_layers == 0: remove_layers = None
         # create temporary description column with removed index layers
-        self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        if remove_layers:
+            if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
+            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        else: self.df["tmp_layer_column"] = self.df['poses_description']
+
         self.df.sort_values(["tmp_layer_column", "poses_description"], inplace=True) # sort to make sure that all poses are in the same order after grouping
 
         # group by temporary description column, reindex
         descriptions = []
         poses = []
+        unique = True
+        if any([len(group_df.index) > 1 for name, group_df in self.df.groupby("tmp_layer_column", sort=False)]):
+            unique = False
+            if not force_reindex: raise RuntimeError(f'Multiple files with identical description found after removing index layers. Set <force_reindex> to True if new index layers should be added.')
+
         for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
-            group_df.reset_index(drop=True, inplace=True) # resetting index for subsequent iterrows, otherwise original index would be used
-            if len(group_df.index) > 1 and not force_reindex == True:
-                raise RuntimeError(f'Found multiple poses with same description after removing {remove_layers} layers. Description: {name}. Aborting because <force_reindex> is not True.')
+            group_df.reset_index(drop=True, inplace=True) # resetting index, otherwise index of original poses df would be used
+                # adding new index layer since multiple
             for i, ser in group_df.iterrows():
                 ext = os.path.splitext(ser['poses'])[1]
-                descriptions.append(f"{ser['tmp_layer_column']}_{str(i).zfill(4)}")
-                poses.append(os.path.join(out_dir, f"{ser['poses_description']}{ext}"))
+                if unique == False: description = f"{name}_{str(i).zfill(4)}"
+                else: description = name
+                descriptions.append(description)
+                poses.append(os.path.join(out_dir, f"{description}{ext}"))
         
         # drop temporary description column
-        self.df.drop("temp_dp_select_col", inplace=True, axis=1)
+        self.df.drop("tmp_layer_column", inplace=True, axis=1)
 
         for old_pose, new_pose in zip(self.df['poses'].to_list(), poses):
             shutil.copy(old_pose, new_pose)
