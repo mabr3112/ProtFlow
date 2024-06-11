@@ -1136,7 +1136,6 @@ class Poses:
         return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
     
     def reindex_poses(self, prefix:str, remove_layers:int=1, force_reindex:bool=False, sep:str="_") -> None:
-        # TODO: TESTING!!! I think it works a bit different now than before, because a new index layer is added automatically
         """
         Removes index layers from poses. Saves reindexed poses to an output directory.
 
@@ -1147,14 +1146,14 @@ class Poses:
         remove_layers : int, optional
             The number of index layers to remove. 
         force_reindex : bool, optional
-            Add index layer if poses with identical description after index layer removal are found.
+            Add a new index layer to all poses.
         sep : str, optional
             The separator used to split the description column into layers.
             
         Further Details
         ---------------
         This method removes index layers from poses (_0001, 0002, etc). Subtracts the set number of layers from the description column and groups the poses accordingly.
-        If multiple poses with identical description after index layer removal are found and force_reindex is True, adds one index layer to all poses. 
+        If force_reindex is True, adds one index layer to all poses. 
 
         Notes
         -----
@@ -1180,17 +1179,15 @@ class Poses:
         # group by temporary description column, reindex
         descriptions = []
         poses = []
-        unique = True
-        if any([len(group_df.index) > 1 for name, group_df in self.df.groupby("tmp_layer_column", sort=False)]):
-            unique = False
-            if not force_reindex: raise RuntimeError(f'Multiple files with identical description found after removing index layers. Set <force_reindex> to True if new index layers should be added.')
+        if any([len(group_df.index) > 1 for name, group_df in self.df.groupby("tmp_layer_column", sort=False)]) and not force_reindex:
+            raise RuntimeError(f'Multiple files with identical description found after removing index layers. Set <force_reindex> to True if new index layers should be added.')
 
         for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
             group_df.reset_index(drop=True, inplace=True) # resetting index, otherwise index of original poses df would be used
                 # adding new index layer since multiple
             for i, ser in group_df.iterrows():
                 ext = os.path.splitext(ser['poses'])[1]
-                if unique == False: description = f"{name}_{str(i).zfill(4)}"
+                if force_reindex: description = f"{name}{sep}{str(i+1).zfill(4)}"
                 else: description = name
                 descriptions.append(description)
                 poses.append(os.path.join(out_dir, f"{description}{ext}"))
