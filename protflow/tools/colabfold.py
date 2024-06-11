@@ -193,7 +193,7 @@ class Colabfold(Runner):
     def __str__(self):
         return "colabfold.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, pose_options: str = None, overwrite: bool = False, return_top_n_poses: int = 1) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, pose_options: str = None, overwrite: bool = False, return_top_n_poses: int = 1) -> Poses:
         """
         run Method
         ==========

@@ -233,7 +233,7 @@ class TMalign(Runner):
 
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str, sc_tm_score: bool = True, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None: # pylint: disable=W0237
+    def run(self, poses: Poses, prefix: str, ref_col: str, sc_tm_score: bool = True, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> Poses: # pylint: disable=W0237
         """
         Execute the TMalign process with given poses and jobstarter configuration.
 

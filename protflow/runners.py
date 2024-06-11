@@ -217,7 +217,7 @@ class Runner:
         """
         raise NotImplementedError(f"Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -> Poses:
         """
         Abstract method to run jobs and send scores to Poses.
 
