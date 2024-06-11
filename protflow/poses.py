@@ -1753,6 +1753,118 @@ class Poses:
         logging.info("Composite score creation completed.")
 
         return self
+    
+    def calculate_mean_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
+        '''Calculates mean score of selected score column. If remove_layers, groups the dataframe by the respective index layer and calculates score for each group.'''
+        col_in_df(self.df, score_col)
+
+        if remove_layers == 0: remove_layers = None
+        # create temporary description column with removed index layers
+        if remove_layers:
+            if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
+            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        else: self.df["tmp_layer_column"] = self.df['poses_description']
+
+        df = []
+        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].mean()
+            df.append(group_df)
+
+        df = pd.concat(df).reset_index(drop=True)
+        df.drop("tmp_layer_column", inplace=True, axis=1)
+        
+        # drop temporary description column
+        self.df = df
+        return self
+
+    def calculate_median_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
+        col_in_df(self.df, score_col)
+
+        if remove_layers == 0: remove_layers = None
+        # create temporary description column with removed index layers
+        if remove_layers:
+            if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
+            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        else: self.df["tmp_layer_column"] = self.df['poses_description']
+
+        df = []
+        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].median()
+            df.append(group_df)
+
+        df = pd.concat(df).reset_index(drop=True)
+        df.drop("tmp_layer_column", inplace=True, axis=1)
+        
+        # drop temporary description column
+        self.df = df
+        return self
+    
+    def calculate_std_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
+        col_in_df(self.df, score_col)
+
+        if remove_layers == 0: remove_layers = None
+        # create temporary description column with removed index layers
+        if remove_layers:
+            if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
+            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        else: self.df["tmp_layer_column"] = self.df['poses_description']
+
+        df = []
+        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].std()
+            df.append(group_df)
+
+        df = pd.concat(df).reset_index(drop=True)
+        df.drop("tmp_layer_column", inplace=True, axis=1)
+        
+        # drop temporary description column
+        self.df = df
+        return self
+    
+    def calculate_max_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
+        col_in_df(self.df, score_col)
+
+        if remove_layers == 0: remove_layers = None
+        # create temporary description column with removed index layers
+        if remove_layers:
+            if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
+            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        else: self.df["tmp_layer_column"] = self.df['poses_description']
+
+        df = []
+        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].max()
+            df.append(group_df)
+
+        df = pd.concat(df).reset_index(drop=True)
+        df.drop("tmp_layer_column", inplace=True, axis=1)
+        
+        # drop temporary description column
+        self.df = df
+        return self
+
+    def calculate_min_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
+        col_in_df(self.df, score_col)
+
+        if remove_layers == 0: remove_layers = None
+        # create temporary description column with removed index layers
+        if remove_layers:
+            if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
+            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        else: self.df["tmp_layer_column"] = self.df['poses_description']
+
+        df = []
+        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].min()
+            df.append(group_df)
+
+        df = pd.concat(df).reset_index(drop=True)
+        df.drop("tmp_layer_column", inplace=True, axis=1)
+        
+        # drop temporary description column
+        self.df = df
+        return self
+
 
 def normalize_series(ser: pd.Series, scale: bool = False) -> pd.Series:
     """
