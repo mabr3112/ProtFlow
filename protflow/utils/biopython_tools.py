@@ -284,7 +284,7 @@ def superimpose(mobile: Structure, target: Structure, mobile_atoms: list = None,
     super_imposer.apply(mobile)
     return mobile
 
-def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None) -> list:
+def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None, include_het_atoms: bool = False) -> list:
     '''
     Extract specified atoms from specified chains in a given structure.
     
@@ -304,7 +304,8 @@ def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None) 
     atms_list = []
     for chain in chains:
         # Only select amino acids in each chain:
-        residues = [res for res in chain if res.id[0] == " "]
+        if include_het_atoms == False: residues = [res for res in chain if res.id[0] == " "]
+        else: residues = [res for res in chain]
         for residue in residues:
             # sort atoms by their atom name, ordering of atoms within residues differs depending on the software creating the .pdb file
             if atoms:
@@ -314,7 +315,7 @@ def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None) 
 
     return atms_list
 
-def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str] = None, excluded_atoms: list[str] = None, exclude_hydrogens: bool = True) -> list:
+def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str] = None, excluded_atoms: list[str] = None, exclude_hydrogens: bool = True, include_het_atoms: bool = False) -> list:
     """
     Select atoms from a structure based on a provided motif.
 
@@ -370,9 +371,15 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
     out_atoms = []
     for chain, res_id in motif:
         if atoms:
-            res_atoms = [pose[chain][(" ", res_id, " ")][atom] for atom in atoms]
+            if include_het_atoms == False: res_atoms = [pose[chain][(" ", res_id, " ")][atom] for atom in atoms]
+            else:
+                for res in pose[chain].get_residues():
+                    if res.id[1] == res_id: res_atoms = [res[atm] for atm in atoms]; break
         else:
-            res_atoms = sorted(list(pose[chain][(" ", res_id, " ")].get_atoms()), key=lambda a: a.id)
+            if include_het_atoms == False: res_atoms = sorted(list(pose[chain][(" ", res_id, " ")].get_atoms()), key=lambda a: a.id)
+            else:
+                for res in pose[chain].get_residues():
+                    if res.id[1] == res_id: res_atoms = sorted(list(res.get_atoms()), key=lambda a: a.id); break
 
         # filter out forbidden atoms
         res_atoms = [atom for atom in res_atoms if atom.name not in excluded_atoms]

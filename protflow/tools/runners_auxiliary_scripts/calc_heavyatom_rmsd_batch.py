@@ -1,6 +1,8 @@
 '''Auxiliary Script to calculate heavy-atom RMSDs based on .pdb inputs.'''
 # imports
 import json
+import math
+import os
 
 # dependencies
 import Bio.PDB
@@ -12,19 +14,32 @@ from Bio.PDB.Structure import Structure
 from protflow.residues import ResidueSelection
 from protflow.utils.biopython_tools import get_atoms, get_atoms_of_motif, load_structure_from_pdbfile
 
-def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_atoms: ResidueSelection = None, target_atoms: ResidueSelection = None, atom_list: list[str] = None) -> Structure:
+def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_atoms: ResidueSelection = None, target_atoms: ResidueSelection = None, atom_list: list[str] = None, include_het_atoms : bool = False, rmsd_mobile_atoms: ResidueSelection = None, rmsd_target_atoms: ResidueSelection = None, rmsd_atom_list: list[str] = None, rmsd_include_het_atoms: bool = False, separate_superposition_and_rmsd: bool = False) -> Structure:
     '''Superimposes :mobile: onto :target: based on provided :mobile_atoms: and :target_atoms: If no atoms are given, superimposition is based on Structure CA.'''
+
     # if no motif is specified, superimpose on protein backbones.
     if (mobile_atoms is None and target_atoms is None):
-        mobile_atms = get_atoms(mobile, atoms=atom_list)
-        target_atms = get_atoms(target, atoms=atom_list)
+        mobile_atms = get_atoms(mobile, atoms=atom_list, include_het_atoms=include_het_atoms)
+        target_atms = get_atoms(target, atoms=atom_list, include_het_atoms=include_het_atoms)
 
     # collect atoms of motif. If only one of the motifs is specified, use the same motif for both target and mobile
     else:
         # in case heavy-atom superimposition is desired, pass 'all' for atom_list
         atom_list = None if atom_list == "all" else atom_list
-        mobile_atms = get_atoms_of_motif(mobile, mobile_atoms or target_atoms, atoms=atom_list)
-        target_atms = get_atoms_of_motif(target, target_atoms or mobile_atoms, atoms=atom_list)
+        mobile_atms = get_atoms_of_motif(mobile, mobile_atoms or target_atoms, atoms=atom_list, include_het_atoms=include_het_atoms)
+        target_atms = get_atoms_of_motif(target, target_atoms or mobile_atoms, atoms=atom_list, include_het_atoms=include_het_atoms)
+
+    # if no motif is specified but separate_superposition_and_rmsd is True, calculate RMSD on protein backbones
+    if rmsd_mobile_atoms == None and rmsd_target_atoms == None and separate_superposition_and_rmsd == True:
+        rmsd_mobile_atoms = get_atoms(mobile, atoms=rmsd_atom_list, include_het_atoms=True)
+        rmsd_target_atoms = get_atoms(target, atoms=rmsd_atom_list, include_het_atoms=True)
+    
+    # collect atoms of RMSD motif. If only one of the motifs is specified, use the same motif for both target and mobile
+    elif separate_superposition_and_rmsd == True:
+        # in case heavy-atom RMSD calculation is desired, pass 'all' for atom_list
+        rmsd_atom_list = None if rmsd_atom_list == "all" else rmsd_atom_list
+        rmsd_mobile_atoms = get_atoms_of_motif(mobile, rmsd_mobile_atoms or rmsd_target_atoms, atoms=rmsd_atom_list, include_het_atoms=rmsd_include_het_atoms)
+        rmsd_target_atoms = get_atoms_of_motif(target, rmsd_target_atoms or rmsd_mobile_atoms, atoms=rmsd_atom_list, include_het_atoms=rmsd_include_het_atoms)
 
     # superimpose and return RMSD
     super_imposer = Bio.PDB.Superimposer()
@@ -32,8 +47,21 @@ def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_ato
         super_imposer.set_atoms(target_atms, mobile_atms)
     except Bio.PDB.PDBExceptions.PDBException as exc:
         raise ValueError(f"mobile_atoms and target_atoms differ in length. mobile_atoms:\n{mobile_atms}\ntarget_atoms\n{target_atms}") from exc
+    
+    if separate_superposition_and_rmsd == True:
+        super_imposer.rotran # no idea if this is necessary
+        super_imposer.apply(rmsd_mobile_atoms)
+        rmsd = calculate_rmsd_without_superposition(target=rmsd_target_atoms, reference=rmsd_mobile_atoms)
+        return rmsd
 
     return super_imposer.rms
+
+def calculate_rmsd_without_superposition(target: list, reference: list):
+    '''Calculates RMSD between two list of atoms without performing superposition.'''
+    if not len(target) == len(reference): raise ValueError(f"Target and reference atoms for RMSD calculation without superposition differ in length. Target atoms:\n{target}\reference atoms:\n{reference}")
+    distances = [target_atm - reference_atm for target_atm, reference_atm in zip(target, reference)]
+    rmsd = math.sqrt(sum([dist ** 2 for dist in distances]) / len((target)))
+    return round(rmsd, 3)
 
 def parse_input_json(json_path: str) -> dict:
     '''Parses json input for calc_heavyatom_rmsd_batch.py'''
@@ -42,7 +70,7 @@ def parse_input_json(json_path: str) -> dict:
             raise KeyError(f"{key} must be specified for target in input_json. target: {target}")
 
     # define options
-    opts = ["ref_pdb", "reference_motif", "target_motif"]
+    opts = ["ref_pdb", "reference_motif", "target_motif", "rmsd_ref_motif", "rmsd_target_motif"]
 
     # read
     with open(json_path, 'r', encoding="UTF-8") as f:
@@ -63,6 +91,7 @@ def main(args):
     # parse targets from input_json
     target_dict = parse_input_json(args.input_json)
     atoms = args.atoms.split(",") if args.atoms is not None else None
+    rmsd_atoms = args.rmsd_atoms.split(",") if args.rmsd_atoms is not None else None
 
     # calc heavy-atom rmsd for each target
     df_dict = {"description": [], "location": [], "rmsd": []}
@@ -73,11 +102,17 @@ def main(args):
             target = load_structure_from_pdbfile(target),
             mobile_atoms = ResidueSelection(opts["reference_motif"]),
             target_atoms = ResidueSelection(opts["target_motif"]),
-            atom_list = atoms
+            atom_list = atoms,
+            include_het_atoms = args.include_het_atoms,
+            rmsd_mobile_atoms = ResidueSelection(opts["rmsd_target_motif"]),
+            rmsd_target_atoms= ResidueSelection(opts["rmsd_ref_motif"]),
+            rmsd_atom_list= rmsd_atoms,
+            rmsd_include_het_atoms = args.rmsd_include_het_atoms,
+            separate_superposition_and_rmsd=args.separate_superposition_and_rmsd
         )
 
         # collect data
-        df_dict['description'].append(target.rsplit("/", maxsplit=1)[-1].rsplit(".", maxsplit=1)[0])
+        df_dict['description'].append(os.path.splitext(os.path.basename(target))[0])
         df_dict['location'].append(target)
         df_dict['rmsd'].append(rms)
 
@@ -94,7 +129,11 @@ if __name__ == "__main__":
     argparser.add_argument("--input_json", type=str, help=".json formatted file that contains a dictionary with all input information: {'target': {'reference_pdb': 'path', 'target_motif': '[...]'}}")
 
     # optional args
-    argparser.add_argument("--atoms", type=str, default=None, help="List of atoms to calculate RMSD over. If nothing is specified, all heavy-atoms are taken.")
+    argparser.add_argument("--atoms", type=str, default=None, help="List of atoms for superposition and RMSD calculation. If nothing is specified, all heavy-atoms are taken.")
+    argparser.add_argument("--rmsd_atoms", type=str, default=None, help="Use atoms for superposition, but calculate RMSD only on rmsd_atoms. If nothing is specified, all heavy-atoms are taken. Only works if flag separate_superposition_and_rmsd is passed.")
+    argparser.add_argument("--separate_superposition_and_rmsd", action="store_true", help="Separate superposition and RMSD calculatio. If nothing is specified, calculate RMSD over atoms.")
+    argparser.add_argument("--include_het_atoms", action="store_true", help="Include hetero atoms (ligands) when selecting atoms for superpositioning & RMSD calculation.")
+    argparser.add_argument("--rmsd_include_het_atoms", action="store_true", help="Include hetero atoms (ligands) when selecting atoms for RMSD calculation.")
 
     # output
     argparser.add_argument("--output_path", type=str, default="heavyatom_rmsd.json")

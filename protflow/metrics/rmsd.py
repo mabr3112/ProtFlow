@@ -545,7 +545,7 @@ class MotifRMSD(Runner):
 
     The MotifRMSD class is intended for researchers and developers who need to perform RMSD calculations for specific motifs as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, target_chains: list[str] = None, ref_chains: list[str] = None, atoms: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False):
+    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, atoms: list[str] = None, rmsd_target_motif : str = None, rmsd_ref_motif : str = None, rmsd_atoms: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False):
         """
         Initialize the MotifRMSD class.
 
@@ -597,9 +597,10 @@ class MotifRMSD(Runner):
         self.set_ref_col(ref_col)
         self.set_target_motif(target_motif)
         self.set_ref_motif(ref_motif)
-        self.set_target_chains(target_chains)
-        self.set_ref_chains(ref_chains)
         self.set_atoms(atoms)
+        self.set_rmsd_target_motif(rmsd_target_motif)
+        self.set_rmsd_ref_motif(rmsd_ref_motif)
+        self.set_rmsd_atoms(rmsd_atoms)
 
     def __str__(self):
         return "Heavyatom motif rmsd calculator"
@@ -645,26 +646,25 @@ class MotifRMSD(Runner):
         else:
             raise ValueError(f"Unsupported type {type(jobstarter)} for parameter :jobstarter:. Has to be of type JobStarter!")
 
-    def set_target_chains(self, chains: list[str]) -> None:
+    def set_rmsd_ref_motif(self, motif: str) -> None:
+        '''Method to set rmsd reference motif. :motif: has to be string and should be a column name in poses.df that will be passed to the .run() function'''
+        self.rmsd_ref_motif = motif
+
+    def set_rmsd_target_motif(self, motif: str) -> None:
+        '''Method to set rmsd target motif. :motif: has to be string and should be a column name in poses.df that will be passed to the .run() function'''
+        self.rmsd_target_motif = motif
+
+    def set_rmsd_atoms(self, atoms: list[str] = None) -> None:
         """
-        Set the target chains for RMSD calculations.
+        Set the atoms used for RMSD calculations.
 
         Parameters:
-            chains (list[str]): The list of target chain names.
+            atoms (list[str]): The atoms used for superposition.
         """
-        self.target_chains = chains if isinstance(chains, list) else [chains]
-
-    def set_ref_chains(self, chains: list[str]) -> None:
-        """
-        Set the reference chains for RMSD calculations.
-
-        Parameters:
-            chains (list[str]): The list of reference chain names.
-        """
-        self.ref_chains = chains if isinstance(chains, list) else [chains]
+        self.rmsd_atoms = atoms
 
     ################################################# Calcs ################################################
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, atoms: list[str] = None, overwrite: bool = False):
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, atoms: list[str] = None, include_het_atoms: bool = False, rmsd_ref_motif: Any = None, rmsd_target_motif: Any = None, rmsd_atoms: list[str] = None, rmsd_include_het_atoms: bool = False, separate_superposition_and_rmsd: bool = False, overwrite: bool = False) -> Poses:
         """
         Calculate the motif-specific RMSD for given poses and jobstarter configuration.
 
@@ -674,14 +674,17 @@ class MotifRMSD(Runner):
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            ref_motif (Any, optional): The reference motif for RMSD calculations. Defaults to None.
-            target_motif (Any, optional): The target motif for RMSD calculations. Defaults to None.
-            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to None.
+            ref_col (str, optional): The reference column for RMSD calculation. Defaults to None.
+            ref_motif (Any, optional): The reference motif for superposition & RMSD calculation. Defaults to None.
+            target_motif (Any, optional): The target motif for superposition & RMSD calculation. Defaults to None.
+            rmsd_ref_motif (Any, optional): Use ref_motif and target_motif for superposition, but calculate RMSD only on selected motif. Defaults to None.
+            rmsd_target_motif (Any, optional): Use ref_motif and target_motif for superposition, but calculate RMSD only on selected motif. Defaults to None.
+            atoms (list[str], optional): The list of atom names for superposition & RMSD calculation. Defaults to None.
+            rmsd_atoms (list[str], optional): Use atoms for superposition, but calculate RMSD only on rmsd_atoms. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
 
         Returns:
-            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.
+            Poses: An instance of the Poses class, containing the processed poses and results of the RMSD calculation.
 
         Raises:
             FileNotFoundError: If required files or directories are not found during the execution process.
@@ -733,7 +736,7 @@ class MotifRMSD(Runner):
         target_motif = target_motif or self.target_motif
 
         # setup runner
-        script_path = f"{script_dir}/calc_heavyatom_rmsd_batch.py"
+        script_path = os.path.join(script_dir, "calc_heavyatom_rmsd_batch.py")
         work_dir, jobstarter = self.generic_run_setup(
             poses = poses,
             prefix = prefix,
@@ -756,7 +759,9 @@ class MotifRMSD(Runner):
             poses = poses,
             ref_col = ref_col,
             ref_motif = ref_motif,
-            target_motif = target_motif
+            target_motif = target_motif,
+            rmsd_ref_motif = rmsd_ref_motif,
+            rmsd_target_motif = rmsd_target_motif
         )
 
         # split input_dict into subdicts
@@ -777,9 +782,24 @@ class MotifRMSD(Runner):
         # setup atoms option
         atoms = atoms or self.atoms
         atoms_str = "" if atoms is None else f"--atoms '{','.join(atoms)}'"
+        rmsd_atoms = rmsd_atoms or self.rmsd_atoms
+        rmsd_atoms_str = "" if rmsd_atoms is None else f"--rmsd_atoms '{','.join(rmsd_atoms)}'"
+
+        # check if superposition should be performed separately from RMSD calculation
+        if rmsd_ref_motif:
+            if not rmsd_ref_motif == ref_motif:
+                separate_superposition_and_rmsd == True
+        if rmsd_target_motif:
+            if not rmsd_target_motif == target_motif:
+                separate_superposition_and_rmsd == True
+        separate_superposition_and_rmsd_str = "--separate_superposition_and_rmsd" if separate_superposition_and_rmsd == True else ""
+        include_het_atoms_str = "--include_het_atoms" if include_het_atoms == True else ""
+        rmsd_include_het_atoms_str = "--rmsd_include_het_atoms" if rmsd_include_het_atoms == True else ""
+
+
 
         # start add_chains_batch.py
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {rmsd_atoms_str} {include_het_atoms_str} {rmsd_include_het_atoms_str} {separate_superposition_and_rmsd_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,
@@ -799,7 +819,7 @@ class MotifRMSD(Runner):
 
         return outputs.return_poses()
 
-    def setup_input_dict(self, poses: Poses, ref_col: str, ref_motif: Any = None, target_motif: Any = None) -> dict:
+    def setup_input_dict(self, poses: Poses, ref_col: str, ref_motif: Any = None, target_motif: Any = None, rmsd_ref_motif: Any = None, rmsd_target_motif: Any = None) -> dict:
         """
         Set up the input dictionary for motif RMSD calculations.
 
@@ -808,8 +828,11 @@ class MotifRMSD(Runner):
         Parameters:
             poses (Poses): The Poses object containing the protein structures.
             ref_col (str): The reference column for RMSD calculations.
-            ref_motif (Any, optional): The reference motif for RMSD calculations. Defaults to None.
-            target_motif (Any, optional): The target motif for RMSD calculations. Defaults to None.
+            ref_motif (Any, optional): The reference motif for superposition. Defaults to None.
+            target_motif (Any, optional): The target motif for superposition. Defaults to None.
+            rmsd_ref_motif (Any, optional): The reference motif for RMSD calculations. Defaults to None.
+            rmsd_target_motif (Any, optional): The target motif for RMSD calculations. Defaults to None.
+
 
         Returns:
             dict: A dictionary structured for input to the motif RMSD calculation script.
@@ -864,12 +887,15 @@ class MotifRMSD(Runner):
         ref_l = setup_ref_col(ref_col or self.ref_col, poses)
         ref_motif_l = setup_motif(ref_motif or self.ref_motif, poses)
         target_motif_l = setup_motif(target_motif or self.target_motif, poses)
+        rmsd_ref_motif_l = setup_motif(rmsd_ref_motif or self.rmsd_ref_motif, poses)
+        rmsd_target_motif_l = setup_motif(rmsd_target_motif or self.rmsd_target_motif, poses)
 
         # construct rmsd_input_dict:
         rmsd_input_dict = {pose: {} for pose in poses.poses_list()}
-        for pose, ref, ref_motif_, target_motif_ in zip(poses.poses_list(), ref_l, ref_motif_l, target_motif_l):
+        for pose, ref, ref_motif_, target_motif_, rmsd_ref_motif_, rmsd_target_motif_ in zip(poses.poses_list(), ref_l, ref_motif_l, target_motif_l, rmsd_ref_motif_l, rmsd_target_motif_l):
             rmsd_input_dict[pose]["ref_pdb"] = os.path.abspath(ref)
             rmsd_input_dict[pose]["target_motif"] = target_motif_
             rmsd_input_dict[pose]["reference_motif"] = ref_motif_
-
+            rmsd_input_dict[pose]["rmsd_ref_motif"] = rmsd_ref_motif_
+            rmsd_input_dict[pose]["rmsd_target_motif"] = rmsd_target_motif_
         return rmsd_input_dict
