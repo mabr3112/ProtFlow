@@ -497,16 +497,6 @@ def calc_ligand_clashes_vdw(pose: str|Structure, ligand_chain: str, factor: floa
 
     This method is designed to facilitate the detection of steric clashes between ligands and the surrounding structure, providing a quantitative measure of potential conflicts.
     """
-    def check_array_for_none(array: np.array):
-        is_none = np.vectorize(lambda x: x is None)
-
-        # Apply the function to the array
-        none_check = is_none(array)
-
-        # Check if any of the elements are None
-        return np.any(none_check)
-
-
     # verify inputs
     if isinstance(pose, str):
         pose = load_structure_from_pdbfile(pose)
@@ -544,7 +534,7 @@ def calc_ligand_clashes_vdw(pose: str|Structure, ligand_chain: str, factor: floa
         ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms()])
         ligand_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose[ligand_chain].get_atoms()])
 
-    if check_array_for_none(ligand_vdw):
+    if np.any(np.isnan(ligand_vdw)):
         raise RuntimeError("Could not find Van der Waals radii for all elements in ligand. Check protflow.utils.vdw_radii and add it, if applicable!")
 
     # calculate distances between all atoms of ligand and protein
