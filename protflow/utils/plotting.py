@@ -107,7 +107,7 @@ class PlottingTrajectory():
         self.data.append((label, data_list))
         return None
 
-    def violin_plot(self, out_path:str=None):
+    def violin_plot(self, out_path:str=None, show_fig:bool=False):
         '''AAA'''
         out_path = out_path or self.location
         if not self.data:
@@ -145,16 +145,16 @@ class PlottingTrajectory():
                   fancybox=True, shadow=True, ncol=1, fontsize=13)
 
         if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-        fig.show()
+        if show_fig: fig.show()
         return None
 
-    def add_and_plot(self, data_list, label):
+    def add_and_plot(self, data_list, label, show_fig: bool=False):
         ''''''
         self.add(data_list, label)
-        self.violin_plot()
+        self.violin_plot(show_fig=show_fig)
         return None
 
-def singular_violinplot(data: list, y_label: str, title: str, out_path: str = None,) -> None:
+def singular_violinplot(data: list, y_label: str, title: str, out_path: str = None, show_fig: bool=False) -> None:
     """
     Create a Singular Violin Plot
     =============================
@@ -230,7 +230,7 @@ def singular_violinplot(data: list, y_label: str, title: str, out_path: str = No
     ax.vlines(1, np.min(data), np.max(data), color="k", linestyle="-", lw=2)
 
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    fig.show()
+    if show_fig: fig.show()
     return None
 
 def violinplot_multiple_cols_dfs(dfs: list[pd.DataFrame], df_names: list[str], cols: list[str], y_labels: list[str], titles: list[str] = None, dims: list[tuple[float,float]] = None, out_path: str = None, colormap: str = "tab20", show_fig: bool = True) -> None:

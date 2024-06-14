@@ -82,6 +82,7 @@ import pandas as pd
 
 # customs
 from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.utils import vdw_radii
 
 def get_mutations_list(wt: str, variant:str) -> None:
     '''Not implemented.'''
@@ -397,7 +398,7 @@ def calc_baker_success(input_df: pd.DataFrame, af2_col: str, bb_rmsd_col: str, m
     '''Implementation of Baker in silico success score. See RFDiffusion publication for info.'''
     return NotImplementedError
 
-def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3, atoms: list[str] = None) -> float:
+def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3, atoms: list[str] = None, exclude_ligand_hydrogens: bool = False) -> float:
     """
     Calculate ligand clashes for a PDB file given a ligand chain.
 
@@ -451,12 +452,116 @@ def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3,
         pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms])
     else:
         raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
-    ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms()])
+    if exclude_ligand_hydrogens: ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if not atom.element == "H"])
+    else: ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms()])
 
     # calculate clashes
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
 
     return np.sum((dgram < dist))
+
+def calc_ligand_clashes_vdw(pose: str|Structure, ligand_chain: str, factor: float = 1, atoms: list[str] = None, exclude_ligand_elements: list[str] = None) -> int:
+    """
+    Calculate ligand clashes for a PDB file given a ligand chain.
+
+    This method calculates the number of clashes between a specified ligand chain and the rest of the structure in a PDB file or a Bio.PDB Structure object. A clash is defined as any pair of atoms (one from the ligand, one from the rest of the structure) that are within the sum of their Van der Waals radii multiplied by a factor.
+
+    Parameters:
+        pose (str | Bio.PDB.Structure.Structure): The pose representing the structure, which can be a path to a PDB file (str) or a Bio.PDB Structure object.
+        ligand_chain (str): The chain identifier for the ligand within the structure.
+        factor (float, optional): The multiplier for the VdW clash threshold for defining a clash. Lower numbers result in less stringent clash detection. Default is 1.0.
+        atoms (list[str], optional): A list of atom names to consider for clash calculations. If None, all atoms are considered. If specified, only these atoms will be included in the clash calculation.
+        exclude_ligand_elements (list[str], optional): A list of elements that should not be considered during clash detection (e.g. ['H']). Default is None
+
+    Returns:
+        float: The number of clashes found between the ligand and the rest of the structure.
+
+    Examples:
+        Here is an example of how to use the `calc_ligand_clashes` method:
+
+        .. code-block:: python
+
+            from Bio.PDB import PDBParser
+
+            # Load structure from a PDB file
+            parser = PDBParser()
+            structure = parser.get_structure("example", "example.pdb")
+
+            # Calculate clashes
+            clashes = calc_ligand_clashes_vdw(structure, ligand_chain="A", factor=0.8, atoms=["N", "CA", "C"], exclude_ligand_atoms=["H"])
+            # clashes will be a float representing the number of clashes
+
+    Further Details:
+        - **Clash Calculation:** The method calculates the Euclidean distance between all specified atoms of the ligand chain and the rest of the structure. A clash is detected if the distance is less than the sum of their Van der Waals radii multiplied by a set factor.
+        - **Usage:** This function is useful for evaluating potential steric clashes in molecular docking studies or for validating the positioning of ligands in structural models.
+
+    This method is designed to facilitate the detection of steric clashes between ligands and the surrounding structure, providing a quantitative measure of potential conflicts.
+    """
+    def check_array_for_none(array: np.array):
+        is_none = np.vectorize(lambda x: x is None)
+
+        # Apply the function to the array
+        none_check = is_none(array)
+
+        # Check if any of the elements are None
+        return np.any(none_check)
+
+
+    # verify inputs
+    if isinstance(pose, str):
+        pose = load_structure_from_pdbfile(pose)
+    elif not isinstance(pose, Structure):
+        raise ValueError(f"Parameter :pose: has to be of type str or Bio.PDB.Structure.Structure. type(pose) = {type(pose)}")
+    
+    if exclude_ligand_elements:
+        if not isinstance(exclude_ligand_elements, list):
+            raise ValueError(f"Parameter:exclude_ligand_atoms: has to be a list of str, not {type(exclude_ligand_elements)}!")
+        exclude_ligand_elements = [element.lower() for element in exclude_ligand_elements]
+
+    # import VdW radii
+    vdw_dict = vdw_radii()
+    
+    # check for ligand chain
+    pose_chains = list(chain.id for chain in pose.get_chains())
+    if ligand_chain not in pose_chains:
+        raise KeyError(f"Chain {ligand_chain} not found in pose. Available Chains: {pose_chains}")
+
+    # get atoms
+    if not atoms or atoms == "all":
+        pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain])
+        pose_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain])
+    elif isinstance(atoms, list) and all(isinstance(atom, str) for atom in atoms):
+        pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms])
+        pose_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms])
+    else:
+        raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
+    
+    # get ligand atoms
+    if exclude_ligand_elements:
+        ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if not atom.element.lower() in exclude_ligand_elements])
+        ligand_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose[ligand_chain].get_atoms() if not atom.element.lower() in exclude_ligand_elements])
+    else:
+        ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms()])
+        ligand_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose[ligand_chain].get_atoms()])
+
+    if check_array_for_none(ligand_vdw):
+        raise RuntimeError("Could not find Van der Waals radii for all elements in ligand. Check protflow.utils.vdw_radii and add it, if applicable!")
+
+    # calculate distances between all atoms of ligand and protein
+    dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
+
+    # calculate distance cutoff for each atom pair, considering VdW radii 
+    distance_cutoff = pose_vdw[:, np.newaxis] + ligand_vdw[np.newaxis, :]
+    # multiply distance cutoffs with set parameter
+    distance_cutoff = distance_cutoff * factor
+
+    # compare distances to distance_cutoff
+    check = dgram - distance_cutoff
+
+    # count number of clashes (where distances are below distance cutoff)
+    clashes = np.sum((check < 0))
+
+    return clashes
 
 def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_dist: float = 5, atoms: list[str] = None, excluded_elements: list[str] = None) -> float:
     """
