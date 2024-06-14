@@ -1754,115 +1754,340 @@ class Poses:
 
         return self
     
-    def calculate_mean_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
-        '''Calculates mean score of selected score column. If remove_layers, groups the dataframe by the respective index layer and calculates score for each group.'''
-        col_in_df(self.df, score_col)
+    def calculate_mean_score(self, name: str, score_col: str, skipna: bool = False, remove_layers: int = None, sep: str = "_"):
+        """
+        Calculate the mean score of the selected score column. If remove_layers is set, calculates mean scores over poses grouped by the description column with the set number of index layers removed.
 
+        Parameters
+        ----------
+        name : str
+            The name of the new column where the mean scores will be stored.
+        score_col : str
+            The name of the column from which to calculate the mean scores.
+        skipna : bool, optional
+            Whether to skip NA/null values. Default is False.
+        remove_layers : int, optional
+            The number of layers to remove from the index for grouping. If None, no layers are removed. Default is None.
+        sep : str, optional
+            The separator used in the 'poses_description' column for splitting and joining layers. Default is "_".
+
+        Returns
+        -------
+        self
+            The instance of the class with the mean scores added to the DataFrame.
+
+        Raises
+        ------
+        TypeError
+            If `remove_layers` is not an integer.
+        ValueError
+            If `score_col` does not exist in the DataFrame.
+
+        Example
+        -------
+        .. code-block:: python
+
+            from poses import Poses
+
+            # Initialize the Poses class with some scores
+            poses_instance = Poses()
+
+            # Calculate the mean score
+            poses_instance.calculate_mean_score(
+                name='mean_score1',
+                score_col='score1',
+                skipna=True,
+                remove_layers=1,
+            )
+        """
+        col_in_df(self.df, score_col)
+        df_layers = self.df.copy()
         if remove_layers == 0: remove_layers = None
         # create temporary description column with removed index layers
         if remove_layers:
             if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
-            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+            df_layers["tmp_layer_column"] = df_layers['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
         else: self.df["tmp_layer_column"] = self.df['poses_description']
 
         df = []
-        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
-            group_df[name] = group_df[score_col].mean()
+        for _, group_df in df_layers.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].mean(skipna=skipna)
             df.append(group_df)
 
         df = pd.concat(df).reset_index(drop=True)
-        df.drop("tmp_layer_column", inplace=True, axis=1)
+        df = df[['poses_description', name]]
         
         # drop temporary description column
-        self.df = df
+        self.df = self.df.merge(df, on='poses_description')
         return self
 
-    def calculate_median_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
-        col_in_df(self.df, score_col)
+    def calculate_median_score(self, name: str, score_col: str, skipna: bool = False, remove_layers: int = None, sep: str = "_"):
+        """
+        Calculate the median score of the selected score column. If remove_layers is set, calculates median scores over poses grouped by the description column with the set number of index layers removed.
 
+        Parameters
+        ----------
+        name : str
+            The name of the new column where the mean scores will be stored.
+        score_col : str
+            The name of the column from which to calculate the median scores.
+        skipna : bool, optional
+            Whether to skip NA/null values. Default is False.
+        remove_layers : int, optional
+            The number of layers to remove from the index for grouping. If None, no layers are removed. Default is None.
+        sep : str, optional
+            The separator used in the 'poses_description' column for splitting and joining layers. Default is "_".
+
+        Returns
+        -------
+        self
+            The instance of the class with the mean scores added to the DataFrame.
+
+        Raises
+        ------
+        TypeError
+            If `remove_layers` is not an integer.
+        ValueError
+            If `score_col` does not exist in the DataFrame.
+
+        Example
+        -------
+        .. code-block:: python
+
+            from poses import Poses
+
+            # Initialize the Poses class with some scores
+            poses_instance = Poses()
+
+            # Calculate the median score
+            poses_instance.calculate_median_score(
+                name='median_score1',
+                score_col='score1',
+                skipna=True,
+                remove_layers=1,
+            )
+        """
+        col_in_df(self.df, score_col)
+        df_layers = self.df.copy()
         if remove_layers == 0: remove_layers = None
         # create temporary description column with removed index layers
         if remove_layers:
             if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
-            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+            df_layers["tmp_layer_column"] = df_layers['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
         else: self.df["tmp_layer_column"] = self.df['poses_description']
 
         df = []
-        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
-            group_df[name] = group_df[score_col].median()
+        for _, group_df in df_layers.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].median(skipna=skipna)
             df.append(group_df)
 
         df = pd.concat(df).reset_index(drop=True)
-        df.drop("tmp_layer_column", inplace=True, axis=1)
+        df = df[['poses_description', name]]
         
         # drop temporary description column
-        self.df = df
+        self.df = self.df.merge(df, on='poses_description')
         return self
     
-    def calculate_std_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
-        col_in_df(self.df, score_col)
+    def calculate_std_score(self, name: str, score_col: str, skipna: bool = False, remove_layers: int = None, sep: str = "_"):
+        """
+        Calculate the standard deviation of the selected score column. If remove_layers is set, calculates standard deviations over poses grouped by the description column with the set number of index layers removed.
 
+        Parameters
+        ----------
+        name : str
+            The name of the new column where the mean scores will be stored.
+        score_col : str
+            The name of the column from which to calculate the standard deviation.
+        skipna : bool, optional
+            Whether to skip NA/null values. Default is False.
+        remove_layers : int, optional
+            The number of layers to remove from the index for grouping. If None, no layers are removed. Default is None.
+        sep : str, optional
+            The separator used in the 'poses_description' column for splitting and joining layers. Default is "_".
+
+        Returns
+        -------
+        self
+            The instance of the class with the mean scores added to the DataFrame.
+
+        Raises
+        ------
+        TypeError
+            If `remove_layers` is not an integer.
+        ValueError
+            If `score_col` does not exist in the DataFrame.
+
+        Example
+        -------
+        .. code-block:: python
+
+            from poses import Poses
+
+            # Initialize the Poses class with some scores
+            poses_instance = Poses()
+
+            # Calculate the standard deviation
+            poses_instance.calculate_std_score(
+                name='mean_score1',
+                score_col='score1',
+                skipna=True,
+                remove_layers=1,
+            )
+        """
+        col_in_df(self.df, score_col)
+        df_layers = self.df.copy()
         if remove_layers == 0: remove_layers = None
         # create temporary description column with removed index layers
         if remove_layers:
             if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
-            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+            df_layers["tmp_layer_column"] = df_layers['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
         else: self.df["tmp_layer_column"] = self.df['poses_description']
 
         df = []
-        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
-            group_df[name] = group_df[score_col].std()
+        for _, group_df in df_layers.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].std(skipna=skipna)
             df.append(group_df)
 
         df = pd.concat(df).reset_index(drop=True)
-        df.drop("tmp_layer_column", inplace=True, axis=1)
+        df = df[['poses_description', name]]
         
         # drop temporary description column
-        self.df = df
+        self.df = self.df.merge(df, on='poses_description')
         return self
     
-    def calculate_max_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
-        col_in_df(self.df, score_col)
+    def calculate_max_score(self, name: str, score_col: str, skipna: bool = False, remove_layers: int = None, sep: str = "_"):
+        """
+        Calculate the maximum value of the selected score column. If remove_layers is set, calculates the maximum value over poses grouped by the description column with the set number of index layers removed.
 
+        Parameters
+        ----------
+        name : str
+            The name of the new column where the maximum values will be stored.
+        score_col : str
+            The name of the column from which to calculate the maximum value.
+        skipna : bool, optional
+            Whether to skip NA/null values. Default is False.
+        remove_layers : int, optional
+            The number of layers to remove from the index for grouping. If None, no layers are removed. Default is None.
+        sep : str, optional
+            The separator used in the 'poses_description' column for splitting and joining layers. Default is "_".
+
+        Returns
+        -------
+        self
+            The instance of the class with the maximum values added to the DataFrame.
+
+        Raises
+        ------
+        TypeError
+            If `remove_layers` is not an integer.
+        ValueError
+            If `score_col` does not exist in the DataFrame.
+
+        Example
+        -------
+        .. code-block:: python
+
+            from poses import Poses
+
+            # Initialize the Poses class with some scores
+            poses_instance = Poses()
+
+            # Calculate the maximum values
+            poses_instance.calculate_max_score(
+                name='max_score1',
+                score_col='score1',
+                skipna=True,
+                remove_layers=1,
+            )
+        """
+
+        col_in_df(self.df, score_col)
+        df_layers = self.df.copy()
         if remove_layers == 0: remove_layers = None
         # create temporary description column with removed index layers
         if remove_layers:
             if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
-            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+            df_layers["tmp_layer_column"] = df_layers['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
         else: self.df["tmp_layer_column"] = self.df['poses_description']
 
         df = []
-        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
-            group_df[name] = group_df[score_col].max()
+        for _, group_df in df_layers.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].max(skipna=skipna)
             df.append(group_df)
 
         df = pd.concat(df).reset_index(drop=True)
-        df.drop("tmp_layer_column", inplace=True, axis=1)
+        df = df[['poses_description', name]]
         
         # drop temporary description column
-        self.df = df
+        self.df = self.df.merge(df, on='poses_description')
         return self
 
-    def calculate_min_score(self, name: str, score_col: str, remove_layers: int = None, sep: str = "_"):
-        col_in_df(self.df, score_col)
+    def calculate_min_score(self, name: str, score_col: str, skipna: bool = False, remove_layers: int = None, sep: str = "_"):
+        """
+        Calculate the minimum value of the selected score column. If remove_layers is set, calculates the maximum value over poses grouped by the description column with the set number of index layers removed.
 
+        Parameters
+        ----------
+        name : str
+            The name of the new column where the minimum values will be stored.
+        score_col : str
+            The name of the column from which to calculate the minimum value.
+        skipna : bool, optional
+            Whether to skip NA/null values. Default is False.
+        remove_layers : int, optional
+            The number of layers to remove from the index for grouping. If None, no layers are removed. Default is None.
+        sep : str, optional
+            The separator used in the 'poses_description' column for splitting and joining layers. Default is "_".
+
+        Returns
+        -------
+        self
+            The instance of the class with the minimum values added to the DataFrame.
+
+        Raises
+        ------
+        TypeError
+            If `remove_layers` is not an integer.
+        ValueError
+            If `score_col` does not exist in the DataFrame.
+
+        Example
+        -------
+        .. code-block:: python
+
+            from poses import Poses
+
+            # Initialize the Poses class with some scores
+            poses_instance = Poses()
+
+            # Calculate the minimum values
+            poses_instance.calculate_min_score(
+                name='min_score1',
+                score_col='score1',
+                skipna=True,
+                remove_layers=1,
+            )
+        """
+        col_in_df(self.df, score_col)
+        df_layers = self.df.copy()
         if remove_layers == 0: remove_layers = None
         # create temporary description column with removed index layers
         if remove_layers:
             if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
-            self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+            df_layers["tmp_layer_column"] = df_layers['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
         else: self.df["tmp_layer_column"] = self.df['poses_description']
 
         df = []
-        for name, group_df in self.df.groupby("tmp_layer_column", sort=False):
-            group_df[name] = group_df[score_col].min()
+        for _, group_df in df_layers.groupby("tmp_layer_column", sort=False):
+            group_df[name] = group_df[score_col].min(skipna=skipna)
             df.append(group_df)
 
         df = pd.concat(df).reset_index(drop=True)
-        df.drop("tmp_layer_column", inplace=True, axis=1)
+        df = df[['poses_description', name]]
         
         # drop temporary description column
-        self.df = df
+        self.df = self.df.merge(on='poses_description')
         return self
 
 
