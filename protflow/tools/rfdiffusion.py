@@ -214,7 +214,7 @@ class RFdiffusion(Runner):
     def __str__(self):
         return "rfdiffusion.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: int = None, update_motifs: list[str] = None) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: int = None, update_motifs: list[str] = None) -> Poses:
         """
         Execute the RFdiffusion process with given poses and jobstarter configuration.
 
