@@ -1187,8 +1187,8 @@ class MotifSeparateSuperpositionRMSD(Runner):
             output_files.append(f"{work_dir}/rmsd_output_{str(i).zfill(4)}.json")
 
         # setup atoms option
-        atoms = atoms or self.atoms
-        atoms_str = "" if atoms is None else f"--super_atoms '{','.join(atoms)}'"
+        super_atoms = super_atoms or self.super_atoms
+        super_atoms_str = "" if super_atoms is None else f"--super_atoms '{','.join(atoms)}'"
         rmsd_atoms = rmsd_atoms or self.rmsd_atoms
         rmsd_atoms_str = "" if rmsd_atoms is None else f"--rmsd_atoms '{','.join(rmsd_atoms)}'"
 
@@ -1196,7 +1196,7 @@ class MotifSeparateSuperpositionRMSD(Runner):
         rmsd_include_het_atoms_str = "--rmsd_include_het_atoms" if rmsd_include_het_atoms == True or self.rmsd_include_het_atoms == True else ""
 
         # start add_chains_batch.py
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {rmsd_atoms_str} {super_include_het_atoms_str} {rmsd_include_het_atoms_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {super_atoms_str} {rmsd_atoms_str} {super_include_het_atoms_str} {rmsd_include_het_atoms_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,
