@@ -1135,7 +1135,7 @@ class Poses:
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
         return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
     
-    def reindex_poses(self, prefix:str, remove_layers:int=1, force_reindex:bool=False, sep:str="_") -> None:
+    def reindex_poses(self, prefix:str, remove_layers:int=1, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
         """
         Removes index layers from poses. Saves reindexed poses to an output directory.
 
@@ -1196,7 +1196,8 @@ class Poses:
         self.df.drop("tmp_layer_column", inplace=True, axis=1)
 
         for old_pose, new_pose in zip(self.df['poses'].to_list(), poses):
-            shutil.copy(old_pose, new_pose)
+            if overwrite == True or not os.path.isfile(new_pose):
+                shutil.copy(old_pose, new_pose)
         
         self.df['poses_description'] = descriptions
         self.df['poses'] = poses
