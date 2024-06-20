@@ -250,6 +250,10 @@ class AttnPacker(Runner):
 
         logging.info(f"{self} finished, collecting scores.")
         scores = collect_scores(work_dir)
+
+        if len(scores.index) < len(poses.df.index):
+            raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
+        
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
