@@ -1632,7 +1632,7 @@ class Poses:
 
         # make sure there are still poses left in the Poses class.
         if len(filter_df) == 0:
-            raise ValueError(f"All poses removed from Poses object. No pose fullfills the filtering criterium {operator} {value} for score {score_col}")
+            logging.warning(f"All poses removed from Poses object. No pose fullfills the filtering criterium {operator} {value} for score {score_col}")
         logging.info(f"Filtered poses from {orig_len} to {len(filter_df.index)} poses.")
 
         # save filtered dataframe if prefix is provided
