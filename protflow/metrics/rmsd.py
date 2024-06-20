@@ -1188,7 +1188,7 @@ class MotifSeparateSuperpositionRMSD(Runner):
 
         # setup atoms option
         super_atoms = super_atoms or self.super_atoms
-        super_atoms_str = "" if super_atoms is None else f"--super_atoms '{','.join(atoms)}'"
+        super_atoms_str = "" if super_atoms is None else f"--super_atoms '{','.join(super_atoms)}'"
         rmsd_atoms = rmsd_atoms or self.rmsd_atoms
         rmsd_atoms_str = "" if rmsd_atoms is None else f"--rmsd_atoms '{','.join(rmsd_atoms)}'"
 
