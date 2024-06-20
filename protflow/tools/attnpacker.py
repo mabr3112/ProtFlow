@@ -129,8 +129,6 @@ class AttnPacker(Runner):
             poses=poses,
             prefix="experiment_1",
             jobstarter=jobstarter,
-            options="packing.num_designs=10",
-            pose_options=["packing.input_pdb='input.pdb'"],
             overwrite=True
         )
 
@@ -156,7 +154,7 @@ class AttnPacker(Runner):
     def __str__(self):
         return "attnpacker.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, pose_options: str = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
         """
         Execute the AttnPacker process with given poses and jobstarter configuration.
 
@@ -166,8 +164,6 @@ class AttnPacker(Runner):
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            options (str, optional): Additional options for the AttnPacker script. Defaults to None.
-            pose_options (list[str], optional): A list of pose-specific options for the AttnPacker script. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
 
         Returns:
@@ -199,8 +195,6 @@ class AttnPacker(Runner):
                     poses=poses,
                     prefix="experiment_1",
                     jobstarter=jobstarter,
-                    options="packing.num_designs=10",
-                    pose_options=["packing.input_pdb='input.pdb'"],
                     overwrite=True
                 )
 
@@ -233,11 +227,17 @@ class AttnPacker(Runner):
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
 
-        # parse options and pose_options:
-        pose_options = self.prep_pose_options(poses, pose_options)
+        poses_sublist = protflow.jobstarters.split_list(poses.poses_list(), n_sublists=jobstarter.max_cores)
+        json_paths = []
+        for index, sublist in enumerate(poses_sublist):
+            in_dict = {"poses": sublist, "scorepath": [os.path.join(work_dir, f"{os.path.splitext(os.path.basename(pose_path))[0]}_attnpacker_out.json") for pose_path in sublist]}
+            json_path = os.path.join(work_dir, f"attnpacker_input_{index}.json")
+            in_df = pd.DataFrame(in_dict)
+            in_df.to_json(json_path)
+            json_paths.append(json_path)
 
         # write attpacker cmds:
-        cmds = [self.write_cmd(pose, output_dir=work_dir, options=options, pose_options=pose_opts) for pose, pose_opts in zip(poses.df["poses"].to_list(), pose_options)]
+        cmds = [self.write_cmd(json_path, output_dir=os.path.join(work_dir, "output_pdbs")) for json_path in json_paths]
 
         # run:
         logging.info(f"Starting attnpacker.py on {len(poses)} poses with {jobstarter.max_cores} cores.")
@@ -261,7 +261,7 @@ class AttnPacker(Runner):
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
-    def write_cmd(self, pose_path:str, output_dir:str, options:str, pose_options:str):
+    def write_cmd(self, json_path:str, output_dir:str):
         """
         Write the command to run the AttnPacker script for a given pose.
 
@@ -270,8 +270,6 @@ class AttnPacker(Runner):
         Parameters:
             pose_path (str): The path to the input PDB file for the pose.
             output_dir (str): The directory where output files will be stored.
-            options (str, optional): Additional options for the AttnPacker script. Defaults to None.
-            pose_options (str, optional): A list of pose-specific options for the AttnPacker script. Defaults to None.
 
         Returns:
             str: The command line string to execute the AttnPacker script with the specified parameters.
@@ -297,8 +295,6 @@ class AttnPacker(Runner):
                 cmd = attnpacker.write_cmd(
                     pose_path=pose_path,
                     output_dir=output_dir,
-                    options="packing.num_designs=10",
-                    pose_options="packing.input_pdb='input.pdb'"
                 )
 
                 # Print the command
@@ -310,25 +306,20 @@ class AttnPacker(Runner):
 
         This method is designed to facilitate the execution of AttnPacker processes within the ProtConductor framework, providing a flexible and robust way to construct and run commands for packing simulations.
         """
+        """
         # check if interfering options were set
         forbidden_options = ['--attnpacker_dir', '--output_dir', '--input_pdb', '--scorefile']
         if (options and any(_ in options for _ in forbidden_options)) or (pose_options and any(_ in pose_options for _ in forbidden_options)):
             raise KeyError(f"Options and pose_options must not contain '--attnpacker_dir', '--output_dir', '--input_pdb' or '--scorefile'!")
+        """
 
-        pdb_dir = os.path.join(output_dir, "output_pdbs")
-        if options:
-            options = options + f" --attnpacker_dir {self.script_path} --output_dir {pdb_dir} --input_pdb {pose_path} --scorefile {output_dir}/attnpacker_scores.csv"
-        else:
-            options = f"--attnpacker_dir {self.script_path} --output_dir {pdb_dir} --input_pdb {pose_path} --scorefile {os.path.join(output_dir, f'{os.path.splitext(os.path.basename(pose_path))[0]}_attnpacker_out.json')}"
+        options = f"--attnpacker_dir {self.script_path} --output_dir {output_dir} --input_json {json_path}"
 
-        # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options)
-
-        return f"{self.python_path} {protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/run_attnpacker.py {protflow.runners.options_flags_to_string(opts, flags, sep='--')}"
+        return f"{self.python_path} {protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/run_attnpacker.py {options}"
 
 def collect_scores(dir: str):
     scorefiles = glob.glob(os.path.join(dir, "*_attnpacker_out.json"))
-    df = [pd.read_json(score) for score in scorefiles]
-    df = pd.concat(df)
+    df = [pd.read_json(score, typ="series") for score in scorefiles]
+    df = pd.DataFrame(df)
     df.reset_index(drop=True, inplace=True)
     return df

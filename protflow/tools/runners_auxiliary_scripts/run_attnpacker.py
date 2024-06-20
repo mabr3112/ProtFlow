@@ -65,38 +65,42 @@ def main(args):
     runner = runner.to(DEVICE)
 
     os.makedirs(args.output_dir, exist_ok=True)
-    pdb_path = args.input_pdb
-    start = time.time()
-    prediction = runner.infer(
-        pdb_path=pdb_path,
-        #Boolean Tensor indicating which residues to design
-        seq_mask=None,
-        #Whether to format output (process into logits, seq labels, etc. or return raw node and pair output)
-        format=True,
-        #Chunk inference by successively packing smaller crops of size chunk_size
-        #This allows packing of arbitrarily long proteins
-        chunk_size = 500,
-    )
-    print(f"Ran Inference on {runner.device} in time {round(time.time()-start,2)} seconds")
+    with open(args.input_json, "r") as jf:
+        input_dict = json.load(jf)
+    
+    pdb_paths = [input_dict["poses"][index] for index in input_dict["poses"]]
+    score_paths = [input_dict["scorepath"][index] for index in input_dict["scorepath"]]
+
+    for pdb_path, score_path in zip(pdb_paths, score_paths):
+        start = time.time()
+        prediction = runner.infer(
+            pdb_path=pdb_path,
+            #Boolean Tensor indicating which residues to design
+            seq_mask=None,
+            #Whether to format output (process into logits, seq labels, etc. or return raw node and pair output)
+            format=True,
+            #Chunk inference by successively packing smaller crops of size chunk_size
+            #This allows packing of arbitrarily long proteins
+            chunk_size = 500,
+        )
+        print(f"Ran Inference on {runner.device} in time {round(time.time()-start,2)} seconds")
 
 
-    predicted_protein = make_predicted_protein(model_out = prediction['model_out'], seq = prediction['seq'])
+        predicted_protein = make_predicted_protein(model_out = prediction['model_out'], seq = prediction['seq'])
 
-    # save optimized packing to the path below
-    pp_pdb_out_name = str(predicted_protein.name) + "_" + "1".zfill(4)
-    pp_pdb_out_path = os.path.join(args.output_dir, f"{pp_pdb_out_name}.pdb")
-    #Please read the doc string for more details
-    projected_coords = project_coords_to_rotamers(predicted_protein,device=DEVICE)
-    # write new pdb using optimized coordinates, write plddt values in bfactor column
-    predicted_protein.to_pdb(pp_pdb_out_path, coords=projected_coords, beta=prediction["pred_plddt"].squeeze())
-    sc_plddts = ",".join([str(round(float(i)*100, 2)) for i in prediction["pred_plddt"]])
+        # save optimized packing to the path below
+        pp_pdb_out_name = str(predicted_protein.name) + "_" + "1".zfill(4)
+        pp_pdb_out_path = os.path.join(args.output_dir, f"{pp_pdb_out_name}.pdb")
+        #Please read the doc string for more details
+        projected_coords = project_coords_to_rotamers(predicted_protein,device=DEVICE)
+        # write new pdb using optimized coordinates, write plddt values in bfactor column
+        predicted_protein.to_pdb(pp_pdb_out_path, coords=projected_coords, beta=prediction["pred_plddt"].squeeze())
+        sc_plddts = ",".join([str(round(float(i)*100, 2)) for i in prediction["pred_plddt"]])
 
-    print(type(prediction))
+        out_dict = {'description': pp_pdb_out_name, 'location': pp_pdb_out_path, 'attnpacker_sc_plddts': sc_plddts}
 
-    out_dict = {'description': pp_pdb_out_name, 'location': pp_pdb_out_path, 'attnpacker_sc_plddts': sc_plddts}
-        
-    with open(args.scorefile, 'w') as jf:
-        json.dump(out_dict, jf, indent=4)
+        with open(score_path, 'w') as jf:
+            json.dump(out_dict, jf, indent=4)
 
 
 
@@ -108,9 +112,8 @@ if __name__ == "__main__":
 
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--attnpacker_dir", type=str, help="Path to AttnPacker directory")
-    argparser.add_argument("--input_pdb", type=str, default=".", help="Path to folder containing input pdb files")
+    argparser.add_argument("--input_json", type=str, default=".", help="Path to folder containing input pdb files")
     argparser.add_argument("--output_dir", type=str, required=True, help="Path to output folder")
-    argparser.add_argument("--scorefile", type=str, default="attnpacker_scores.csv", help="Path to output folder")
 
     args = argparser.parse_args()
 
