@@ -2,7 +2,7 @@
 
 import os
 import sys
-import csv
+import json
 
 
 
@@ -94,16 +94,9 @@ def main(args):
     print(type(prediction))
 
     out_dict = {'description': pp_pdb_out_name, 'location': pp_pdb_out_path, 'attnpacker_sc_plddts': sc_plddts}
-    
-    field_names = list(out_dict.keys())
-    
-    # Opening the CSV file in append mode
-    file_exists = os.path.isfile(args.scorefile)
-    with open(args.scorefile, 'a', newline='') as csv_file:
-        writer = csv.DictWriter(csv_file, fieldnames=field_names)
-        if not file_exists: writer.writeheader()
-        # Writing the dictionary as a new row
-        writer.writerow(out_dict)
+        
+    with open(args.scorefile, 'w') as jf:
+        json.dump(out_dict, jf, indent=4)
 
 
 

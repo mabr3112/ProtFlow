@@ -66,6 +66,7 @@ Version
 # general imports
 import os
 import logging
+import glob
 
 # dependencies
 import pandas as pd
@@ -146,7 +147,7 @@ class AttnPacker(Runner):
     """
     def __init__(self, script_path: str = protflow.config.ATTNPACKER_DIR_PATH, python_path: str = protflow.config.ATTNPACKER_PYTHON_PATH, jobstarter: str = None) -> None:
         '''sbatch_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
-        self.script_path = self.search_path(script_path, "ATTNPACKER_DIR_PATH")
+        self.script_path = self.search_path(script_path, "ATTNPACKER_DIR_PATH", is_dir=True)
         self.python_path = self.search_path(python_path, "ATTNPACKER_PYTHON_PATH")
         self.name = "attnpacker.py"
         self.jobstarter = jobstarter
@@ -229,12 +230,8 @@ class AttnPacker(Runner):
         scorefile = os.path.join(work_dir, f"attnpacker_scores.{poses.storage_format}")
 
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
-            if overwrite:
-                logging.warning(f"Removing previously generated scorefile at {scorefile}")
-                os.remove(scorefile)
-            else:
-                logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
-                return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
+            logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
+            return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
 
         # parse options and pose_options:
         pose_options = self.prep_pose_options(poses, pose_options)
@@ -252,8 +249,7 @@ class AttnPacker(Runner):
         )
 
         logging.info(f"{self} finished, collecting scores.")
-        # TODO: this is not done gracefully, too lazy to fix atm
-        scores = pd.read_csv(scorefile)
+        scores = collect_scores(work_dir)
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -319,9 +315,16 @@ class AttnPacker(Runner):
         if options:
             options = options + f" --attnpacker_dir {self.script_path} --output_dir {pdb_dir} --input_pdb {pose_path} --scorefile {output_dir}/attnpacker_scores.csv"
         else:
-            options = f"--attnpacker_dir {self.script_path} --output_dir {pdb_dir} --input_pdb {pose_path} --scorefile {output_dir}/attnpacker_scores.csv"
+            options = f"--attnpacker_dir {self.script_path} --output_dir {pdb_dir} --input_pdb {pose_path} --scorefile {os.path.join(output_dir, f'{os.path.splitext(os.path.basename(pose_path))[0]}_attnpacker_out.json')}"
 
         # parse options
         opts, flags = protflow.runners.parse_generic_options(options, pose_options)
 
         return f"{self.python_path} {protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/run_attnpacker.py {protflow.runners.options_flags_to_string(opts, flags, sep='--')}"
+
+def collect_scores(dir: str):
+    scorefiles = glob.glob(os.path.join(dir, "*_attnpacker_out.json"))
+    df = [pd.read_json(score) for score in scorefiles]
+    df = pd.concat(df)
+    df.reset_index(drop=True, inplace=True)
+    return df
