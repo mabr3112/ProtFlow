@@ -233,7 +233,7 @@ class TMalign(Runner):
 
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str, sc_tm_score: bool = True, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None: # pylint: disable=W0237
+    def run(self, poses: Poses, prefix: str, ref_col: str, sc_tm_score: bool = True, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> Poses: # pylint: disable=W0237
         """
         Execute the TMalign process with given poses and jobstarter configuration.
 
@@ -303,10 +303,7 @@ class TMalign(Runner):
         )
 
         scorefile = os.path.join(work_dir, f"{prefix}_TM.{poses.storage_format}")
-        logging.info(work_dir)
-        logging.info(prefix)
-        logging.info(poses.storage_format)
-        logging.info(scorefile)
+        
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
             if sc_tm_score:

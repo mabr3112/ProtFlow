@@ -193,7 +193,7 @@ class Colabfold(Runner):
     def __str__(self):
         return "colabfold.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, pose_options: str = None, overwrite: bool = False, return_top_n_poses: int = 1) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, options: str = None, pose_options: str = None, overwrite: bool = False, return_top_n_poses: int = 1) -> Poses:
         """
         run Method
         ==========
@@ -308,6 +308,10 @@ class Colabfold(Runner):
         # collect scores
         logging.info(f"Predictions finished, starting to collect scores.")
         scores = self.collect_scores(work_dir=work_dir, num_return_poses=return_top_n_poses)
+
+        if len(scores.index) < len(poses.df.index):
+            raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
+        
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
         

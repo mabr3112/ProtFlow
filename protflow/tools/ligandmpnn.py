@@ -311,6 +311,9 @@ class LigandMPNN(Runner):
             preserve_original_output=preserve_original_output
         )
 
+        if len(scores.index) < len(poses.df.index) * nseq:
+            raise RuntimeError("Number of output poses is smaller than number of input poses * nseq. Some runs might have crashed!")
+
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
