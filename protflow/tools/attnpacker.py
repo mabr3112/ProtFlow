@@ -225,7 +225,7 @@ class AttnPacker(Runner):
 
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
-            return RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
+            return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
         poses_sublist = protflow.jobstarters.split_list(poses.poses_list(), n_sublists=jobstarter.max_cores)
         json_paths = []
