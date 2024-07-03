@@ -1056,7 +1056,7 @@ class Poses:
         for pose, new_pose in zip(poses, new_poses):
             shutil.copy(pose, new_pose)
 
-    def poses_list(self):
+    def poses_list(self) -> list[str]:
         """
         Returns a list of pose file paths from the DataFrame.
 
@@ -1201,6 +1201,7 @@ class Poses:
         
         self.df['poses_description'] = descriptions
         self.df['poses'] = poses
+        self.df.reset_index(inplace=True, drop=True)
 
     def duplicate_poses(self, output_dir:str, n_duplicates:int) -> None:
         """
@@ -1517,7 +1518,7 @@ class Poses:
         # Filter df down to the number of poses specified with <n>
         orig_len = str(len(self.df))
         filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
-        logging.info(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses.")
+        logging.info(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses according to {score_col}.")
 
         # save filtered dataframe if prefix is provided
         if prefix:
@@ -1541,7 +1542,8 @@ class Poses:
                 df_names=["Before Filtering", "After Filtering"],
                 cols=cols,
                 y_labels=cols,
-                out_path=out_path
+                out_path=out_path,
+                show_fig=False
             )
 
         # update object attributs [df]
@@ -1655,7 +1657,8 @@ class Poses:
                 df_names=["Before Filtering", "After Filtering"],
                 cols=cols,
                 y_labels=cols,
-                out_path=out_path
+                out_path=out_path,
+                show_fig=False
             )
 
         # update object attributs [df]
