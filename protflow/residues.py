@@ -115,8 +115,8 @@ class ResidueSelection:
     >>> print(selection.to_dict())
     {'A': [1, 2], 'B': [3]}
     """
-    def __init__(self, selection: list = None, delim: str = ",", fast: bool = False):
-        self.residues = parse_selection(selection, delim=delim, fast=fast)
+    def __init__(self, selection: list = None, delim: str = ",", fast: bool = False, from_scorefile: bool = False):
+        self.residues = parse_selection(selection, delim=delim, fast=fast, from_scorefile=from_scorefile)
 
     def __str__(self) -> str:
         return ", ".join([f"{chain}{str(resi)}" for chain, resi in self])
@@ -324,6 +324,8 @@ def parse_selection(input_selection, delim: str = ",", fast: bool = False, from_
     >>> parse_selection([("A", 1), ("B", 2), ("C", 3)], fast=True)
     (('A', 1), ('B', 2), ('C', 3))
     """
+    if fast and from_scorefile:
+        raise RuntimeError(":fast: and :from_scorefile: are mutually exclusive!")
     if fast:
         return fast_parse_selection(input_selection)
     if from_scorefile:
