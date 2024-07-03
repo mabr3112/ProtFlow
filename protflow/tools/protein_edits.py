@@ -94,6 +94,7 @@ from protflow.runners import Runner, col_in_df
 from protflow.config import PROTFLOW_ENV
 from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR
 from protflow.utils.utils import parse_fasta_to_dict
+from protflow.utils.biopython_tools import load_structure_from_pdbfile
 
 class ChainAdder(Runner):
     """
@@ -820,11 +821,8 @@ class ChainRemover(Runner):
         return "chain_remover"
 
     #################################### METHODS #######################################
-    def run(self, poses, prefix, jobstarter):
-        '''.run() method is not implemented in this class. Use .remove_chains() instead!!!'''
-        raise NotImplementedError
 
-    def remove_chains(self, poses: Poses, prefix: str, chains: list = None, jobstarter: JobStarter = None, overwrite: bool = False):
+    def run(self, poses: Poses, prefix: str, chains: list = None, preserve_chains: list = None, jobstarter: JobStarter = None, overwrite: bool = False):
         """
         Remove chains from the poses.
 
@@ -884,6 +882,11 @@ class ChainRemover(Runner):
         def output_exists(work_dir: str, files_list: list[str]) -> bool:
             '''checks if output of copying chains exists'''
             return os.path.isdir(work_dir) and all(os.path.isfile(fn) for fn in files_list)
+        
+        if chains and preserve_chains:
+            raise ValueError(f":chains: and :preserve_chains: are mutually exclusive!")
+        if not chains and not preserve_chains:
+            raise ValueError(f"Either :chains: or :preserve_chains: must be set!")
 
         # setup runner
         script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/remove_chains_batch.py"
@@ -901,14 +904,29 @@ class ChainRemover(Runner):
             return poses.change_poses_dir(work_dir, copy=False)
 
         # setup chains
-        if isinstance(chains, str):
-            if len(chains) == 1:
-                chain_list = [[chains] for _ in poses]
-            else:
-                self.check_for_prefix(chains, poses)
-                chain_list = poses.df[chains].to_list()
-        elif isinstance(chains, list):
-            chain_list = [chains for _ in poses]
+        if chains:
+            if isinstance(chains, str):
+                if len(chains) == 1:
+                    chain_list = [[chains] for _ in poses]
+                else:
+                    self.check_for_prefix(chains, poses)
+                    chain_list = poses.df[chains].to_list()
+            elif isinstance(chains, list):
+                chain_list = [chains for _ in poses]
+
+        # setup preserved chains
+        if preserve_chains:
+            if isinstance(preserve_chains, str):
+                if len(preserve_chains) == 1:
+                    preserved_chain_list = [[preserve_chains] for _ in poses]
+                else:
+                    self.check_for_prefix(preserve_chains, poses)
+                    preserved_chain_list = poses.df[preserve_chains].to_list()
+            elif isinstance(preserve_chains, list):
+                preserved_chain_list = [preserve_chains for _ in poses]
+
+            chain_list = [[chain.id for chain in load_structure_from_pdbfile(pose).get_chains() if not chain.id in preserved_chain_list] for pose in poses.poses_list()]
+            
 
         # batch inputs to max_cores
         input_dict = {pose: chain for pose, chain in zip(poses.poses_list(), chain_list)}
