@@ -270,8 +270,14 @@ def fast_parse_selection(input_selection: tuple[tuple[str, int]]) -> tuple[tuple
     (('A', 1), ('B', 2), ('C', 3))
     """
     return input_selection
+    
+def parse_from_scorefile(input_selection: dict) -> tuple[tuple[str, int]]:
+    if isinstance(input_selection, dict) and "residues" in input_selection:
+        return tuple([tuple(sele) for sele in input_selection["residues"]])
+    else:
+        raise TypeError(f"Unsupported Input type for parameter 'input_selection' {type(input_selection)}. This function is meant to parse ResidueSelections that were written to file. Only dict with 'residues' as key allowed.")
 
-def parse_selection(input_selection, delim: str = ",", fast: bool = False) -> tuple[tuple[str,int]]:
+def parse_selection(input_selection, delim: str = ",", fast: bool = False, from_scorefile: bool = False) -> tuple[tuple[str,int]]:
     """
     Parses a selection into ResidueSelection formatted selection.
 
@@ -290,6 +296,9 @@ def parse_selection(input_selection, delim: str = ",", fast: bool = False) -> tu
     fast : bool, optional
         If True, uses `fast_parse_selection` to bypass type checking and parsing for performance reasons.
         Use when `input_selection` is already in the correct format. Default is False.
+    from_scorefile : bool, optional
+        If True, parses a residue selection that was read in from a scorefile (in the form {'residues': [['A', 1], ['B', 3]}).
+        Default is False.
 
     Returns
     -------
@@ -317,6 +326,8 @@ def parse_selection(input_selection, delim: str = ",", fast: bool = False) -> tu
     """
     if fast:
         return fast_parse_selection(input_selection)
+    if from_scorefile:
+        return parse_from_scorefile(input_selection)
     if isinstance(input_selection, str):
         return tuple(parse_residue(residue.strip()) for residue in input_selection.split(delim))
     if isinstance(input_selection, list) or isinstance(input_selection, tuple):
