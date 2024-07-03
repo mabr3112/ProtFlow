@@ -140,7 +140,7 @@ class PlottingTrajectory():
             ax.vlines(i+1, quartile1, quartile3, color="k", linestyle="-", lw=5)
             ax.vlines(i+1, np.min(d), np.max(d), color="k", linestyle="-", lw=2)
 
-        handles = [mpatches.Patch(color=c, label=l) for c, l in zip(colors, [x[0] for x in self.data])]
+        handles = [mpatches.Patch(color=c, label=f"{l[0]} (n={len(l[1])})") for c, l in zip(colors, [x for x in self.data])]
         fig.legend(handles=handles, loc='right', bbox_to_anchor=(0.45+(1-len(self.data)*0.05),0.5),
                   fancybox=True, shadow=True, ncol=1, fontsize=13)
 
