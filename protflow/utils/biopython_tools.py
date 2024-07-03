@@ -511,7 +511,7 @@ def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_p
     path_to_output_structure = out_pdb_path or pose_path
 
     # check if output already exists
-    if overwrite == True and os.path.isfile(path_to_output_structure) and not out_pdb_path == pose_path:
+    if overwrite == False and os.path.isfile(path_to_output_structure) and not out_pdb_path == pose_path:
         return path_to_output_structure
     
     # change numbering
