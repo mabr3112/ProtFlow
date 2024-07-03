@@ -147,7 +147,7 @@ class GenericMetric(Runner):
 
     The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+    def __init__(self, python_path: str = os.path.join(PROTFLOW_ENV, "python3"), module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         """
         Initialize the BackboneRMSD class.
 
@@ -183,6 +183,7 @@ class GenericMetric(Runner):
         """
         self.set_module(module)
         self.set_function(function)
+        self.set_python_path(python_path)
 
         self.set_jobstarter(jobstarter)
         self.set_options(options)
@@ -223,6 +224,9 @@ class GenericMetric(Runner):
             - **Integration:** The reference column set by this method is used by other methods in the class to perform RMSD calculations.
         """
         self.module = module
+
+    def set_python_path(self, python_path: str) -> None:
+        self.python_path = python_path
 
     def set_function(self, function: str) -> None:
         """
@@ -336,7 +340,7 @@ class GenericMetric(Runner):
             raise ValueError(f"Parameter :options: must be of type dict. type(options= = {type(options)})")
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, python_path: str = None, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
         """
         Calculate the backbone RMSD for given poses and jobstarter configuration.
 
@@ -404,6 +408,7 @@ class GenericMetric(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
+        python_path = python_path or self.python_path
         module = module or self.module
         function = function or self.function
         options = options or self.options
@@ -421,10 +426,10 @@ class GenericMetric(Runner):
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
 
-        # split poses into number of max_cores lists
-        poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores)
+        # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
+        poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
         out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, sublist in enumerate(poses_sublists)]
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --module {module} --function {function}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
+        cmds = [f"{python_path} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --module {module} --function {function}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
         if options:
             options_path = os.path.join(poses.work_dir, prefix, f"{prefix}_options.json")
             with open(options_path, "w") as f:
@@ -495,7 +500,6 @@ if __name__ == "__main__":
     argparser.add_argument("--module", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
     argparser.add_argument("--function", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
     argparser.add_argument("--options", type=str, default=None, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-
 
     arguments = argparser.parse_args()
     main(arguments)

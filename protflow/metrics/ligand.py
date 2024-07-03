@@ -429,8 +429,8 @@ class LigandClashes(Runner):
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
 
-        # split poses into number of max_cores lists
-        poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores)
+        # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
+        poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
         out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, sublist in enumerate(poses_sublists)]
         cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --mode clash_vdw --factor {factor} --ligand_chain {ligand_chain} {atoms_str} {exclude_ligand_elements_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
         
@@ -845,8 +845,8 @@ class LigandContacts(Runner):
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
 
-        # split poses into number of max_cores lists
-        poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores)
+        # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
+        poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
         out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, sublist in enumerate(poses_sublists)]
         cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --min_dist {min_dist} --max_dist {max_dist} --mode contacts --ligand_chain {ligand_chain} {atoms_str} {exclude_elements_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
         
