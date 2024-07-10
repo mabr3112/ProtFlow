@@ -908,9 +908,6 @@ class ChainRemover(Runner):
             if isinstance(chains, str):
                 if len(chains) == 1:
                     chain_list = [[chains] for _ in poses]
-                else:
-                    self.check_for_prefix(chains, poses)
-                    chain_list = poses.df[chains].to_list()
             elif isinstance(chains, list):
                 chain_list = [chains for _ in poses]
 
@@ -919,13 +916,10 @@ class ChainRemover(Runner):
             if isinstance(preserve_chains, str):
                 if len(preserve_chains) == 1:
                     preserved_chain_list = [[preserve_chains] for _ in poses]
-                else:
-                    self.check_for_prefix(preserve_chains, poses)
-                    preserved_chain_list = poses.df[preserve_chains].to_list()
             elif isinstance(preserve_chains, list):
                 preserved_chain_list = [preserve_chains for _ in poses]
 
-            chain_list = [[chain.id for chain in load_structure_from_pdbfile(pose).get_chains() if not chain.id in preserved_chain_list] for pose in poses.poses_list()]
+            chain_list = [[chain.id for chain in load_structure_from_pdbfile(pose).get_chains() if not chain.id in pres_chains] for pose, pres_chains in zip(poses.poses_list(), preserved_chain_list)]
             
 
         # batch inputs to max_cores
