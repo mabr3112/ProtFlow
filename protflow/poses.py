@@ -622,7 +622,7 @@ class Poses:
         - Ensures that descriptions are derived in a consistent format, suitable for use in data management and analysis.
 
         """
-        return [pose.strip("/").rsplit("/", maxsplit=1)[-1].split(".", maxsplit=1)[0]for pose in poses]
+        return [description_from_path(pose) for pose in poses]
 
     def set_poses(self, poses: Union[list,str,pd.DataFrame] = None, glob_suffix: str = None) -> None:
         """
@@ -1750,7 +1750,8 @@ class Poses:
                 titles=scoreterms,
                 y_labels=scoreterms,
                 dims=None,
-                out_path=out_path
+                out_path=out_path,
+                show_fig=False
             )
 
         self.save_scores()
@@ -2560,3 +2561,7 @@ def filter_dataframe_by_value(df: pd.DataFrame, col: str, value: float|int, oper
         raise KeyError("Invalid operator. Supported operators are '>','>=', '<', '<=', '=', '!='.")
 
     return filtered_df
+
+def description_from_path(path:str):
+    description = os.path.splitext(os.path.basename(path))[0]
+    return description
