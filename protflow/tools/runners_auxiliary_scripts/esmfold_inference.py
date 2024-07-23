@@ -1,6 +1,9 @@
 from pathlib import Path
 import sys
 import logging
+
+print(f"esmfold_inference.py sys.path variable = {sys.path }")
+
 import typing as T
 import argparse
 import numpy as np

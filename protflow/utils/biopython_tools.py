@@ -74,7 +74,7 @@ from Bio.SeqUtils.ProtParam import ProteinAnalysis
 # customs
 from protflow.residues import ResidueSelection
 
-def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = "pose") -> Bio.PDB.Structure:
+def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Bio.PDB.Structure:
     """
     Load a structure from a PDB file using BioPython's PDBParser.
 
@@ -90,7 +90,7 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
                            all_models is False. Defaults to 0 (first model).
     quiet (bool, optional): If True, suppresses output from the PDBParser. 
                             Defaults to True.
-    handle (str, optional): String handle that is passed to the PDBParser's get_structure() method.
+    handle (str, optional): String handle that is passed to the PDBParser's get_structure() method and sets the id of the structure.
 
     Returns:
     Bio.PDB.Structure: The parsed structure object from the PDB file. If 
@@ -114,6 +114,10 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
         raise FileNotFoundError(f"PDB file {path_to_pdb} not found!")
     if not path_to_pdb.endswith(".pdb"):
         raise ValueError(f"File must be .pdb file. File: {path_to_pdb}")
+
+    # set description as structure name if no other name is provided
+    if not handle:
+        handle = os.path.splitext(os.path.basename(path_to_pdb))[0]
 
     # load poses
     pdb_parser = Bio.PDB.PDBParser(QUIET=quiet)
