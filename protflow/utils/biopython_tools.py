@@ -466,7 +466,7 @@ def get_sequence_from_pose(pose: Structure, chain_sep:str=":") -> str:
     # collect sequence
     return chain_sep.join([str(x.get_sequence()) for x in ppb.build_peptides(pose)])
 
-def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_pdb_path: str = None, keep_chain: str = "") -> str:
+def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_pdb_path: str = None, keep_chain: str = "", overwrite: bool = False) -> str:
     """
     Renumber the residues of a BioPython structure based on a residue mapping.
 
@@ -508,12 +508,17 @@ def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_p
     - The function creates a deep copy of the input structure and applies the residue renumbering to the copy.
     - The `keep_chain` parameter allows for retaining the original numbering of a specified chain.
     """
+    path_to_output_structure = out_pdb_path or pose_path
+
+    # check if output already exists
+    if overwrite == False and os.path.isfile(path_to_output_structure) and not out_pdb_path == pose_path:
+        return path_to_output_structure
+    
     # change numbering
     pose = load_structure_from_pdbfile(pose_path)
     pose = renumber_pose_by_residue_mapping(pose=pose, residue_mapping=residue_mapping, keep_chain=keep_chain)
 
     # save pose
-    path_to_output_structure = out_pdb_path or pose_path
     save_structure_to_pdbfile(pose, path_to_output_structure)
     return path_to_output_structure
 
