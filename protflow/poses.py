@@ -622,7 +622,7 @@ class Poses:
         - Ensures that descriptions are derived in a consistent format, suitable for use in data management and analysis.
 
         """
-        return [pose.strip("/").rsplit("/", maxsplit=1)[-1].split(".", maxsplit=1)[0]for pose in poses]
+        return [description_from_path(pose) for pose in poses]
 
     def set_poses(self, poses: Union[list,str,pd.DataFrame] = None, glob_suffix: str = None) -> None:
         """
@@ -1177,8 +1177,7 @@ class Poses:
         self.df.sort_values(["tmp_layer_column", "poses_description"], inplace=True) # sort to make sure that all poses are in the same order after grouping
 
         # group by temporary description column, reindex
-        descriptions = []
-        poses = []
+        out = []
         if any([len(group_df.index) > 1 for name, group_df in self.df.groupby("tmp_layer_column", sort=False)]) and not force_reindex:
             raise RuntimeError(f'Multiple files with identical description found after removing index layers. Set <force_reindex> to True if new index layers should be added.')
 
@@ -1189,19 +1188,17 @@ class Poses:
                 ext = os.path.splitext(ser['poses'])[1]
                 if force_reindex: description = f"{name}{sep}{str(i+1).zfill(4)}"
                 else: description = name
-                descriptions.append(description)
-                poses.append(os.path.join(out_dir, f"{description}{ext}"))
+                path = os.path.join(out_dir, f"{description}{ext}")
+                if overwrite == True or not os.path.isfile(path):
+                    shutil.copy(ser['poses'], path)
+                ser['poses'] = path
+                ser['poses_description'] = description
+                out.append(ser)
         
+        self.df = pd.DataFrame(out)
+        self.df.reset_index(inplace=True, drop=True)
         # drop temporary description column
         self.df.drop("tmp_layer_column", inplace=True, axis=1)
-
-        for old_pose, new_pose in zip(self.df['poses'].to_list(), poses):
-            if overwrite == True or not os.path.isfile(new_pose):
-                shutil.copy(old_pose, new_pose)
-        
-        self.df['poses_description'] = descriptions
-        self.df['poses'] = poses
-        self.df.reset_index(inplace=True, drop=True)
 
     def duplicate_poses(self, output_dir:str, n_duplicates:int) -> None:
         """
@@ -1750,7 +1747,8 @@ class Poses:
                 titles=scoreterms,
                 y_labels=scoreterms,
                 dims=None,
-                out_path=out_path
+                out_path=out_path,
+                show_fig=False
             )
 
         self.save_scores()
@@ -2560,3 +2558,7 @@ def filter_dataframe_by_value(df: pd.DataFrame, col: str, value: float|int, oper
         raise KeyError("Invalid operator. Supported operators are '>','>=', '<', '<=', '=', '!='.")
 
     return filtered_df
+
+def description_from_path(path:str):
+    description = os.path.splitext(os.path.basename(path))[0]
+    return description

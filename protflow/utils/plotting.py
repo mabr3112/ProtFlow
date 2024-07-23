@@ -582,7 +582,7 @@ def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str
         fig.show()
     return None
 
-def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column: str, color_column: str = None, size_column: str = None, labels: list[str] = None, title: str =None, out_path: str = None, show_fig: bool = False):
+def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column: str, color_column: str = None, size_column: str = None, labels: list[str] = None, title: str =None, show_corr: bool = False, out_path: str = None, show_fig: bool = False):
     """
     Create a Scatter Plot from a DataFrame
     ======================================
@@ -738,6 +738,17 @@ def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column: str, color_colum
 
     if title:
         plt.suptitle(title, size=20)
+
+    if show_corr:
+        # Calculate Pearson correlation coefficient
+        corr_coef = np.corrcoef(x_data, y_data)[0, 1]
+        plt.text(0.05, 0.95, f'Correlation: {corr_coef:.2f}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+
+        # Calculate and plot line of best fit
+        slope, intercept = np.polyfit(x_data, y_data, 1)
+        best_fit_line = slope * x_data + intercept
+        plt.plot(x_data, best_fit_line, color='red', linestyle='--', linewidth=2, label=f'y={slope:.2f}x+{intercept:.2f}')
+        plt.legend()
 
     # Save the plot as a PNG file if out_path is provided
     if out_path:

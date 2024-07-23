@@ -31,7 +31,15 @@ def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_ato
     try:
         super_imposer.set_atoms(target_atms, mobile_atms)
     except Bio.PDB.PDBExceptions.PDBException as exc:
-        raise ValueError(f"mobile_atoms and target_atoms differ in length. mobile_atoms:\n{mobile_atms}\ntarget_atoms\n{target_atms}") from exc
+        try:
+            mob = mobile.get_parent().id
+        except:
+            mob = mobile.id
+        try:
+            tar = target.get_parent().id
+        except:
+            tar = target.id
+        raise ValueError(f"mobile_atoms of {mob} and target_atoms of {tar} differ in length. mobile_atoms:\n{mobile_atms}\ntarget_atoms\n{target_atms}") from exc
 
     return super_imposer.rms
 

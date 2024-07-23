@@ -39,6 +39,7 @@ import time
 import subprocess
 import itertools
 import os
+import logging
 
 import numpy as np
 
@@ -258,7 +259,7 @@ class SbatchArrayJobstarter(JobStarter):
         """
         # check if cmds is smaller than 1000. If yes, split cmds and start split array!
         if len(cmds) > self.slurm_max_arrayjobs:
-            print(f"The commands-list you supplied is longer than self.slurm_max_arrayjobs. Your job will be subdivided into multiple arrays.")
+            logging.info(f"The commands-list you supplied is longer than self.slurm_max_arrayjobs. Your job will be subdivided into multiple arrays.")
             for sublist in split_list(cmds, self.slurm_max_arrayjobs):
                 self.start(cmds=sublist, jobname=jobname, wait=wait, output_path=output_path)
             return None
@@ -335,10 +336,13 @@ class SbatchArrayJobstarter(JobStarter):
             Interval (in seconds) at which to check the job status. Default is 5.
         """
         # Check if job is running by capturing the length of the output of squeue command that only returns jobs with <jobname>:
-        while len(subprocess.run(f'squeue -n {jobname} -o "%A"', shell=True, capture_output=True, text=True, check=True).stdout.strip().split("\n")) > 1:
+        job_output = subprocess.run(f'squeue -n {jobname} -o "%A"', shell=True, capture_output=True, text=True, check=False).stdout.strip().split("\n")
+        while len(job_output) > 1:
             time.sleep(interval)
-        print(f"Job {jobname} completed.\n")
-        time.sleep(10)
+            job_output = subprocess.run(f'squeue -n {jobname} -o "%A"', shell=True, capture_output=True, text=True, check=False).stdout.strip().split("\n")
+
+        logging.info(f"Job {jobname} completed.\n")
+        time.sleep(interval)
         return None
 
 class LocalJobStarter(JobStarter):
