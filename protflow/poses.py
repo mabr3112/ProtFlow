@@ -368,7 +368,7 @@ class Poses:
             work_dir = os.path.abspath(work_dir)
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {os.path.abspath(work_dir)}")
-        self.work_dir = work_dir
+        self.work_dir = os.path.abspath(work_dir)
 
         # setup common directories for workflows:
         self.scores_dir = set_dir("scores", work_dir)
