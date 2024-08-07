@@ -1251,8 +1251,7 @@ class Poses:
         # merge DataFrames:
         self.df.merge(pd.DataFrame(output_dict), left_on="poses_description", right_on="temp_dp_select_col")
 
-        # drop select_col and reset index:
-        self.df.drop("temp_dp_select_col", inplace=True, axis=1)
+        # reset index:
         self.df.reset_index(inplace=True, drop=True)
 
         # check if outputs exist:
