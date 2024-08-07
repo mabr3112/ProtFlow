@@ -900,7 +900,7 @@ class Poses:
         def extract_extension(file_path):
             _, ext = os.path.splitext(file_path)
             return ext
-
+        
         pose_col = pose_col or 'poses'
 
         # extract extensions and create a set containing only unique values
@@ -1200,7 +1200,7 @@ class Poses:
         # drop temporary description column
         self.df.drop("tmp_layer_column", inplace=True, axis=1)
 
-    def duplicate_poses(self, output_dir:str, n_duplicates:int) -> None:
+    def duplicate_poses(self, output_dir:str, n_duplicates:int, overwrite:bool=False) -> None:
         """
         Duplicates poses a specified number of times and saves them to an output directory.
 
@@ -1234,34 +1234,30 @@ class Poses:
         - Logs the duplication process and verifies the creation of duplicate files.
 
         """
-        def insert_index_layer(pose, n, sep:str="_") -> str:
+        def insert_index_layer(dir:str, input_path:str, n:int, sep:str="_") -> str:
             '''inserts index layer.'''
-            filepath, filename = pose.rsplit("/", maxsplit=1)
-            description, ext = filename.rsplit(".", maxsplit=1)
-            return f"{filepath}/{description}{sep}{str(n).zfill(4)}.{ext}"
+            in_file = os.path.basename(input_path)
+            description, extension = os.path.splitext(in_file)
+            out_path = os.path.join(dir, f"{description}{sep}{str(n).zfill(4)}{extension}")
+            return out_path
+        
+        # create output directory
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # iterate over poses and copy them to new location with one additional index layer
+        poses = []
+        for _, pose in self.df.iterrows():
+            original_path = pose["poses"]
+            for n in range(1, n_duplicates+1):
+                path = insert_index_layer(output_dir, original_path, n=n, sep="_")
+                pose["poses"] = path
+                pose["poses_description"] = description_from_path(path)
+                poses.append(pose)
+                if overwrite == True or not os.path.isfile(path):
+                    shutil.copy(original_path, path)
 
-        # define outputs:
-        output_files = [f'{output_dir}/{insert_index_layer(pose, n, "_")}' for pose in self.poses_list() for n in range(n_duplicates)]
-        output_dict = {
-            "temp_dp_select_col": [file_path.rsplit("/", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0] for file_path in output_files],
-            "temp_dp_description": [file_path.rsplit("/", maxsplit=1)[-1].rsplit(".", maxsplit=1)[0] for file_path in output_files],
-            "temp_dp_location": output_files
-        }
-
-        # merge DataFrames:
-        self.df.merge(pd.DataFrame(output_dict), left_on="poses_description", right_on="temp_dp_select_col")
-
-        # reset index:
+        self.df = pd.DataFrame(poses)
         self.df.reset_index(inplace=True, drop=True)
-
-        # check if outputs exist:
-        for pose in self:
-            if not os.path.isfile(pose["temp_dp_location"]):
-                shutil.copy(pose["pose"], pose["temp_dp_location"])
-
-        # reset poses and poses_description columns
-        self.df["poses"] = self.df["temp_dp_location"]
-        self.df["poses_description"] = self.df["description"]
 
     def reset_poses(self, new_poses_col: str='input_poses', force_reset_df: bool=False):
         """
