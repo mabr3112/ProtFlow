@@ -617,3 +617,27 @@ def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_
 
     # return number of contacts
     return np.sum((dgram > min_dist) & (dgram < max_dist)) / len(ligand_atoms)
+
+
+def residue_contacts(pose:str, max_distance:float, target_chain:str, partner_chain:str, target_resnum: int, target_atom_names:list[str]=None, partner_atom_names:list[str]=None, min_distance:float=0, ):
+    # TODO: Write proper docstrings!
+    # calculates number of atoms on partner_chain that are between max_distance and min_distance from target_atom_names on target_resnum of chain target_chain.
+    
+    pose = load_structure_from_pdbfile(pose)
+    target = pose[target_chain][target_resnum]
+    partner = pose[partner_chain]
+    if target_atom_names:
+        target_coords = np.array([atom.get_coord() for atom in target.get_atoms() if atom.id in target_atom_names])
+    else:
+        target_coords = np.array([atom.get_coord() for atom in target.get_atoms()])
+
+    if partner_atom_names:
+        partner_coords = np.array([atom.get_coord() for atom in partner.get_atoms() if atom.id in partner_atom_names])
+    else:
+        partner_coords = np.array([atom.get_coord() for atom in partner.get_atoms()])
+    
+    # calculate complete dgram
+    dgram = np.linalg.norm(target_coords[:, np.newaxis] - partner_coords[np.newaxis, :], axis=-1)
+
+    # return number of contacts
+    return np.sum((dgram < max_distance) & (dgram > min_distance))
