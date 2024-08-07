@@ -368,7 +368,9 @@ class Poses:
             work_dir = os.path.abspath(work_dir)
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {os.path.abspath(work_dir)}")
-        self.work_dir = os.path.abspath(work_dir)
+            self.work_dir = os.path.abspath(work_dir)
+        else:
+            self.work_dir = None
 
         # setup common directories for workflows:
         self.scores_dir = set_dir("scores", work_dir)
@@ -1245,19 +1247,20 @@ class Poses:
         os.makedirs(output_dir, exist_ok=True)
         
         # iterate over poses and copy them to new location with one additional index layer
-        poses = []
-        for _, pose in self.df.iterrows():
-            original_path = pose["poses"]
-            for n in range(1, n_duplicates+1):
-                path = insert_index_layer(output_dir, original_path, n=n, sep="_")
-                pose["poses"] = path
-                pose["poses_description"] = description_from_path(path)
-                poses.append(pose)
-                if overwrite == True or not os.path.isfile(path):
-                    shutil.copy(original_path, path)
-
-        self.df = pd.DataFrame(poses)
-        self.df.reset_index(inplace=True, drop=True)
+        duplicates = []
+        for n in range(1, n_duplicates+1):
+            new_df = self.df.copy(deep=True)
+            new_paths = [insert_index_layer(output_dir, pose, n, "_") for pose in new_df["poses"].to_list()]
+            new_descriptions = [description_from_path(path) for path in new_paths]
+            for old_pose, new_pose in zip(new_df["poses"].to_list(), new_paths):
+                if overwrite == True or not os.path.isfile(new_pose):
+                    shutil.copy(old_pose, new_pose)
+            new_df["poses"] = new_paths
+            new_df["poses_description"] = new_descriptions
+            duplicates.append(new_df)
+        
+        self.df = pd.concat(duplicates)
+        self.df.reset_index(drop=True, inplace=True)
 
     def reset_poses(self, new_poses_col: str='input_poses', force_reset_df: bool=False):
         """
