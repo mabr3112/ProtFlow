@@ -215,7 +215,7 @@ class RFdiffusion(Runner):
     def __str__(self):
         return "rfdiffusion.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: int = None, update_motifs: list[str] = None, fail_on_missing_output_poses: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: bool = False, update_motifs: list[str] = None, fail_on_missing_output_poses: bool = False) -> Poses:
         """
         Execute the RFdiffusion process with given poses and jobstarter configuration.
 
@@ -229,7 +229,7 @@ class RFdiffusion(Runner):
             options (str, optional): Additional options for the RFdiffusion script. Defaults to None.
             pose_options (list[str], optional): A list of pose-specific options for the RFdiffusion script. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-            multiplex_poses (int, optional): If specified, create multiple copies of poses to fully utilize parallel computing. Defaults to None.
+            multiplex_poses (bool, optional): If specified, create multiple copies of poses (according to number of cpus in jobstarter) to fully utilize parallel computing. Defaults to False.
             update_motifs (list[str], optional): A list of motifs to update based on the RFdiffusion outputs. Defaults to None.
             fail_on_missing_output_poses (bool, optional): RFdiffusion runs crash sometimes unexpectedly, which might disrupt longer pipelines. Fail if some poses are missing. Defaults to False.
 

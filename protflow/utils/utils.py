@@ -107,7 +107,7 @@ def vdw_radii() -> dict[str:float]:
         "ca":2.31,
         "sc":2.11,
         "ti":None,
-        "v":None,
+        "v":0, # set to zero because Rosetta uses V as virtual atoms
         "cr":None,
         "mn":None,
         "fe":2.44,
