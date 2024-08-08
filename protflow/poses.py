@@ -364,7 +364,7 @@ class Poses:
             return dir_
 
         # setup and create work_dir if it does not already exist
-        if work_dir is not None:
+        if work_dir:
             work_dir = os.path.abspath(work_dir)
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {os.path.abspath(work_dir)}")
