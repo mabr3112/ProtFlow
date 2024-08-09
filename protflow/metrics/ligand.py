@@ -762,7 +762,7 @@ class LigandContacts(Runner):
         self.exclude_elements = exclude_elements
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ligand_chain: str = None, jobstarter: JobStarter = None, min_dist: float = None, max_dist: float = None, atoms: list[str] = None, exclude_elements: list[str] = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, ligand_chain: str = None, jobstarter: JobStarter = None, min_dist: float = None, max_dist: float = None, atoms: list[str] = None, exclude_elements: list[str] = None, normalize_by_num_atoms: bool = True, overwrite: bool = False) -> Poses:
         """
         Calculate the backbone RMSD for given poses and jobstarter configuration.
 
@@ -841,6 +841,7 @@ class LigandContacts(Runner):
         
         atoms_str = f"--atoms {','.join(atoms)}" if atoms else ""
         exclude_elements_str = f"--exclude_elements {','.join(exclude_elements)}" if exclude_elements else ""
+        normalize_by_num_atoms_str = f"--normalize_by_num_atoms" if normalize_by_num_atoms else ""
 
         scorefile = os.path.join(work_dir, f"{prefix}_ligand_contacts.{poses.storage_format}")
 
@@ -854,12 +855,12 @@ class LigandContacts(Runner):
         # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
         poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
         out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, sublist in enumerate(poses_sublists)]
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --min_dist {min_dist} --max_dist {max_dist} --mode contacts --ligand_chain {ligand_chain} {atoms_str} {exclude_elements_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
+        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --min_dist {min_dist} --max_dist {max_dist} --mode contacts --ligand_chain {ligand_chain} {atoms_str} {exclude_elements_str} {normalize_by_num_atoms_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
         
         # run command
         jobstarter.start(
             cmds = cmds,
-            jobname = "ligand_clash",
+            jobname = "ligand_contacts",
             output_path = work_dir
         )
 
@@ -975,7 +976,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
     return clashes
 
 
-def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_dist: float = 5, atoms: list[str] = None, exclude_elements: list[str] = None) -> float:
+def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_dist: float = 5, atoms: list[str] = None, exclude_elements: list[str] = None, normalize_by_num_atoms: bool = False) -> float:
     """
     Calculate contacts of a ligand within a structure.
 
@@ -1038,7 +1039,10 @@ def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
 
     # return number of contacts
-    return round(np.sum((dgram > min_dist) & (dgram < max_dist)) / len(ligand_atoms), 2)
+    if normalize_by_num_atoms:
+        return round(np.sum((dgram > min_dist) & (dgram < max_dist)) / len(ligand_atoms), 2)
+    else: 
+        return np.sum((dgram > min_dist) & (dgram < max_dist))
 
 def main(args):
 
@@ -1056,7 +1060,7 @@ def main(args):
         df.to_json(args.out)
 
     elif args.mode == "contacts":
-        contacts = [_calc_ligand_contacts(pose, args.ligand_chain, args.min_dist, args.max_dist, atoms, exclude_elements) for pose in input_poses]
+        contacts = [_calc_ligand_contacts(pose, args.ligand_chain, args.min_dist, args.max_dist, atoms, exclude_elements, args.normalize_by_num_atoms) for pose in input_poses]
         out_dict = {"description": [os.path.splitext(os.path.basename(pose))[0] for pose in input_poses], "location": input_poses, "contacts": contacts}
         df = pd.DataFrame(out_dict)
         df.to_json(args.out)
@@ -1080,6 +1084,7 @@ if __name__ == "__main__":
     argparser.add_argument("--min_dist", type=float, default=0, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
     argparser.add_argument("--max_dist", type=float, default=5, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
     argparser.add_argument("--clash_distance", type=float, default=None, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
+    argparser.add_argument("--normalize_by_num_atoms", action="store_true", help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
 
     arguments = argparser.parse_args()
     main(arguments)
