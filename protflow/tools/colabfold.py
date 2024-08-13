@@ -535,15 +535,15 @@ def collect_scores(work_dir: str, num_return_poses: int = 1) -> pd.DataFrame:
     return scores_df
 
 
-def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, binder_length:int):
+def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, binder_length:int) -> Poses:
     # TODO: write documentation
     # calculates interaction paes from colabfold predictions
     def calculate_interaction_pae(pae_list:list,binder_length):
         paes = pd.DataFrame(pae_list)
         paes = paes.to_numpy()
 
-        pae_interaction1 = np.mean(paes[:binder_length+1, binder_length+1:])
-        pae_interaction2 = np.mean(paes[binder_length+1:, :binder_length+1:])
+        pae_interaction1 = np.mean(paes[:binder_length, binder_length:])
+        pae_interaction2 = np.mean(paes[binder_length:, :binder_length:])
         pae_binder = pae_binder = np.mean(paes[:binder_length, :binder_length])
         pae_target = np.mean(paes[binder_length:, binder_length:])
         pae_interaction_total = (pae_interaction1 + pae_interaction2) / 2
@@ -565,4 +565,6 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
     poses.df[f"{prefix}_pae_interaction"] = paes_interaction
     poses.df[f"{prefix}_pae_binder"] = paes_binder
     poses.df[f"{prefix}_pae_target"] = paes_target
+
+    return poses
 
