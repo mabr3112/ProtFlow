@@ -1378,7 +1378,7 @@ class Poses:
 
     def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":") -> None:
         """
-        Converts PDB pose files to FASTA format and optionally updates the poses.
+        Converts PDB pose files to FASTA format and optionally updates the poses. Paths to fasta location are saved in poses dataframe under column <prefix>_fasta_location.
 
         Parameters
         ----------
