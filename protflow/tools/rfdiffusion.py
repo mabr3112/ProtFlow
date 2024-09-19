@@ -215,7 +215,7 @@ class RFdiffusion(Runner):
     def __str__(self):
         return "rfdiffusion.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: bool = False, update_motifs: list[str] = None, fail_on_missing_output_poses: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: int = False, update_motifs: list[str] = None, fail_on_missing_output_poses: bool = False) -> Poses:
         """
         Execute the RFdiffusion process with given poses and jobstarter configuration.
 
@@ -225,11 +225,11 @@ class RFdiffusion(Runner):
             poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.
             prefix (str): A prefix used to name and organize the output files.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            num_diffusions (int, optional): The number of diffusions to run for each input pose. Defaults to 1.
+            num_diffusions (int, optional): The number of diffusions to run for each input pose. Be aware that the number of output poses per input pose is multiplex_poses * num_diffusions! Defaults to 1.
             options (str, optional): Additional options for the RFdiffusion script. Defaults to None.
             pose_options (list[str], optional): A list of pose-specific options for the RFdiffusion script. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-            multiplex_poses (bool, optional): If specified, create multiple copies of poses (according to number of cpus in jobstarter) to fully utilize parallel computing. Defaults to False.
+            multiplex_poses (int, optional): If specified, create multiple copies of poses to fully utilize parallel computing. Be aware that the number of output poses per input pose is multiplex_poses * num_diffusions! Defaults to False.
             update_motifs (list[str], optional): A list of motifs to update based on the RFdiffusion outputs. Defaults to None.
             fail_on_missing_output_poses (bool, optional): RFdiffusion runs crash sometimes unexpectedly, which might disrupt longer pipelines. Fail if some poses are missing. Defaults to False.
 
@@ -287,12 +287,22 @@ class RFdiffusion(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
+        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
+
+        # sanity checks
+        if multiplex_poses == 1:
+            logging.warning(f"Multiplex_poses must be higher than 1 to be effective!")
+
+        # log number of diffusions per backbone
+        if multiplex_poses:
+            logging.info(f"Total number of diffusions per input pose: {multiplex_poses * num_diffusions}")
+        else:
+            logging.info(f"Total number of diffusions per input pose: {num_diffusions}")
+
         # setup runner-specific directories
         pdb_dir = os.path.join(work_dir, "output_pdbs")
         if not os.path.isdir(pdb_dir):
             os.makedirs(pdb_dir, exist_ok=True)
-
-        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip diffusion step.
         scorefile = os.path.join(work_dir, f"rfdiffusion_scores.{poses.storage_format}")
@@ -305,6 +315,8 @@ class RFdiffusion(Runner):
                 motifs = update_motifs,
                 prefix = prefix
             )
+            if multiplex_poses:
+                poses.reindex_poses(prefix=f"{prefix}_post_multiplex_reindexing", remove_layers=2, force_reindex=True, overwrite=overwrite)
             return poses
 
         # in case overwrite is set, overwrite previous results.
@@ -318,6 +330,9 @@ class RFdiffusion(Runner):
         # parse options and pose_options:
         pose_options = self.prep_pose_options(poses, pose_options)
 
+        # create temporary pose_opts column (makes it easier to match pose_opts when multiplexing input poses)
+        poses.df[f"temp_{prefix}_pose_opts"] = pose_options
+
         # handling of empty poses DataFrame.
         if len(poses) == 0 and pose_options:
             # if no poses are set, but pose_options are provided, create as many jobs as pose_options. output_pdbs must be specified in pose options!
@@ -327,12 +342,15 @@ class RFdiffusion(Runner):
             cmds = [self.write_cmd(pose=None, options=options, pose_opts="inference.output_prefix=" + os.path.join(pdb_dir, f"diff_{str(i+1).zfill(4)}"), output_dir=pdb_dir, num_diffusions=num_diffusions) for i in range(jobstarter.max_cores)]
         elif multiplex_poses:
             # create multiple copies (specified by multiplex variable) of poses to fully utilize parallel computing:
-            poses.duplicate_poses(f"{poses.work_dir}/{prefix}_input_pdbs/", jobstarter.max_cores)
+            poses.duplicate_poses(f"{poses.work_dir}/{prefix}_multiplexed_input_pdbs/", multiplex_poses)
             self.index_layers += 1
-            cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses.poses_list(), pose_options)]
+            cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions= num_diffusions) for pose, pose_opts in zip(poses.poses_list(), poses.df[f"temp_{prefix}_pose_opts"].to_list())]
         else:
             # write rfdiffusion cmds
             cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses.poses_list(), pose_options)]
+
+        # drop temporary pose_opts col
+        poses.df.drop([f"temp_{prefix}_pose_opts"], axis=1, inplace=True)
 
         # diffuse
         jobstarter.start(
@@ -359,6 +377,9 @@ class RFdiffusion(Runner):
                 motifs = update_motifs,
                 prefix = prefix
             )
+
+        if multiplex_poses:
+            poses.reindex_poses(prefix=f"{prefix}_post_multiplex_reindexing", remove_layers=2, force_reindex=True, overwrite=overwrite)
 
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
 
