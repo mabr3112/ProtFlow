@@ -107,7 +107,7 @@ class PlottingTrajectory():
         self.data.append((label, data_list))
         return None
 
-    def violin_plot(self, out_path:str=None):
+    def violin_plot(self, out_path:str=None, show_fig:bool=False):
         '''AAA'''
         out_path = out_path or self.location
         if not self.data:
@@ -140,21 +140,21 @@ class PlottingTrajectory():
             ax.vlines(i+1, quartile1, quartile3, color="k", linestyle="-", lw=5)
             ax.vlines(i+1, np.min(d), np.max(d), color="k", linestyle="-", lw=2)
 
-        handles = [mpatches.Patch(color=c, label=l) for c, l in zip(colors, [x[0] for x in self.data])]
+        handles = [mpatches.Patch(color=c, label=f"{l[0]} (n={len(l[1])})") for c, l in zip(colors, [x for x in self.data])]
         fig.legend(handles=handles, loc='right', bbox_to_anchor=(0.45+(1-len(self.data)*0.05),0.5),
                   fancybox=True, shadow=True, ncol=1, fontsize=13)
 
         if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-        fig.show()
+        if show_fig: fig.show()
         return None
 
-    def add_and_plot(self, data_list, label):
+    def add_and_plot(self, data_list, label, show_fig: bool=False):
         ''''''
         self.add(data_list, label)
-        self.violin_plot()
+        self.violin_plot(show_fig=show_fig)
         return None
 
-def singular_violinplot(data: list, y_label: str, title: str, out_path: str = None,) -> None:
+def singular_violinplot(data: list, y_label: str, title: str, out_path: str = None, show_fig: bool=False) -> None:
     """
     Create a Singular Violin Plot
     =============================
@@ -230,7 +230,7 @@ def singular_violinplot(data: list, y_label: str, title: str, out_path: str = No
     ax.vlines(1, np.min(data), np.max(data), color="k", linestyle="-", lw=2)
 
     if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
-    fig.show()
+    if show_fig: fig.show()
     return None
 
 def violinplot_multiple_cols_dfs(dfs: list[pd.DataFrame], df_names: list[str], cols: list[str], y_labels: list[str], titles: list[str] = None, dims: list[tuple[float,float]] = None, out_path: str = None, colormap: str = "tab20", show_fig: bool = True) -> None:
@@ -582,7 +582,7 @@ def violinplot_multiple_lists(lists: list, titles: list[str], y_labels: list[str
         fig.show()
     return None
 
-def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column: str, color_column: str = None, size_column: str = None, labels: list[str] = None, title: str =None, out_path: str = None, show_fig: bool = False):
+def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column: str, color_column: str = None, size_column: str = None, labels: list[str] = None, title: str =None, show_corr: bool = False, out_path: str = None, show_fig: bool = False):
     """
     Create a Scatter Plot from a DataFrame
     ======================================
@@ -738,6 +738,17 @@ def scatterplot(dataframe:pd.DataFrame, x_column:str, y_column: str, color_colum
 
     if title:
         plt.suptitle(title, size=20)
+
+    if show_corr:
+        # Calculate Pearson correlation coefficient
+        corr_coef = np.corrcoef(x_data, y_data)[0, 1]
+        plt.text(0.05, 0.95, f'Correlation: {corr_coef:.2f}', transform=plt.gca().transAxes, fontsize=12, verticalalignment='top')
+
+        # Calculate and plot line of best fit
+        slope, intercept = np.polyfit(x_data, y_data, 1)
+        best_fit_line = slope * x_data + intercept
+        plt.plot(x_data, best_fit_line, color='red', linestyle='--', linewidth=2, label=f'y={slope:.2f}x+{intercept:.2f}')
+        plt.legend()
 
     # Save the plot as a PNG file if out_path is provided
     if out_path:

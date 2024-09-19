@@ -96,6 +96,7 @@ Version
 # import general
 import os
 import glob
+import logging
 
 # import dependencies
 import pandas as pd
@@ -232,7 +233,7 @@ class TMalign(Runner):
 
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, ref_col: str, sc_tm_score: bool = True, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> None: # pylint: disable=W0237
+    def run(self, poses: Poses, prefix: str, ref_col: str, sc_tm_score: bool = True, options: str = None, pose_options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> Poses: # pylint: disable=W0237
         """
         Execute the TMalign process with given poses and jobstarter configuration.
 
@@ -302,6 +303,7 @@ class TMalign(Runner):
         )
 
         scorefile = os.path.join(work_dir, f"{prefix}_TM.{poses.storage_format}")
+        
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
             if sc_tm_score:
@@ -336,7 +338,7 @@ class TMalign(Runner):
         )
 
         scores = self.collect_scores(output_dir=work_dir)
-        scores = scores.merge(poses.df[['poses', 'poses_description', ref_col]], left_on="description", right_on="poses_description").drop('poses_description', axis=1)
+        scores = scores.merge(poses.df[['poses', 'poses_description']], left_on="description", right_on="poses_description").drop('poses_description', axis=1)
         scores = scores.rename(columns={"poses": "location"})
 
         # write output scorefile
@@ -718,6 +720,7 @@ class TMscore(Runner):
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
+
         scorefile = os.path.join(work_dir, f"{prefix}_TM.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)

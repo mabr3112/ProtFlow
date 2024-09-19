@@ -151,7 +151,7 @@ class Rosetta(Runner):
 
     The Rosetta class is intended for researchers and developers who need to perform Rosetta simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.ROSETTA_BIN_PATH, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = protflow.config.ROSETTA_BIN_PATH, jobstarter: str = None, fail_on_missing_output_poses: bool = False) -> None:
         """
         Initialize the Rosetta class with the necessary configuration.
 
@@ -181,10 +181,11 @@ class Rosetta(Runner):
 
         This method ensures that the Rosetta class is correctly initialized with the necessary configurations to run Rosetta applications within the ProtFlow framework.
         """
-        self.script_path = self.search_path(script_path, "ROSETTA_BIN_PATH")
+        self.script_path = self.search_path(script_path, "ROSETTA_BIN_PATH", is_dir=True)
         self.name = "rosetta.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
+        self.fail_on_missing_output_poses = fail_on_missing_output_poses
 
     def __str__(self):
         return "rosetta.py"
@@ -249,7 +250,7 @@ class Rosetta(Runner):
         # otherwise raise error for not properly setting up the rosetta script paths.
         raise ValueError(f"No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list|str = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list|str = None, overwrite: bool = False, fail_on_missing_output_poses: bool = False) -> Poses:
         """
         Execute the Rosetta process with given poses and jobstarter configuration.
 
@@ -358,6 +359,11 @@ class Rosetta(Runner):
 
         # collect scores
         scores = collect_scores(work_dir=work_dir)
+
+        fail_on_missing_output_poses = fail_on_missing_output_poses or self.fail_on_missing_output_poses
+        if len(scores.index) < len(poses.df.index) * nstruct and fail_on_missing_output_poses == True:
+            raise RuntimeError("Number of output poses is smaller than number of input poses * nstruct. Some runs might have crashed!")
+    
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 

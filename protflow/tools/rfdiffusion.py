@@ -71,6 +71,7 @@ from glob import glob
 import re
 from typing import Any
 import numpy as np
+import random # for delay before rfdiffusion runs
 
 # dependencies
 import pandas as pd
@@ -214,7 +215,7 @@ class RFdiffusion(Runner):
     def __str__(self):
         return "rfdiffusion.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: int = None, update_motifs: list[str] = None) -> RunnerOutput:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, num_diffusions: int = 1, options: str = None, pose_options: list[str] = None, overwrite: bool = False, multiplex_poses: int = False, update_motifs: list[str] = None, fail_on_missing_output_poses: bool = False) -> Poses:
         """
         Execute the RFdiffusion process with given poses and jobstarter configuration.
 
@@ -224,12 +225,14 @@ class RFdiffusion(Runner):
             poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.
             prefix (str): A prefix used to name and organize the output files.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            num_diffusions (int, optional): The number of diffusions to run for each input pose. Defaults to 1.
+            num_diffusions (int, optional): The number of diffusions to run for each input pose. Be aware that the number of output poses per input pose is multiplex_poses * num_diffusions! Defaults to 1.
             options (str, optional): Additional options for the RFdiffusion script. Defaults to None.
             pose_options (list[str], optional): A list of pose-specific options for the RFdiffusion script. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-            multiplex_poses (int, optional): If specified, create multiple copies of poses to fully utilize parallel computing. Defaults to None.
+            multiplex_poses (int, optional): If specified, create multiple copies of poses to fully utilize parallel computing. Be aware that the number of output poses per input pose is multiplex_poses * num_diffusions! Defaults to False.
             update_motifs (list[str], optional): A list of motifs to update based on the RFdiffusion outputs. Defaults to None.
+            fail_on_missing_output_poses (bool, optional): RFdiffusion runs crash sometimes unexpectedly, which might disrupt longer pipelines. Fail if some poses are missing. Defaults to False.
+
 
         Returns:
             RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RFdiffusion process.
@@ -263,7 +266,8 @@ class RFdiffusion(Runner):
                     num_diffusions=3,
                     options="inference.num_designs=10",
                     pose_options=["inference.input_pdb='input.pdb'"],
-                    overwrite=True
+                    overwrite=True,
+                    fail_on_missing_output_poses=True
                 )
 
                 # Access and process the results
@@ -283,12 +287,22 @@ class RFdiffusion(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
+        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
+
+        # sanity checks
+        if multiplex_poses == 1:
+            logging.warning(f"Multiplex_poses must be higher than 1 to be effective!")
+
+        # log number of diffusions per backbone
+        if multiplex_poses:
+            logging.info(f"Total number of diffusions per input pose: {multiplex_poses * num_diffusions}")
+        else:
+            logging.info(f"Total number of diffusions per input pose: {num_diffusions}")
+
         # setup runner-specific directories
         pdb_dir = os.path.join(work_dir, "output_pdbs")
         if not os.path.isdir(pdb_dir):
             os.makedirs(pdb_dir, exist_ok=True)
-
-        logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip diffusion step.
         scorefile = os.path.join(work_dir, f"rfdiffusion_scores.{poses.storage_format}")
@@ -301,6 +315,8 @@ class RFdiffusion(Runner):
                 motifs = update_motifs,
                 prefix = prefix
             )
+            if multiplex_poses:
+                poses.reindex_poses(prefix=f"{prefix}_post_multiplex_reindexing", remove_layers=2, force_reindex=True, overwrite=overwrite)
             return poses
 
         # in case overwrite is set, overwrite previous results.
@@ -314,6 +330,9 @@ class RFdiffusion(Runner):
         # parse options and pose_options:
         pose_options = self.prep_pose_options(poses, pose_options)
 
+        # create temporary pose_opts column (makes it easier to match pose_opts when multiplexing input poses)
+        poses.df[f"temp_{prefix}_pose_opts"] = pose_options
+
         # handling of empty poses DataFrame.
         if len(poses) == 0 and pose_options:
             # if no poses are set, but pose_options are provided, create as many jobs as pose_options. output_pdbs must be specified in pose options!
@@ -323,12 +342,15 @@ class RFdiffusion(Runner):
             cmds = [self.write_cmd(pose=None, options=options, pose_opts="inference.output_prefix=" + os.path.join(pdb_dir, f"diff_{str(i+1).zfill(4)}"), output_dir=pdb_dir, num_diffusions=num_diffusions) for i in range(jobstarter.max_cores)]
         elif multiplex_poses:
             # create multiple copies (specified by multiplex variable) of poses to fully utilize parallel computing:
-            poses.duplicate_poses(f"{poses.work_dir}/{prefix}_input_pdbs/", jobstarter.max_cores)
+            poses.duplicate_poses(f"{poses.work_dir}/{prefix}_multiplexed_input_pdbs/", multiplex_poses)
             self.index_layers += 1
-            cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses.poses_list(), pose_options)]
+            cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions= num_diffusions) for pose, pose_opts in zip(poses.poses_list(), poses.df[f"temp_{prefix}_pose_opts"].to_list())]
         else:
             # write rfdiffusion cmds
             cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses.poses_list(), pose_options)]
+
+        # drop temporary pose_opts col
+        poses.df.drop([f"temp_{prefix}_pose_opts"], axis=1, inplace=True)
 
         # diffuse
         jobstarter.start(
@@ -339,7 +361,10 @@ class RFdiffusion(Runner):
         )
 
         # collect RFdiffusion outputs
-        scores = self.collect_scores(work_dir=work_dir, rename_pdbs=True).reset_index(drop=True)
+        scores = collect_scores(work_dir=work_dir, rename_pdbs=True)
+        if fail_on_missing_output_poses == True and len(scores.index) < len(poses.df.index) * num_diffusions:
+            raise RuntimeError("Number of output poses is smaller than number of input poses * num_diffusions. Some runs might have crashed!")
+        
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -352,6 +377,9 @@ class RFdiffusion(Runner):
                 motifs = update_motifs,
                 prefix = prefix
             )
+
+        if multiplex_poses:
+            poses.reindex_poses(prefix=f"{prefix}_post_multiplex_reindexing", remove_layers=2, force_reindex=True, overwrite=overwrite)
 
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
 
@@ -438,8 +466,10 @@ class RFdiffusion(Runner):
 
         opts_str = " ".join([f"{k}={v}" for k, v in start_opts.items()])
 
+        timer = round(random.uniform(0, 5), 4) # delay between 0 and 10 s to prevent jobs crashing because of simultaneious directory creation during parallel computing. TODO: check if this helps!
+
         # return cmd
-        return f"{self.python_path} {self.script_path} {opts_str}"
+        return f"sleep {timer}; {self.python_path} {self.script_path} {opts_str}"
 
     def parse_rfdiffusion_opts(self, options: str, pose_options: str) -> dict:
         """
@@ -479,65 +509,65 @@ class RFdiffusion(Runner):
         splitstr = [x for x in re_split_rfdiffusion_opts(options) + re_split_rfdiffusion_opts(pose_options) if x] # adding pose_opts after options makes sure that pose_opts overwrites options!
         return {x.split("=")[0]: "=".join(x.split("=")[1:]) for x in splitstr}
 
-    def collect_scores(self, work_dir: str, rename_pdbs: bool = True) -> pd.DataFrame:
-        """
-        Collect scores from RFdiffusion output files.
+def collect_scores(work_dir: str, rename_pdbs: bool = True) -> pd.DataFrame:
+    """
+    Collect scores from RFdiffusion output files.
 
-        This method collects scores from .trb files generated by RFdiffusion into a single pandas DataFrame. It also optionally renames the output .pdb files based on the diffusion process.
+    This method collects scores from .trb files generated by RFdiffusion into a single pandas DataFrame. It also optionally renames the output .pdb files based on the diffusion process.
 
-        Parameters:
-            work_dir (str): The working directory where RFdiffusion output files are stored.
-            rename_pdbs (bool, optional): If True, rename the .pdb files based on the new descriptions. Defaults to True.
+    Parameters:
+        work_dir (str): The working directory where RFdiffusion output files are stored.
+        rename_pdbs (bool, optional): If True, rename the .pdb files based on the new descriptions. Defaults to True.
 
-        Returns:
-            pd.DataFrame: A DataFrame containing the collected scores from the RFdiffusion output.
+    Returns:
+        pd.DataFrame: A DataFrame containing the collected scores from the RFdiffusion output.
 
-        Raises:
-            FileNotFoundError: If no .pdb files are found in the specified directory.
+    Raises:
+        FileNotFoundError: If no .pdb files are found in the specified directory.
 
-        Examples:
-            Here is an example of how to use the `collect_scores` method:
+    Examples:
+        Here is an example of how to use the `collect_scores` method:
 
-            .. code-block:: python
+        .. code-block:: python
 
-                work_dir = "/path/to/output"
-                scores_df = rfdiffusion.collect_scores(work_dir, rename_pdbs=True)
-                # scores_df will contain the combined scores from the RFdiffusion output files
+            work_dir = "/path/to/output"
+            scores_df = rfdiffusion.collect_scores(work_dir, rename_pdbs=True)
+            # scores_df will contain the combined scores from the RFdiffusion output files
 
-        Further Details:
-            - **Score Collection:** The method iterates over .pdb files in the specified directory, collecting corresponding .trb files and concatenating their scores into a DataFrame.
-            - **File Renaming:** If `rename_pdbs` is set to True, the method renames the .pdb files based on new descriptions to ensure unique identification.
-            - **DataFrame Structure:** The resulting DataFrame includes relevant score information, and columns are renamed appropriately if files are renamed.
+    Further Details:
+        - **Score Collection:** The method iterates over .pdb files in the specified directory, collecting corresponding .trb files and concatenating their scores into a DataFrame.
+        - **File Renaming:** If `rename_pdbs` is set to True, the method renames the .pdb files based on new descriptions to ensure unique identification.
+        - **DataFrame Structure:** The resulting DataFrame includes relevant score information, and columns are renamed appropriately if files are renamed.
 
-        This method is designed to streamline the collection and organization of RFdiffusion output scores, facilitating further analysis and processing.
-        """
-        # collect scores from .trb-files into one pandas DataFrame:
-        pdb_dir = os.path.join(work_dir, "output_pdbs")
-        pl = glob(f"{pdb_dir}/*.pdb")
-        if not pl: raise FileNotFoundError(f"No .pdb files were found in the diffusion output direcotry {pdb_dir}. RFDiffusion might have crashed (check inpainting error-log), or the path might be wrong!")
+    This method is designed to streamline the collection and organization of RFdiffusion output scores, facilitating further analysis and processing.
+    """
+    # collect scores from .trb-files into one pandas DataFrame:
+    pdb_dir = os.path.join(work_dir, "output_pdbs")
+    pl = glob(f"{pdb_dir}/*.pdb")
+    if not pl: raise FileNotFoundError(f"No .pdb files were found in the diffusion output direcotry {pdb_dir}. RFDiffusion might have crashed (check inpainting error-log), or the path might be wrong!")
 
-        # collect rfdiffusion scores into a DataFrame:
-        scores = []
-        for pdb in pl:
-            if os.path.isfile(trb := pdb.replace(".pdb", ".trb")):
-                scores.append(parse_diffusion_trbfile(trb))
-        scores = pd.concat(scores)
+    # collect rfdiffusion scores into a DataFrame:
+    scores = []
+    for pdb in pl:
+        if os.path.isfile(trb := pdb.replace(".pdb", ".trb")):
+            scores.append(parse_diffusion_trbfile(trb))
+    scores = pd.concat(scores)
 
-        # rename pdbs if option is set:
-        if rename_pdbs is True:
-            scores.loc[:, "new_description"] = ["_".join(desc.split("_")[:-1]) + "_" + str(int(desc.split("_")[-1]) + 1).zfill(4) for desc in scores["description"]]
-            scores.loc[:, "new_loc"] = [loc.replace(old_desc, new_desc) for loc, old_desc, new_desc in zip(list(scores["location"]), list(scores["description"]), list(scores["new_description"]))]
+    # rename pdbs if option is set:
+    if rename_pdbs is True:
+        scores.loc[:, "new_description"] = ["_".join(desc.split("_")[:-1]) + "_" + str(int(desc.split("_")[-1]) + 1).zfill(4) for desc in scores["description"]]
+        scores.loc[:, "new_loc"] = [loc.replace(old_desc, new_desc) for loc, old_desc, new_desc in zip(list(scores["location"]), list(scores["description"]), list(scores["new_description"]))]
 
-            # rename all diffusion outputfiles according to new indeces:
-            _ = [[os.rename(f, f.replace(old_desc, new_desc)) for f in glob(f"{pdb_dir}/{old_desc}.*")] for old_desc, new_desc in zip(list(scores["description"]), list(scores["new_description"]))]
+        # rename all diffusion outputfiles according to new indeces:
+        _ = [[os.rename(f, f.replace(old_desc, new_desc)) for f in glob(f"{pdb_dir}/{old_desc}.*")] for old_desc, new_desc in zip(list(scores["description"]), list(scores["new_description"]))]
 
-            # Collect information of path to .pdb files into DataFrame under 'location' column
-            scores = scores.drop(columns=["location"]).rename(columns={"new_loc": "location"})
-            scores = scores.drop(columns=["description"]).rename(columns={"new_description": "description"})
+        # Collect information of path to .pdb files into DataFrame under 'location' column
+        scores = scores.drop(columns=["location"]).rename(columns={"new_loc": "location"})
+        scores = scores.drop(columns=["description"]).rename(columns={"new_description": "description"})
 
-        scores.reset_index(drop=True, inplace=True)
+    scores.reset_index(drop=True, inplace=True)
 
-        return scores
+    return scores
 
 def parse_diffusion_trbfile(path: str) -> pd.DataFrame:
     """

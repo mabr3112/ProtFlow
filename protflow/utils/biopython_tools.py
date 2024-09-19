@@ -74,7 +74,7 @@ from Bio.SeqUtils.ProtParam import ProteinAnalysis
 # customs
 from protflow.residues import ResidueSelection
 
-def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = "pose") -> Bio.PDB.Structure:
+def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Bio.PDB.Structure:
     """
     Load a structure from a PDB file using BioPython's PDBParser.
 
@@ -90,7 +90,7 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
                            all_models is False. Defaults to 0 (first model).
     quiet (bool, optional): If True, suppresses output from the PDBParser. 
                             Defaults to True.
-    handle (str, optional): String handle that is passed to the PDBParser's get_structure() method.
+    handle (str, optional): String handle that is passed to the PDBParser's get_structure() method and sets the id of the structure.
 
     Returns:
     Bio.PDB.Structure: The parsed structure object from the PDB file. If 
@@ -114,6 +114,10 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
         raise FileNotFoundError(f"PDB file {path_to_pdb} not found!")
     if not path_to_pdb.endswith(".pdb"):
         raise ValueError(f"File must be .pdb file. File: {path_to_pdb}")
+
+    # set description as structure name if no other name is provided
+    if not handle:
+        handle = os.path.splitext(os.path.basename(path_to_pdb))[0]
 
     # load poses
     pdb_parser = Bio.PDB.PDBParser(QUIET=quiet)
@@ -284,7 +288,7 @@ def superimpose(mobile: Structure, target: Structure, mobile_atoms: list = None,
     super_imposer.apply(mobile)
     return mobile
 
-def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None) -> list:
+def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None, include_het_atoms: bool = False) -> list:
     '''
     Extract specified atoms from specified chains in a given structure.
     
@@ -304,7 +308,8 @@ def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None) 
     atms_list = []
     for chain in chains:
         # Only select amino acids in each chain:
-        residues = [res for res in chain if res.id[0] == " "]
+        if include_het_atoms == False: residues = [res for res in chain if res.id[0] == " "]
+        else: residues = [res for res in chain]
         for residue in residues:
             # sort atoms by their atom name, ordering of atoms within residues differs depending on the software creating the .pdb file
             if atoms:
@@ -314,7 +319,7 @@ def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None) 
 
     return atms_list
 
-def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str] = None, excluded_atoms: list[str] = None, exclude_hydrogens: bool = True) -> list:
+def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str] = None, excluded_atoms: list[str] = None, exclude_hydrogens: bool = True, include_het_atoms: bool = False) -> list:
     """
     Select atoms from a structure based on a provided motif.
 
@@ -370,9 +375,15 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
     out_atoms = []
     for chain, res_id in motif:
         if atoms:
-            res_atoms = [pose[chain][(" ", res_id, " ")][atom] for atom in atoms]
+            if include_het_atoms == False: res_atoms = [pose[chain][(" ", res_id, " ")][atom] for atom in atoms]
+            else:
+                for res in pose[chain].get_residues():
+                    if res.id[1] == res_id: res_atoms = [res[atm] for atm in atoms]; break
         else:
-            res_atoms = sorted(list(pose[chain][(" ", res_id, " ")].get_atoms()), key=lambda a: a.id)
+            if include_het_atoms == False: res_atoms = sorted(list(pose[chain][(" ", res_id, " ")].get_atoms()), key=lambda a: a.id)
+            else:
+                for res in pose[chain].get_residues():
+                    if res.id[1] == res_id: res_atoms = sorted(list(res.get_atoms()), key=lambda a: a.id); break
 
         # filter out forbidden atoms
         res_atoms = [atom for atom in res_atoms if atom.name not in excluded_atoms]
@@ -459,7 +470,7 @@ def get_sequence_from_pose(pose: Structure, chain_sep:str=":") -> str:
     # collect sequence
     return chain_sep.join([str(x.get_sequence()) for x in ppb.build_peptides(pose)])
 
-def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_pdb_path: str = None, keep_chain: str = "") -> str:
+def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_pdb_path: str = None, keep_chain: str = "", overwrite: bool = False) -> str:
     """
     Renumber the residues of a BioPython structure based on a residue mapping.
 
@@ -501,12 +512,17 @@ def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_p
     - The function creates a deep copy of the input structure and applies the residue renumbering to the copy.
     - The `keep_chain` parameter allows for retaining the original numbering of a specified chain.
     """
+    path_to_output_structure = out_pdb_path or pose_path
+
+    # check if output already exists
+    if overwrite == False and os.path.isfile(path_to_output_structure) and not out_pdb_path == pose_path:
+        return path_to_output_structure
+    
     # change numbering
     pose = load_structure_from_pdbfile(pose_path)
     pose = renumber_pose_by_residue_mapping(pose=pose, residue_mapping=residue_mapping, keep_chain=keep_chain)
 
     # save pose
-    path_to_output_structure = out_pdb_path or pose_path
     save_structure_to_pdbfile(pose, path_to_output_structure)
     return path_to_output_structure
 
