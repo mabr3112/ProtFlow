@@ -242,7 +242,7 @@ class TMalign(Runner):
         Parameters:
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
-            ref_col (str): Column containing paths to PDB files used as reference for TM score calculation.
+            ref_col (str|): Column containing paths to PDB files used as reference for TM score calculation. Can also be a path to a singular reference .pdb file.
             sc_tm_score (bool, optional): If True, calculates the self-consistency TM score for each backbone in ref_col and adds it into the column {prefix}_sc_tm. Defaults to True.
             options (str, optional): Additional command-line options for the TMalign script. Defaults to None.
             pose_options (str, optional): Name of poses.df column containing options for TMalign. Defaults to None.
@@ -309,7 +309,6 @@ class TMalign(Runner):
             if sc_tm_score:
                 output.df = calc_sc_tm(input_df=output.df, name=f"{prefix}_sc_tm", ref_col=ref_col, tm_col=f"{prefix}_TM_score_ref")
             return output
-
 
         # prepare pose options
         pose_options = self.prep_pose_options(poses, pose_options)
