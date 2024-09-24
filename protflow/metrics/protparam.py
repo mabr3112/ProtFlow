@@ -278,9 +278,7 @@ def main(args):
     in_df = pd.read_json(args.input_json)
     out_df = []
     for i, series in in_df.iterrows():
-        print(i)
         params = determine_protparams(seq=series['sequence'], pH=args.pH)
-        print(params)
         params['description'] = series['name']
         out_df.append(params)
     out_df = pd.concat(out_df)
