@@ -307,10 +307,7 @@ def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None, 
     atms_list = []
     for chain in chains:
         # Only select amino acids in each chain:
-        if include_het_atoms:
-            residues = [res for res in chain]
-        else:
-            residues = [res for res in chain if res.id[0] == " "]
+        residues = [res for res in chain if include_het_atoms or res.id[0] == " "]
 
         for residue in residues:
             # sort atoms by their atom name, ordering of atoms within residues differs depending on the software creating the .pdb file
