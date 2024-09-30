@@ -24,6 +24,7 @@ Authors
 -------
 Markus Braun, Adrian Tripp
 """
+import os
 
 def parse_fasta_to_dict(fasta_path: str, encoding:str="UTF-8") -> dict[str:str]:
     '''
@@ -79,6 +80,22 @@ def parse_fasta_to_dict(fasta_path: str, encoding:str="UTF-8") -> dict[str:str]:
     fasta_dict = {x[0]: "".join(x[1:]) for x in raw_fasta_list if len(x) > 1}
 
     return fasta_dict
+
+def sequence_dict_to_fasta(seq_dict: dict, out_path: str, combined_filename: str = None) -> None:
+    '''Writes protein sequences stored into seq_dict {'description': seq, ...} to .fa files. If combined_filename is specified, all sequences will be written into one file.'''
+    # make sure out_path exists
+    os.makedirs(out_path, exist_ok=True)
+
+    # if combined_filename is specified, write everything into one .fa file.
+    if combined_filename:
+        with open(f"{out_path}/{combined_filename}", 'w', encoding="UTF-8") as f:
+            f.write("\n".join([f">{desc}\n{seq}" for desc, seq in seq_dict.items()]) + "\n")
+        return
+
+    # otherwise, write every sequence into its own .fa file, named after the 'description' (will also be put next to >)
+    for description, seq in seq_dict.items():
+        with open(f"{out_path}/{description}.fa", 'w', encoding="UTF-8") as f:
+            f.write(f"{description}\n{seq}\n")
 
 def vdw_radii() -> dict[str:float]:
     '''
