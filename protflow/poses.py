@@ -364,11 +364,13 @@ class Poses:
             return dir_
 
         # setup and create work_dir if it does not already exist
-        if work_dir is not None and not os.path.isdir(work_dir):
+        if work_dir:
             work_dir = os.path.abspath(work_dir)
             os.makedirs(work_dir, exist_ok=True)
             logging.info(f"Creating directory {os.path.abspath(work_dir)}")
-        self.work_dir = os.path.abspath(work_dir)
+            self.work_dir = os.path.abspath(work_dir)
+        else:
+            self.work_dir = None
 
         # setup common directories for workflows:
         self.scores_dir = set_dir("scores", work_dir)
@@ -900,7 +902,7 @@ class Poses:
         def extract_extension(file_path):
             _, ext = os.path.splitext(file_path)
             return ext
-
+        
         pose_col = pose_col or 'poses'
 
         # extract extensions and create a set containing only unique values
@@ -1200,7 +1202,7 @@ class Poses:
         # drop temporary description column
         self.df.drop("tmp_layer_column", inplace=True, axis=1)
 
-    def duplicate_poses(self, output_dir:str, n_duplicates:int) -> None:
+    def duplicate_poses(self, output_dir:str, n_duplicates:int, overwrite:bool=False) -> None:
         """
         Duplicates poses a specified number of times and saves them to an output directory.
 
@@ -1234,35 +1236,31 @@ class Poses:
         - Logs the duplication process and verifies the creation of duplicate files.
 
         """
-        def insert_index_layer(pose, n, sep:str="_") -> str:
+        def insert_index_layer(dir:str, input_path:str, n:int, sep:str="_") -> str:
             '''inserts index layer.'''
-            filepath, filename = pose.rsplit("/", maxsplit=1)
-            description, ext = filename.rsplit(".", maxsplit=1)
-            return f"{filepath}/{description}{sep}{str(n).zfill(4)}.{ext}"
-
-        # define outputs:
-        output_files = [f'{output_dir}/{insert_index_layer(pose, n, "_")}' for pose in self.poses_list() for n in range(n_duplicates)]
-        output_dict = {
-            "temp_dp_select_col": [file_path.rsplit("/", maxsplit=1)[-1].rsplit("_", maxsplit=1)[0] for file_path in output_files],
-            "temp_dp_description": [file_path.rsplit("/", maxsplit=1)[-1].rsplit(".", maxsplit=1)[0] for file_path in output_files],
-            "temp_dp_location": output_files
-        }
-
-        # merge DataFrames:
-        self.df.merge(pd.DataFrame(output_dict), left_on="poses_description", right_on="temp_dp_select_col")
-
-        # drop select_col and reset index:
-        self.df.drop("temp_dp_select_col", inplace=True, axis=1)
-        self.df.reset_index(inplace=True, drop=True)
-
-        # check if outputs exist:
-        for pose in self:
-            if not os.path.isfile(pose["temp_dp_location"]):
-                shutil.copy(pose["pose"], pose["temp_dp_location"])
-
-        # reset poses and poses_description columns
-        self.df["poses"] = self.df["temp_dp_location"]
-        self.df["poses_description"] = self.df["description"]
+            in_file = os.path.basename(input_path)
+            description, extension = os.path.splitext(in_file)
+            out_path = os.path.join(dir, f"{description}{sep}{str(n).zfill(4)}{extension}")
+            return out_path
+        
+        # create output directory
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # iterate over poses and copy them to new location with one additional index layer
+        duplicates = []
+        for n in range(1, n_duplicates+1):
+            new_df = self.df.copy(deep=True)
+            new_paths = [insert_index_layer(output_dir, pose, n, "_") for pose in new_df["poses"].to_list()]
+            new_descriptions = [description_from_path(path) for path in new_paths]
+            for old_pose, new_pose in zip(new_df["poses"].to_list(), new_paths):
+                if overwrite == True or not os.path.isfile(new_pose):
+                    shutil.copy(old_pose, new_pose)
+            new_df["poses"] = new_paths
+            new_df["poses_description"] = new_descriptions
+            duplicates.append(new_df)
+        
+        self.df = pd.concat(duplicates)
+        self.df.reset_index(drop=True, inplace=True)
 
     def reset_poses(self, new_poses_col: str='input_poses', force_reset_df: bool=False):
         """
@@ -1380,7 +1378,7 @@ class Poses:
 
     def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":") -> None:
         """
-        Converts PDB pose files to FASTA format and optionally updates the poses.
+        Converts PDB pose files to FASTA format and optionally updates the poses. Paths to fasta location are saved in poses dataframe under column <prefix>_fasta_location.
 
         Parameters
         ----------

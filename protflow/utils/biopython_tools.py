@@ -123,8 +123,7 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
     pdb_parser = Bio.PDB.PDBParser(QUIET=quiet)
     if all_models:
         return pdb_parser.get_structure(handle, path_to_pdb)
-    else:
-        return pdb_parser.get_structure(handle, path_to_pdb)[model]
+    return pdb_parser.get_structure(handle, path_to_pdb)[model]
 
 def save_structure_to_pdbfile(pose: Structure, save_path: str) -> None:
     """
@@ -308,8 +307,11 @@ def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None, 
     atms_list = []
     for chain in chains:
         # Only select amino acids in each chain:
-        if include_het_atoms == False: residues = [res for res in chain if res.id[0] == " "]
-        else: residues = [res for res in chain]
+        if include_het_atoms:
+            residues = [res for res in chain]
+        else:
+            residues = [res for res in chain if res.id[0] == " "]
+
         for residue in residues:
             # sort atoms by their atom name, ordering of atoms within residues differs depending on the software creating the .pdb file
             if atoms:
@@ -375,15 +377,19 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
     out_atoms = []
     for chain, res_id in motif:
         if atoms:
-            if include_het_atoms == False: res_atoms = [pose[chain][(" ", res_id, " ")][atom] for atom in atoms]
-            else:
+            if include_het_atoms: # if this flag is set, only read in atoms of the first residue
                 for res in pose[chain].get_residues():
-                    if res.id[1] == res_id: res_atoms = [res[atm] for atm in atoms]; break
+                    if res.id[1] == res_id:
+                        res_atoms = [res[atm] for atm in atoms]; break
+            else:
+                res_atoms = [pose[chain][(" ", res_id, " ")][atom] for atom in atoms]
         else:
-            if include_het_atoms == False: res_atoms = sorted(list(pose[chain][(" ", res_id, " ")].get_atoms()), key=lambda a: a.id)
-            else:
+            if include_het_atoms: # if this flag is set, only read in atoms of the first residue
                 for res in pose[chain].get_residues():
-                    if res.id[1] == res_id: res_atoms = sorted(list(res.get_atoms()), key=lambda a: a.id); break
+                    if res.id[1] == res_id:
+                        res_atoms = sorted(list(res.get_atoms()), key=lambda a: a.id); break
+            else:
+                res_atoms = sorted(list(pose[chain][(" ", res_id, " ")].get_atoms()), key=lambda a: a.id) # sort atoms, otherwise RMSD is affected by atom ordering. Atom ordering depends on the tool that generated the .pdb file.
 
         # filter out forbidden atoms
         res_atoms = [atom for atom in res_atoms if atom.name not in excluded_atoms]
@@ -515,9 +521,9 @@ def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_p
     path_to_output_structure = out_pdb_path or pose_path
 
     # check if output already exists
-    if overwrite == False and os.path.isfile(path_to_output_structure) and not out_pdb_path == pose_path:
+    if not overwrite and os.path.isfile(path_to_output_structure) and out_pdb_path != pose_path:
         return path_to_output_structure
-    
+
     # change numbering
     pose = load_structure_from_pdbfile(pose_path)
     pose = renumber_pose_by_residue_mapping(pose=pose, residue_mapping=residue_mapping, keep_chain=keep_chain)
@@ -644,12 +650,11 @@ def load_sequence_from_fasta(fasta:str, return_multiple_entries:bool=True):
     - If `return_multiple_entries` is set to True and the file contains multiple entries, an iterator is returned to handle the sequences.
     """
     records = SeqIO.parse(fasta, "fasta")
-    if len([i for i in records]) == 1 or not return_multiple_entries:
+    if len(list(records)) == 1 or not return_multiple_entries:
         return next(records)
-    else:
-        return records
+    return records
 
-def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], pH: float = 7):
+def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], pH: float = 7) -> pd.DataFrame:
     """
     Calculate protein features based on a sequence.
 
@@ -714,16 +719,16 @@ def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], 
 
     # create data dict
     data = {
-        "sequence": seq,
-        "molecular_weight": round(protparams.molecular_weight(), 3),
-        "aromaticity": round(protparams.aromaticity(), 4),
-        "GRAVY": round(protparams.gravy(), 4),
-        "instability_index": protparams.instability_index(),
-        "isoelectric_point": round(protparams.isoelectric_point(), 2),
-        "molar_extinction_coefficient_red": protparams.molar_extinction_coefficient()[0],
-        "molar_extinction_coefficient_ox": protparams.molar_extinction_coefficient()[1],
-        "secondary_structure_fraction": protparams.secondary_structure_fraction(),
-        f"charge_at_pH_{pH}": round(protparams.charge_at_pH(pH=pH), 2)
+        "sequence": [seq],
+        "molecular_weight": [round(protparams.molecular_weight(), 3)],
+        "aromaticity": [round(protparams.aromaticity(), 4)],
+        "GRAVY": [round(protparams.gravy(), 4)],
+        "instability_index": [protparams.instability_index()],
+        "isoelectric_point": [round(protparams.isoelectric_point(), 2)],
+        "molar_extinction_coefficient_red": [protparams.molar_extinction_coefficient()[0]],
+        "molar_extinction_coefficient_ox": [protparams.molar_extinction_coefficient()[1]],
+        "secondary_structure_fraction": [protparams.secondary_structure_fraction()],
+        f"charge_at_pH_{pH}": [round(protparams.charge_at_pH(pH=pH), 2)]
     }
 
     return pd.DataFrame(data)

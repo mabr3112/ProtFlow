@@ -24,6 +24,7 @@ Authors
 -------
 Markus Braun, Adrian Tripp
 """
+import os
 
 def parse_fasta_to_dict(fasta_path: str, encoding:str="UTF-8") -> dict[str:str]:
     '''
@@ -80,6 +81,22 @@ def parse_fasta_to_dict(fasta_path: str, encoding:str="UTF-8") -> dict[str:str]:
 
     return fasta_dict
 
+def sequence_dict_to_fasta(seq_dict: dict, out_path: str, combined_filename: str = None) -> None:
+    '''Writes protein sequences stored into seq_dict {'description': seq, ...} to .fa files. If combined_filename is specified, all sequences will be written into one file.'''
+    # make sure out_path exists
+    os.makedirs(out_path, exist_ok=True)
+
+    # if combined_filename is specified, write everything into one .fa file.
+    if combined_filename:
+        with open(f"{out_path}/{combined_filename}", 'w', encoding="UTF-8") as f:
+            f.write("\n".join([f">{desc}\n{seq}" for desc, seq in seq_dict.items()]) + "\n")
+        return
+
+    # otherwise, write every sequence into its own .fa file, named after the 'description' (will also be put next to >)
+    for description, seq in seq_dict.items():
+        with open(f"{out_path}/{description}.fa", 'w', encoding="UTF-8") as f:
+            f.write(f">{description}\n{seq}\n")
+
 def vdw_radii() -> dict[str:float]:
     '''
     from https://en.wikipedia.org/wiki/Atomic_radii_of_the_elements_(data_page), accessed 30.1.2023
@@ -107,7 +124,7 @@ def vdw_radii() -> dict[str:float]:
         "ca":2.31,
         "sc":2.11,
         "ti":None,
-        "v":None,
+        "v":0, # set to zero because Rosetta uses V as virtual atoms
         "cr":None,
         "mn":None,
         "fe":2.44,
@@ -176,3 +193,9 @@ def vdw_radii() -> dict[str:float]:
         "ac":None
         }
     return vdw_radii
+
+def _mutually_exclusive(opt_a, name_a: str, opt_b, name_b: str, none_ok: bool = False):
+    if opt_a and opt_b:
+        raise ValueError(f"Paramters '{name_a}' and '{name_b}' are mutually exclusive. Specify either one of them, but not both.")
+    if not (opt_a or opt_b or none_ok):
+        raise ValueError(f"At least one of parameters {name_a} or {name_b} must be set.")

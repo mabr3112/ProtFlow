@@ -90,7 +90,7 @@ class ResidueSelector:
             poses = Poses()
             selector.set_poses(poses=poses)
         """
-        if not isinstance(poses, Poses):
+        if not isinstance(poses, Poses) and poses is not None:
             raise TypeError(f"Parameter :poses: must be of type Poses. type(poses) = {type(poses)}")
         self.poses = poses
 
@@ -189,9 +189,9 @@ class ChainSelector(ResidueSelector):
         """
         if not chains:
             self.chains = None
-        if not isinstance(chains, list):
+        elif not isinstance(chains, list):
             raise ValueError(f"Parameter :chains: must be a list containing the chains to select as single characters, e.g. chains=['A', 'C']")
-        if not all(isinstance(chain, str) or len(chain) > 1 for chain in chains):
+        elif not all(isinstance(chain, str) or len(chain) > 1 for chain in chains):
             raise ValueError(f"Parameter :chains: must be a list containing the chains to select as single characters, e.g. chains=['A', 'C']")
         self.chains = chains
         self.chain = None
@@ -211,7 +211,7 @@ class ChainSelector(ResidueSelector):
         """
         if not chain:
             self.chain = None
-        if not isinstance(chain, str) or len(chain) > 1:
+        elif not isinstance(chain, str) or len(chain) > 1:
             raise ValueError(f"Parameter :chain: must be a string of a single character denoting the chain that should be selected. e.g. chain='B' ")
         self.chain = chain
         self.chains = None
