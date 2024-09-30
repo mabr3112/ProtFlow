@@ -470,8 +470,6 @@ class Colabfold(Runner):
             takes list of .json files from af2_predictions and collects scores (mean_plddt, max_plddt, etc.)
             '''
             # no statistics to calculate if only one model was used:
-            print(input_tuple_list)
-            print(len(input_tuple_list))
             if len(input_tuple_list) == 1:
                 json_path, input_pdb = input_tuple_list[0]
                 df = summarize_af2_json(json_path, input_pdb)
