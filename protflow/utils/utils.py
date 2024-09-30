@@ -95,7 +95,7 @@ def sequence_dict_to_fasta(seq_dict: dict, out_path: str, combined_filename: str
     # otherwise, write every sequence into its own .fa file, named after the 'description' (will also be put next to >)
     for description, seq in seq_dict.items():
         with open(f"{out_path}/{description}.fa", 'w', encoding="UTF-8") as f:
-            f.write(f"{description}\n{seq}\n")
+            f.write(f">{description}\n{seq}\n")
 
 def vdw_radii() -> dict[str:float]:
     '''
@@ -193,3 +193,9 @@ def vdw_radii() -> dict[str:float]:
         "ac":None
         }
     return vdw_radii
+
+def _mutually_exclusive(opt_a, name_a: str, opt_b, name_b: str, none_ok: bool = False):
+    if opt_a and opt_b:
+        raise ValueError(f"Paramters '{name_a}' and '{name_b}' are mutually exclusive. Specify either one of them, but not both.")
+    if not (opt_a or opt_b or none_ok):
+        raise ValueError(f"At least one of parameters {name_a} or {name_b} must be set.")

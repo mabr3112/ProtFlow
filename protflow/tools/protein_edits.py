@@ -94,8 +94,7 @@ from protflow.residues import ResidueSelection
 from protflow.runners import Runner, RunnerOutput, col_in_df
 from protflow.config import PROTFLOW_ENV
 from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR
-from protflow.utils.plotting import check_for_col_in_df
-from protflow.utils.utils import parse_fasta_to_dict
+from protflow.utils.utils import parse_fasta_to_dict, _mutually_exclusive
 from protflow.utils.biopython_tools import load_structure_from_pdbfile
 
 class ChainAdder(Runner):
@@ -957,7 +956,7 @@ class SequenceRemover(Runner):
         self.python = python
 
     def _outputs_exist(self, poses: Poses, work_dir: str) -> bool:
-        return os.path.isfile(f"{work_dir}/done.txt") and all(os.path.isfile(f"{work_dir}/chains_removed/{description}.fa" for description in poses.df["poses_description"].to_list()))
+        return os.path.isfile(f"{work_dir}/done.txt") and all(os.path.isfile(f"{work_dir}/chains_removed/{description}.fa") for description in poses.df["poses_description"].to_list())
 
     def _write_json(self, out_dict: str, fp: str) -> None:
         with open(fp, 'w', encoding="UTF-8") as f:
@@ -1014,6 +1013,90 @@ class SequenceRemover(Runner):
 
         # write cmd
         script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/remove_sequence_batch.py"
+        cmds = [f"{self.python}/python3 {script_path} --input_json {input_json} --output_dir {work_dir}" for input_json in input_json_list]
+
+        # execute with jobstarter
+        jobstarter.start(cmds=cmds, jobname=prefix, output_path=work_dir)
+
+        # integrate into poses (update DataFrame)
+        output_df = self._output_df(poses, work_dir)
+        return RunnerOutput(poses, output_df, prefix=prefix).return_poses()
+
+class SequenceAdder(Runner):
+    def __init__(self, sequence: list[int] = None, sequence_col: str = None, python: str = PROTFLOW_ENV, jobstarter: JobStarter = None):
+        '''
+        Parameters:
+        sequence: Either string of sequence that should be added.
+        sequence_col: column in poses.df that contains the sequences to be added. sequence and sequence_col are mutually exclusive.
+        '''
+        _mutually_exclusive(sequence, "sequence", sequence_col, "sequence_col", none_ok=True)
+        self.sequence = sequence
+        self.sequence_col = sequence_col
+        self.jobstarter = jobstarter
+        self.python = python
+
+    def _outputs_exist(self, poses: Poses, work_dir: str) -> bool:
+        return os.path.isfile(f"{work_dir}/done.txt") and all(os.path.isfile(f"{work_dir}/sequence_added/{description}.fa") for description in poses.df["poses_description"].to_list())
+
+    def _write_json(self, out_dict: str, fp: str) -> None:
+        with open(fp, 'w', encoding="UTF-8") as f:
+            json.dump(out_dict, f)
+
+    def _prep_sequence_col(self, seq_col: str, poses: Poses) -> None:
+        if isinstance(seq_col, str):
+            col_in_df(poses.df, seq_col)
+            return poses.df[seq_col]
+        if seq_col is None:
+            return None
+        raise ValueError(f"Unsupported type for paramter 'seq_col': {type(seq_col)}. Should be string pointing to column of poses.df. For more info, visit the documentation! Current parameter chains: {seq_col}")
+
+    def _output_df(self, poses: Poses, work_dir: str) -> pd.DataFrame:
+        out_df = pd.DataFrame({
+            "location": [f"{work_dir}/sequence_added/{poses_description}.fa" for poses_description in list(poses.df["poses_description"])],
+            "description": poses.df["poses_description"].to_list()
+        })
+        return out_df
+
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, sequence: str = None, sequence_col: str = None, insert_idx: int = -1, overwrite: bool = False) -> Poses:
+        '''
+        Parameters:
+        chains: can either be a list that contains chain idx to drop, or a str that points to the column in poses.df that contains this list for every pose.
+        '''
+        # sanity
+        if not all(fp.endswith(".fa") or fp.endswith(".fasta") for fp in poses.poses_list()):
+            raise ValueError(f"Your poses must be .fasta or .fa files. If you would like to remove chains from .pdb files, use the ChainRemover class.")
+        sequence = sequence or self.sequence
+        sequence_col = self._prep_sequence_col(sequence_col or self.sequence_col, poses)
+        _mutually_exclusive(sequence, "sequence", sequence_col, "sequence_col")
+
+        # prep parameters
+        sequence_col = self._prep_sequence_col(sequence_col or self.sequence_col, poses)
+        sequences = [sequence for _ in poses.poses_list()] if sequence else sequence_col
+
+        # setup work_dir
+        work_dir, jobstarter = self.generic_run_setup(
+            poses=poses,
+            prefix=prefix,
+            jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
+        )
+
+        # check if outputs exist
+        if self._outputs_exist(poses, work_dir) and not overwrite:
+            out_df = self._output_df(poses, work_dir)
+            return RunnerOutput(poses, out_df, prefix).return_poses()
+
+        # write json files for jobstarters
+        input_dict = {pose: {"insert_idx": insert_idx, "seq": sequence} for pose, sequence in zip(poses.poses_list(), sequences)}
+        split_poses = split_list(list(input_dict.keys()), n_sublists=jobstarter.max_cores) # splits list into nested sublists
+        input_json_list = []
+        for i, poses_l in enumerate(split_poses, start=1):
+            sublist_dict = {os.path.abspath(pose): input_dict[pose] for pose in poses_l}
+            fp = f"{work_dir}/sequence_adder_{str(i).zfill(4)}.json"
+            self._write_json(sublist_dict, fp)
+            input_json_list.append(fp)
+
+        # write cmd
+        script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/add_sequence_batch.py"
         cmds = [f"{self.python}/python3 {script_path} --input_json {input_json} --output_dir {work_dir}" for input_json in input_json_list]
 
         # execute with jobstarter
