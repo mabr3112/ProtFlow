@@ -248,7 +248,7 @@ class ProtParam(Runner):
         # write commands
         cmds = []
         for json in json_files:
-            cmds.append(f"{self.python} {script_dir}/run_protparam.py --input_json {json} --output_path {os.path.splitext(json)[0]}_out.json --pH {pH}")
+            cmds.append(f"{self.python} {__file__} --input_json {json} --output_path {os.path.splitext(json)[0]}_out.json --pH {pH}")
 
         # run command
         jobstarter.start(
@@ -272,3 +272,33 @@ class ProtParam(Runner):
         # create standardised output for poses class:
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
         return output.return_poses()
+
+def main(args):
+
+    in_df = pd.read_json(args.input_json)
+    out_df = []
+    for i, series in in_df.iterrows():
+        params = determine_protparams(seq=series['sequence'], pH=args.pH)
+        params['description'] = series['name']
+        out_df.append(params)
+    out_df = pd.concat(out_df)
+    out_df.reset_index(drop=True, inplace=True)
+    out_df.to_json(args.output_path)
+
+
+if __name__ == "__main__":
+    import argparse
+    import pandas as pd
+    from protflow.utils.biopython_tools import determine_protparams
+
+    # setup args
+    argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # options
+    argparser.add_argument("--input_json", type=str, help=".json formatted input file. should contain one column called 'name' and one column called 'sequence'.")
+    argparser.add_argument("--output_path", type=str, help="path were output .json file is saved.")
+    argparser.add_argument("--pH", type=float, default=7, help="pH for charge calculation")
+
+    args = argparser.parse_args()
+
+    main(args)

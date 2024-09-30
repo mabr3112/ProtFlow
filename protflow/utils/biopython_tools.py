@@ -654,7 +654,7 @@ def load_sequence_from_fasta(fasta:str, return_multiple_entries:bool=True):
         return next(records)
     return records
 
-def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], pH: float = 7):
+def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], pH: float = 7) -> pd.DataFrame:
     """
     Calculate protein features based on a sequence.
 
@@ -719,16 +719,16 @@ def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], 
 
     # create data dict
     data = {
-        "sequence": seq,
-        "molecular_weight": round(protparams.molecular_weight(), 3),
-        "aromaticity": round(protparams.aromaticity(), 4),
-        "GRAVY": round(protparams.gravy(), 4),
-        "instability_index": protparams.instability_index(),
-        "isoelectric_point": round(protparams.isoelectric_point(), 2),
-        "molar_extinction_coefficient_red": protparams.molar_extinction_coefficient()[0],
-        "molar_extinction_coefficient_ox": protparams.molar_extinction_coefficient()[1],
-        "secondary_structure_fraction": protparams.secondary_structure_fraction(),
-        f"charge_at_pH_{pH}": round(protparams.charge_at_pH(pH=pH), 2)
+        "sequence": [seq],
+        "molecular_weight": [round(protparams.molecular_weight(), 3)],
+        "aromaticity": [round(protparams.aromaticity(), 4)],
+        "GRAVY": [round(protparams.gravy(), 4)],
+        "instability_index": [protparams.instability_index()],
+        "isoelectric_point": [round(protparams.isoelectric_point(), 2)],
+        "molar_extinction_coefficient_red": [protparams.molar_extinction_coefficient()[0]],
+        "molar_extinction_coefficient_ox": [protparams.molar_extinction_coefficient()[1]],
+        "secondary_structure_fraction": [protparams.secondary_structure_fraction()],
+        f"charge_at_pH_{pH}": [round(protparams.charge_at_pH(pH=pH), 2)]
     }
 
     return pd.DataFrame(data)

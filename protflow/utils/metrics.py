@@ -162,7 +162,7 @@ def get_mutation_indeces(wt: str, variant:str) -> list[int]:
     # Find indices where mutations occur (1-based index)
     return list(np.where(wt_arr != variant_arr)[0] + 1)
 
-def calc_rog_of_pdb(pdb_path: str, min_dist: float = 0) -> float:
+def calc_rog_of_pdb(pdb_path: str, min_dist: float = 0, chain: str = None) -> float:
     """
     Calculate the radius of gyration of a protein from a PDB file.
 
@@ -187,9 +187,9 @@ def calc_rog_of_pdb(pdb_path: str, min_dist: float = 0) -> float:
     >>> rog = calc_rog_of_pdb("example.pdb")
     >>> print(rog)
     """
-    return calc_rog(load_structure_from_pdbfile(pdb_path), min_dist=min_dist)
+    return calc_rog(load_structure_from_pdbfile(pdb_path), min_dist=min_dist, chain = chain)
 
-def calc_rog(pose: Structure, min_dist: float = 0) -> float:
+def calc_rog(pose: Structure, min_dist: float = 0, chain: str = None) -> float:
     """
     Calculate the radius of gyration of a protein's alpha carbons.
 
@@ -223,7 +223,10 @@ def calc_rog(pose: Structure, min_dist: float = 0) -> float:
     >>> print(rog)
     """
     # get CA coordinates and calculate centroid
-    ca_coords = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.id == "CA"])
+    if chain:
+        ca_coords = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.id == "CA" and atom.get_parent().get_parent().id == chain])
+    else:
+        ca_coords = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.id == "CA"])
     centroid = np.mean(ca_coords, axis=0)
 
     # calculate average distance of CA atoms to centroid
