@@ -1629,6 +1629,8 @@ class Poses:
 
         # make sure there are still poses left in the Poses class.
         if len(filter_df) == 0:
+            if reject_zero:
+                raise ValueError(f"None of your poses pass the filter {score_col}{operator}{value}. This filter operation removes all poses from your poses.df! Either choose a less stringent filter, or set the parameter 'reject_zero=False'.")
             logging.warning(f"All poses removed from Poses object. No pose fullfills the filtering criterium {operator} {value} for score {score_col}")
         logging.info(f"Filtered poses from {orig_len} to {len(filter_df.index)} poses.")
 

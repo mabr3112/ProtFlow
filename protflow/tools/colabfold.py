@@ -532,7 +532,6 @@ def collect_scores(work_dir: str, num_return_poses: int = 1) -> pd.DataFrame:
 
     return scores_df
 
-
 def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, binder_start:int, binder_end:int, target_start:int, target_end:int) -> Poses:
     # TODO: write documentation
     # calculates interaction paes from colabfold predictions
