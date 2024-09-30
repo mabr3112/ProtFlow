@@ -540,13 +540,13 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
     def calculate_interaction_pae(pae_list:list, binder_start:int, binder_end:int, target_start:int, target_end:int):
         paes = pd.DataFrame(pae_list)
         paes = paes.to_numpy()
-        pae_interaction1 = np.mean(pae[binder_start:binder_end, target_start:target_end])
-        pae_interaction2 = np.mean(pae[target_start:target_end, binder_start:binder_end])
+        pae_interaction1 = np.mean(paes[binder_start:binder_end, target_start:target_end])
+        pae_interaction2 = np.mean(paes[target_start:target_end, binder_start:binder_end])
         pae_binder = pae_binder = np.mean(paes[binder_start:binder_end, binder_start:binder_end])
         pae_target = np.mean(paes[target_start:target_end, target_start:target_end])
         pae_interaction_total = (pae_interaction1 + pae_interaction2) / 2
         return (pae_interaction_total, pae_binder, pae_target)
-    
+
     col_in_df(poses.df, pae_list_col)
     paes_interaction = []
     paes_binder = []
@@ -557,9 +557,8 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
         paes_interaction.append(pae_interaction)
         paes_binder.append(pae_binder)
         paes_target.append(pae_target)
-        
+
     poses.df[f"{prefix}_pae_interaction"] = paes_interaction
     poses.df[f"{prefix}_pae_binder"] = paes_binder
     poses.df[f"{prefix}_pae_target"] = paes_target
     return poses
-
