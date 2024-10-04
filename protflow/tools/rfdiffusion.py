@@ -308,6 +308,7 @@ class RFdiffusion(Runner):
         scorefile = os.path.join(work_dir, f"rfdiffusion_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
+            poses.duplicate_poses(f"{poses.work_dir}/{prefix}_multiplexed_input_pdbs/", multiplex_poses)
             poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
             if update_motifs:
                 self.remap_motifs(
@@ -343,7 +344,7 @@ class RFdiffusion(Runner):
         elif multiplex_poses:
             # create multiple copies (specified by multiplex variable) of poses to fully utilize parallel computing:
             poses.duplicate_poses(f"{poses.work_dir}/{prefix}_multiplexed_input_pdbs/", multiplex_poses)
-            self.index_layers += 1
+            #self.index_layers += 1
             cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions= num_diffusions) for pose, pose_opts in zip(poses.poses_list(), poses.df[f"temp_{prefix}_pose_opts"].to_list())]
         else:
             # write rfdiffusion cmds
@@ -362,9 +363,9 @@ class RFdiffusion(Runner):
 
         # collect RFdiffusion outputs
         scores = collect_scores(work_dir=work_dir, rename_pdbs=True)
-        if fail_on_missing_output_poses == True and len(scores.index) < len(poses.df.index) * num_diffusions:
+        if fail_on_missing_output_poses and len(scores.index) < len(poses.df.index) * num_diffusions:
             raise RuntimeError("Number of output poses is smaller than number of input poses * num_diffusions. Some runs might have crashed!")
-        
+
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -382,7 +383,6 @@ class RFdiffusion(Runner):
             poses.reindex_poses(prefix=f"{prefix}_post_multiplex_reindexing", remove_layers=2, force_reindex=True, overwrite=overwrite)
 
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
-
         return poses
 
     def remap_motifs(self, poses: Poses, motifs: list, prefix: str) -> None:
