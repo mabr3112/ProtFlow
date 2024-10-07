@@ -311,14 +311,31 @@ class Colabfold(Runner):
 
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
-        
+
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
-        
+
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
+    def prep_a3m_for_prediction(self, poses: list[str], fasta_dir: str, max_filenum: int) -> list[str]:
+        """TODO: Write Docstring."""
+        def prep_a3m_dirs(poses: list[str], fasta_dir: str) -> str:
+            '''Copies a3ms together into one directory, returns path to directory'''
+            os.makedirs(os.path.abspath(fasta_dir), exist_ok=True)
+            for pose in poses:
+                shutil.copy(pose, f"{fasta_dir}/")
+            return fasta_dir
+
+        # define the number of input files to generate
+        splitnum = len(poses) if len(poses) < max_filenum else max_filenum
+
+        # split poses into input_lists
+        poses_split = [list(x) for x in np.array_split(poses, int(splitnum))]
+
+        # copy a3m files into subdirectories and return path of subdirectory as "pose"
+        return [prep_a3m_dirs(poses_sublist, os.path.join(fasta_dir, f"/input_{str(i).zfill(4)}")) for i, poses_sublist in enumerate(poses_split)]
 
     def prep_fastas_for_prediction(self, poses: list[str], fasta_dir: str, max_filenum: int) -> list[str]:
         """
@@ -367,6 +384,11 @@ class Colabfold(Runner):
                 f.write("\n".join(fastas))
 
             return path
+
+        # if all inputs are .a3m files, predict them directly
+        if all(pose.endswith(".a3m") for pose in poses):
+            logging.info(f"Predicting poses directly from .a3m files!")
+            return self.prep_a3m_for_prediction(poses, fasta_dir, max_filenum)
 
         # determine how to split the poses into <max_gpus> fasta files:
         splitnum = len(poses) if len(poses) < max_filenum else max_filenum
