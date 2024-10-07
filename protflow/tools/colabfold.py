@@ -335,7 +335,7 @@ class Colabfold(Runner):
         poses_split = [list(x) for x in np.array_split(poses, int(splitnum))]
 
         # copy a3m files into subdirectories and return path of subdirectory as "pose"
-        return [prep_a3m_dirs(poses_sublist, os.path.join(fasta_dir, f"/input_{str(i).zfill(4)}")) for i, poses_sublist in enumerate(poses_split)]
+        return [prep_a3m_dirs(poses_sublist, os.path.join(fasta_dir, f"input_{str(i+1).zfill(4)}")) for i, poses_sublist in enumerate(poses_split)]
 
     def prep_fastas_for_prediction(self, poses: list[str], fasta_dir: str, max_filenum: int) -> list[str]:
         """
