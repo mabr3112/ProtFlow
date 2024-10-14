@@ -70,13 +70,14 @@ import pandas as pd
 import Bio
 import Bio.PDB
 from Bio.PDB.Structure import Structure
+from Bio.PDB.Model import Model
 from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 
 # customs
 from protflow.residues import ResidueSelection
 
-def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Bio.PDB.Structure:
+def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Union[Structure, Model]:
     """
     Load a structure from a PDB file using BioPython's PDBParser.
 
