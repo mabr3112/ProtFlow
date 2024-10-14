@@ -406,8 +406,6 @@ class BackboneRMSD(Runner):
 
         This method is designed to streamline the execution of backbone RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze RMSD calculations.
         """
-        # if self.atoms is all, calculate Allatom RMSD.
-
         # prep variables
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
@@ -415,7 +413,11 @@ class BackboneRMSD(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
+        # set up ref_col and check if col contains files:
         ref_col = ref_col or self.ref_col
+        if not all([isinstance(x, str) for x in poses.df[ref_col].values]):
+            raise KeyError(f"Column {ref_col} contains non-string values. First rows: {poses.df[ref_col].head(5)}")
+
         scorefile = f"{work_dir}/{prefix}_rmsd.{poses.storage_format}"
 
         # check if RMSD was calculated if overwrite was not set.
@@ -848,6 +850,8 @@ class MotifRMSD(Runner):
                 return [residue_selection.to_string() if isinstance(residue_selection, ResidueSelection) else residue_selection for residue_selection in poses.df[motif].to_list()]
             elif isinstance(motif, ResidueSelection):
                 return [motif for _ in poses]
+            elif motif is None:
+                raise ValueError(f"No motif was set for motif {motif}. Either provide a string that points to a column in poses.df containing the motifs, or pass a ResidueSelection object as the motif.")
             raise TypeError(f"Unsupportet parameter type for motif: {type(motif)}. Either provide a string that points to a column in poses.df containing the motifs, or pass a ResidueSelection object.")
 
         # use class default if parameters were not set and setup parameters:

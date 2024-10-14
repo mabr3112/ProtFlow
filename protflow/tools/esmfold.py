@@ -264,7 +264,7 @@ class ESMFold(Runner):
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
-        
+
         logging.info(f"Running {self} in {work_dir} on {len(poses.df.index)} poses.")
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip ESMFold.
