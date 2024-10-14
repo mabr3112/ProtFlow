@@ -311,14 +311,31 @@ class Colabfold(Runner):
 
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
-        
+
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
-        
+
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
+    def prep_a3m_for_prediction(self, poses: list[str], fasta_dir: str, max_filenum: int) -> list[str]:
+        """TODO: Write Docstring."""
+        def prep_a3m_dirs(poses: list[str], fasta_dir: str) -> str:
+            '''Copies a3ms together into one directory, returns path to directory'''
+            os.makedirs(os.path.abspath(fasta_dir), exist_ok=True)
+            for pose in poses:
+                shutil.copy(pose, f"{fasta_dir}/")
+            return fasta_dir
+
+        # define the number of input files to generate
+        splitnum = len(poses) if len(poses) < max_filenum else max_filenum
+
+        # split poses into input_lists
+        poses_split = [list(x) for x in np.array_split(poses, int(splitnum))]
+
+        # copy a3m files into subdirectories and return path of subdirectory as "pose"
+        return [prep_a3m_dirs(poses_sublist, os.path.join(fasta_dir, f"input_{str(i+1).zfill(4)}")) for i, poses_sublist in enumerate(poses_split)]
 
     def prep_fastas_for_prediction(self, poses: list[str], fasta_dir: str, max_filenum: int) -> list[str]:
         """
@@ -367,6 +384,11 @@ class Colabfold(Runner):
                 f.write("\n".join(fastas))
 
             return path
+
+        # if all inputs are .a3m files, predict them directly
+        if all(pose.endswith(".a3m") for pose in poses):
+            logging.info(f"Predicting poses directly from .a3m files!")
+            return self.prep_a3m_for_prediction(poses, fasta_dir, max_filenum)
 
         # determine how to split the poses into <max_gpus> fasta files:
         splitnum = len(poses) if len(poses) < max_filenum else max_filenum
@@ -470,8 +492,6 @@ def collect_scores(work_dir: str, num_return_poses: int = 1) -> pd.DataFrame:
         takes list of .json files from af2_predictions and collects scores (mean_plddt, max_plddt, etc.)
         '''
         # no statistics to calculate if only one model was used:
-        print(input_tuple_list)
-        print(len(input_tuple_list))
         if len(input_tuple_list) == 1:
             json_path, input_pdb = input_tuple_list[0]
             df = summarize_af2_json(json_path, input_pdb)
@@ -534,7 +554,6 @@ def collect_scores(work_dir: str, num_return_poses: int = 1) -> pd.DataFrame:
 
     return scores_df
 
-
 def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, binder_start:int, binder_end:int, target_start:int, target_end:int) -> Poses:
     # TODO: write documentation
     # calculates interaction paes from colabfold predictions
@@ -542,13 +561,13 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
     def calculate_interaction_pae(pae_list:list, binder_start:int, binder_end:int, target_start:int, target_end:int):
         paes = pd.DataFrame(pae_list)
         paes = paes.to_numpy()
-        pae_interaction1 = np.mean(pae[binder_start:binder_end, target_start:target_end])
-        pae_interaction2 = np.mean(pae[target_start:target_end, binder_start:binder_end])
+        pae_interaction1 = np.mean(paes[binder_start:binder_end, target_start:target_end])
+        pae_interaction2 = np.mean(paes[target_start:target_end, binder_start:binder_end])
         pae_binder = pae_binder = np.mean(paes[binder_start:binder_end, binder_start:binder_end])
         pae_target = np.mean(paes[target_start:target_end, target_start:target_end])
         pae_interaction_total = (pae_interaction1 + pae_interaction2) / 2
         return (pae_interaction_total, pae_binder, pae_target)
-    
+
     col_in_df(poses.df, pae_list_col)
     paes_interaction = []
     paes_binder = []
@@ -559,9 +578,8 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
         paes_interaction.append(pae_interaction)
         paes_binder.append(pae_binder)
         paes_target.append(pae_target)
-        
+
     poses.df[f"{prefix}_pae_interaction"] = paes_interaction
     poses.df[f"{prefix}_pae_binder"] = paes_binder
     poses.df[f"{prefix}_pae_target"] = paes_target
     return poses
-

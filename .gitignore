@@ -168,3 +168,4 @@ examples/rfdiffusion_mpnn_esm_output/
 protslurm/config.py
 config.py
 manuscript
+config_copy.py
