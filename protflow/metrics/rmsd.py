@@ -545,7 +545,7 @@ class MotifRMSD(Runner):
 
     The MotifRMSD class is intended for researchers and developers who need to perform RMSD calculations for specific motifs as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, atoms: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False):
+    def __init__(self, ref_col: str = None, target_motif: str = None, ref_motif: str = None, atoms: list[str] = None, return_superimposed_poses: bool = False, jobstarter: JobStarter = None, overwrite: bool = False):
         """
         Initialize the MotifRMSD class.
 
@@ -598,6 +598,7 @@ class MotifRMSD(Runner):
         self.set_target_motif(target_motif)
         self.set_ref_motif(ref_motif)
         self.set_atoms(atoms)
+        self.set_return_superimposed_poses(return_superimposed_poses)
 
     def __str__(self):
         return "Heavyatom motif rmsd calculator"
@@ -628,6 +629,10 @@ class MotifRMSD(Runner):
         '''Method to set reference motif. :motif: has to be string and should be a column name in poses.df that will be passed to the .run() function'''
         self.ref_motif = motif
 
+    def set_return_superimposed_poses(self, return_superimposed_poses: bool) -> None:
+        '''Method to set if superimposed poses should be returned. :return_superimposed_poses: has to be bool'''
+        self.return_superimposed_poses = return_superimposed_poses
+
     def set_jobstarter(self, jobstarter: str) -> None:
         """
         Set the jobstarter configuration for the MotifRMSD runner.
@@ -644,7 +649,7 @@ class MotifRMSD(Runner):
             raise ValueError(f"Unsupported type {type(jobstarter)} for parameter :jobstarter:. Has to be of type JobStarter!")
 
     ################################################# Calcs ################################################
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, atoms: list[str] = None, overwrite: bool = False):
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, ref_col: str = None, ref_motif: Any = None, target_motif: Any = None, atoms: list[str] = None, return_superimposed_poses: bool = False, overwrite: bool = False):
         """
         Calculate the motif-specific RMSD for given poses and jobstarter configuration.
 
@@ -658,6 +663,7 @@ class MotifRMSD(Runner):
             ref_motif (Any, optional): The reference motif for RMSD calculations. Defaults to None.
             target_motif (Any, optional): The target motif for RMSD calculations. Defaults to None.
             atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to None.
+            return_superimposed_poses (bool, optional): If True, return superimposed poses as new poses.
             overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
 
         Returns:
@@ -711,6 +717,7 @@ class MotifRMSD(Runner):
         ref_col = ref_col or self.ref_col
         ref_motif = ref_motif or self.ref_motif
         target_motif = target_motif or self.target_motif
+        return_superimposed_poses = return_superimposed_poses or self.return_superimposed_poses
 
         # setup runner
         script_path = f"{script_dir}/calc_heavyatom_rmsd_batch.py"
@@ -758,8 +765,11 @@ class MotifRMSD(Runner):
         atoms = atoms or self.atoms
         atoms_str = "" if atoms is None else f"--atoms '{','.join(atoms)}'"
 
+        # setup pose superimposition
+        super_str = "--return_superimposed_poses" if return_superimposed_poses else ""
+
         # start add_chains_batch.py
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {super_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,

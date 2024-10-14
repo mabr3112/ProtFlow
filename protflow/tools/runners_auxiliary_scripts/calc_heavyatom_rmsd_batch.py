@@ -1,6 +1,7 @@
 '''Auxiliary Script to calculate heavy-atom RMSDs based on .pdb inputs.'''
 # imports
 import json
+import os
 
 # dependencies
 import Bio.PDB
@@ -10,9 +11,10 @@ from Bio.PDB.Structure import Structure
 
 # customs
 from protflow.residues import ResidueSelection
-from protflow.utils.biopython_tools import get_atoms, get_atoms_of_motif, load_structure_from_pdbfile
+from protflow.utils.biopython_tools import get_atoms, get_atoms_of_motif, load_structure_from_pdbfile, save_structure_to_pdbfile
+from protflow.poses import description_from_path
 
-def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_atoms: ResidueSelection = None, target_atoms: ResidueSelection = None, atom_list: list[str] = None) -> Structure:
+def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_atoms: ResidueSelection = None, target_atoms: ResidueSelection = None, atom_list: list[str] = None, output_superimposed:bool=False) -> Structure:
     '''Superimposes :mobile: onto :target: based on provided :mobile_atoms: and :target_atoms: If no atoms are given, superimposition is based on Structure CA.'''
     # if no motif is specified, superimpose on protein backbones.
     if (mobile_atoms is None and target_atoms is None):
@@ -41,7 +43,10 @@ def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_ato
             tar = target.id
         raise ValueError(f"mobile_atoms of {mob} and target_atoms of {tar} differ in length. mobile_atoms:\n{mobile_atms}\ntarget_atoms\n{target_atms}") from exc
 
-    return super_imposer.rms
+    if output_superimposed:
+        super_imposer.apply(mobile.get_atoms())
+
+    return super_imposer.rms, mobile
 
 def parse_input_json(json_path: str) -> dict:
     '''Parses json input for calc_heavyatom_rmsd_batch.py'''
@@ -76,17 +81,24 @@ def main(args):
     df_dict = {"description": [], "location": [], "rmsd": []}
     for target in target_dict:
         opts = target_dict[target]
-        rms = motif_superimpose_calc_rmsd(
-            mobile = load_structure_from_pdbfile(opts["ref_pdb"]),
-            target = load_structure_from_pdbfile(target),
+        rms, superimposed = motif_superimpose_calc_rmsd(
+            mobile = load_structure_from_pdbfile(target),
+            target = load_structure_from_pdbfile(opts["ref_pdb"]),
             mobile_atoms = ResidueSelection(opts["reference_motif"]),
             target_atoms = ResidueSelection(opts["target_motif"]),
-            atom_list = atoms
+            atom_list = atoms,
+            output_superimposed=args.return_superimposed_pose
         )
 
+        # write superimposed structure to file
+        if args.return_superimposed_pose:
+            path = os.path.join(os.path.dirname(args.output_path), "superimposed", f"{description_from_path(target)}.pdb")
+            save_structure_to_pdbfile(superimposed, save_path=path)
+
+
         # collect data
-        df_dict['description'].append(target.rsplit("/", maxsplit=1)[-1].rsplit(".", maxsplit=1)[0])
-        df_dict['location'].append(target)
+        df_dict['description'].append(description_from_path(target))
+        df_dict['location'].append(path if args.return_superimposed_pose else target)
         df_dict['rmsd'].append(rms)
 
     # store scores in .json DataFrame
@@ -103,6 +115,7 @@ if __name__ == "__main__":
 
     # optional args
     argparser.add_argument("--atoms", type=str, default=None, help="List of atoms to calculate RMSD over. If nothing is specified, all heavy-atoms are taken.")
+    argparser.add_argument("--return_superimposed_pose", action="store_true", help="Return the superimposed pose.")
 
     # output
     argparser.add_argument("--output_path", type=str, default="heavyatom_rmsd.json")
