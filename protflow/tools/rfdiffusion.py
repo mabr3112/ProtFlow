@@ -296,6 +296,7 @@ class RFdiffusion(Runner):
         # log number of diffusions per backbone
         if multiplex_poses:
             logging.info(f"Total number of diffusions per input pose: {multiplex_poses * num_diffusions}")
+            self.index_layers = 2
         else:
             logging.info(f"Total number of diffusions per input pose: {num_diffusions}")
 
@@ -414,8 +415,8 @@ class RFdiffusion(Runner):
         for motif_col in motifs:
             poses.df[motif_col] = update_motif_res_mapping(
                 poses.df[motif_col].to_list(),
-                poses.df[f"{prefix}_con_ref_pdb_idx"].to_list(),
-                poses.df[f"{prefix}_con_hal_pdb_idx"].to_list()
+                poses.df[f"{prefix}_complex_con_ref_pdb_idx"].to_list(),
+                poses.df[f"{prefix}_complex_con_hal_pdb_idx"].to_list()
             )
 
     def write_cmd(self, pose: str, options: str, pose_opts: str, output_dir: str, num_diffusions: int=1) -> str:
@@ -612,7 +613,7 @@ def parse_diffusion_trbfile(path: str) -> pd.DataFrame:
     sd["perres_plddt"] = [last_plddts]
 
     # instantiate scoresdict and start collecting:
-    scoreterms = ["con_hal_pdb_idx", "con_ref_pdb_idx", "sampled_mask"]
+    scoreterms = ["con_hal_pdb_idx", "con_ref_pdb_idx", "complex_con_hal_pdb_idx", "complex_con_ref_pdb_idx", "sampled_mask"]
     for st in scoreterms:
         sd[st] = [data_dict[st]]
 

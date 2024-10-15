@@ -1546,7 +1546,7 @@ class Poses:
         logging.info(f"Filtering completed.")
         return self
 
-    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses":
+    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None, fail_on_empty: bool = True) -> "Poses":
         """
         Filters poses based on a specified value in a score column, with options to generate plots.
 
@@ -1629,9 +1629,9 @@ class Poses:
 
         # make sure there are still poses left in the Poses class.
         if len(filter_df) == 0:
-            if reject_zero:
-                raise ValueError(f"None of your poses pass the filter {score_col}{operator}{value}. This filter operation removes all poses from your poses.df! Either choose a less stringent filter, or set the parameter 'reject_zero=False'.")
             logging.warning(f"All poses removed from Poses object. No pose fullfills the filtering criterium {operator} {value} for score {score_col}")
+            if fail_on_empty:
+                raise ValueError(f"None of your poses pass the filter {score_col}{operator}{value}. This filter operation removes all poses from your poses.df! Either choose a less stringent filter, or set the parameter 'reject_zero=False'.")
         logging.info(f"Filtered poses from {orig_len} to {len(filter_df.index)} poses.")
 
         # save filtered dataframe if prefix is provided

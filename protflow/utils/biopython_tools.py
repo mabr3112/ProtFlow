@@ -62,19 +62,22 @@ Markus Braun, Adrian Tripp
 import copy
 import os
 from typing import Union
+import Bio.PDB.Model
+import Bio.PDB.Structure
 import pandas as pd
 
 # dependencies
 import Bio
 import Bio.PDB
 from Bio.PDB.Structure import Structure
+from Bio.PDB.Model import Model
 from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 
 # customs
 from protflow.residues import ResidueSelection
 
-def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Bio.PDB.Structure:
+def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Union[Structure, Model]:
     """
     Load a structure from a PDB file using BioPython's PDBParser.
 
@@ -125,7 +128,7 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
         return pdb_parser.get_structure(handle, path_to_pdb)
     return pdb_parser.get_structure(handle, path_to_pdb)[model]
 
-def save_structure_to_pdbfile(pose: Structure, save_path: str) -> None:
+def save_structure_to_pdbfile(pose: Structure, save_path: str, multimodel: bool = False) -> None:
     """
     Save a BioPython structure object to a PDB file.
 
@@ -137,7 +140,8 @@ def save_structure_to_pdbfile(pose: Structure, save_path: str) -> None:
         The BioPython `Structure` object to be saved.
     save_path : str
         The file path where the PDB file will be written. The file will be created if it does not exist, or overwritten if it does.
-
+    multimodel : bool
+        If the structure to be saved is a multimodel PDB file, write all models. Only works if input is a Structure object, not a model!
     Returns:
     --------
     None
@@ -163,6 +167,20 @@ def save_structure_to_pdbfile(pose: Structure, save_path: str) -> None:
         # Save the structure to a new PDB file
         save_structure_to_pdbfile(structure, "output.pdb")
     """
+    
+    if multimodel:
+        if not isinstance(pose, Structure):
+            raise TypeError(f"Input pose must be a BioPython Structure, not {type(pose)}!")
+        for model in pose.get_models():
+            model.serial_num = model.id
+        io = Bio.PDB.PDBIO(use_model_flag=True)
+
+        if os.path.exists(save_path):
+            os.remove(save_path)
+        with open(save_path, 'a') as f:
+            io.set_structure(pose)
+            io.save(f)
+        
     io = Bio.PDB.PDBIO()
     io.set_structure(pose)
     io.save(save_path)
