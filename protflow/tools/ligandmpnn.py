@@ -187,7 +187,7 @@ class LigandMPNN(Runner):
     def __str__(self):
         return "ligandmpnn.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = None, model_type: str = None, options: str = None, pose_options: object = None, fixed_res_col: str = None, design_res_col: str = None, pose_opt_cols: dict = None, return_seq_threaded_pdbs_as_pose: bool = False, preserve_original_output: bool = False, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = 1, model_type: str = None, options: str = None, pose_options: object = None, fixed_res_col: str = None, design_res_col: str = None, pose_opt_cols: dict = None, return_seq_threaded_pdbs_as_pose: bool = False, preserve_original_output: bool = False, overwrite: bool = False) -> Poses:
         """
         Execute the LigandMPNN process with given poses and jobstarter configuration.
 
@@ -197,7 +197,7 @@ class LigandMPNN(Runner):
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            nseq (int, optional): The number of sequences to generate for each input pose. Defaults to None.
+            nseq (int, optional): The number of sequences to generate for each input pose. Defaults to 1.
             model_type (str, optional): The type of model to use. Defaults to 'ligand_mpnn'.
             options (str, optional): Additional options for the LigandMPNN script. Defaults to None.
             pose_options (object, optional): Pose-specific options for the LigandMPNN script. Defaults to None.
