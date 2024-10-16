@@ -686,3 +686,29 @@ def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
     if flags and len(flags) > 1:
         out_str += f" {sep}" + f" {sep}".join(flags)
     return out_str
+
+def prepend_cmd(cmds: list[str], pre_cmd: str) -> list[str]:
+    """
+    Prepends a single command to all commands in a list.
+
+    Parameters
+    ----------
+    cmds : list[str]
+        A list of commands, where all elements are strings.
+    pre_cmd : str
+        A string containing a command, which should be prepended to all commands in the commands list.
+
+    Returns
+    -------
+    list[str]
+        A list of all commands with the additional command prepended to each.
+
+    Examples
+    --------
+    >>> cmds = [run_inference.sh pose_0001.pdb, run_inference.sh pose_0002.pdb]
+    >>> pre_cmd = "conda init"
+    >>> prepend_cmd(cmds, pre_cmd)
+    "['conda init; run_inference.sh pose_0001.pdb', 'conda init; run_inference.sh pose_0002.pdb']"
+    """
+    cmds = ["; ".join([pre_cmd, cmd]) for cmd in cmds]
+    return cmds

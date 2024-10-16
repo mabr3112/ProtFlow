@@ -79,7 +79,7 @@ import numpy as np
 import protflow.config
 import protflow.jobstarters
 import protflow.tools
-from protflow.runners import Runner, RunnerOutput
+from protflow.runners import Runner, RunnerOutput, prepend_cmd
 from protflow.poses import Poses, col_in_df
 from protflow.jobstarters import JobStarter
 
@@ -150,7 +150,7 @@ class Colabfold(Runner):
 
     The ColabFold class is intended for researchers and developers who need to perform AlphaFold2 predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.COLABFOLD_SCRIPT_PATH, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = protflow.config.COLABFOLD_SCRIPT_PATH, pre_cmd:str=protflow.config.COLABFOLD_PRE_CMD, jobstarter: str = None) -> None:
         """
         __init__ Method
         ===============
@@ -187,6 +187,7 @@ class Colabfold(Runner):
 
         self.script_path = script_path
         self.name = "colabfold.py"
+        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 
@@ -295,6 +296,10 @@ class Colabfold(Runner):
         cmds = []
         for pose, pose_opt in zip(pose_fastas, pose_options):
             cmds.append(self.write_cmd(pose, output_dir=af2_preds_dir, options=options, pose_options=pose_opt))
+
+        # prepend pre-cmd if defined:
+        if self.pre_cmd:
+            cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
 
         # run
         logging.info(f"Starting AF2 predictions of {len(poses)} sequences on {jobstarter.max_cores} cores.")
