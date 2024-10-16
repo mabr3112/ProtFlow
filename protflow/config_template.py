@@ -6,7 +6,7 @@ PROTFLOW_ENV = "" # "/path/to/mambaforge/envs/protflow/bin/"
 
 # auxiliary runners directory path
 #TODO: @Markus Implement checkup if AUXILIARY_RUNNER_SCRIPTS_DIR points to the correct directory (Think about pointing to protflow directory)!
-AUXILIARY_RUNNER_SCRIPTS_DIR = ""
+AUXILIARY_RUNNER_SCRIPTS_DIR = "" # "/path/to/ProtFlow/protflow/tools/runners_auxiliary_scripts/"
 
 # protein_generator.py
 PROTEIN_GENERATOR_SCRIPT_PATH = ""
@@ -14,7 +14,7 @@ PROTEIN_GENERATOR_SCRIPT_PATH = ""
 # ligandmpnn.py
 LIGANDMPNN_SCRIPT_PATH = "" # "/path/to/LigandMPNN/run.py"
 LIGANDMPNN_PYTHON_PATH = "" # "/path/to/anaconda3/envs/ligandmpnn_env/bin/python3"
-LIGANDMPNN_PRE_CMD = ""
+LIGANDMPNN_PRE_CMD = "" # "echo 'this will be printed before running ligandmpnn'"
 
 # rosetta.py
 ROSETTA_BIN_PATH = "" # "/path/to/Rosetta/main/source/bin/"
