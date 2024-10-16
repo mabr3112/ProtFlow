@@ -81,9 +81,7 @@ from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 import protflow.config
 from protflow.residues import ResidueSelection
-from protflow.runners import Runner, col_in_df
-from protflow.runners import RunnerOutput
-
+from protflow.runners import Runner, RunnerOutput, col_in_df, prepend_cmd
 
 class RFdiffusion(Runner):
     """
@@ -152,7 +150,7 @@ class RFdiffusion(Runner):
 
     The RFdiffusion class is intended for researchers and developers who need to perform RFdiffusion simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.RFDIFFUSION_SCRIPT_PATH, python_path: str = protflow.config.RFDIFFUSION_PYTHON_PATH, jobstarter: JobStarter = None) -> None:
+    def __init__(self, script_path: str = protflow.config.RFDIFFUSION_SCRIPT_PATH, python_path: str = protflow.config.RFDIFFUSION_PYTHON_PATH, pre_cmd : str = protflow.config.RFDIFFUSION_PRE_CMD, jobstarter: JobStarter = None) -> None:
         """
         Initialize the RFdiffusion class.
 
@@ -208,6 +206,7 @@ class RFdiffusion(Runner):
         """
         self.script_path = self.search_path(script_path, "RFDIFFUSION_SCRIPT_PATH")
         self.python_path = self.search_path(python_path, "RFDIFFUSION_PYTHON_PATH")
+        self.pre_cmd = pre_cmd
         self.name = "rfdiffusion.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
@@ -351,6 +350,10 @@ class RFdiffusion(Runner):
         else:
             # write rfdiffusion cmds
             cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions=num_diffusions) for pose, pose_opts in zip(poses.poses_list(), pose_options)]
+
+        # prepend pre-cmd if defined:
+        if self.pre_cmd:
+            cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
 
         # drop temporary pose_opts col
         poses.df.drop([f"temp_{prefix}_pose_opts"], axis=1, inplace=True)

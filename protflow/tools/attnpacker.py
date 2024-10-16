@@ -76,7 +76,7 @@ import protflow.config
 import protflow.jobstarters
 import protflow.tools
 from protflow.poses import Poses
-from protflow.runners import Runner, RunnerOutput
+from protflow.runners import Runner, RunnerOutput, prepend_cmd
 from protflow.jobstarters import JobStarter
 
 class AttnPacker(Runner):
@@ -143,10 +143,11 @@ class AttnPacker(Runner):
 
     The AttnPacker class is intended for researchers and developers who need to perform packing simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.ATTNPACKER_DIR_PATH, python_path: str = protflow.config.ATTNPACKER_PYTHON_PATH, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = protflow.config.ATTNPACKER_DIR_PATH, python_path: str = protflow.config.ATTNPACKER_PYTHON_PATH, pre_cmd : str = protflow.config.ATTNPACKER_PRE_CMD, jobstarter: str = None) -> None:
         '''sbatch_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
         self.script_path = self.search_path(script_path, "ATTNPACKER_DIR_PATH", is_dir=True)
         self.python_path = self.search_path(python_path, "ATTNPACKER_PYTHON_PATH")
+        self.pre_cmd = pre_cmd
         self.name = "attnpacker.py"
         self.jobstarter = jobstarter
         self.index_layers = 1
@@ -239,6 +240,10 @@ class AttnPacker(Runner):
         # write attpacker cmds:
         cmds = [self.write_cmd(json_path, output_dir=os.path.join(work_dir, "output_pdbs")) for json_path in json_paths]
 
+        # prepend pre-cmd if defined:
+        if self.pre_cmd:
+            cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
+            
         # run:
         logging.info(f"Starting attnpacker.py on {len(poses)} poses with {jobstarter.max_cores} cores.")
         jobstarter.start(

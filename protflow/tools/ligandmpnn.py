@@ -85,7 +85,7 @@ import protflow.tools
 import protflow.runners
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
-from protflow.runners import Runner, RunnerOutput, regex_expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string
+from protflow.runners import Runner, RunnerOutput, regex_expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string, prepend_cmd
 
 
 LIGANDMPNN_CHECKPOINT_DICT = {
@@ -159,7 +159,7 @@ class LigandMPNN(Runner):
     -------
     0.1.0
     """
-    def __init__(self, script_path:str=protflow.config.LIGANDMPNN_SCRIPT_PATH, python_path:str=protflow.config.LIGANDMPNN_PYTHON_PATH, jobstarter:JobStarter=None) -> None:
+    def __init__(self, script_path:str=protflow.config.LIGANDMPNN_SCRIPT_PATH, python_path:str=protflow.config.LIGANDMPNN_PYTHON_PATH, pre_cmd:str=protflow.config.LIGANDMPNN_PRE_CMD, jobstarter:JobStarter=None) -> None:
         """
         Initializes the LigandMPNN class.
 
@@ -179,6 +179,7 @@ class LigandMPNN(Runner):
 
         self.script_path = self.search_path(script_path, "LIGANDMPNN_SCRIPT_PATH")
         self.python_path = self.search_path(python_path, "LIGANDMPNN_PYTHON_PATH")
+        self.pre_cmd = pre_cmd
         self.name = "ligandmpnn.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
@@ -186,7 +187,7 @@ class LigandMPNN(Runner):
     def __str__(self):
         return "ligandmpnn.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = None, model_type: str = None, options: str = None, pose_options: object = None, fixed_res_col: str = None, design_res_col: str = None, pose_opt_cols: dict = None, return_seq_threaded_pdbs_as_pose: bool = False, preserve_original_output: bool = False, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = 1, model_type: str = None, options: str = None, pose_options: object = None, fixed_res_col: str = None, design_res_col: str = None, pose_opt_cols: dict = None, return_seq_threaded_pdbs_as_pose: bool = False, preserve_original_output: bool = False, overwrite: bool = False) -> Poses:
         """
         Execute the LigandMPNN process with given poses and jobstarter configuration.
 
@@ -196,7 +197,7 @@ class LigandMPNN(Runner):
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            nseq (int, optional): The number of sequences to generate for each input pose. Defaults to None.
+            nseq (int, optional): The number of sequences to generate for each input pose. Defaults to 1.
             model_type (str, optional): The type of model to use. Defaults to 'ligand_mpnn'.
             options (str, optional): Additional options for the LigandMPNN script. Defaults to None.
             pose_options (object, optional): Pose-specific options for the LigandMPNN script. Defaults to None.
@@ -296,6 +297,10 @@ class LigandMPNN(Runner):
         if run_batch:
             cmds = self.setup_batch_run(cmds, num_batches=jobstarter.max_cores, output_dir=work_dir)
 
+        # prepend pre-cmd if defined:
+        if self.pre_cmd:
+            cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
+            
         # create output directories, LigandMPNN crashes sometimes when multiple processes create the same directory simultaneously (frozen os error)
         for folder in ["backbones", "input_json_files", "packed", "seqs"]:
             os.makedirs(os.path.join(work_dir, folder), exist_ok=True)
