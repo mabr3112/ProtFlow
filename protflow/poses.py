@@ -2559,6 +2559,6 @@ def filter_dataframe_by_value(df: pd.DataFrame, col: str, value: float|int, oper
 
     return filtered_df
 
-def description_from_path(path:str):
-    description = os.path.splitext(os.path.basename(path))[0]
-    return description
+def description_from_path(path: str) -> str:
+    '''Extracts "description" from a pose path.'''
+    return os.path.splitext(os.path.basename(path))[0]

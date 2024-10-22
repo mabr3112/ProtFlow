@@ -48,8 +48,11 @@ Version
 """
 
 # customs
+from typing import Union
+from itertools import product
+
 import protflow.residues
-from protflow.poses import Poses
+from protflow.poses import Poses, col_in_df
 from protflow.residues import ResidueSelection
 from protflow.utils.biopython_tools import load_structure_from_pdbfile
 
@@ -519,3 +522,349 @@ class NotSelector(ResidueSelector):
 
         # select not_selection:
         return all_res - residue_selection
+
+class DistanceSelector(ResidueSelector):
+    """
+    TODO: doc string generation
+    Selects all residues that have a certain distance from another residue.
+
+    This class extends ResidueSelector to allow selection of residues based on distances to other residues
+    from the protein structures contained in a Poses object.
+
+    Attributes:
+        poses (Poses): The Poses object containing the protein structures.
+
+
+    """
+    def __init__(self, center: Union[ResidueSelection, str, list] = None, distance: float = None, operator: str = "<=", poses: Poses = None, center_atoms: Union[list, str] = None, noncenter_atoms: Union[list, str] = None, include_center:bool=False):
+        """
+        Initialize the DistanceSelector with optional Poses object, center, distance, operator, center_atoms and noncenter_atoms).
+
+        Parameters:
+            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.
+            center ([ResidueSelection, str, list], optional): A single ResidueSelector, the name of a poses DataFrame column containing ResidueSelectors or a list of ResidueSelectors. Defaults to None.
+            distance (float, optional): A float value indicating the distance for residue selection. Defaults to None.
+            operator (str, optional): A string indicating the operator that should be used together with :distance: for residue selection. Defaults to '<='.
+            center_atoms ([list, str], optional): A string containing a single atom name or a list of atom names from which distances should be calculated. Defaults to None.
+            noncenter_atoms ([list, str], optional): A string containing a single atom name or a list of atom names to which distances should be calculated. Defaults to None.
+            include_center (bool, optional): Include the center in the output residue selection. Defaults to False.
+
+        Raises:
+            ValueError: If both chain and chains are provided.
+
+        Examples:
+            >>> poses = Poses()
+            >>> selector = ChainSelector(poses=poses, chain='A')
+        """
+
+        super().__init__(poses = poses)
+        self.set_centers(center)
+        self.set_distance(distance)
+        self.set_operator(operator)
+        self.set_center_atoms(center_atoms)
+        self.set_noncenter_atoms(noncenter_atoms)
+        self.set_include_center(include_center)
+
+    def set_centers(self, center: Union[ResidueSelection, str, list] = None) -> None:
+        """
+        Sets centers for the select() method.
+
+        Parameters:
+            center ([ResidueSelection, str, list]): A single ResidueSelection, a list of ResidueSelections or the name of a dataframe column containing ResidueSelections.
+
+        Raises:
+            ValueError: If center is not a single ResidueSelection, a list of ResidueSelections or the name of a dataframe column containing ResidueSelections.
+
+        Examples:
+            >>> selector.set_centers(center="residue_selection_col")
+        """
+        if not isinstance(center, (ResidueSelection, list, str)):
+            raise ValueError("Input to center must be ResidueSelection, a list of ResidueSelections or the name of poses dataframe column containing ResidueSelections!")
+        self.center = center
+
+    def set_include_center(self, include_center:bool=False) -> None:
+        """
+        Sets include_center for the select() method.
+
+        Parameters:
+            include_center (bool, optional): True or False. Default False.
+
+        Raises:
+            ValueError: If center is not a single ResidueSelection, a list of ResidueSelections or the name of a dataframe column containing ResidueSelections.
+
+        Examples:
+            >>> selector.set_include_center(include_center=True)
+        """
+        if not isinstance(include_center, bool):
+            raise ValueError("Input to center must be bool!")
+        self.include_center = include_center
+
+
+    def set_center_atoms(self, center_atoms: Union[str, list] = None) -> None:
+        """
+        Sets centers for the select() method.
+
+        Parameters:
+            center_atoms ([str, list]): A single atom name or a list of atom names. Default is None.
+
+        Raises:
+            ValueError: If centcenter_atomser is not a single atom name or a list of atom names.
+
+        Examples:
+            >>> selector.set_centers(center="residue_selection_col")
+        """
+        if not center_atoms:
+            self.center_atoms = None
+        elif isinstance(center_atoms, str):
+            self.center_atoms = [center_atoms]
+        elif isinstance(center_atoms, list):
+            self.center_atoms = center_atoms
+        else:
+            raise ValueError("Input to center_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
+
+    def set_noncenter_atoms(self, noncenter_atoms: Union[str, list] = None) -> None:
+        """
+        Sets noncenter_atoms for the select() method.
+
+        Parameters:
+            noncenter_atoms ([str, list]): A single atom name or a list of atom names. Default is None.
+
+        Raises:
+            ValueError: If noncenter_atoms is not a single atom name or a list of atom names.
+
+        Examples:
+            >>> selector.set_centers(center="residue_selection_col")
+        """
+        if not noncenter_atoms:
+            self.noncenter_atoms = None
+        elif isinstance(noncenter_atoms, str):
+            self.noncenter_atoms = [noncenter_atoms]
+        elif isinstance(noncenter_atoms, list):
+            self.noncenter_atoms = noncenter_atoms
+        else:
+            raise ValueError("Input to noncenter_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
+        
+    def set_operator(self, operator: str) -> None:
+        """
+        Sets the operator for the select() method.
+
+        Parameters:
+            operator (str): An operator. Must be one of '<', '>', '<=' or '>='.
+
+        Raises:
+            ValueError: If operator is not one of '<', '>', '<=' or '>='..
+
+        Examples:
+            >>> selector.set_operator(operator="<")
+        """
+        if not operator in ["<", ">", "<=", ">="]:
+            raise ValueError(f"Operator must be '<', '>', '<=' or '>='!")
+        else:
+            self.operator = operator
+        
+    def extract_center(self, center: Union[ResidueSelection, str, list], poses: Poses) -> list:
+        """
+        Extracts centers from input.
+
+        Parameters:
+            center ([ResidueSelection, str, list]): A single ResidueSelection, a list of ResidueSelections or the name of a dataframe column containing ResidueSelections.
+            poses (Poses): A poses object.
+        Raises:
+            ValueError: If center is not a single ResidueSelection, a list of ResidueSelections or the name of a dataframe column containing ResidueSelections.
+            ValueError: If the length of the input ResidueSelections is different to the number of poses.
+
+        Examples:
+            >>> selector.set_centers(center="residue_selection_col")
+        """
+        if isinstance(center, str):
+            # read in center from poses dataframe column
+            col_in_df(poses.df, center)
+            centers = self.poses.df[center].to_list()
+        elif isinstance(center, list):
+            # use poses from list
+            centers = center
+        elif isinstance(center, ResidueSelection):
+            # use input residue selection
+            centers = [center for _ in poses.poses_list()]
+        if any(not isinstance(sel, ResidueSelection) for sel in centers) or not isinstance(center, (ResidueSelection, list, str)):
+            raise ValueError(f"Input to center must be ResidueSelection, a list of ResidueSelections or the name of poses dataframe column containing ResidueSelections, not {type(center)}!")
+        return centers
+
+    def set_distance(self, distance: float=None) -> None:
+        """
+        Sets distance for the select() method.
+
+        Parameters:
+            distance (float, optional): A float value. Default None
+
+        Raises:
+            ValueError: If distance is not a single float value.
+
+        Examples:
+            >>> selector.set_distance(distance=8.4)
+        """
+        if not distance:
+            self.distance = None
+        elif isinstance(distance, (float, int)):
+            self.distance = distance
+        else:
+            raise ValueError("Input to distance must be a float!")
+
+    def select(self, prefix: str, poses: Poses = None, center: Union[ResidueSelection, str, list] = None, distance: float = None, operator: str = None, center_atoms: Union[str, list[str]] = None, noncenter_atoms: Union[str, list[str]] = None, include_center:bool=False) -> None:
+        """
+        Selects all residues with a certain distance from center for all poses in a Poses object.
+
+        Selected residues are added as ResidueSelection objects under the column `prefix` in Poses.df.
+
+        Parameters:
+            prefix (str): The name of the column that will be added to Poses.df.
+            poses (Poses, optional): The Poses object containing the protein structures. Defaults to None.
+            center ([ResidueSelection, str, list], optional): A single ResidueSelector, the name of a poses DataFrame column containing ResidueSelectors or a list of ResidueSelectors. Defaults to None.
+            distance (float, optional): A float value indicating the distance for residue selection. Defaults to None.
+            operator (str, optional): A string indicating the operator that should be used together with :distance: for residue selection. Defaults to None.
+            center_atoms ([list, str], optional): A string containing a single atom name or a list of atom names from which distances should be calculated. Defaults to None.
+            noncenter_atoms ([list, str], optional): A string containing a single atom name or a list of atom names to which distances should be calculated. Defaults to None.
+            include_center (bool, optional): Include the center in the output residue selection. Defaults to False.
+
+        Raises:
+            ValueError: If no poses are provided or set in the instance.
+            ValueError: If no distance is provided or set in the instance.
+            ValueError: If no operator is provided or set in the instance.
+            ValueError: If no center is provided or set in the instance.
+            ValueError: If center_atoms or noncenter_atoms is not a string or a list of strings.
+
+        Examples:
+            >>> selector.select(prefix='selected_chain_A', chain='A')
+        """
+        poses.check_prefix(prefix)
+        if not (poses := poses or self.poses):
+            raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
+
+        if not (distance := distance or self.distance): 
+            raise ValueError(f"You must set a distance for your .select() method. Either with :distance: parameter of .select() or the ResidueSelector.set_distance() method to the class.")
+
+        if not (operator := operator or self.operator):
+            raise ValueError(f"You must set an operator for your .select() method. Either with :operator: parameter of .select() or the ResidueSelector.set_operator() method to the class.")
+
+        include_center = include_center or self.include_center
+
+        # pick class center if center is not set
+        if not (center := center or self.center): 
+            raise ValueError(f"You must set a center for your .select() method. Either with :center: parameter of .select() or the ResidueSelector.set_center() method to the class.")
+        centers = self.extract_center(center, poses)
+
+        if not len(centers) == len(poses.poses_list()):
+            raise ValueError(f"Number of input ResidueSelections ({len(center)}) must be the same as the number of poses ({len(self.poses.poses_list())})!")
+
+        center_atoms = center_atoms or self.center_atoms
+        if isinstance(center_atoms, str):
+            center_atoms = [center_atoms]
+        elif isinstance(center_atoms, list):
+            center_atoms = center_atoms
+        elif center_atoms:
+            raise ValueError("Input to center_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
+        
+        noncenter_atoms = noncenter_atoms or self.noncenter_atoms
+        if isinstance(noncenter_atoms, str):
+            noncenter_atoms = [noncenter_atoms]
+        elif isinstance(noncenter_atoms, list):
+            noncenter_atoms = noncenter_atoms
+        elif noncenter_atoms:
+            raise ValueError("Input to neighbor_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
+
+        # select Residues
+        poses.df[prefix] = [self.select_single(pose_path=pose, center=center, distance=distance, operator=operator, center_atoms=center_atoms, noncenter_atoms=noncenter_atoms, include_center=include_center) for pose, center in zip(poses.poses_list(), centers)]
+
+    def select_single(self, pose_path: str, center: ResidueSelection, distance: float, operator: str, center_atoms: list = None, noncenter_atoms: list = None, include_center: bool = False) -> ResidueSelection: # pylint: disable=W0221
+        """
+        Selects residues of a given chain of poses and returns them as a ResidueSelection object.
+
+        Parameters:
+            pose_path (str): The file path to the pose structure.
+            center (ResidueSelection): A single ResidueSelection indicating the residues from which distances should be calculated.
+            distance (float): A single float value indicating the distance for residue selection.
+            operator (str): A single string indicating the operator for residue selection.
+            center_atoms (list, optional): A list of atom names for center residues which should be considered for distance calculation.
+            noncenter_atoms (list, optional): A list of atom names for noncenter residues which should be considered for distance calculation.
+            include_center (bool, optional): Include the center in the output residue selection. Defaults to False.
+
+        Returns:
+            ResidueSelection: The selected residues of the pose.
+
+        Raises:
+            KeyError: If specified center ResidueSelection is not found in the pose.
+
+        Examples:
+            >>> selection = selector.select_single(pose_path='path/to/pose.pdb', chains=['A'])
+        """
+        pose = load_structure_from_pdbfile(pose_path)
+
+        # get central residues:
+        center_res = []
+        for chain, resnums in center.to_dict().items():
+            # TODO: stupid selection because model[chain][resnum] does not always work (e.g. for ligands/heteroatoms), check back with future BioPython versions
+            for resnum in resnums:
+                res = [res for res in pose.get_residues() if res.id[1] == resnum and res.parent.id == chain]
+                if len(res) == 0:
+                    raise KeyError(f"Residue {chain}{resnum} not found in pose {pose_path}!")
+                center_res.append(res[0])
+
+        # get all noncenter residues
+        noncenter_res = [res for res in pose.get_residues() if not res.id[1] == resnum or not res.parent.id == chain]
+
+        selected_residues = self._determine_residues_in_distance(central_residues=center_res, noncentral_residues=noncenter_res, distance=distance, operator=operator, center_atoms=center_atoms, noncenter_atoms=noncenter_atoms)
+
+        # convert selected Biopython residues to ResidueSelection object and return
+        if include_center:
+            return ResidueSelection([residue.parent.id + str(residue.id[1]) for residue in selected_residues]) + center
+        else:
+            return ResidueSelection([residue.parent.id + str(residue.id[1]) for residue in selected_residues])
+
+    def _determine_residues_in_distance(self, central_residues: list, noncentral_residues:list, distance:float, operator:str, center_atoms:list=None, noncenter_atoms:list=None) -> list[str]:
+        """
+        Determines residues within distance of central residues.
+
+        Parameters:
+            central_residues (list): A single chain identifier. Defaults to None.
+            noncentral_residues (list): A list of BioPython residues from which distances should be calculated to all other residues.
+            distance (float): A single float value indicating the distance for residue selection.
+            operator (str): A single string indicating the operator for residue selection.
+            center_atoms (list, optional): A list of atom names for center residues which should be considered for distance calculation. Defaults to None.
+            noncenter_atoms (list, optional): A list of atom names for noncenter residues which should be considered for distance calculation. Defaults to None.
+
+        Returns:
+            list[str]: The list of chain identifiers to use for selection.
+
+        Raises:
+            ValueError: If both chain and chains are provided.
+            ValueError: If both self.chain and self.chains are set.
+            ValueError: If no chain identifiers are set.
+
+        Examples:
+            >>> chains = selector.prep_chain_input(chain='A')
+        """
+        # get list of all center atoms
+        if center_atoms:
+            center_atms = [atom for central_res in central_residues for atom in central_res.get_atoms() if atom.id in center_atoms]
+        else:
+            center_atms = [atom for central_res in central_residues for atom in central_res.get_atoms()]
+
+        # get list of all other atoms
+        if noncenter_atoms:
+            noncenter_atms = [atom for noncentral_res in noncentral_residues for atom in noncentral_res.get_atoms() if atom.id in noncenter_atoms]
+        else:
+            noncenter_atms = [atom for noncentral_res in noncentral_residues for atom in noncentral_res.get_atoms()]
+
+        selected = []
+        for center_atm, noncenter_atm in product(center_atms, noncenter_atms):
+            if operator == "<" and center_atm - noncenter_atm < distance:
+                selected.append(noncenter_atm.parent)
+            elif operator == ">" and center_atm - noncenter_atm > distance:
+                selected.append(noncenter_atm.parent)
+            elif operator == ">=" and center_atm - noncenter_atm >= distance:
+                selected.append(noncenter_atm.parent)
+            elif operator == "<=" and center_atm - noncenter_atm <= distance:
+                selected.append(noncenter_atm.parent)
+
+        return list(set(selected))
+        
