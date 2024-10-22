@@ -458,7 +458,7 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
         out_atoms += res_atoms
     return out_atoms
 
-def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = True) -> Structure:
+def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = False) -> Structure:
     """
     Add a chain from a reference structure to a target structure, optionally translating it and handling ID conflicts.
 
