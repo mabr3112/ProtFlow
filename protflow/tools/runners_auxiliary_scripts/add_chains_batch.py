@@ -44,8 +44,6 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
         reference_chains = prep_chains(reference_chains)
         target_atoms = get_atoms(target, atoms=atom_list, chains=target_chains or reference_chains)
         reference_atoms = get_atoms(reference, atoms=atom_list, chains=reference_chains or target_chains)
-    else:
-        raise ValueError(f"Impossible argument setup.")
 
     return target_atoms, reference_atoms
 

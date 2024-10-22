@@ -610,6 +610,8 @@ class LigandMPNN(Runner):
         # define model_checkpoint option:
         if f"checkpoint_{model}" not in opts:
             model_checkpoint_options = f"--checkpoint_{model}={ligandmpnn_dir}/{LIGANDMPNN_CHECKPOINT_DICT[model]}"
+        else:
+            model_checkpoint_options = opts[f"checkpoint_{model}"]
 
         # safety
         logging.debug(f"Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
