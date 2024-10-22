@@ -64,9 +64,8 @@ Creating and manipulating `ResidueSelection` objects:
 
 This module simplifies the process of handling residue selections in bioinformatics workflows, providing a consistent interface for different types of input and output formats.
 """
-
 # imports
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 
 class ResidueSelection:
     """
@@ -244,6 +243,56 @@ class ResidueSelection:
             out_d[chain].append(res_id)
 
         return out_d
+    
+    def to_rfdiffusion_contig(self) -> str:
+        """
+        Parses ResidueSelection object to contig string for RFdiffusion.
+
+        Example:
+            If self.residues = (("A", 1), ("A", 2), ("A", 3), ("C", 4), ("C", 6)),
+            the output will be "A1-3,C4,C6".
+        """
+        # Collect residues per chain
+        chain_residues = defaultdict(list)
+        for chain, resnum in self.residues:
+            chain_residues[chain].append(resnum)
+
+        contig_parts = []
+
+        # Process each chain separately
+        for chain in sorted(chain_residues.keys()):
+            # Sort residue numbers for the chain
+            resnums = sorted(chain_residues[chain])
+
+            # Find consecutive ranges
+            ranges = []
+            start = prev = resnums[0]
+            for resnum in resnums[1:]:
+                if resnum == prev + 1:
+                    # Continue the consecutive range
+                    prev = resnum
+                else:
+                    # End of the current range
+                    if start == prev:
+                        # Single residue
+                        ranges.append(f"{chain}{start}")
+                    else:
+                        # Range of residues
+                        ranges.append(f"{chain}{start}-{prev}")
+                    # Start a new range
+                    start = prev = resnum
+            # Add the last range
+            if start == prev:
+                ranges.append(f"{chain}{start}")
+            else:
+                ranges.append(f"{chain}{start}-{prev}")
+
+            # Add ranges to the contig parts
+            contig_parts.extend(ranges)
+
+        # Combine all parts into the final contig string
+        contig_str = ",".join(contig_parts)
+        return contig_str
 
 def fast_parse_selection(input_selection: tuple[tuple[str, int]]) -> tuple[tuple[str, int]]:
     """
@@ -270,7 +319,7 @@ def fast_parse_selection(input_selection: tuple[tuple[str, int]]) -> tuple[tuple
     (('A', 1), ('B', 2), ('C', 3))
     """
     return input_selection
-    
+
 def parse_from_scorefile(input_selection: dict) -> tuple[tuple[str, int]]:
     if isinstance(input_selection, dict) and "residues" in input_selection:
         return tuple([tuple(sele) for sele in input_selection["residues"]])
