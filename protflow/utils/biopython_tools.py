@@ -57,14 +57,15 @@ Authors
 -------
 Markus Braun, Adrian Tripp
 """
-
 # Imports
 import copy
 import os
 from typing import Union
+import Bio.PDB.Entity
+import numpy as np
+import pandas as pd
 import Bio.PDB.Model
 import Bio.PDB.Structure
-import pandas as pd
 
 # dependencies
 import Bio
@@ -167,20 +168,22 @@ def save_structure_to_pdbfile(pose: Structure, save_path: str, multimodel: bool 
         # Save the structure to a new PDB file
         save_structure_to_pdbfile(structure, "output.pdb")
     """
-    
+    # setup multimodel saving
     if multimodel:
+        # sanity and prep PDBIO for multimodel structure
         if not isinstance(pose, Structure):
             raise TypeError(f"Input pose must be a BioPython Structure, not {type(pose)}!")
         for model in pose.get_models():
             model.serial_num = model.id
         io = Bio.PDB.PDBIO(use_model_flag=True)
 
+        # remove existing garbage and store
         if os.path.exists(save_path):
             os.remove(save_path)
-        with open(save_path, 'a') as f:
+        with open(save_path, 'a', encoding="UTF-8") as f:
             io.set_structure(pose)
             io.save(f)
-        
+
     io = Bio.PDB.PDBIO()
     io.set_structure(pose)
     io.save(save_path)
@@ -415,7 +418,7 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
         out_atoms += res_atoms
     return out_atoms
 
-def add_chain(target: Structure, reference: Structure, copy_chain: str, overwrite: bool = True) -> Structure:
+def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = True) -> Structure:
     """
     Add a specified chain from a reference structure to a target structure.
 
@@ -429,6 +432,8 @@ def add_chain(target: Structure, reference: Structure, copy_chain: str, overwrit
         The BioPython `Structure` object from which the chain will be copied.
     copy_chain : str
         The identifier of the chain to be copied from the reference structure.
+    translate_x : str
+        Specify whether the protein should be translated by {translate_x} on the x-axis. This is useful when setting up multi-state design for LigandMPNN. 
     overwrite : bool, optional
         If True, an existing chain in the target structure with the same identifier will be overwritten. Defaults to True.
 
@@ -462,7 +467,39 @@ def add_chain(target: Structure, reference: Structure, copy_chain: str, overwrit
             target.detach_child(copy_chain)
     target.add(reference[copy_chain])
 
+    if translate_x:
+        translate_entity(target[copy_chain], vector=np.array([translate_x, 0, 0]))
+
     return target
+
+def translate_entity(entity: Bio.PDB.Entity, vector: np.array) -> None:
+    """
+    Translates all atom coordinates in the given entity by the specified vector.
+
+    Parameters:
+    - entity: Bio.PDB.Entity.Entity
+        The entity (Structure, Model, Chain, or Residue) whose coordinates will be translated.
+    - vector: array-like of shape (3,)
+        The translation vector (dx, dy, dz).
+
+    Returns:
+    - None. The entity is modified in place.
+    """
+    # Ensure the vector is a NumPy array
+    vector = np.array(vector, dtype=float)
+
+    # Collect all atoms in the entity
+    atoms = list(entity.get_atoms())
+
+    # Extract all coordinates into a NumPy array
+    coords = np.array([atom.get_coord() for atom in atoms])
+
+    # Apply the translation to all coordinates at once
+    coords += vector
+
+    # Update the atom coordinates
+    for atom, new_coord in zip(atoms, coords):
+        atom.set_coord(new_coord)
 
 ######################## Bio.PDB.Structure.Structure functions ##########################################
 def get_sequence_from_pose(pose: Structure, chain_sep:str=":") -> str:
