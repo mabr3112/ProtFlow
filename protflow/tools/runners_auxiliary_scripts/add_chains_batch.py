@@ -28,22 +28,25 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
     if (target_motif or reference_motif) and (target_chains or reference_chains):
         raise ValueError(f"Both motif and chain are specified for superimposition. Only specify either chain or motif, but not both!")
 
-    # if nothing is specified, do not superimpose!
-    if all((spec is None for spec in [target_motif, reference_motif, target_chains, reference_chains])):
-        target_atoms = None
-        reference_atoms = None
-
     # parsing motifs
     if (target_motif or reference_motif):
         target_atoms = get_atoms_of_motif(target, target_motif or reference_motif, atoms=atom_list)
         reference_atoms = get_atoms_of_motif(reference, reference_motif or target_motif, atoms=atom_list)
 
     # parsing chains
-    if (target_chains or reference_chains):
+    elif (target_chains or reference_chains):
         target_chains = prep_chains(target_chains)
         reference_chains = prep_chains(reference_chains)
         target_atoms = get_atoms(target, atoms=atom_list, chains=target_chains or reference_chains)
         reference_atoms = get_atoms(reference, atoms=atom_list, chains=reference_chains or target_chains)
+
+    # if nothing is specified, do not superimpose!
+    elif all((spec is None for spec in [target_motif, reference_motif, target_chains, reference_chains])):
+        target_atoms = None
+        reference_atoms = None
+
+    else:
+        raise ValueError(f"Impossible parameter combination reached.")
 
     return target_atoms, reference_atoms
 
