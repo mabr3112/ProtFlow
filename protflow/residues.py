@@ -243,7 +243,7 @@ class ResidueSelection:
             out_d[chain].append(res_id)
 
         return out_d
-    
+
     def to_rfdiffusion_contig(self) -> str:
         """
         Parses ResidueSelection object to contig string for RFdiffusion.
