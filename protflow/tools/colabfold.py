@@ -79,7 +79,7 @@ import numpy as np
 import protflow.config
 import protflow.jobstarters
 import protflow.tools
-from protflow.runners import Runner, RunnerOutput
+from protflow.runners import Runner, RunnerOutput, prepend_cmd
 from protflow.poses import Poses, col_in_df
 from protflow.jobstarters import JobStarter
 
@@ -150,7 +150,7 @@ class Colabfold(Runner):
 
     The ColabFold class is intended for researchers and developers who need to perform AlphaFold2 predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.COLABFOLD_SCRIPT_PATH, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = protflow.config.COLABFOLD_SCRIPT_PATH, pre_cmd:str=protflow.config.COLABFOLD_PRE_CMD, jobstarter: str = None) -> None:
         """
         __init__ Method
         ===============
@@ -187,6 +187,7 @@ class Colabfold(Runner):
 
         self.script_path = script_path
         self.name = "colabfold.py"
+        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 
@@ -296,6 +297,10 @@ class Colabfold(Runner):
         for pose, pose_opt in zip(pose_fastas, pose_options):
             cmds.append(self.write_cmd(pose, output_dir=af2_preds_dir, options=options, pose_options=pose_opt))
 
+        # prepend pre-cmd if defined:
+        if self.pre_cmd:
+            cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
+
         # run
         logging.info(f"Starting AF2 predictions of {len(poses)} sequences on {jobstarter.max_cores} cores.")
         jobstarter.start(
@@ -311,14 +316,31 @@ class Colabfold(Runner):
 
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
-        
+
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
-        
+
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
 
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
+    def prep_a3m_for_prediction(self, poses: list[str], fasta_dir: str, max_filenum: int) -> list[str]:
+        """TODO: Write Docstring."""
+        def prep_a3m_dirs(poses: list[str], fasta_dir: str) -> str:
+            '''Copies a3ms together into one directory, returns path to directory'''
+            os.makedirs(os.path.abspath(fasta_dir), exist_ok=True)
+            for pose in poses:
+                shutil.copy(pose, f"{fasta_dir}/")
+            return fasta_dir
+
+        # define the number of input files to generate
+        splitnum = len(poses) if len(poses) < max_filenum else max_filenum
+
+        # split poses into input_lists
+        poses_split = [list(x) for x in np.array_split(poses, int(splitnum))]
+
+        # copy a3m files into subdirectories and return path of subdirectory as "pose"
+        return [prep_a3m_dirs(poses_sublist, os.path.join(fasta_dir, f"input_{str(i+1).zfill(4)}")) for i, poses_sublist in enumerate(poses_split)]
 
     def prep_fastas_for_prediction(self, poses: list[str], fasta_dir: str, max_filenum: int) -> list[str]:
         """
@@ -367,6 +389,11 @@ class Colabfold(Runner):
                 f.write("\n".join(fastas))
 
             return path
+
+        # if all inputs are .a3m files, predict them directly
+        if all(pose.endswith(".a3m") for pose in poses):
+            logging.info(f"Predicting poses directly from .a3m files!")
+            return self.prep_a3m_for_prediction(poses, fasta_dir, max_filenum)
 
         # determine how to split the poses into <max_gpus> fasta files:
         splitnum = len(poses) if len(poses) < max_filenum else max_filenum
@@ -531,7 +558,6 @@ def collect_scores(work_dir: str, num_return_poses: int = 1) -> pd.DataFrame:
     scores_df.drop(['pdb_file', 'json_file'], axis=1, inplace=True)
 
     return scores_df
-
 
 def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, binder_start:int, binder_end:int, target_start:int, target_end:int) -> Poses:
     # TODO: write documentation

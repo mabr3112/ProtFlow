@@ -33,11 +33,6 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
         target_atoms = None
         reference_atoms = None
 
-    # all_atoms is specified, superimpose on all atoms!
-    #if all((spec is None for spec in [target_motif, reference_motif, target_chains, reference_chains])):
-    #    target_atoms = get_atoms(target, atoms=atom_list)
-    #    reference_atoms = get_atoms(reference, atoms=atom_list)
-
     # parsing motifs
     if (target_motif or reference_motif):
         target_atoms = get_atoms_of_motif(target, target_motif or reference_motif, atoms=atom_list)
@@ -47,13 +42,14 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
     if (target_chains or reference_chains):
         target_chains = prep_chains(target_chains)
         reference_chains = prep_chains(reference_chains)
-        if isinstance(target_chains, str):
-            target_chains = [target_chains]
         target_atoms = get_atoms(target, atoms=atom_list, chains=target_chains or reference_chains)
+        reference_atoms = get_atoms(reference, atoms=atom_list, chains=reference_chains or target_chains)
+    else:
+        raise ValueError(f"Impossible argument setup.")
 
     return target_atoms, reference_atoms
 
-def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: str, target_atoms: list = None, reference_atoms: list = None) -> Structure:
+def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: str, target_atoms: list = None, reference_atoms: list = None, translate_x: float = None) -> Structure:
     '''Superimposes :copy_chain: from :reference: onto :target: '''
     # if atoms specified, superimpose:
     if reference_atoms and target_atoms:
@@ -69,11 +65,12 @@ def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: s
         reference = reference,
         target = target,
         copy_chain = copy_chain,
+        translate_x = translate_x
     )
 
     return target_with_chain
 
-def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: str, target_motif: ResidueSelection = None, reference_motif: str = None, target_chains: list[str] = None, reference_chains: list[str] = None, inplace: bool = False, output_dir: str = False, atom_list: list[str] = None) -> str:
+def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: str, target_motif: ResidueSelection = None, reference_motif: str = None, target_chains: list[str] = None, reference_chains: list[str] = None, translate_x: float = None, inplace: bool = False, output_dir: str = False, atom_list: list[str] = None) -> str:
     '''Superimposes a chain onto a .pdb file'''
     # safety
     atom_list = atom_list or ["N", "CA", "O"]
@@ -92,7 +89,7 @@ def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: s
         reference_motif = reference_motif,
         target_chains = target_chains,
         reference_chains = reference_chains,
-        atom_list = atom_list
+        atom_list = atom_list,
     )
 
     # copy chain into target
@@ -102,6 +99,7 @@ def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: s
         copy_chain=copy_chain,
         target_atoms=target_atoms,
         reference_atoms=reference_atoms,
+        translate_x=translate_x
     )
 
     # output
@@ -129,7 +127,8 @@ def parse_input_json(input_json: str) -> dict:
         "reference_motif",
         "target_chains",
         "reference_chains",
-        "atoms"
+        "atoms",
+        "translate_x"
     ]
 
     # parse json file
@@ -164,6 +163,7 @@ def main(args) -> None:
             reference_motif = ResidueSelection(opts["reference_motif"]) if opts["reference_motif"] is not None else None,
             target_chains = opts["target_chains"],
             reference_chains = opts["reference_chains"],
+            translate_x = opts["translate_x"],
             inplace=args.inplace,
             output_dir=args.output_dir
         )

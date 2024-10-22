@@ -81,7 +81,7 @@ from Bio.PDB.Structure import Structure
 import pandas as pd
 
 # customs
-from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.biopython_tools import get_atoms, load_structure_from_pdbfile
 from protflow.utils.utils import vdw_radii
 
 def get_mutations_list(wt: str, variant:str) -> None:
@@ -397,10 +397,6 @@ def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> 
     input_df = input_df.merge(grouped_max, on=ref_col, how='left')
     return input_df
 
-def calc_baker_success(input_df: pd.DataFrame, af2_col: str, bb_rmsd_col: str, motif_rmsd_col: str) -> None:
-    '''Implementation of Baker in silico success score. See RFDiffusion publication for info.'''
-    return NotImplementedError
-
 def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3, atoms: list[str] = None, exclude_ligand_hydrogens: bool = False) -> float:
     """
     Calculate ligand clashes for a PDB file given a ligand chain.
@@ -455,8 +451,10 @@ def calc_ligand_clashes(pose: str|Structure, ligand_chain: str, dist: float = 3,
         pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms])
     else:
         raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
-    if exclude_ligand_hydrogens: ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if not atom.element == "H"])
-    else: ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms()])
+    if exclude_ligand_hydrogens: 
+        ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if not atom.element == "H"])
+    else: 
+        ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms()])
 
     # calculate clashes
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
@@ -505,7 +503,7 @@ def calc_ligand_clashes_vdw(pose: str|Structure, ligand_chain: str, factor: floa
         pose = load_structure_from_pdbfile(pose)
     elif not isinstance(pose, Structure):
         raise ValueError(f"Parameter :pose: has to be of type str or Bio.PDB.Structure.Structure. type(pose) = {type(pose)}")
-    
+
     if exclude_ligand_elements:
         if not isinstance(exclude_ligand_elements, list):
             raise ValueError(f"Parameter:exclude_ligand_atoms: has to be a list of str, not {type(exclude_ligand_elements)}!")
@@ -513,7 +511,7 @@ def calc_ligand_clashes_vdw(pose: str|Structure, ligand_chain: str, factor: floa
 
     # import VdW radii
     vdw_dict = vdw_radii()
-    
+
     # check for ligand chain
     pose_chains = list(chain.id for chain in pose.get_chains())
     if ligand_chain not in pose_chains:
@@ -528,7 +526,7 @@ def calc_ligand_clashes_vdw(pose: str|Structure, ligand_chain: str, factor: floa
         pose_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms])
     else:
         raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
-    
+
     # get ligand atoms
     if exclude_ligand_elements:
         ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if not atom.element.lower() in exclude_ligand_elements])
@@ -545,6 +543,7 @@ def calc_ligand_clashes_vdw(pose: str|Structure, ligand_chain: str, factor: floa
 
     # calculate distance cutoff for each atom pair, considering VdW radii 
     distance_cutoff = pose_vdw[:, np.newaxis] + ligand_vdw[np.newaxis, :]
+
     # multiply distance cutoffs with set parameter
     distance_cutoff = distance_cutoff * factor
 
@@ -621,11 +620,10 @@ def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_
     # return number of contacts
     return np.sum((dgram > min_dist) & (dgram < max_dist)) / len(ligand_atoms)
 
-
 def residue_contacts(pose:str, max_distance:float, target_chain:str, partner_chain:str, target_resnum: int, target_atom_names:list[str]=None, partner_atom_names:list[str]=None, min_distance:float=0, ):
     # TODO: Write proper docstrings!
     # calculates number of atoms on partner_chain that are between max_distance and min_distance from target_atom_names on target_resnum of chain target_chain.
-    
+
     pose = load_structure_from_pdbfile(pose)
     target = pose[target_chain][target_resnum] #[res for res in pose[target_chain].get_residues() if res.get_segid() == target_resnum][0]
     partner = pose[partner_chain]
@@ -638,9 +636,27 @@ def residue_contacts(pose:str, max_distance:float, target_chain:str, partner_cha
         partner_coords = np.array([atom.get_coord() for atom in partner.get_atoms() if atom.id in partner_atom_names])
     else:
         partner_coords = np.array([atom.get_coord() for atom in partner.get_atoms()])
-    
+
     # calculate complete dgram
     dgram = np.linalg.norm(target_coords[:, np.newaxis] - partner_coords[np.newaxis, :], axis=-1)
 
     # return number of contacts
     return np.sum((dgram < max_distance) & (dgram > min_distance))
+
+def calc_interchain_contacts(pose: Structure, chains: list[str,str], contact_bounds: tuple[float,float] = (4,8), atoms: list[str] = None) -> float:
+    '''Calculates contacts between chains in pose'''
+    # get atoms of chains
+    chain_a_atoms = np.array([atom.coord for atom in get_atoms(pose, chains=list(chains[0]), atoms=atoms)])
+    chain_b_atoms = np.array([atom.coord for atom in get_atoms(pose, chains=list(chains[1]), atoms=atoms)])
+
+    # calc dgram
+    dgram = np.linalg.norm(chain_a_atoms[:, np.newaxis] - chain_b_atoms[np.newaxis, :], axis=-1)
+
+    # return number of contacts according to dgram.
+    min_dist, max_dist = contact_bounds
+    return np.sum((dgram > min_dist) & (dgram < max_dist))
+
+def calc_interchain_contacts_pdb(pdb_path: str, chains: list[str,str], contact_bounds: tuple[float,float] = (4,8), atoms: list[str] = None):
+    '''Calculates interchain contacts in pose for .pdb file'''
+    pose = load_structure_from_pdbfile(pdb_path)
+    return calc_interchain_contacts(pose, chains, contact_bounds, atoms)

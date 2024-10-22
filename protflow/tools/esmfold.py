@@ -80,7 +80,7 @@ from protflow.poses import Poses
 import protflow.config
 import protflow.jobstarters
 import protflow.tools
-from protflow.runners import Runner, RunnerOutput
+from protflow.runners import Runner, RunnerOutput, prepend_cmd
 from protflow.jobstarters import JobStarter
 from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 
@@ -150,7 +150,7 @@ class ESMFold(Runner):
 
     The ESMFold class is intended for researchers and developers who need to perform ESMFold simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str = protflow.config.ESMFOLD_PYTHON_PATH, jobstarter: JobStarter = None) -> None:
+    def __init__(self, python_path: str = protflow.config.ESMFOLD_PYTHON_PATH, pre_cmd:str=protflow.config.ESMFOLD_PRE_CMD, jobstarter: JobStarter = None) -> None:
         """
         Initialize the ESMFold class with necessary configurations.
 
@@ -193,6 +193,7 @@ class ESMFold(Runner):
         self.script_path = f"{script_dir}/esmfold_inference.py"
         self.python_path = python_path
         self.name = "esmfold.py"
+        self.pre_cmd = pre_cmd
         self.index_layers = 0
         self.jobstarter = jobstarter
 
@@ -289,6 +290,10 @@ class ESMFold(Runner):
         # write ESMFold cmds:
         cmds = [self.write_cmd(pose, output_dir=esm_preds_dir, options=options) for pose in pose_fastas]
 
+        # prepend pre-cmd if defined:
+        if self.pre_cmd:
+            cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
+            
         # run
         logging.info(f"Starting prediction of len {len(poses)} sequences on {jobstarter.max_cores} cores.")
         jobstarter.start(

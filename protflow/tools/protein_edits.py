@@ -287,7 +287,7 @@ class ChainAdder(Runner):
         )
         return chains_added
 
-    def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None, overwrite: bool = False) -> Poses:
+    def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, overwrite: bool = False) -> Poses:
         """
         Add a protein chain after superimposition on a motif or chain.
 
@@ -304,6 +304,7 @@ class ChainAdder(Runner):
             reference_motif (ResidueSelection, optional): The reference motif for superimposition. Defaults to None.
             target_chains (list, optional): A list of target chains for superimposition. Defaults to None.
             reference_chains (list, optional): A list of reference chains for superimposition. Defaults to None.
+            translate_x (float, optional): Translate the chain to copy by x Angstrom in x-axis. This option can e.g. be used to set up multi-state design with LigandMPNN.
             overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.
 
         Returns:
@@ -380,6 +381,7 @@ class ChainAdder(Runner):
             reference_motif = reference_motif,
             target_chains = target_chains,
             reference_chains = reference_chains,
+            translate_x = translate_x
         )
 
         # split input_dict into subdicts
@@ -405,7 +407,7 @@ class ChainAdder(Runner):
 
         return poses.change_poses_dir(work_dir, copy=False)
 
-    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None) -> dict:
+    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None) -> dict:
         '''Prepares motif and chain specifications for superimposer setup.
         Returns dictionary (dict) that holds the kwargs for superimposition: {'target_motif': [target_motif_list], ...}'''
         # safety
@@ -416,7 +418,6 @@ class ChainAdder(Runner):
         col_in_df(poses.df, ref_col)
         copy_chain_l = setup_chain_list(copy_chain, poses)
         out_dict = {pose["poses"]: {"copy_chain": chain, "reference_pdb": os.path.abspath(pose[ref_col])} for pose, chain in zip(poses, copy_chain_l)}
-        #out_dict = {'target_motif': None, 'reference_motif': None, 'target_chains': None, 'reference_chains': None}
 
         # if nothing is specified, return nothing.
         if all ((opt is None for opt in [reference_motif, target_motif, reference_chains, target_chains])):
@@ -433,6 +434,12 @@ class ChainAdder(Runner):
             for pose in poses:
                 out_dict[pose["poses"]]["target_chains"] = parse_chain(target_chains or reference_chains, pose)
                 out_dict[pose["poses"]]["reference_chains"] = parse_chain(reference_chains or target_chains, pose)
+
+        # setup translation arg:
+        if translate_x:
+            assert isinstance(translate_x, float), f"Parameter translate_x must be of type(float). type(translate_x): {type(translate_x)}"
+            for pose in poses:
+                out_dict[pose["poses"]]["translate_x"] = translate_x
 
         return out_dict
 

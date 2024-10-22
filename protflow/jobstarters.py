@@ -396,7 +396,7 @@ class LocalJobStarter(JobStarter):
         super().__init__()
         self.max_cores = max_cores
 
-    def start(self, cmds: list, jobname: str, wait: bool = True, output_path: str = None) -> None:
+    def start(self, cmds: list, jobname: str, wait: bool = True, output_path: str = "./") -> None:
         """
         Submits a list of commands to be run locally, managing the execution and logging of each command.
 
