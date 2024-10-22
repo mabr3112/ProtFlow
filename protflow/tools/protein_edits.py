@@ -419,6 +419,12 @@ class ChainAdder(Runner):
         copy_chain_l = setup_chain_list(copy_chain, poses)
         out_dict = {pose["poses"]: {"copy_chain": chain, "reference_pdb": os.path.abspath(pose[ref_col])} for pose, chain in zip(poses, copy_chain_l)}
 
+        # setup translation arg:
+        if translate_x:
+            assert isinstance(translate_x, (float, int)), f"Parameter translate_x must be of type(float). type(translate_x): {type(translate_x)}"
+            for pose in poses:
+                out_dict[pose["poses"]]["translate_x"] = translate_x
+
         # if nothing is specified, return nothing.
         if all ((opt is None for opt in [reference_motif, target_motif, reference_chains, target_chains])):
             return out_dict
@@ -434,12 +440,6 @@ class ChainAdder(Runner):
             for pose in poses:
                 out_dict[pose["poses"]]["target_chains"] = parse_chain(target_chains or reference_chains, pose)
                 out_dict[pose["poses"]]["reference_chains"] = parse_chain(reference_chains or target_chains, pose)
-
-        # setup translation arg:
-        if translate_x:
-            assert isinstance(translate_x, float), f"Parameter translate_x must be of type(float). type(translate_x): {type(translate_x)}"
-            for pose in poses:
-                out_dict[pose["poses"]]["translate_x"] = translate_x
 
         return out_dict
 
