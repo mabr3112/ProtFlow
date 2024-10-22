@@ -117,6 +117,9 @@ class ResidueSelection:
     def __init__(self, selection: list = None, delim: str = ",", fast: bool = False, from_scorefile: bool = False):
         self.residues = parse_selection(selection, delim=delim, fast=fast, from_scorefile=from_scorefile)
 
+    def __len__(self) -> int:
+        return len(self.residues)
+
     def __str__(self) -> str:
         return ", ".join([f"{chain}{str(resi)}" for chain, resi in self])
 
