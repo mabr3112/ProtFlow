@@ -570,6 +570,7 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
         pae_interaction2 = np.mean(paes[target_start:target_end, binder_start:binder_end])
         pae_binder = pae_binder = np.mean(paes[binder_start:binder_end, binder_start:binder_end])
         pae_target = np.mean(paes[target_start:target_end, target_start:target_end])
+        print(f"pae_target: {pae_target}")
         pae_interaction_total = (pae_interaction1 + pae_interaction2) / 2
         return (pae_interaction_total, pae_binder, pae_target)
 
