@@ -623,7 +623,6 @@ def calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_
 def residue_contacts(pose:str, max_distance:float, target_chain:str, partner_chain:str, target_resnum: int, target_atom_names:list[str]=None, partner_atom_names:list[str]=None, min_distance:float=0, ):
     # TODO: Write proper docstrings!
     # calculates number of atoms on partner_chain that are between max_distance and min_distance from target_atom_names on target_resnum of chain target_chain.
-
     pose = load_structure_from_pdbfile(pose)
     target = pose[target_chain][target_resnum] #[res for res in pose[target_chain].get_residues() if res.get_segid() == target_resnum][0]
     partner = pose[partner_chain]

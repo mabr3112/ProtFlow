@@ -384,10 +384,10 @@ def parse_selection(input_selection, delim: str = ",", fast: bool = False, from_
         return parse_from_scorefile(input_selection)
     if isinstance(input_selection, str):
         return tuple(parse_residue(residue.strip()) for residue in input_selection.split(delim))
-    if isinstance(input_selection, list) or isinstance(input_selection, tuple):
+    if isinstance(input_selection, (list, tuple)):
         if all(isinstance(residue, str) for residue in input_selection):
             return tuple(parse_residue(residue) for residue in input_selection)
-        elif all(isinstance(residue, list) or isinstance(residue, tuple) for residue in input_selection):
+        if all(isinstance(residue, (list, tuple)) for residue in input_selection):
             return tuple(parse_residue("".join([str(r) for r in residue])) for residue in input_selection)
     raise TypeError(f"Unsupported Input type for parameter 'input_selection' {type(input_selection)}. Only str and list allowed.")
 

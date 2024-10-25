@@ -849,7 +849,7 @@ class MotifRMSD(Runner):
                 col_in_df(poses.df, motif)
                 return [residue_selection.to_string() if isinstance(residue_selection, ResidueSelection) else residue_selection for residue_selection in poses.df[motif].to_list()]
             elif isinstance(motif, ResidueSelection):
-                return [motif for _ in poses]
+                return [motif.to_string() for _ in poses]
             elif motif is None:
                 raise ValueError(f"No motif was set for motif {motif}. Either provide a string that points to a column in poses.df containing the motifs, or pass a ResidueSelection object as the motif.")
             raise TypeError(f"Unsupportet parameter type for motif: {type(motif)}. Either provide a string that points to a column in poses.df containing the motifs, or pass a ResidueSelection object.")
