@@ -70,6 +70,7 @@ import os
 import logging
 from glob import glob
 import shutil
+import sys
 
 # dependencies
 import pandas as pd
@@ -570,7 +571,6 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
         pae_interaction2 = np.mean(paes[target_start:target_end, binder_start:binder_end])
         pae_binder = pae_binder = np.mean(paes[binder_start:binder_end, binder_start:binder_end])
         pae_target = np.mean(paes[target_start:target_end, target_start:target_end])
-        print(f"pae_target: {pae_target}")
         pae_interaction_total = (pae_interaction1 + pae_interaction2) / 2
         return (pae_interaction_total, pae_binder, pae_target)
 
@@ -580,7 +580,7 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
     paes_target = []
 
     for pae_list in poses.df[pae_list_col].to_list():
-        pae_interaction, pae_binder, pae_target = calculate_interaction_pae(pae_list, binder_start, binder_end, target_start, target_end)
+        pae_interaction, pae_binder, pae_target = calculate_interaction_pae(pae_list, binder_start=binder_start, binder_end=binder_end, target_start=target_start, target_end=target_end)
         paes_interaction.append(pae_interaction)
         paes_binder.append(pae_binder)
         paes_target.append(pae_target)
