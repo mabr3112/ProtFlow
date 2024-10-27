@@ -272,7 +272,7 @@ class Colabfold(Runner):
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip Colabfold.
         scorefile = os.path.join(work_dir, f"colabfold_scores.{poses.storage_format}")
-        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)):
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
@@ -529,7 +529,7 @@ def collect_scores(work_dir: str, num_return_poses: int = 1) -> pd.DataFrame:
         df = pd.read_json(json_path)
         means = df.mean(numeric_only=True).to_frame().T # pylint: disable=E1101
         means["plddt_list"] = [df["plddt"]]
-        means["pae_list"] = [df["pae"]]
+        means["pae_list"] = [df["pae"].to_dict()]
         means["json_file"] = json_path
         means["pdb_file"] = input_pdb
         return means
@@ -564,27 +564,40 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
     # TODO: write documentation
     # calculates interaction paes from colabfold predictions
 
-    def calculate_interaction_pae(pae_list:list, binder_start:int, binder_end:int, target_start:int, target_end:int):
-        paes = pd.DataFrame(pae_list)
-        paes = paes.to_numpy()
+    def calculate_interaction_pae(pae_dict: dict, binder_start: int, binder_end: int, target_start: int, target_end: int) -> tuple[float,float,float]:
+        # stack dict into numpy array for fast calculations
+        print(f"pae_dict type = {type(pae_dict)}")
+        paes = np.stack(list(pae_dict.values()))
+        print(f"pae_dict shape: ", paes.shape)
+
+        # sum up pae's at binder-target residue pairs
         pae_interaction1 = np.mean(paes[binder_start:binder_end, target_start:target_end])
         pae_interaction2 = np.mean(paes[target_start:target_end, binder_start:binder_end])
-        pae_binder = pae_binder = np.mean(paes[binder_start:binder_end, binder_start:binder_end])
+
+        # sum up pae's at binder and target individually
+        pae_binder = np.mean(paes[binder_start:binder_end, binder_start:binder_end])
         pae_target = np.mean(paes[target_start:target_end, target_start:target_end])
+        print(f"pae_target: {pae_target}, pae_binder: {pae_binder}")
         pae_interaction_total = (pae_interaction1 + pae_interaction2) / 2
+        print(f"pae_interaction_total: {pae_interaction_total}")
         return (pae_interaction_total, pae_binder, pae_target)
 
+    # check for prefix
     col_in_df(poses.df, pae_list_col)
+
+    # create output score lists to aggregate scores later
     paes_interaction = []
     paes_binder = []
     paes_target = []
 
+    # iterate through every pae_list in poses.df to calculate interaction pae
     for pae_list in poses.df[pae_list_col].to_list():
         pae_interaction, pae_binder, pae_target = calculate_interaction_pae(pae_list, binder_start=binder_start, binder_end=binder_end, target_start=target_start, target_end=target_end)
         paes_interaction.append(pae_interaction)
         paes_binder.append(pae_binder)
         paes_target.append(pae_target)
 
+    # add scores to dataframe and return
     poses.df[f"{prefix}_pae_interaction"] = paes_interaction
     poses.df[f"{prefix}_pae_binder"] = paes_binder
     poses.df[f"{prefix}_pae_target"] = paes_target
