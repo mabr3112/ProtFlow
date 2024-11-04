@@ -54,11 +54,11 @@ def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: s
     '''Superimposes :copy_chain: from :reference: onto :target: '''
     # if atoms specified, superimpose:
     if reference_atoms and target_atoms:
-        reference = superimpose(
-            mobile = reference,
-            target = target,
-            mobile_atoms = reference_atoms,
-            target_atoms = target_atoms
+        target = superimpose(
+            mobile = target,
+            target = reference,
+            mobile_atoms = target_atoms,
+            target_atoms = reference_atoms
         )
 
     # copy chain.
