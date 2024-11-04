@@ -87,18 +87,20 @@ def main(args):
             mobile_atoms = ResidueSelection(opts["reference_motif"]),
             target_atoms = ResidueSelection(opts["target_motif"]),
             atom_list = atoms,
-            output_superimposed=args.return_superimposed_pose
+            output_superimposed=args.return_superimposed_poses
         )
 
         # write superimposed structure to file
-        if args.return_superimposed_pose:
-            path = os.path.join(os.path.dirname(args.output_path), "superimposed", f"{description_from_path(target)}.pdb")
+        if args.return_superimposed_poses:
+            out_dir = os.path.dirname(args.output_path)
+            os.makedirs(super_dir := os.path.join(out_dir, "superimposed"), exist_ok=True)
+            path = os.path.join(super_dir, f"{description_from_path(target)}.pdb")
             save_structure_to_pdbfile(superimposed, save_path=path)
 
 
         # collect data
         df_dict['description'].append(description_from_path(target))
-        df_dict['location'].append(path if args.return_superimposed_pose else target)
+        df_dict['location'].append(path if args.return_superimposed_poses else target)
         df_dict['rmsd'].append(rms)
 
     # store scores in .json DataFrame
@@ -115,7 +117,7 @@ if __name__ == "__main__":
 
     # optional args
     argparser.add_argument("--atoms", type=str, default=None, help="List of atoms to calculate RMSD over. If nothing is specified, all heavy-atoms are taken.")
-    argparser.add_argument("--return_superimposed_pose", action="store_true", help="Return the superimposed pose.")
+    argparser.add_argument("--return_superimposed_poses", action="store_true", help="Return the superimposed pose.")
 
     # output
     argparser.add_argument("--output_path", type=str, default="heavyatom_rmsd.json")
