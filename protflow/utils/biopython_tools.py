@@ -57,14 +57,14 @@ Authors
 -------
 Markus Braun, Adrian Tripp
 """
-
 # Imports
 import copy
 import os
 from typing import Union
-import Bio.PDB.Model
-import Bio.PDB.Structure
+import Bio.PDB.Entity
+import numpy as np
 import pandas as pd
+import string
 
 # dependencies
 import Bio
@@ -73,6 +73,8 @@ from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
+import Bio.PDB.Model
+import Bio.PDB.Structure
 
 # customs
 from protflow.residues import ResidueSelection
@@ -167,23 +169,64 @@ def save_structure_to_pdbfile(pose: Structure, save_path: str, multimodel: bool 
         # Save the structure to a new PDB file
         save_structure_to_pdbfile(structure, "output.pdb")
     """
-    
+    # setup multimodel saving
     if multimodel:
+        # sanity and prep PDBIO for multimodel structure
         if not isinstance(pose, Structure):
             raise TypeError(f"Input pose must be a BioPython Structure, not {type(pose)}!")
         for model in pose.get_models():
             model.serial_num = model.id
         io = Bio.PDB.PDBIO(use_model_flag=True)
 
+        # remove existing garbage and store
         if os.path.exists(save_path):
             os.remove(save_path)
-        with open(save_path, 'a') as f:
+        with open(save_path, 'a', encoding="UTF-8") as f:
             io.set_structure(pose)
             io.save(f)
-        
+
     io = Bio.PDB.PDBIO()
     io.set_structure(pose)
     io.save(save_path)
+
+def get_next_chain_id(existing_ids):
+    """
+    Generate the next available chain ID for a protein structure.
+
+    Chain IDs are generated as single letters from 'A' to 'Z' and, if all single-letter
+    chain IDs are occupied, as double-letter combinations from 'AA' to 'ZZ'.
+
+    Parameters
+    ----------
+    existing_ids : iterable
+        A collection of existing chain IDs to avoid.
+
+    Returns
+    -------
+    str
+        The next available chain ID that is not in `existing_ids`.
+
+    Raises
+    ------
+    ValueError
+        If no available chain IDs are found.
+    """
+    import string
+    from itertools import chain, product
+
+    # Generate single-letter chain IDs ('A' to 'Z')
+    single_letters = list(string.ascii_uppercase)
+    # Generate double-letter chain IDs ('AA', 'AB', ..., 'ZZ')
+    double_letters = [''.join(pair) for pair in product(string.ascii_uppercase, repeat=2)]
+
+    # Combine both lists
+    all_chain_ids = chain(single_letters, double_letters)
+
+    # Find the first available chain ID
+    for chain_id in all_chain_ids:
+        if chain_id not in existing_ids:
+            return chain_id
+    raise ValueError("No available chain IDs.")
 
 def superimpose_on_motif(mobile: Structure, target: Structure, mobile_atoms: ResidueSelection = None, target_atoms: ResidueSelection = None, atom_list: list[str] = None) -> Structure:
     """
@@ -415,54 +458,76 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
         out_atoms += res_atoms
     return out_atoms
 
-def add_chain(target: Structure, reference: Structure, copy_chain: str, overwrite: bool = True) -> Structure:
+def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = False) -> Structure:
     """
-    Add a specified chain from a reference structure to a target structure.
+    Add a chain from a reference structure to a target structure, optionally translating it and handling ID conflicts.
 
-    This function adds a chain from a reference structure into a target structure. The user can specify whether to overwrite an existing chain in the target structure with the same identifier.
-
-    Parameters:
-    -----------
-    target : Bio.PDB.Structure
-        The BioPython `Structure` object to which the chain will be added.
-    reference : Bio.PDB.Structure
-        The BioPython `Structure` object from which the chain will be copied.
+    Parameters
+    ----------
+    target : Structure
+        The structure to which the chain will be added.
+    reference : Structure
+        The structure from which the chain will be copied.
     copy_chain : str
-        The identifier of the chain to be copied from the reference structure.
+        The chain ID in the reference structure to be copied.
+    translate_x : float, optional
+        The distance by which to translate the new chain along the x-axis (default is None).
     overwrite : bool, optional
-        If True, an existing chain in the target structure with the same identifier will be overwritten. Defaults to True.
+        Whether to overwrite the chain in the target structure if a chain with the same ID already exists.
+        If False and a conflict occurs, a new unique chain ID will be generated (default is True).
 
-    Returns:
-    --------
-    Bio.PDB.Structure
-        The target structure with the added chain.
-
-    Example:
-    --------
-    Add chain B from a reference structure to a target structure:
-
-    .. code-block:: python
-
-        from biopython_tools import add_chain, load_structure_from_pdbfile
-
-        # Load structures
-        target_structure = load_structure_from_pdbfile("target.pdb")
-        reference_structure = load_structure_from_pdbfile("reference.pdb")
-
-        # Add chain B from reference to target
-        updated_structure = add_chain(target_structure, reference_structure, "B")
-
-    Notes:
-    ------
-    - If `overwrite` is set to True, any existing chain in the target structure with the same identifier as `copy_chain` will be removed before adding the new chain.
-    - The function modifies the target structure in place and returns it.
+    Returns
+    -------
+    Structure
+        The updated target structure with the added chain.
     """
-    if overwrite:
-        if copy_chain in [chain.id for chain in target.get_chains()]:
+    existing_chain_ids = {chain.id for chain in target.get_chains()}
+    new_chain_id = copy_chain
+
+    if copy_chain in existing_chain_ids:
+        if overwrite:
             target.detach_child(copy_chain)
-    target.add(reference[copy_chain])
+        else:
+            new_chain_id = get_next_chain_id(existing_chain_ids)
+
+    # Deep copy the chain to avoid modifying the reference structure
+    chain_to_add = copy.deepcopy(reference[copy_chain])
+    chain_to_add.id = new_chain_id
+    target.add(chain_to_add)
+
+    if translate_x:
+        translate_entity(target[new_chain_id], vector=np.array([translate_x, 0, 0]))
 
     return target
+
+def translate_entity(entity: Bio.PDB.Entity, vector: np.array) -> None:
+    """
+    Translates all atom coordinates in the given entity by the specified vector.
+
+    Parameters:
+    - entity: Bio.PDB.Entity.Entity
+        The entity (Structure, Model, Chain, or Residue) whose coordinates will be translated.
+    - vector: array-like of shape (3,)
+        The translation vector (dx, dy, dz).
+
+    Returns:
+    - None. The entity is modified in place.
+    """
+    # Ensure the vector is a NumPy array
+    vector = np.array(vector, dtype=float)
+
+    # Collect all atoms in the entity
+    atoms = list(entity.get_atoms())
+
+    # Extract all coordinates into a NumPy array
+    coords = np.array([atom.get_coord() for atom in atoms])
+
+    # Apply the translation to all coordinates at once
+    coords += vector
+
+    # Update the atom coordinates
+    for atom, new_coord in zip(atoms, coords):
+        atom.set_coord(new_coord)
 
 ######################## Bio.PDB.Structure.Structure functions ##########################################
 def get_sequence_from_pose(pose: Structure, chain_sep:str=":") -> str:

@@ -82,8 +82,8 @@ def main(args):
     for target in target_dict:
         opts = target_dict[target]
         rms, superimposed = motif_superimpose_calc_rmsd(
-            mobile = load_structure_from_pdbfile(target),
-            target = load_structure_from_pdbfile(opts["ref_pdb"]),
+            mobile = load_structure_from_pdbfile(opts["ref_pdb"]),
+            target = load_structure_from_pdbfile(target),
             mobile_atoms = ResidueSelection(opts["reference_motif"]),
             target_atoms = ResidueSelection(opts["target_motif"]),
             atom_list = atoms,

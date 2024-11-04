@@ -280,6 +280,7 @@ class RFdiffusion(Runner):
         This method is designed to streamline the execution of RFdiffusion processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze diffusion simulations.
         """
         # setup runner
+        self.index_layers = 1
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
@@ -295,7 +296,6 @@ class RFdiffusion(Runner):
         # log number of diffusions per backbone
         if multiplex_poses:
             logging.info(f"Total number of diffusions per input pose: {multiplex_poses * num_diffusions}")
-            self.index_layers = 2
         else:
             logging.info(f"Total number of diffusions per input pose: {num_diffusions}")
 
@@ -309,7 +309,8 @@ class RFdiffusion(Runner):
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             if multiplex_poses:
-                self.index_layers += 1
+                poses.duplicate_poses(f"{poses.work_dir}/{prefix}_multiplexed_input_pdbs/", multiplex_poses)
+
             poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
             if update_motifs:
                 self.remap_motifs(
@@ -345,7 +346,6 @@ class RFdiffusion(Runner):
         elif multiplex_poses:
             # create multiple copies (specified by multiplex variable) of poses to fully utilize parallel computing:
             poses.duplicate_poses(f"{poses.work_dir}/{prefix}_multiplexed_input_pdbs/", multiplex_poses)
-            #self.index_layers += 1
             cmds = [self.write_cmd(pose, options, pose_opts, output_dir=pdb_dir, num_diffusions= num_diffusions) for pose, pose_opts in zip(poses.poses_list(), poses.df[f"temp_{prefix}_pose_opts"].to_list())]
         else:
             # write rfdiffusion cmds
