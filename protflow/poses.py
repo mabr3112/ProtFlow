@@ -1457,6 +1457,8 @@ class Poses:
             The prefix used for naming the output filtered poses file and plot.
         plot : bool, optional
             If True, generates a plot comparing scores before and after filtering (default is False).
+        plot_cols : list[str], optional
+            Add additional plotting data to the output filtering plot.
         overwrite : bool, optional
             If True, overwrites existing filtered poses files (default is True).
         storage_format : str, optional
@@ -1532,7 +1534,7 @@ class Poses:
             out_path = os.path.join(self.plots_dir, f"{prefix}_filter.png")
             logging.info(f"Creating filter plot at {out_path}.")
             if plot_cols:
-                [col_in_df(col) for col in plot_cols]
+                [col_in_df(self.df, col) for col in plot_cols]
                 cols = [score_col] + plot_cols
             else:
                 cols = [score_col]
@@ -1566,6 +1568,8 @@ class Poses:
             The prefix used for naming the output filtered poses file and plot.
         plot : bool, optional
             If True, generates a plot comparing scores before and after filtering (default is False).
+        plot_cols : list[str], optional
+            Add additional plotting data to the output filtering plot.
         overwrite : bool, optional
             If True, overwrites existing filtered poses files (default is True).
         storage_format : str, optional
@@ -1653,7 +1657,7 @@ class Poses:
             out_path = os.path.join(self.plots_dir, f"{prefix}_filter.png")
             logging.info(f"Creating filter plot at {out_path}.")
             if plot_cols:
-                [col_in_df(col) for col in plot_cols]
+                [col_in_df(self.df, col) for col in plot_cols]
                 cols = [score_col] + plot_cols
             else:
                 cols = [score_col]
