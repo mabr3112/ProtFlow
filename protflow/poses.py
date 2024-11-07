@@ -1752,12 +1752,12 @@ class Poses:
             os.makedirs(self.plots_dir, exist_ok=True)
             out_path = os.path.join(self.plots_dir, f"{name}_comp_score.png")
             logging.info(f"Creating composite score plot at {out_path}.")
-            scoreterms.append(name)
+            plot_scoreterms = scoreterms + [name]
             plots.violinplot_multiple_cols(
                 dataframe=self.df,
-                cols=scoreterms,
-                titles=scoreterms,
-                y_labels=scoreterms,
+                cols=plot_scoreterms,
+                titles=plot_scoreterms,
+                y_labels=plot_scoreterms,
                 dims=None,
                 out_path=out_path,
                 show_fig=False
