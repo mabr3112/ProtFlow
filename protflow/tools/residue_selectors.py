@@ -436,10 +436,13 @@ class NotSelector(ResidueSelector):
         Examples:
             >>> selector.set_contig(contig='A1-7,A25-109,B45-50,C1,C3,C5')
         """
-        if not isinstance(contig, str):
-            raise ValueError(f"Contig must be of type str. E.g.: contig='A1-7,A25-109,B45-50,C1,C3,C5")
-        self.contig = contig
-        self.residue_selection = None
+        if not contig:
+            self.contig = None
+        elif isinstance(contig, str):
+            self.contig = contig
+            self.residue_selection = None
+        else:
+            raise ValueError(f"Contig must be of type str. E.g.: contig='A1-7,A25-109,B45-50,C1,C3,C5. contig: {contig}")
 
     def prep_residue_selection(self, residue_selection: ResidueSelection|str, poses: Poses) -> list[ResidueSelection]:
         """
@@ -460,7 +463,7 @@ class NotSelector(ResidueSelector):
         """
         if isinstance(residue_selection, str):
             poses.check_prefix(residue_selection)
-            return poses[residue_selection].to_list()
+            return poses.df[residue_selection].to_list()
         if isinstance(residue_selection, ResidueSelection):
             return [residue_selection for _ in poses]
         raise TypeError(f"Unsupported argument type {type(residue_selection)} for NotSelector.select(). Only ResidueSelection or 'str' (column in poses.df) are allowed.")
