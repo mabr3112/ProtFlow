@@ -1435,7 +1435,7 @@ class Poses:
             self.df['poses'] = fasta_paths
 
     ########################################## Filtering ###############################################
-    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None) -> "Poses":
+    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, plot_cols: list[str] = None, overwrite: bool = True, storage_format: str = None) -> "Poses":
         """
         Filters poses based on their rank in a specified score column, with options to handle layers and generate plots.
 
@@ -1457,6 +1457,8 @@ class Poses:
             The prefix used for naming the output filtered poses file and plot.
         plot : bool, optional
             If True, generates a plot comparing scores before and after filtering (default is False).
+        plot_cols : list[str], optional
+            Add additional plotting data to the output filtering plot.
         overwrite : bool, optional
             If True, overwrites existing filtered poses files (default is True).
         storage_format : str, optional
@@ -1531,7 +1533,11 @@ class Poses:
 
             out_path = os.path.join(self.plots_dir, f"{prefix}_filter.png")
             logging.info(f"Creating filter plot at {out_path}.")
-            cols = [score_col]
+            if plot_cols:
+                [col_in_df(self.df, col) for col in plot_cols]
+                cols = [score_col] + plot_cols
+            else:
+                cols = [score_col]
             plots.violinplot_multiple_cols_dfs(
                 dfs=[self.df, filter_df],
                 df_names=["Before Filtering", "After Filtering"],
@@ -1546,7 +1552,7 @@ class Poses:
         logging.info(f"Filtering completed.")
         return self
 
-    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str = None, plot: bool = False, overwrite: bool = True, storage_format: str = None, fail_on_empty: bool = True) -> "Poses":
+    def filter_poses_by_value(self, score_col: str, value, operator: str, prefix: str = None, plot: bool = False, plot_cols: list[str] = None, overwrite: bool = True, storage_format: str = None, fail_on_empty: bool = True) -> "Poses":
         """
         Filters poses based on a specified value in a score column, with options to generate plots.
 
@@ -1562,6 +1568,8 @@ class Poses:
             The prefix used for naming the output filtered poses file and plot.
         plot : bool, optional
             If True, generates a plot comparing scores before and after filtering (default is False).
+        plot_cols : list[str], optional
+            Add additional plotting data to the output filtering plot.
         overwrite : bool, optional
             If True, overwrites existing filtered poses files (default is True).
         storage_format : str, optional
@@ -1648,7 +1656,11 @@ class Poses:
             os.makedirs(self.plots_dir, exist_ok=True)
             out_path = os.path.join(self.plots_dir, f"{prefix}_filter.png")
             logging.info(f"Creating filter plot at {out_path}.")
-            cols = [score_col]
+            if plot_cols:
+                [col_in_df(self.df, col) for col in plot_cols]
+                cols = [score_col] + plot_cols
+            else:
+                cols = [score_col]
             plots.violinplot_multiple_cols_dfs(
                 dfs=[self.df, filter_df],
                 df_names=["Before Filtering", "After Filtering"],
@@ -1740,12 +1752,12 @@ class Poses:
             os.makedirs(self.plots_dir, exist_ok=True)
             out_path = os.path.join(self.plots_dir, f"{name}_comp_score.png")
             logging.info(f"Creating composite score plot at {out_path}.")
-            scoreterms.append(name)
+            plot_scoreterms = scoreterms + [name]
             plots.violinplot_multiple_cols(
                 dataframe=self.df,
-                cols=scoreterms,
-                titles=scoreterms,
-                y_labels=scoreterms,
+                cols=plot_scoreterms,
+                titles=plot_scoreterms,
+                y_labels=plot_scoreterms,
                 dims=None,
                 out_path=out_path,
                 show_fig=False
