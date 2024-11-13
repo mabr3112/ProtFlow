@@ -203,13 +203,13 @@ def _mutually_exclusive(opt_a, name_a: str, opt_b, name_b: str, none_ok: bool = 
 
 def add_group_statistics(df: pd.DataFrame, group_col: str, prefix: str, statistics: list = ('min', 'mean', 'median', 'max', 'std')) -> pd.DataFrame:
     """
-    Adds group-based statistical features to the DataFrame.
+    Adds group-based statistical features to the DataFrame for numeric columns only.
 
     This function groups the DataFrame by the specified `group_col` and computes
-    the specified statistics (default: min, mean, median, max, std) for all columns
-    that start with the given `prefix`. The computed statistics are then merged
-    back into the original DataFrame, with new column names indicating the
-    statistic and original column.
+    the specified statistics (default: min, mean, median, max, std) for all numeric
+    columns that start with the given `prefix`. The computed statistics exclude
+    NaN values and are then merged back into the original DataFrame, with new
+    column names indicating the statistic and original column.
 
     Parameters
     ----------
@@ -221,12 +221,13 @@ def add_group_statistics(df: pd.DataFrame, group_col: str, prefix: str, statisti
         
     prefix : str
         The prefix string to filter columns for which statistics will be computed.
-        Only columns starting with this prefix will be considered.
+        Only numeric columns starting with this prefix will be considered.
         
     statistics : list of str, optional
         The list of statistical functions to apply. Supported statistics include
-        'min', 'mean', 'median', 'max', 'std' by default. You can customize this
-        list as needed, provided that the functions are supported by pandas.
+        'min', 'mean', 'median', 'max', 'std', 'sum', 'count' by default. You can
+        customize this list as needed, provided that the functions are supported
+        by pandas.
 
     Returns
     -------
@@ -239,7 +240,7 @@ def add_group_statistics(df: pd.DataFrame, group_col: str, prefix: str, statisti
     ------
     ValueError
         If the specified `group_col` does not exist in the DataFrame.
-        If no columns match the specified `prefix`.
+        If no numeric columns match the specified `prefix`.
         If any of the specified `statistics` are not supported by pandas.
 
     Example
@@ -251,6 +252,7 @@ def add_group_statistics(df: pd.DataFrame, group_col: str, prefix: str, statisti
         'group_col': ['A', 'A', 'B', 'B', 'B'],
         'start_str1': [10, 20, 30, 40, 50],
         'start_str2': [5, 15, 25, 35, 45],
+        'start_str3': ['x', 'y', 'z', 'w', 'v'],  # Non-numeric column
         'other_col': [100, 200, 300, 400, 500]
     }
     df = pd.DataFrame(data)
@@ -258,23 +260,25 @@ def add_group_statistics(df: pd.DataFrame, group_col: str, prefix: str, statisti
     df_with_stats = add_group_statistics(df, group_col='group_col', prefix='start_str')
     print(df_with_stats)
     ```
-
+    
     Output:
     ```
-      group_col  start_str1  start_str2  other_col  start_str1_min  start_str1_mean  start_str1_median  start_str1_max  start_str1_std  start_str2_min  start_str2_mean  start_str2_median  start_str2_max  start_str2_std
-    0         A          10           5        100              10              15.0               15.0              20          7.071068               5              10.0                10.0              15          7.071068
-    1         A          20          15        200              10              15.0               15.0              20          7.071068               5              10.0                10.0              15          7.071068
-    2         B          30          25        300              30              40.0               40.0              50         10.000000              25              35.0                35.0              45         10.000000
-    3         B          40          35        400              30              40.0               40.0              50         10.000000              25              35.0                35.0              45         10.000000
-    4         B          50          45        500              30              40.0               40.0              50         10.000000              25              35.0                35.0              45         10.000000
+      group_col  start_str1  start_str2 start_str3  other_col  start_str1_min  start_str1_mean  start_str1_median  start_str1_max  start_str1_std  start_str2_min  start_str2_mean  start_str2_median  start_str2_max  start_str2_std
+    0         A          10           5          x        100              10              15.0               15.0              20          7.071068               5              10.0                10.0              15          7.071068
+    1         A          20          15          y        200              10              15.0               15.0              20          7.071068               5              10.0                10.0              15          7.071068
+    2         B          30          25          z        300              30              40.0               40.0              50         10.000000              25              35.0                35.0              45         10.000000
+    3         B          40          35          w        400              30              40.0               40.0              50         10.000000              25              35.0                35.0              45         10.000000
+    4         B          50          45          v        500              30              40.0               40.0              50         10.000000              25              35.0                35.0              45         10.000000
     ```
 
     Notes
     -----
     - The function assumes that the specified `group_col` exists in the DataFrame.
-    - Columns to compute statistics on are selected based on the provided prefix.
+    - Only numeric columns that start with the provided prefix are selected for
+      statistical computations. Non-numeric columns with the prefix are ignored.
+    - NaN values in the selected columns are excluded from all statistical calculations.
     - The resulting DataFrame will have additional columns for each statistic applied
-      to each selected column.
+      to each selected numeric column.
     - If the original DataFrame contains columns with names that could collide with
       the new statistical columns, consider renaming them before using this function
       to avoid unintended overwrites.
@@ -284,21 +288,22 @@ def add_group_statistics(df: pd.DataFrame, group_col: str, prefix: str, statisti
     if group_col not in df.columns:
         raise ValueError(f"The group_col '{group_col}' does not exist in the DataFrame.")
 
-    # Select columns that start with the given prefix
-    cols_to_aggregate = [col for col in df.columns if col.startswith(prefix)]
+    # Select columns that start with the given prefix and are numeric
+    cols_with_prefix = [col for col in df.columns if col.startswith(prefix)]
+    numeric_cols = df[cols_with_prefix].select_dtypes(include='number').columns.tolist()
 
-    if not cols_to_aggregate:
-        raise ValueError(f"No columns start with the prefix '{prefix}'.")
+    if not numeric_cols:
+        raise ValueError(f"No numeric columns start with the prefix '{prefix}'.")
 
     # Verify that all specified statistics are supported by pandas
-    supported_stats = {'min', 'mean', 'median', 'max', 'std', 'sum', 'count', 'min'}
+    supported_stats = {'min', 'mean', 'median', 'max', 'std', 'sum', 'count', 'var', 'prod', 'size'}
     if not set(statistics).issubset(supported_stats):
         unsupported = set(statistics) - supported_stats
         raise ValueError(f"Unsupported statistics provided: {unsupported}. "
                          f"Supported statistics are: {supported_stats}")
 
-    # Group by the group_col and compute the statistics
-    grouped = df.groupby(group_col)[cols_to_aggregate].agg(statistics)
+    # Group by the group_col and compute the statistics, excluding NaN values
+    grouped = df.groupby(group_col)[numeric_cols].agg(statistics)
 
     # Flatten the MultiIndex columns
     grouped.columns = [f"{col}_{stat}" for col, stat in grouped.columns]
