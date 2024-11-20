@@ -578,7 +578,7 @@ class DistanceSelector(ResidueSelector):
         Examples:
             >>> selector.set_centers(center="residue_selection_col")
         """
-        if not isinstance(center, (ResidueSelection, list, str)):
+        if center and not isinstance(center, (ResidueSelection, list, str)):
             raise ValueError("Input to center must be ResidueSelection, a list of ResidueSelections or the name of poses dataframe column containing ResidueSelections!")
         self.center = center
 
