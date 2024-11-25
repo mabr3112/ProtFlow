@@ -35,6 +35,7 @@ This module is designed to be extended with additional jobstarters for different
 
 """
 from multiprocessing import ProcessError
+from typing import Union
 import time
 import subprocess
 import itertools
@@ -210,7 +211,7 @@ class SbatchArrayJobstarter(JobStarter):
         >>> job_starter = SbatchArrayJobstarter(max_cores=50, remove_cmdfile=True, options="--time=10:00", gpus=True)
         >>> job_starter.start(cmds=["echo 'Hello World!'"], jobname="test_job", wait=True, output_path="/path/to/output")
     """
-    def __init__(self, max_cores: int = 100, remove_cmdfile: bool = False, options: str = None, gpus: bool = False, batch_cmds: bool = False):
+    def __init__(self, max_cores: int = 100, remove_cmdfile: bool = False, options: str = None, gpus: bool = False, batch_cmds: int = None):
         """
         Initializes the SbatchArrayJobstarter with optional parameters.
 
@@ -225,7 +226,7 @@ class SbatchArrayJobstarter(JobStarter):
         gpus : bool, optional
             Whether to use GPUs for the job. Default is False.
         batch_cmds : bool, optional
-            Whether to batch the input cmds to the number of max_cores. Default is False.
+            Whether to batch the input cmds to the specified number. Default is None.
 
         Note
         ----
@@ -240,7 +241,7 @@ class SbatchArrayJobstarter(JobStarter):
         # static attribute, can be changed depending on slurm settings:
         self.slurm_max_arrayjobs = 1000
 
-    def start(self, cmds: list, jobname: str, wait: bool = True, output_path: str = "./", batch_cmds: bool = False) -> None:
+    def start(self, cmds: list, jobname: str, wait: bool = True, output_path: str = "./", batch_cmds: int = None) -> None:
         """
         Writes commands into a command file and starts an SBATCH job running the command file.
 
@@ -255,7 +256,7 @@ class SbatchArrayJobstarter(JobStarter):
         output_path : str, optional
             Path where output files should be stored. Default is "./".
         batch_cmds : bool, optional
-            Whether to batch the input cmds to the number of max_cores. Default is False.
+            Whether to batch the input cmds to the specified number. Default is None.
 
         Raises
         ------
@@ -265,8 +266,8 @@ class SbatchArrayJobstarter(JobStarter):
 
         # batch input cmds to number of available cores if specified
         batch_cmds = batch_cmds or self.batch_cmds
-        if batch_cmds and len(cmds) > self.max_cores:
-            cmds = "; ".join([sublist for sublist in split_list(cmds, n_sublists=self.max_cores)])
+        if batch_cmds and len(cmds) > batch_cmds:
+            cmds = ["; ".join(sublist) for sublist in split_list(cmds, n_sublists=batch_cmds)]
 
         # check if cmds is smaller than 1000. If yes, split cmds and start split array!
         if len(cmds) > self.slurm_max_arrayjobs:
