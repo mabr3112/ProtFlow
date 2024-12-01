@@ -35,6 +35,7 @@ This module is designed to be extended with additional jobstarters for different
 
 """
 from multiprocessing import ProcessError
+from typing import Union
 import time
 import subprocess
 import itertools
@@ -210,7 +211,7 @@ class SbatchArrayJobstarter(JobStarter):
         >>> job_starter = SbatchArrayJobstarter(max_cores=50, remove_cmdfile=True, options="--time=10:00", gpus=True)
         >>> job_starter.start(cmds=["echo 'Hello World!'"], jobname="test_job", wait=True, output_path="/path/to/output")
     """
-    def __init__(self, max_cores: int = 100, remove_cmdfile: bool = False, options: str = None, gpus: bool = False):
+    def __init__(self, max_cores: int = 100, remove_cmdfile: bool = False, options: str = None, gpus: bool = False, batch_cmds: int = None):
         """
         Initializes the SbatchArrayJobstarter with optional parameters.
 
@@ -224,6 +225,8 @@ class SbatchArrayJobstarter(JobStarter):
             Additional SBATCH options to be used when submitting jobs. Default is None.
         gpus : bool, optional
             Whether to use GPUs for the job. Default is False.
+        batch_cmds : bool, optional
+            Whether to batch the input cmds to the specified number. Default is None.
 
         Note
         ----
@@ -232,12 +235,13 @@ class SbatchArrayJobstarter(JobStarter):
         super().__init__() # runs init-function of parent class (JobStarter)
         self.max_cores = max_cores
         self.remove_cmdfile = remove_cmdfile
+        self.batch_cmds = batch_cmds
         self.set_options(options, gpus=gpus)
 
         # static attribute, can be changed depending on slurm settings:
         self.slurm_max_arrayjobs = 1000
 
-    def start(self, cmds: list, jobname: str, wait: bool = True, output_path: str = "./") -> None:
+    def start(self, cmds: list, jobname: str, wait: bool = True, output_path: str = "./", batch_cmds: int = None) -> None:
         """
         Writes commands into a command file and starts an SBATCH job running the command file.
 
@@ -251,12 +255,20 @@ class SbatchArrayJobstarter(JobStarter):
             Whether to wait for the job to complete before returning. Default is True.
         output_path : str, optional
             Path where output files should be stored. Default is "./".
+        batch_cmds : bool, optional
+            Whether to batch the input cmds to the specified number. Default is None.
 
         Raises
         ------
         RuntimeError
             If the SLURM submission fails.
         """
+
+        # batch input cmds to number of available cores if specified
+        batch_cmds = batch_cmds or self.batch_cmds
+        if batch_cmds and len(cmds) > batch_cmds:
+            cmds = ["; ".join(sublist) for sublist in split_list(cmds, n_sublists=batch_cmds)]
+
         # check if cmds is smaller than 1000. If yes, split cmds and start split array!
         if len(cmds) > self.slurm_max_arrayjobs:
             logging.info(f"The commands-list you supplied is longer than self.slurm_max_arrayjobs. Your job will be subdivided into multiple arrays.")
