@@ -261,7 +261,7 @@ class LigandMPNN(Runner):
             logging.info(f"Setting up ligandmpnn for batched design.")
 
         # check if sidechain packing was specified in options
-        pack_sidechains = "pack_side_chains" in options
+        pack_sidechains = "pack_side_chains" in options if options else False
 
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
