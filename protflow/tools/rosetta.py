@@ -499,7 +499,7 @@ def collect_scores(work_dir: str) -> pd.DataFrame:
     for oldname, newname in zip(names_dict["raw_description"].values(), names_dict["description"].values()):
         shutil.move(f"{work_dir}/{oldname}.pdb", (nf := f"{work_dir}/{newname}.pdb"))
         if not os.path.isfile(nf):
-            print(f"WARNING: Could not rename file {oldname} to {nf}\n Retrying renaming.")
+            logging.warning(f"WARNING: Could not rename file {oldname} to {nf}\n Retrying renaming.")
             shutil.move(f"{work_dir}/{oldname}.pdb", (nf := f"{work_dir}/{newname}.pdb"))
 
     # Collect information of path to .pdb files into dataframe under "location" column
