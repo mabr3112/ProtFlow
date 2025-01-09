@@ -155,7 +155,7 @@ class AlphaFold3(Runner):
 
     The ColabFold class is intended for researchers and developers who need to perform AlphaFold2 predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.ALPHAFOLD3_SCRIPT_PATH, python_path: str = protflow.config.ALPHAFOLD3_PYTHON_PATH, pre_cmd:str=protflow.config.COLABFOLD_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = protflow.config.ALPHAFOLD3_SCRIPT_PATH, python_path: str = protflow.config.ALPHAFOLD3_PYTHON_PATH, pre_cmd:str=protflow.config.ALPHAFOLD3_PRE_CMD, jobstarter: str = None) -> None:
         """
         __init__ Method
         ===============
