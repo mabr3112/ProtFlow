@@ -81,110 +81,49 @@ from protflow.runners import Runner, RunnerOutput
 from protflow.residues import ResidueSelection
 from protflow.poses import Poses, col_in_df, description_from_path
 from protflow.jobstarters import JobStarter
-from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.biopython_tools import load_structure_from_pdbfile, three_to_one_AA_code
 
 class SelectionIdentity(Runner):
     """
-    BackboneRMSD Class
-    ==================
+    A class to calculate selection identity metrics for a set of protein poses.
 
-    The `BackboneRMSD` class is a specialized class designed to facilitate the calculation of backbone RMSD values within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with RMSD calculations.
+    This class facilitates the computation of residue identities for a selection of residues 
+    in protein structures and can store these identities in a standardized format. 
 
-    Detailed Description
-    --------------------
-    The `BackboneRMSD` class manages all aspects of calculating RMSD for protein backbones. It handles the configuration of necessary scripts and executables, prepares the environment for RMSD calculations, and executes the commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
+    Parameters
+    ----------
+    residue_selection : Union[str, ResidueSelection], optional
+        A residue selection or the name of a DataFrame column containing `ResidueSelection` objects. 
+        Default is `None`.
+    onelettercode : bool, optional
+        Whether to use one-letter amino acid codes instead of three-letter codes. Default is `False`.
+    python_path : str, optional
+        Path to the Python executable to be used for running subprocesses. Default is the Python 
+        executable in the `PROTFLOW_ENV`.
+    jobstarter : JobStarter, optional
+        A `JobStarter` object for managing parallel execution. Default is `None`.
+    overwrite : bool, optional
+        Whether to overwrite existing results if score files are detected. Default is `False`.
 
-    Key functionalities include:
-        - Setting up paths to RMSD calculation scripts and Python executables.
-        - Configuring job starter options, either automatically or manually.
-        - Handling the execution of RMSD commands with support for different atoms and chains.
-        - Collecting and processing output data into a pandas DataFrame.
-        - Managing overwrite options and handling existing score files.
-
-    Returns
+    Methods
     -------
-    An instance of the `BackboneRMSD` class, configured to run RMSD calculations and handle outputs efficiently.
-
-    Raises
-    ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If atoms or chains are not of the expected type.
-
-    Examples
-    --------
-    Here is an example of how to initialize and use the `BackboneRMSD` class:
-
-    .. code-block:: python
-
-        from protflow.poses import Poses
-        from protflow.jobstarters import JobStarter
-        from rmsd import BackboneRMSD
-
-        # Create instances of necessary classes
-        poses = Poses()
-        jobstarter = LocalJobStarter(max_cores=4)
-
-        # Initialize the BackboneRMSD class
-        backbone_rmsd = BackboneRMSD()
-
-        # Run the RMSD calculation
-        results = backbone_rmsd.run(
-            poses=poses,
-            prefix="experiment_1",
-            jobstarter=jobstarter,
-            ref_col="reference_location",
-            chains=["A", "B"],
-            overwrite=True
-        )
-
-        # Access and process the results
-        print(results)
-
-    Further Details
-    ---------------
-        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.
-        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the RMSD calculation process to their specific needs.
-        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
-
-    The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+    set_python_path(python_path: str)
+        Set the Python executable path for subprocesses.
+    set_onelettercode(onelettercode: bool)
+        Configure the output format to use one-letter amino acid codes.
+    set_residue_selection(residue_selection: Union[str, ResidueSelection])
+        Define the residue selection or DataFrame column containing selections.
+    set_jobstarter(jobstarter: JobStarter)
+        Configure the job starter for parallel execution.
+    run(poses: Poses, prefix: str, residue_selection: Union[str, ResidueSelection] = None, 
+        onelettercode: bool = False, jobstarter: JobStarter = None, python_path: str = None, 
+        overwrite: bool = False) -> Poses
+        Run the selection identity calculations on the given poses.
     """
-    def __init__(self, residue_selection: Union[str, ResidueSelection] = None, python_path: str = os.path.join(PROTFLOW_ENV, "python3"), jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
-        """
-        Initialize the BackboneRMSD class.
-
-        This constructor sets up the BackboneRMSD instance with default or provided parameters. It configures the reference column, atoms, chains, jobstarter, and overwrite options for RMSD calculations.
-
-        Parameters:
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to ["CA"].
-            chains (list[str], optional): The list of chain names to calculate RMSD over. Defaults to None.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-            jobstarter (str, optional): The jobstarter configuration for running the RMSD calculations. Defaults to None.
-
-        Returns:
-            None
-
-        Examples:
-            Here is an example of how to initialize the BackboneRMSD class:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class with default parameters
-                backbone_rmsd = BackboneRMSD()
-
-                # Initialize the BackboneRMSD class with custom parameters
-                backbone_rmsd = BackboneRMSD(ref_col="reference", atoms=["CA", "CB"], chains=["A", "B"], overwrite=True, jobstarter="custom_starter")
-
-        Further Details:
-            - **Default Values:** If no parameters are provided, the class initializes with default values suitable for basic RMSD calculations.
-            - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
-            - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
-        """
+    def __init__(self, residue_selection: Union[str, ResidueSelection] = None, onelettercode: bool = False, python_path: str = os.path.join(PROTFLOW_ENV, "python"), jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         self.set_python_path(python_path)
         self.set_residue_selection(residue_selection)
+        self.set_onelettercode(onelettercode)
 
         self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
@@ -192,9 +131,42 @@ class SelectionIdentity(Runner):
     ########################## Input ################################################
 
     def set_python_path(self, python_path: str) -> None:
+        """
+        Set the Python executable path to be used for subprocess execution.
+
+        Parameters
+        ----------
+        python_path : str
+            The path to the Python executable.
+        """
         self.python_path = python_path
 
+    def set_onelettercode(self, onelettercode: bool) -> None:
+        """
+        Configure whether to use one-letter amino acid codes in the output.
+
+        Parameters
+        ----------
+        onelettercode : bool
+            Set to `True` to use one-letter codes; `False` to use three-letter codes.
+        """
+        self.onelettercode = onelettercode
+
     def set_residue_selection(self, residue_selection: Union[str, ResidueSelection] = None):
+        """
+        Set the residue selection criteria or reference column.
+
+        Parameters
+        ----------
+        residue_selection : Union[str, ResidueSelection], optional
+            A `ResidueSelection` object or the name of a DataFrame column containing 
+            residue selections. Default is `None`.
+
+        Raises
+        ------
+        ValueError
+            If the provided `residue_selection` is neither a `ResidueSelection` nor a valid column name.
+        """
         if not residue_selection:
             self.residue_selection = None
         elif isinstance(residue_selection, str) or isinstance(residue_selection, ResidueSelection):
@@ -204,36 +176,17 @@ class SelectionIdentity(Runner):
 
     def set_jobstarter(self, jobstarter: JobStarter) -> None:
         """
-        Set the jobstarter configuration.
+        Set the job starter for managing parallel execution.
 
-        This method sets the jobstarter configuration to be used.
+        Parameters
+        ----------
+        jobstarter : JobStarter
+            A `JobStarter` object for handling parallel job execution.
 
-        Parameters:
-            jobstarter (JobStarter): The jobstarter configuration.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If jobstarter is not of type JobStarter.
-
-        Examples:
-            Here is an example of how to use the `set_jobstarter` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the jobstarter configuration
-                backbone_rmsd.set_jobstarter("custom_starter")
-
-        Further Details:
-            - **Usage:** The jobstarter configuration specifies how the RMSD calculations will be managed and executed, particularly in HPC environments.
-            - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
-            - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
+        Raises
+        ------
+        ValueError
+            If the provided `jobstarter` is not a `JobStarter` instance or `None`.
         """
         if isinstance(jobstarter, JobStarter) or jobstarter == None:
             self.jobstarter = jobstarter
@@ -242,66 +195,41 @@ class SelectionIdentity(Runner):
         
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, residue_selection: Union[str, ResidueSelection] = None, jobstarter: JobStarter = None, python_path: str = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, residue_selection: Union[str, ResidueSelection] = None, onelettercode: bool = False, jobstarter: JobStarter = None, python_path: str = None, overwrite: bool = False) -> Poses:
         """
-        Calculate the backbone RMSD for given poses and jobstarter configuration.
+        Run the selection identity calculations for the given poses.
 
-        This method sets up and runs the RMSD calculation process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.
+        Parameters
+        ----------
+        poses : Poses
+            A `Poses` object containing protein structures to analyze.
+        prefix : str
+            Prefix for output file names.
+        residue_selection : Union[str, ResidueSelection], optional
+            Residue selection criteria. Can be a `ResidueSelection` object or a column name in 
+            the poses DataFrame. Default is `None`.
+        onelettercode : bool, optional
+            Use one-letter amino acid codes in the output. Default is `False`.
+        jobstarter : JobStarter, optional
+            A `JobStarter` object for managing parallel execution. Default is `None`.
+        python_path : str, optional
+            Path to the Python executable for subprocess execution. Defaults to the class-level 
+            `python_path` attribute.
+        overwrite : bool, optional
+            Whether to overwrite existing score files. Default is `False`.
 
-        Parameters:
-            poses (Poses): The Poses object containing the protein structures.
-            prefix (str): A prefix used to name and organize the output files.
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            chains (list[str], optional): A list of chain names to calculate RMSD over. Defaults to None.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
+        Returns
+        -------
+        Poses
+            Updated `Poses` object with calculated residue identities.
 
-        Returns:
-            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.
-
-        Raises:
-            FileNotFoundError: If required files or directories are not found during the execution process.
-            ValueError: If invalid arguments are provided to the method.
-            TypeError: If chains are not of the expected type.
-
-        Examples:
-            Here is an example of how to use the `run` method:
-
-            .. code-block:: python
-
-                from protflow.poses import Poses
-                from protflow.jobstarters import JobStarter
-                from rmsd import BackboneRMSD
-
-                # Create instances of necessary classes
-                poses = Poses()
-                jobstarter = LocalJobStarter(max_cores=4)
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Run the RMSD calculation
-                results = backbone_rmsd.run(
-                    poses=poses,
-                    prefix="experiment_1",
-                    jobstarter=jobstarter,
-                    ref_col="reference",
-                    chains=["A", "B"],
-                    overwrite=True
-                )
-
-                # Access and process the results
-                print(results)
-
-        Further Details:
-            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It supports splitting poses into sublists for parallel processing.
-            - **Input Handling:** The method prepares input JSON files for each sublist of poses and constructs commands for running RMSD calculations using BioPython.
-            - **Output Management:** The method handles the collection and processing of output data from multiple score files, concatenating them into a single DataFrame and saving the results.
-            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the RMSD calculation process to their specific needs, including specifying atoms and chains for RMSD calculations.
-
-        This method is designed to streamline the execution of backbone RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze RMSD calculations.
+        Raises
+        ------
+        ValueError
+            If the input poses are not in `.pdb` format or if invalid residue selections are provided.
+        RuntimeError
+            If the number of output poses is less than the input poses, indicating possible job failure.
         """
-
         # prep variables
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
@@ -315,6 +243,7 @@ class SelectionIdentity(Runner):
         # use parameters of run function (if available), otherwise fall back to class
         python_path = python_path or self.python_path
         residue_selection = residue_selection or self.residue_selection
+        onelettercode = onelettercode or self.onelettercode
 
         # load residue selections
         if isinstance(residue_selection, str):
@@ -353,7 +282,7 @@ class SelectionIdentity(Runner):
             out_jsons.append(os.path.join(work_dir, f"output_{i}.json"))
 
         # write cmds
-        cmds = [f"{python_path} {__file__} --input_json {in_json} --output_json {out_json}" for in_json, out_json in zip(in_jsons, out_jsons)]
+        cmds = [f"{python_path} {__file__} --input_json {in_json} --output_json {out_json} {'--onelettercode' if onelettercode else ''}" for in_json, out_json in zip(in_jsons, out_jsons)]
 
         # run command
         jobstarter.start(
@@ -390,7 +319,10 @@ def main(args):
         for residue in pose.get_residues():
             chain_id = residue.parent.id
             resnum = residue.id[1]
-            resname = residue.get_resname()
+            if args.onelettercode:
+                resname = three_to_one_AA_code(residue.get_resname())
+            else:
+                resname = residue.get_resname()
             if chain_id not in residues_dict:
                 residues_dict[chain_id] = {}
             residues_dict[chain_id][resnum] = resname
@@ -414,6 +346,7 @@ if __name__ == "__main__":
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--input_json", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
     argparser.add_argument("--output_json", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
+    argparser.add_argument("--onelettercode", action="store_true", help="Return one letter code instead of three-letter code. Fails on noncanonical.")
 
     arguments = argparser.parse_args()
     main(arguments)

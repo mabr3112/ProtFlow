@@ -932,13 +932,13 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
     poses.set_work_dir(working_dir)
 
     # initialize residue selector and id metric
-    selector = DistanceSelector()
+    selector = DistanceSelector(center=center)
     selid = SelectionIdentity(python_path=python_path, jobstarter=jobstarter, overwrite=overwrite)
 
     # iterate over all shell distances
     for index, (dist, bias) in enumerate(zip(shell_distances, shell_biases)):
         # select residues in shell
-        selector.select(prefix=f"{prefix}_selection_{dist}", poses=poses, center=center, distance=dist, operator="<=", center_atoms=center_atoms, noncenter_atoms=noncenter_atoms, include_center=False)
+        selector.select(prefix=f"{prefix}_selection_{dist}", poses=poses, distance=dist, operator="<=", center_atoms=center_atoms, noncenter_atoms=noncenter_atoms, include_center=False)
         if index == 0:
             poses.df[f"{prefix}_selected_residues"] = poses.df[f"{prefix}_selection_{dist}"]
         else:

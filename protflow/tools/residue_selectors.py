@@ -682,7 +682,7 @@ class DistanceSelector(ResidueSelector):
         if isinstance(center, str):
             # read in center from poses dataframe column
             col_in_df(poses.df, center)
-            centers = self.poses.df[center].to_list()
+            centers = poses.df[center].to_list()
         elif isinstance(center, list):
             # use poses from list
             centers = center

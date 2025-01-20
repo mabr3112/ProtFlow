@@ -97,8 +97,8 @@ def main(args):
             target_atoms = ResidueSelection(opts["target_motif"]),
             atom_list = super_atoms,
             include_het_atoms = args.super_include_het_atoms,
-            rmsd_mobile_atoms = ResidueSelection(opts["rmsd_target_motif"]),
-            rmsd_target_atoms= ResidueSelection(opts["rmsd_ref_motif"]),
+            rmsd_mobile_atoms = ResidueSelection(opts["rmsd_ref_motif"]),
+            rmsd_target_atoms= ResidueSelection(opts["rmsd_target_motif"]),
             rmsd_atom_list= rmsd_atoms,
             rmsd_include_het_atoms = args.rmsd_include_het_atoms,
         )

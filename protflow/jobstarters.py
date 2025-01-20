@@ -334,7 +334,7 @@ class SbatchArrayJobstarter(JobStarter):
         """
         self.options = self.parse_options(options)
         if gpus:
-            self.options += f"--gpus-per-node {gpus} -c2"
+            self.options += f"--gpus-per-node {gpus}"
 
     def wait_for_job(self, jobname: str, interval: float = 5) -> None:
         """
