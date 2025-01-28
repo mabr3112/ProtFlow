@@ -288,7 +288,7 @@ class ESMFold(Runner):
         # prepend pre-cmd if defined:
         if self.pre_cmd:
             cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
-            
+
         # run
         logging.info(f"Starting prediction of len {len(poses)} sequences on {jobstarter.max_cores} cores.")
         jobstarter.start(

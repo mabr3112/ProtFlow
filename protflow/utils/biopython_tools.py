@@ -60,11 +60,11 @@ Markus Braun, Adrian Tripp
 # Imports
 import copy
 import os
+import string
 from typing import Union
 import Bio.PDB.Entity
 import numpy as np
 import pandas as pd
-import string
 
 # dependencies
 import Bio
@@ -74,7 +74,7 @@ from Bio.PDB.Model import Model
 from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from Bio.SeqUtils import seq1, seq3
-
+from Bio.PDB import Polypeptide
 import Bio.PDB.Model
 import Bio.PDB.Structure
 
@@ -213,11 +213,11 @@ def get_next_chain_id(existing_ids):
     ValueError
         If no available chain IDs are found.
     """
-    import string
     from itertools import chain, product
 
     # Generate single-letter chain IDs ('A' to 'Z')
     single_letters = list(string.ascii_uppercase)
+
     # Generate double-letter chain IDs ('AA', 'AB', ..., 'ZZ')
     double_letters = [''.join(pair) for pair in product(string.ascii_uppercase, repeat=2)]
 
@@ -901,3 +901,26 @@ def one_to_three_AA_code(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], 
     - The function supports input sequences in various formats, including strings, `SeqRecord`, and `Seq` objects.
     """
     return seq3(seq, custom_map=custom_map, undef_code=undef_code)
+
+def remove_non_residue_residues(model: Model, remove_hydrogens: bool = False) -> Model:
+    """
+    Removes non-residue residues from a BioPython Model object,
+    keeping only standard amino acids and modified amino acids.
+    """
+    for residue in model.get_residues():
+        residues_to_remove = []
+        # Check if residue is a standard amino acid or a modified amino acid
+        # by checking if it has a standard three-letter amino acid code.
+        if not Polypeptide.is_aa(residue, standard=False):
+            residues_to_remove.append(residue)
+
+        # Remove marked residues
+        for residue in residues_to_remove:
+            residue.get_parent().detach_child(residue.id)
+
+        if remove_hydrogens:
+            for atom in residue.get_atoms():
+                if atom.element == "H":
+                    atom.get_parent().detach_child(atom.id)
+
+    return model

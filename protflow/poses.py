@@ -1202,7 +1202,7 @@ class Poses:
         # drop temporary description column
         self.df.drop("tmp_layer_column", inplace=True, axis=1)
 
-    def duplicate_poses(self, output_dir:str, n_duplicates:int, overwrite:bool=False) -> None:
+    def duplicate_poses(self, output_dir: str, n_duplicates: int, overwrite: bool = False) -> None:
         """
         Duplicates poses a specified number of times and saves them to an output directory.
 
@@ -1236,29 +1236,28 @@ class Poses:
         - Logs the duplication process and verifies the creation of duplicate files.
 
         """
-        def insert_index_layer(dir:str, input_path:str, n:int, sep:str="_") -> str:
-            '''inserts index layer.'''
+        def _insert_index_layer(dir_: str, input_path:str, n:int, sep:str="_") -> str:
             in_file = os.path.basename(input_path)
             description, extension = os.path.splitext(in_file)
-            out_path = os.path.join(dir, f"{description}{sep}{str(n).zfill(4)}{extension}")
+            out_path = os.path.join(dir_, f"{description}{sep}{str(n).zfill(4)}{extension}")
             return out_path
-        
+
         # create output directory
         os.makedirs(output_dir, exist_ok=True)
-        
+
         # iterate over poses and copy them to new location with one additional index layer
         duplicates = []
         for n in range(1, n_duplicates+1):
             new_df = self.df.copy(deep=True)
-            new_paths = [insert_index_layer(output_dir, pose, n, "_") for pose in new_df["poses"].to_list()]
+            new_paths = [_insert_index_layer(output_dir, pose, n, "_") for pose in new_df["poses"].to_list()]
             new_descriptions = [description_from_path(path) for path in new_paths]
             for old_pose, new_pose in zip(new_df["poses"].to_list(), new_paths):
-                if overwrite == True or not os.path.isfile(new_pose):
+                if overwrite or not os.path.isfile(new_pose):
                     shutil.copy(old_pose, new_pose)
             new_df["poses"] = new_paths
             new_df["poses_description"] = new_descriptions
             duplicates.append(new_df)
-        
+
         self.df = pd.concat(duplicates)
         self.df.reset_index(drop=True, inplace=True)
 
