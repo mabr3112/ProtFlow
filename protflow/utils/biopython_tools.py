@@ -60,11 +60,11 @@ Markus Braun, Adrian Tripp
 # Imports
 import copy
 import os
+import string
 from typing import Union
 import Bio.PDB.Entity
 import numpy as np
 import pandas as pd
-import string
 
 # dependencies
 import Bio
@@ -73,6 +73,8 @@ from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
 from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
+from Bio.SeqUtils import seq1, seq3
+from Bio.PDB import Polypeptide
 import Bio.PDB.Model
 import Bio.PDB.Structure
 
@@ -211,11 +213,11 @@ def get_next_chain_id(existing_ids):
     ValueError
         If no available chain IDs are found.
     """
-    import string
     from itertools import chain, product
 
     # Generate single-letter chain IDs ('A' to 'Z')
     single_letters = list(string.ascii_uppercase)
+
     # Generate double-letter chain IDs ('AA', 'AB', ..., 'ZZ')
     double_letters = [''.join(pair) for pair in product(string.ascii_uppercase, repeat=2)]
 
@@ -729,10 +731,11 @@ def load_sequence_from_fasta(fasta:str, return_multiple_entries:bool=True):
     - The function utilizes `Bio.SeqIO.parse` to read the FASTA file and determine the number of entries.
     - If `return_multiple_entries` is set to True and the file contains multiple entries, an iterator is returned to handle the sequences.
     """
-    records = SeqIO.parse(fasta, "fasta")
-    if len(list(records)) == 1 or not return_multiple_entries:
-        return next(records)
+    records = list(SeqIO.parse(fasta, "fasta"))
+    if len(records) == 1 or not return_multiple_entries:
+        return records[0]
     return records
+
 
 def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], pH: float = 7) -> pd.DataFrame:
     """
@@ -812,3 +815,112 @@ def determine_protparams(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], 
     }
 
     return pd.DataFrame(data)
+
+def three_to_one_AA_code(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], custom_map: dict = None, undef_code="X") -> str:
+    """
+    Converts a sequence in 3-letter code to 1-letter code.
+
+    This function converts an input sequence in 3-letter code to 1-letter code using BioPython's `Bio.SeqUtils` functions. The results are returned in a string.
+
+    Parameters:
+    -----------
+    seq : Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq]
+        The input sequence in 3-letter code. The input can be a string, `SeqRecord`, or `Seq` object.
+    custom_map : dict, optional
+        Use a custom 1-letter code for a given 3-letter code (e.g. for noncanonical residues).
+    undef_code: str, optional
+        Replace all unknown 3-letter codes (e.g. from ligands or noncannonical residues) with this string.
+
+    Returns:
+    --------
+    str
+        A string of all residues in the sequence in one-letter code
+
+    Example:
+    --------
+    Convert 3-letter code to 1-letter code:
+
+    .. code-block:: python
+
+        from biopython_tools import three_to_one_AA_code
+
+        # Define a protein sequence
+        sequence = "HisAlaTrp")
+
+        # Calculate properties
+        oneletter_seq = three_to_one_AA_code(sequence)
+
+        # Print properties
+        print(oneletter_seq)
+
+    Notes:
+    ------
+    - The function supports input sequences in various formats, including strings, `SeqRecord`, and `Seq` objects.
+    """
+    return seq1(seq, custom_map=custom_map, undef_code=undef_code)
+
+def one_to_three_AA_code(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], custom_map: dict = None, undef_code="X") -> str:
+    """
+    Converts a sequence in 1-letter code to 3-letter code.
+
+    This function converts an input sequence in 1-letter code to 3-letter code using BioPython's `Bio.SeqUtils` functions. The results are returned in a string.
+
+    Parameters:
+    -----------
+    seq : Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq]
+        The input sequence in 1-letter code. The input can be a string, `SeqRecord`, or `Seq` object.
+    custom_map : dict, optional
+        Use a custom 3-letter code for a given 1-letter code (e.g. for noncanonical residues).
+    undef_code: str, optional
+        Replace all unknown 1-letter codes (e.g. from ligands or noncannonical residues) with this string.
+
+    Returns:
+    --------
+    str
+        A string of all residues in the sequence in one-letter code
+
+    Example:
+    --------
+    Convert 1-letter code to 3-letter code:
+
+    .. code-block:: python
+
+        from biopython_tools import one_to_three_AA_code
+
+        # Define a protein sequence
+        sequence = "HAW")
+
+        # Calculate properties
+        threeletter_seq = one_to_three_AA_code(sequence)
+
+        # Print properties
+        print(threeletter_seq)
+
+    Notes:
+    ------
+    - The function supports input sequences in various formats, including strings, `SeqRecord`, and `Seq` objects.
+    """
+    return seq3(seq, custom_map=custom_map, undef_code=undef_code)
+
+def remove_non_residue_residues(model: Model, remove_hydrogens: bool = False) -> Model:
+    """
+    Removes non-residue residues from a BioPython Model object,
+    keeping only standard amino acids and modified amino acids.
+    """
+    for residue in model.get_residues():
+        residues_to_remove = []
+        # Check if residue is a standard amino acid or a modified amino acid
+        # by checking if it has a standard three-letter amino acid code.
+        if not Polypeptide.is_aa(residue, standard=False):
+            residues_to_remove.append(residue)
+
+        # Remove marked residues
+        for residue in residues_to_remove:
+            residue.get_parent().detach_child(residue.id)
+
+        if remove_hydrogens:
+            for atom in residue.get_atoms():
+                if atom.element == "H":
+                    atom.get_parent().detach_child(atom.id)
+
+    return model

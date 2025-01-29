@@ -868,7 +868,6 @@ class MotifRMSD(Runner):
 
         return rmsd_input_dict
 
-
 class MotifSeparateSuperpositionRMSD(Runner):
     """
     MotifSeparateSuperpositionRMSD Class

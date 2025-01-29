@@ -72,6 +72,7 @@ import os
 import logging
 from glob import glob
 import shutil
+from typing import Union
 
 # dependencies
 import pandas as pd
@@ -86,7 +87,7 @@ import protflow.runners
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.runners import Runner, RunnerOutput, regex_expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string, prepend_cmd
-
+from protflow.config import PROTFLOW_ENV
 
 LIGANDMPNN_CHECKPOINT_DICT = {
     "protein_mpnn": f"/model_params/proteinmpnn_v_48_020.pt",
@@ -253,11 +254,15 @@ class LigandMPNN(Runner):
 
         This method is designed to streamline the execution of LigandMPNN processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein design simulations.
         """
+        self.index_layers = 1
         # run in batch mode if pose_options are not set:
         pose_opt_cols = pose_opt_cols or {}
         run_batch = self.check_for_batch_run(pose_options, pose_opt_cols)
         if run_batch:
             logging.info(f"Setting up ligandmpnn for batched design.")
+
+        # check if sidechain packing was specified in options
+        pack_sidechains = "pack_side_chains" in options if options else False
 
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
@@ -300,7 +305,7 @@ class LigandMPNN(Runner):
         # prepend pre-cmd if defined:
         if self.pre_cmd:
             cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
-            
+
         # create output directories, LigandMPNN crashes sometimes when multiple processes create the same directory simultaneously (frozen os error)
         for folder in ["backbones", "input_json_files", "packed", "seqs"]:
             os.makedirs(os.path.join(work_dir, folder), exist_ok=True)
@@ -317,7 +322,8 @@ class LigandMPNN(Runner):
         scores = collect_scores(
             work_dir=work_dir,
             return_seq_threaded_pdbs_as_pose=return_seq_threaded_pdbs_as_pose,
-            preserve_original_output=preserve_original_output
+            preserve_original_output=preserve_original_output,
+            pack_sidechains=pack_sidechains
         )
 
         if len(scores.index) < len(poses.df.index) * nseq:
@@ -626,7 +632,7 @@ class LigandMPNN(Runner):
         # write command and return.
         return f"{self.python_path} {self.script_path} {model_checkpoint_options} --out_folder {output_dir}/ --pdb_path {pose_path} {options}"
 
-def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve_original_output:bool=True) -> pd.DataFrame:
+def collect_scores(work_dir: str, return_seq_threaded_pdbs_as_pose: bool, preserve_original_output: bool = True, pack_sidechains: bool = False) -> pd.DataFrame:
     """
     Collects scores from the LigandMPNN output.
 
@@ -690,7 +696,7 @@ def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve
         }
         '''
         # Define cols and initiate them as empty lists:
-        seqs_dict = dict()
+        seqs_dict = {}
         cols = ["mpnn_origin", "seed", "description", "sequence", "T", "id", "seq_rec", "overall_confidence", "ligand_confidence"]
         for col in cols:
             seqs_dict[col] = []
@@ -706,7 +712,7 @@ def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve
                     seqs_dict[k].append(v)
         return seqs_dict
 
-    def write_mpnn_fastas(seqs_dict:dict) -> pd.DataFrame:
+    def write_mpnn_fastas(seqs_dict: dict) -> pd.DataFrame:
         seqs_dict["location"] = list()
         for d, s in zip(seqs_dict["description"], seqs_dict["sequence"]):
             seqs_dict["location"].append((fa_file := f"{seq_dir}/{d}.fa"))
@@ -714,20 +720,33 @@ def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve
                 f.write(f">{d}\n{s}")
         return pd.DataFrame(seqs_dict)
 
-    def rename_mpnn_pdb(pdb):
+    def rename_mpnn_pdb(pdb: str) -> None:
         '''changes single digit file extension to 4 digit file extension'''
         filename, extension = os.path.splitext(pdb)[0].rsplit('_', 1)
         filename = f"{filename}_{extension.zfill(4)}.pdb"
         shutil.move(pdb, filename)
-        return
+
+    def rename_packed_pdb(pdb_path: str) -> None:
+        '''changes single digit file extension to 4 digit file extension.'''
+        filename = os.path.splitext(pdb_path)[0]
+        name_split = filename.split("_")
+        name_split[-1] = name_split[-1].zfill(4)
+        name_split[-2] = name_split[-2].zfill(4)
+        name_split.remove("packed")
+        filename = f"{'_'.join(name_split)}.pdb"
+        shutil.move(pdb_path, filename)
+        if filename.endswith("_0001.pdb"):
+            shutil.copy(filename, filename.rsplit("_", 1)[0] + ".pdb")
 
     # read .pdb files
     seq_dir = os.path.join(work_dir, 'seqs')
     pdb_dir = os.path.join(work_dir, 'backbones')
     fl = glob(f"{seq_dir}/*.fa")
     pl = glob(f"{pdb_dir}/*.pdb")
-    if not fl: raise FileNotFoundError(f"No .fa files were found in the output directory of LigandMPNN {seq_dir}. LigandMPNN might have crashed (check output log), or path might be wrong!")
-    if not pl: raise FileNotFoundError(f"No .pdb files were found in the output directory of LigandMPNN {pdb_dir}. LigandMPNN might have crashed (check output log), or path might be wrong!")
+    if not fl:
+        raise FileNotFoundError(f"No .fa files were found in the output directory of LigandMPNN {seq_dir}. LigandMPNN might have crashed (check output log), or path might be wrong!")
+    if not pl:
+        raise FileNotFoundError(f"No .pdb files were found in the output directory of LigandMPNN {pdb_dir}. LigandMPNN might have crashed (check output log), or path might be wrong!")
 
     seqs = [mpnn_fastaparser(fasta) for fasta in fl]
     seqs_dict = convert_ligandmpnn_seqs_to_dict(seqs)
@@ -750,6 +769,17 @@ def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve
     if return_seq_threaded_pdbs_as_pose:
         #replace .fa with sequence threaded pdb files as poses
         scores['location'] = [os.path.join(pdb_dir, f"{os.path.splitext(os.path.basename(series['location']))[0]}.pdb") for _, series in scores.iterrows()]
+
+    if pack_sidechains:
+        pack_dir = os.path.join(work_dir, 'packed')
+        pack_fl = glob(f"{pack_dir}/*_1.pdb")
+        if not pack_fl:
+            raise FileNotFoundError(f"No .pdb files were found in the output directory of LigandMPNN {pack_dir}. LigandMPNN might have crashed (check output log), or path might be wrong!")
+        for pdb in pack_fl:
+            rename_packed_pdb(pdb)
+
+        # extract only first replicate
+        scores['location'] = [os.path.join(pack_dir, f"{os.path.splitext(os.path.basename(series['location']))[0]}.pdb") for _, series in scores.iterrows()]
 
     if not preserve_original_output:
         if os.path.isdir(original_seqs_dir):
@@ -815,3 +845,147 @@ def write_to_json(input_dict: dict, output_path:str) -> str:
     with open(output_path, 'w', encoding="UTF-8") as f:
         json.dump(input_dict, f)
     return output_path
+
+def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Union[str,ResidueSelection], shell_distances: list = [10, 15, 20, 1000], shell_biases: list = [0, 0.25, 0.5, 1], center_atoms: list[str] = None, noncenter_atoms: list[str] = ["CA"], jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
+    """
+    Creates distance-based conservation bias commands for LigandMPNN runs and saves them in a poses DataFrame column.
+
+    This function creates commands for conservation bias based on shells with a distance from a given ResidueSelection.
+
+    Parameters:
+        poses (Poses): The Poses object containing the protein structures.
+        prefix (str): A prefix used as output folder and column name in the poses DataFrame to save the commands.
+        center (str or ResidueSelection): The center of the shells. Can be either a single ResidueSelection or a poses DataFrame column containing ResidueSelections.
+        shell_distances (list, optional): The shells for creating conservation bias. The numbers represent the distance from the center. Defaults to [10, 15, 20, 100].
+        shell_biases (list, optional): The strength of the bias for each shell. Defaults to [0, 0.25, 0.5, 1].
+        center_atoms (list, optional): The atom names of the center ResidueSelection which should be used for shell distance calculations. None means all atoms are selected. Defaults to None.
+        noncenter_atoms (list, optional): The atom names of noncenter residues which should be used for shell distance calculations. None means all atoms are selected. Defaults to ["CA"].
+        jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
+        overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
+
+    Returns:
+        Poses: The updated Poses object containing the commands for conservation bias in a poses DataFrame column.
+
+    Raises:
+        KeyError: If shell_distances are not sorted in ascending order.
+
+    Examples:
+        Here is an example of how to use the `create_distance_conservation_bias_cmds` method:
+
+        .. code-block:: python
+
+            from protflow.poses import Poses
+            from protflow.jobstarters import LocalJobStarter
+            from protflow.residue_selectors import ResidueSelection
+            from ligandmpnn import create_distance_conservation_bias_cmds
+
+            # Create instances of necessary classes
+            poses = Poses(poses=".", glob_suffix="*.pdb)
+            jobstarter = LocalJobStarter()
+            central_selection = ResidueSelection("A23")
+
+            # Run the diffusion process
+            poses = create_distance_conservation_bias_cmds(
+                poses=poses,
+                prefix="prefix",
+                prefix="conservation_bias_cmd",
+                jobstarter=jobstarter,
+                center=central_selection,
+            )
+
+            # Access and process the results
+            print(poses.df["prefix"])
+
+    Further Details:
+        - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed.
+        - **Output Management:** The method handles the collection and processing of output data, ensuring that results are organized and accessible for further analysis.
+        - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the process to their specific needs.
+
+    This method is designed to streamline the creation of distance-based conservation bias commands  for LigandMPNN within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein design simulations.
+    """
+
+    def create_bias_dict(resdict: dict, bias: float):
+        bias_dict = {}
+        for res, id in resdict.items():
+            bias_dict[res] = {id: bias}
+        return bias_dict
+    
+    def combine_dicts(dict_list: list[dict]):
+        out_dict = {}
+        for in_dict in dict_list:
+            out_dict.update(in_dict)
+        return out_dict
+    
+    from protflow.tools.residue_selectors import DistanceSelector
+    from protflow.metrics.selection_identity import SelectionIdentity
+
+    # check input
+    if not shell_distances == sorted(shell_distances):
+        raise KeyError(f"shell_distances must be in ascending order like {sorted(shell_distances)}, not {shell_distances}!")
+    
+    # set python path
+    python_path = os.path.join(PROTFLOW_ENV, "python")
+
+    # create output directory
+    os.makedirs(working_dir := os.path.abspath(os.path.join(poses.work_dir, prefix)), exist_ok=True)
+    original_work_dir = poses.work_dir
+    poses.set_work_dir(working_dir)
+
+    # initialize residue selector and id metric
+    selector = DistanceSelector(center=center)
+    selid = SelectionIdentity(python_path=python_path, jobstarter=jobstarter, overwrite=overwrite)
+
+    # iterate over all shell distances
+    for index, (dist, bias) in enumerate(zip(shell_distances, shell_biases)):
+        # select residues in shell
+        selector.select(prefix=f"{prefix}_selection_{dist}", poses=poses, distance=dist, operator="<=", center_atoms=center_atoms, noncenter_atoms=noncenter_atoms, include_center=False)
+        if index == 0:
+            poses.df[f"{prefix}_selected_residues"] = poses.df[f"{prefix}_selection_{dist}"]
+        else:
+            # subtract previous selections in shells that are not the innermost shell
+            poses.df[f"{prefix}_selection_{dist}"] = poses.df[f"{prefix}_selection_{dist}"] - poses.df[f"{prefix}_selected_residues"]
+            # add current selection to overall selection
+            poses.df[f"{prefix}_selected_residues"] = poses.df[f"{prefix}_selected_residues"] + poses.df[f"{prefix}_selection_{dist}"]
+
+        # determine residue ids
+        selid.run(poses=poses, prefix=f"{prefix}_selection_{dist}_ids", residue_selection=f"{prefix}_selection_{dist}", onelettercode=True)
+
+        # create bias dictionary
+        poses.df[f"{prefix}_{dist}_bias_dicts"] = poses.df.apply(lambda row: create_bias_dict(row[f"{prefix}_selection_{dist}_ids_selection_identities"], bias), axis=1)
+
+    # write bias dict for all shells
+    poses.df[f"{prefix}_overall_bias_dict"] = poses.df.apply(lambda row: combine_dicts([row[f"{prefix}_{dist}_bias_dicts"] for dist in shell_distances]), axis=1)
+
+    # write json files for each dict
+    os.makedirs(dict_dir := os.path.join(working_dir, "bias_dicts"), exist_ok=True)
+    dict_paths = []
+    for i, row in poses.df.iterrows():
+        with open(dict_path := os.path.join(dict_dir, f"{row['poses_description']}_bias_dict.json"), 'w') as f:
+            json.dump(row[f"{prefix}_overall_bias_dict"], f, indent=4)
+        dict_paths.append(dict_path)
+    
+    # save paths to json files in poses dataframe
+    poses.df[f"{prefix}_overall_bias_json"] = dict_paths
+
+    # save cmds for LigandMPNN in poses dataframe
+    poses.df[f"{prefix}"] = [f"--bias_AA_per_residue {dict_path}" for dict_path in dict_paths]
+
+    # clean dataframe
+    cols_to_drop = [
+        f"{prefix}_selection_{dist}" for dist in shell_distances
+    ] + [
+        f"{prefix}_selection_{dist}_ids_description" for dist in shell_distances
+    ] + [
+        f"{prefix}_selection_{dist}_ids_selection_identities" for dist in shell_distances
+    ] + [
+        f"{prefix}_selection_{dist}_ids_location" for dist in shell_distances
+    ] + [
+        f"{prefix}_{dist}_bias_dicts" for dist in shell_distances] + [f"{prefix}_selected_residues"]
+    poses.df.drop(cols_to_drop, axis=1, inplace=True)
+
+    # revert to original work dir
+    poses.set_work_dir(original_work_dir)
+
+    return poses
+
+

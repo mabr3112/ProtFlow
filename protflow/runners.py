@@ -117,7 +117,7 @@ class RunnerOutput:
         if any(col not in results.columns for col in mandatory_cols):
             raise ValueError(f"Input Data to RunnerOutput class MUST contain columns 'description' and 'location'.\nDescription should carry the name of the poses, while 'location' should contain the path (+ filename and suffix).")
         if not (results['description'] == results['location'].apply(extract_description)).all():
-            raise ValueError(f"'description' column does not match 'location' column in runner output dataframe!")
+            raise ValueError(f"'description' column does not match 'location' column in runner output dataframe!\n{results[['description', 'location']].head(5).values}")
         return results
 
     def return_poses(self) -> Poses:
