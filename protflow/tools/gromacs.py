@@ -367,7 +367,7 @@ class Gromacs(Runner):
         md_fn_list = []
         for pose, pose_dir in zip(poses, pose_dirs):
             md_tpr_fn = os.path.join(pose_dir, "md.tpr")
-            md_fn = os.path.join(pose_dir, "md.gro")
+            md_fn = os.path.join(pose_dir, "md.xtc")
             cmd = f"cd {pose_dir}; {self.gromacs_path} grompp -f {self.md_params.md} -c {pose[f'{prefix}_npt_poses']} -p {pose[f'{prefix}_topol_poses']} -n {pose[f'{prefix}_index_poses']} -o {md_tpr_fn} && {self.gromacs_path} mdrun -v -deffnm md -nb auto -pme auto -bonded cpu -update auto"
             cmds.append(cmd)
             md_tpr_fn_list.append(md_tpr_fn)
