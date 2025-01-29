@@ -272,7 +272,7 @@ class Colabfold(Runner):
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip Colabfold.
         scorefile = os.path.join(work_dir, f"colabfold_scores.{poses.storage_format}")
-        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)):
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
