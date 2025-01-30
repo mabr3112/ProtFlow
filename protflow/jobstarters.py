@@ -237,6 +237,7 @@ class SbatchArrayJobstarter(JobStarter):
         self.remove_cmdfile = remove_cmdfile
         self.batch_cmds = batch_cmds
         self.set_options(options, gpus=gpus)
+        self.bash = False
 
         # static attribute, can be changed depending on slurm settings:
         self.slurm_max_arrayjobs = 1000
@@ -263,6 +264,8 @@ class SbatchArrayJobstarter(JobStarter):
         RuntimeError
             If the SLURM submission fails.
         """
+        if self.bash:
+            cmds = [f"/bin/bash -c '{cmd}'" for cmd in cmds]
         # batch input cmds to number of available cores if specified
         batch_cmds = batch_cmds or self.batch_cmds
         if batch_cmds and len(cmds) > batch_cmds:
@@ -294,6 +297,10 @@ class SbatchArrayJobstarter(JobStarter):
         if self.remove_cmdfile:
             subprocess.run(f"rm {cmdfile}", shell=True, stdout=True, stderr=True, check=True)
         return None
+
+    def _use_bash(self, use_bash: bool) -> None:
+        '''Configure whether to use bash shell to execute commands or default.'''
+        self.bash = use_bash
 
     def parse_options(self, options: object) -> str:
         """
