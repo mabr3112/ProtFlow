@@ -252,7 +252,7 @@ class Gromacs(Runner):
         if not all(os.path.isfile(index_fn) for index_fn in index_fn_list) or self.overwrite_prep:
             jobstarter.start(
                 cmds = cmds,
-                jobname = "md_ions_setup",
+                jobname = "md_index_setup",
                 wait = True,
                 output_path = work_dir
             )

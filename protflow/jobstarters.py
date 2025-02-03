@@ -265,7 +265,7 @@ class SbatchArrayJobstarter(JobStarter):
             If the SLURM submission fails.
         """
         if self.bash:
-            cmds = [f"/bin/bash -c '{cmd}'" for cmd in cmds]
+            cmds = [f'/bin/bash -c "{cmd}"' for cmd in cmds]
         # batch input cmds to number of available cores if specified
         batch_cmds = batch_cmds or self.batch_cmds
         if batch_cmds and len(cmds) > batch_cmds:
