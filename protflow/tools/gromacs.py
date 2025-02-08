@@ -11,7 +11,7 @@ import protflow
 from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
-from protflow.config import PROTFLOW_DIR
+from protflow.config import PROTFLOW_DIR, PROTFLOW_ENV
 from protflow.utils import biopython_tools as bpt
 
 GROMACS_PARAMS_DIR = os.path.join(PROTFLOW_DIR, "protflow/utils/gromacs/params")
@@ -527,3 +527,55 @@ def is_valid_variable(var: str) -> None:
     pattern = r'^[A-Za-z0-9_/\-]+$'
     if not bool(re.fullmatch(pattern, var)):
         raise ValueError(f'Variable contains illegal characters. Only letters, "_", "-", or "/" allowed. variable: {var}')
+
+class MDAnalysis(Runner):
+    '''MDAnalysis class docs'''
+    def __init__(self, python: str = f"{PROTFLOW_ENV}/python", script_path: str = None):
+        self.python = python
+        self.set_script(script_path)
+        self.options = ""
+        self.pose_options = ""
+
+    def set_script(self, script_path: str) -> None:
+        '''Set the script that should be run by MDAnalysis.run() method. 
+        The script has to output a pandas DataFrame containing at least "location" and "description" columns that can be integrated by RunnerOutput methods.'''
+        self.script_path = script_path
+
+    def set_options(self, options: str) -> None:
+        '''Set options that should be added to every execution of your md-analysis script.'''
+        self.options = options
+
+    def set_pose_options(self, pose_options: dict) -> None:
+        '''Set pose_options for MDAnalysis self.script. 
+        'pose_options' has to be a dictionary. 
+        The keys of the dictionary are the 'flags' of the command-line options to be invoked.
+        The values specified for the keys should be of type 'str' and should represent columns in the poses.df DataFrame of the Poses that you want to analyze.
+        The command-writer will assign every pose its corresponding value of the column specified.
+        This way, every pose can have its own value for any given parameter (i.e. residue index for which to calculate RMSF).'''
+        self.pose_options = pose_options
+
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter, overwrite: bool = False) -> Poses:
+        '''Run your MDAnalysis script.'''
+        # setup runner
+        work_dir, jobstarter = self.generic_run_setup(
+            poses=poses,
+            prefix=prefix,
+            jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
+        )
+
+        # check for output
+        scorefile = os.path.join(work_dir, f"{prefix}_scores.{poses.storage_format}")
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
+            return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+
+        # write commands
+        self.write_cmds(poses)
+
+    def write_cmds(self, poses: Poses) -> list[str]:
+        '''Automated cmd-file writer. Takes class attributes self.python, self.script_path, self.options and self.pose_options to write command for .run() method.'''
+        # check if pose_options specified columns are present in poses.df
+        col_in_df()
+        
+        cmds = [f"{self.python} {self.script_path} {}"]
+
