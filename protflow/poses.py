@@ -2404,7 +2404,6 @@ def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
     -----
     - The function raises a KeyError if any of the specified columns are not found in the DataFrame.
     - Ensures that the DataFrame contains the necessary columns for subsequent operations.
-
     """
     if isinstance(column, list):
         for col in column:
