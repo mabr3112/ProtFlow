@@ -424,7 +424,7 @@ class Gromacs(Runner):
         fit_fn_list = []
         for pose, pose_dir in zip(poses, pose_dirs):
             fit_fn = os.path.join(pose_dir, f"{pose['poses_description']}_noHOH.xtc")
-            cmd = f"cd {pose_dir}; gmx trjconv -s {pose[f'{prefix}_md_tpr_poses']} -f {pose[f'{prefix}_pbc_remove_poses']} -o {fit_fn} -n {pose[f'{prefix}_index_poses']} -fit rot+trans <<< $'C-alpha\\n1'"
+            cmd = f"cd {pose_dir}; {self.gromacs_path} trjconv -s {pose[f'{prefix}_md_tpr_poses']} -f {pose[f'{prefix}_pbc_remove_poses']} -o {fit_fn} -n {pose[f'{prefix}_index_poses']} -fit rot+trans <<< $'C-alpha\\n1'"
             fit_fn_list.append(fit_fn)
             cmds.append(cmd)
         poses.df[f'{prefix}_fit_poses'] = fit_fn_list
@@ -447,7 +447,7 @@ class Gromacs(Runner):
         t0_extract_fn_list = []
         for pose, pose_dir in zip(poses, pose_dirs):
             t0_extract_fn = os.path.join(pose_dir, f"{pose['poses_description']}_t0.gro")
-            cmd = f"cd {pose_dir}; gmx trjconv -s {pose[f'{prefix}_md_tpr_poses']} -f {pose[f'{prefix}_npt_poses']} -o {t0_extract_fn} -n {pose[f'{prefix}_index_poses']} -center -pbc mol <<< $'System\n1'"
+            cmd = f"cd {pose_dir}; {self.gromacs_path} trjconv -s {pose[f'{prefix}_md_tpr_poses']} -f {pose[f'{prefix}_npt_poses']} -o {t0_extract_fn} -n {pose[f'{prefix}_index_poses']} -center -pbc mol <<< $'System\\n1'"
             t0_extract_fn_list.append(t0_extract_fn)
             cmds.append(cmd)
         poses.df[f'{prefix}_t0_extract_poses'] = t0_extract_fn_list
@@ -469,7 +469,7 @@ class Gromacs(Runner):
         tpr_extract_fn_list = []
         for pose, pose_dir in zip(poses, pose_dirs):
             tpr_extract_fn = os.path.join(pose_dir, f"{pose['poses_description']}_protein_only.tpr")
-            cmd = f"cd {pose_dir}; gmx convert-tpr -s {pose[f'{prefix}_md_tpr_poses']} -o {tpr_extract_fn} <<< $'1'"
+            cmd = f"cd {pose_dir}; {self.gromacs_path} convert-tpr -s {pose[f'{prefix}_md_tpr_poses']} -o {tpr_extract_fn} <<< $'1'"
             tpr_extract_fn_list.append(tpr_extract_fn)
             cmds.append(cmd)
 
