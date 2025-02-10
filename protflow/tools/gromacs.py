@@ -102,8 +102,8 @@ class Gromacs(Runner):
             jobstarter = jobstarter,
         )
 
-        # return
-        return NotImplemented
+        # return unchanged poses (gromacs files are stored under pefixes!)
+        return poses
 
     def prep_md_inputs(self, work_dir: str, poses: Poses, prefix: str, jobstarter: JobStarter):
         '''Setup a system for equilibration.'''
@@ -571,7 +571,7 @@ class MDAnalysis(Runner):
         '''
         self.pose_flags = pose_flags
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
         '''Run your MDAnalysis script.'''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
