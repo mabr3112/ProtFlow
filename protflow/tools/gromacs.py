@@ -21,7 +21,7 @@ class Gromacs(Runner):
     '''Class Docs'''
     def __init__(self, gromacs_path: str = protflow.config.GROMACS_PATH, jobstarter: JobStarter = None, pre_cmd: str = None, md_params: "MDParams" = None):
         '''Init Docs'''
-        self.gromacs_path = self.search_path(os.path.join(gromacs_path + "gmx"), "GROMACS_PATH")
+        self.gromacs_path = self.search_path(os.path.join(gromacs_path, "gmx"), "GROMACS_PATH")
         self.gromacs_dir = self.search_path(gromacs_path, "GROMACS_PATH", is_dir=True)
         self.pre_cmd = pre_cmd
         self.name = "esmfold.py"
@@ -137,7 +137,7 @@ class Gromacs(Runner):
         topol_fn_list = []
         for pose, pose_dir in zip(cleaned_poses, pose_dirs):
             processed_fn = os.path.join(pose_dir, protflow.poses.description_from_path(pose) + "_processed.gro")
-            pdb2gmx_cmd = f"cd {pose_dir}; {self.gromacs_path} pdb2gmx -f {cleaned_fn} -o {processed_fn} -ter -ignh -water {self.md_params.water_model} -ff {self.md_params.force_field}"
+            pdb2gmx_cmd = f"cd {pose_dir}; {self.gromacs_path} pdb2gmx -f {pose} -o {processed_fn} -ter -ignh -water {self.md_params.water_model} -ff {self.md_params.force_field}"
             cmds.append(pdb2gmx_cmd)
             processed_poses.append(processed_fn)
             topol_fn_list.append(os.path.join(pose_dir, "topol.top"))
@@ -162,7 +162,7 @@ class Gromacs(Runner):
         cmds = []
         for pose, pose_dir in zip(poses, pose_dirs):
             pbc_fn = os.path.join(pose_dir, pose["poses_description"] + "_pbc.gro")
-            cmd = f"cd {pose_dir}; {self.gromacs_path} editconf -f {processed_fn} -o {pbc_fn} -bt dodecahedron -d 1.0" #TODO implement this as md_params parameter!
+            cmd = f"cd {pose_dir}; {self.gromacs_path} editconf -f {pose} -o {pbc_fn} -bt dodecahedron -d 1.0" #TODO implement this as md_params parameter!
             cmds.append(cmd)
             pbc_fn_list.append(pbc_fn)
         poses.df[f"{prefix}_pbc_poses"] = pbc_fn_list
