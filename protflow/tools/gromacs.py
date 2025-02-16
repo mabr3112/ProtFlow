@@ -589,10 +589,14 @@ class MDAnalysis(Runner):
         # write commands
         cmds = self.write_cmds(poses)
 
+        # create input folders
+        for pose in poses:
+            os.makedirs(os.path.join(work_dir, pose["poses_description"]), exist_ok=True)
+
         # start
         jobstarter.start(
             cmds = cmds,
-            jobname = "md",
+            jobname = "md_analysis",
             wait = True,
             output_path = work_dir
         )
@@ -609,7 +613,7 @@ class MDAnalysis(Runner):
         if self.pose_options:
             if not isinstance(self.pose_options, dict):
                 raise ValueError(f"MDAnalysis attribute .pose_options must be a dictionary holding {{'option': 'poses.df column name'}}\nCurrent .pose_options: {self.pose_options}")
-            protflow.poses.col_in_df(poses.df, list(self.pose_options.keys()))
+            protflow.poses.col_in_df(poses.df, list(self.pose_options.values()))
         if self.pose_flags:
             if not isinstance(self.pose_flags, str):
                 raise ValueError(f"MDAnalysis attribute .pose_flags must be of type(str). Current self.pose_flags: {self.pose_flags}")
@@ -621,7 +625,7 @@ class MDAnalysis(Runner):
             pose_options_str = ""
             if self.pose_options:
                 # parse individual pose_opts from pose-level pose_options
-                pose_options_str += " ".join([f"--{opt}={pose[opt_col]}" for opt, opt_col in self.pose_options.values()])
+                pose_options_str += " ".join([f"--{opt}={pose[opt_col]}" for opt, opt_col in self.pose_options.items()])
 
             # add flags
             if self.pose_flags:
@@ -632,7 +636,8 @@ class MDAnalysis(Runner):
             parsed_opts, parsed_flags = protflow.runners.parse_generic_options(self.options, pose_options_str, sep="--")
 
             # parse options and flags into combined string and add to options_list
-            options_list.append(protflow.runners.options_flags_to_string(parsed_opts, parsed_flags))
+            parsed_cmd = protflow.runners.options_flags_to_string(parsed_opts, parsed_flags)
+            options_list.append(parsed_cmd)
 
         # be aware that this compiling of commands requires the user to specify the input in pose_options!
         cmds = [f"{self.python} {self.script_path} {options}" for options in options_list]
@@ -643,7 +648,8 @@ class MDAnalysis(Runner):
         # Every command writes its scores into its own directories.
         scores_list = []
         for pose in poses:
-            pose_scores_fn = f"{work_dir}/{pose['description']}/mdanalysis_scores.json"
+            print(pose.index)
+            pose_scores_fn = f"{work_dir}/{pose['poses_description']}/mdanalysis_scores.json"
             scores_list.append(pd.read_json(pose_scores_fn))
         scores_df = pd.concat([scores_list], ignore_index=True).reset_index(drop=True)
         return scores_df
