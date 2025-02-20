@@ -150,7 +150,7 @@ class ESMFold(Runner):
 
     The ESMFold class is intended for researchers and developers who need to perform ESMFold simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str = protflow.config.ESMFOLD_PYTHON_PATH, pre_cmd:str=protflow.config.ESMFOLD_PRE_CMD, jobstarter: JobStarter = None) -> None:
+    def __init__(self, python_path: str = protflow.config.ESMFOLD_PYTHON_PATH, pre_cmd: str = protflow.config.ESMFOLD_PRE_CMD, jobstarter: JobStarter = None) -> None:
         """
         Initialize the ESMFold class with necessary configurations.
 
@@ -185,15 +185,10 @@ class ESMFold(Runner):
 
         This method prepares the ESMFold class for running folding simulations, ensuring that all necessary configurations and paths are correctly set up.
         """
-        if not script_dir:
-            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under ESMFOLD_SCRIPT_PATH.")
-        if not python_path:
-            raise ValueError(f"No python path is set for {self}. Set the path in the config.py file under ESMFOLD_PYTHON_PATH.")
-
-        self.script_path = f"{script_dir}/esmfold_inference.py"
-        self.python_path = python_path
-        self.name = "esmfold.py"
+        self.script_path = self.search_path(script_dir, "AUXILIARY_RUNNER_SCRIPTS_DIR", is_dir=True)
+        self.python_path = self.search_path(python_path, "ESMFOLD_PYTHON_PATH")
         self.pre_cmd = pre_cmd
+        self.name = "esmfold.py"
         self.index_layers = 0
         self.jobstarter = jobstarter
 
@@ -293,7 +288,7 @@ class ESMFold(Runner):
         # prepend pre-cmd if defined:
         if self.pre_cmd:
             cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
-            
+
         # run
         logging.info(f"Starting prediction of len {len(poses)} sequences on {jobstarter.max_cores} cores.")
         jobstarter.start(

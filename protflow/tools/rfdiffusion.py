@@ -324,7 +324,8 @@ class RFdiffusion(Runner):
 
         # in case overwrite is set, overwrite previous results.
         if overwrite or not os.path.isfile(scorefile):
-            if os.path.isfile(scorefile): os.remove(scorefile)
+            if os.path.isfile(scorefile):
+                os.remove(scorefile)
             for pdb in glob(f"{pdb_dir}/*pdb"):
                 if os.path.isfile(trb := pdb.replace(".pdb", ".trb")):
                     os.remove(trb)
@@ -558,7 +559,8 @@ def collect_scores(work_dir: str, rename_pdbs: bool = True) -> pd.DataFrame:
     # collect scores from .trb-files into one pandas DataFrame:
     pdb_dir = os.path.join(work_dir, "output_pdbs")
     pl = glob(f"{pdb_dir}/*.pdb")
-    if not pl: raise FileNotFoundError(f"No .pdb files were found in the diffusion output direcotry {pdb_dir}. RFDiffusion might have crashed (check inpainting error-log), or the path might be wrong!")
+    if not pl:
+        raise FileNotFoundError(f"No .pdb files were found in the diffusion output direcotry {pdb_dir}. RFDiffusion might have crashed (check inpainting error-log), or the path might be wrong!")
 
     # collect rfdiffusion scores into a DataFrame:
     scores = []
@@ -615,8 +617,10 @@ def parse_diffusion_trbfile(path: str) -> pd.DataFrame:
     This method is designed to parse and organize the data from RFdiffusion .trb files, making it easier to analyze the results.
     """
     # read trbfile:
-    if path.endswith(".trb"): data_dict = np.load(path, allow_pickle=True)
-    else: raise ValueError(f"only .trb-files can be passed into parse_inpainting_trbfile. <trbfile>: {path}")
+    if path.endswith(".trb"):
+        data_dict = np.load(path, allow_pickle=True)
+    else:
+        raise ValueError(f"only .trb-files can be passed into parse_inpainting_trbfile. <trbfile>: {path}")
 
     # calc mean_plddt:
     sd = {}
@@ -632,12 +636,10 @@ def parse_diffusion_trbfile(path: str) -> pd.DataFrame:
         scoreterms.append("complex_con_hal_pdb_idx")
     if "complex_con_ref_pdb_idx" in data_dict:
         scoreterms.append("complex_con_ref_pdb_idx")
-    
+
     # collect data
     for st in scoreterms:
         sd[st] = [data_dict[st]]
-
-
 
     # collect metadata
     sd["location"] = path.replace(".trb", ".pdb")
@@ -725,7 +727,7 @@ def update_motif_res_mapping(motif_l: list[ResidueSelection], con_ref_idx: list,
     for motif, ref_idx, hal_idx in zip(motif_l, con_ref_idx, con_hal_idx):
         # error handling
         if not isinstance(motif, ResidueSelection):
-            raise TypeError(f"Individual motifs must be of type ResidueSelection. Create ResidueSelection objects out of your motifs.")
+            raise TypeError("Individual motifs must be of type ResidueSelection. Create ResidueSelection objects out of your motifs.")
 
         # setup mapping from rfdiffusion outputs:
         exchange_dict = get_residue_mapping(ref_idx, hal_idx)

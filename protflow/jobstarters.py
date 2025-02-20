@@ -237,6 +237,7 @@ class SbatchArrayJobstarter(JobStarter):
         self.remove_cmdfile = remove_cmdfile
         self.batch_cmds = batch_cmds
         self.set_options(options, gpus=gpus)
+        self.bash = False
 
         # static attribute, can be changed depending on slurm settings:
         self.slurm_max_arrayjobs = 1000
@@ -263,7 +264,8 @@ class SbatchArrayJobstarter(JobStarter):
         RuntimeError
             If the SLURM submission fails.
         """
-
+        if self.bash:
+            cmds = [f'/bin/bash -c "{cmd}"' for cmd in cmds]
         # batch input cmds to number of available cores if specified
         batch_cmds = batch_cmds or self.batch_cmds
         if batch_cmds and len(cmds) > batch_cmds:
@@ -271,7 +273,7 @@ class SbatchArrayJobstarter(JobStarter):
 
         # check if cmds is smaller than 1000. If yes, split cmds and start split array!
         if len(cmds) > self.slurm_max_arrayjobs:
-            logging.info(f"The commands-list you supplied is longer than self.slurm_max_arrayjobs. Your job will be subdivided into multiple arrays.")
+            logging.info("The commands-list you supplied is longer than self.slurm_max_arrayjobs. Your job will be subdivided into multiple arrays.")
             for sublist in split_list(cmds, self.slurm_max_arrayjobs):
                 self.start(cmds=sublist, jobname=jobname, wait=wait, output_path=output_path)
             return None
@@ -284,17 +286,21 @@ class SbatchArrayJobstarter(JobStarter):
         # write sbatch command and run
         self.options += f" -vvv -e {output_path}/{jobname}_slurm.err -o {output_path}/{jobname}_slurm.out --open-mode=append"
         sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {self.options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
-        
-        with open(f"{output_path}/{jobname}_jobstarter.log", "w") as out_file:
+
+        with open(f"{output_path}/{jobname}_jobstarter.log", "w", encoding="UTF-8") as out_file:
             # Run the sbatch command and direct both stdout and stderr to the log file
             subprocess.run(sbatch_cmd, shell=True, stdout=out_file, stderr=out_file, check=True)
-        
+
         # wait for job and clean up
         if wait:
             self.wait_for_job(jobname)
         if self.remove_cmdfile:
             subprocess.run(f"rm {cmdfile}", shell=True, stdout=True, stderr=True, check=True)
         return None
+
+    def _use_bash(self, use_bash: bool) -> None:
+        '''Configure whether to use bash shell to execute commands or default.'''
+        self.bash = use_bash
 
     def parse_options(self, options: object) -> str:
         """
@@ -316,9 +322,12 @@ class SbatchArrayJobstarter(JobStarter):
             If the options parameter is not a string or list.
         """
         # parse options
-        if isinstance(options, list): return " ".join(options)
-        if isinstance(options, str): return options
-        if options is None: return ""
+        if isinstance(options, list):
+            return " ".join(options)
+        if isinstance(options, str):
+            return options
+        if options is None:
+            return ""
         raise TypeError(f"Unsupported type for argument options: {type(options)}. Supported types: [str, list]")
 
     def set_options(self, options: object, gpus: int) -> None:
@@ -432,7 +441,8 @@ class LocalJobStarter(JobStarter):
             # Open the file to capture output and error
             with open(output_file, 'w', encoding="UTF-8") as file:
                 # Start the process
-                process = subprocess.Popen(command, env=env, shell=True, stdout=file, stderr=subprocess.STDOUT)
+                process = subprocess.Popen(command, env=env, executable="/bin/bash", shell=True, stdout=file, stderr=subprocess.STDOUT)
+            process.command = command # giving process a custom attribute for later error tractability
             return process
 
         def update_active_processes(active_processes: list) -> list:
@@ -442,7 +452,7 @@ class LocalJobStarter(JobStarter):
                 if process.poll() is not None: # process finished
                     returncode = process.wait()
                     if returncode != 0:
-                        raise ProcessError(f"Subprocess Crashed. Check last output log of Subprocess!")
+                        raise ProcessError(f"Subprocess Crashed. Check last output log of Subprocess! Command: {process.command}")
                     active_processes.remove(process)
             return active_processes
 

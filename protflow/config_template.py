@@ -1,6 +1,9 @@
 '''
 This module contains all paths to tools integrated in ProtFlow. PRE_CMD are commands that should be run before the runner is executed (e.g. if import of a specific module is necessary for the environment to work)
 '''
+# path to root directory of ProtFlow:
+PROTFLOW_DIR = "" # "/path/to/ProtFlow/"
+
 # protflow environment python
 PROTFLOW_ENV = "" # "/path/to/mambaforge/envs/protflow/bin/"
 
@@ -44,3 +47,10 @@ FPOCKET_PATH = "" # "/path/to/anaconda3/envs/protslurm/bin/fpocket"
 
 # dssp
 DSSP_PATH = "" # "/path/to/mambaforge/envs/dssp/bin/mkdssp"
+
+# boltz
+BOLTZ_PATH = "" #/path/to/CONDA/envs/boltz_env/bin/boltz
+BOLTZ_PRE_CMD = ""
+
+# gromacs
+GROMACS_PATH = "" #/path/to/gromacs/bin/

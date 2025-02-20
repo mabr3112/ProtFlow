@@ -500,7 +500,7 @@ def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[di
     flags = list(set(flags) | set(pose_flags))
     return opts, flags
 
-def col_in_df(df:pd.DataFrame, column:str):
+def col_in_df(df: pd.DataFrame, column: str) -> None:
     """
     Checks if a column exists in a DataFrame.
 
