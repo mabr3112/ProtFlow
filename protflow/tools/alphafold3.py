@@ -445,7 +445,7 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
             summary = pd.read_json(os.path.join(model_dir, "summary_confidences.json"), typ='series', orient='records')
             score = pd.concat([summary, confidences])
             model = os.path.join(model_dir, "model.cif")
-            score["location"] = os.path.abspath(shutil.copy(model, os.path.join(model_dir, f"{data["name"]}_{i+1:04d}.cif")))
+            score["location"] = os.path.abspath(shutil.copy(model, os.path.join(model_dir, f"{data['name']}_{i+1:04d}.cif")))
             score["description"] = description_from_path(score["location"])
             scores.append(score)
         scores = pd.DataFrame(scores)
@@ -456,8 +456,8 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
         openbabel_fileconverter(input_file=input, output_format=format, output_file=output)
         return output
 
-    # collect all output directories
-    out_dirs = glob(os.path.join(work_dir, "*"))
+    # collect all output directories, ignore mmseqs dirs
+    out_dirs = [d for d in glob(os.path.join(work_dir, "*")) if os.path.isdir(d) and not os.path.basename(d).startswith("mmseq")]
 
     scores = []
     for out_dir in out_dirs:
