@@ -162,7 +162,7 @@ class Gromacs(Runner):
         cmds = []
         for pose, pose_dir in zip(poses, pose_dirs):
             pbc_fn = os.path.join(pose_dir, pose["poses_description"] + "_pbc.gro")
-            cmd = f"cd {pose_dir}; {self.gromacs_path} editconf -f {pose} -o {pbc_fn} -bt dodecahedron -d 1.0" #TODO implement this as md_params parameter!
+            cmd = f"cd {pose_dir}; {self.gromacs_path} editconf -f {pose[f'{prefix}_processed_poses']} -o {pbc_fn} -bt dodecahedron -d 1.0" #TODO implement this as md_params parameter!
             cmds.append(cmd)
             pbc_fn_list.append(pbc_fn)
         poses.df[f"{prefix}_pbc_poses"] = pbc_fn_list
@@ -651,5 +651,5 @@ class MDAnalysis(Runner):
             print(pose.index)
             pose_scores_fn = f"{work_dir}/{pose['poses_description']}/mdanalysis_scores.json"
             scores_list.append(pd.read_json(pose_scores_fn))
-        scores_df = pd.concat([scores_list], ignore_index=True).reset_index(drop=True)
+        scores_df = pd.concat(scores_list, ignore_index=True).reset_index(drop=True)
         return scores_df
