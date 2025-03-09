@@ -9,7 +9,7 @@ import pandas as pd
 
 # customs
 import protflow
-from protflow.runners import Runner, RunnerOutput
+from protflow.runners import Runner
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.config import PROTFLOW_DIR, PROTFLOW_ENV
@@ -584,7 +584,8 @@ class MDAnalysis(Runner):
         scorefile = os.path.join(work_dir, f"{prefix}_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
-            return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+            self.integrate_scores(poses, scores, prefix)
+            return poses
 
         # write commands
         cmds = self.write_cmds(poses)
@@ -605,7 +606,8 @@ class MDAnalysis(Runner):
         scores = self.collect_scores(work_dir, poses)
 
         # integrate and return
-        return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+        self.integrate_scores(poses, scores, prefix)
+        return poses
 
     def write_cmds(self, poses: Poses) -> list[str]:
         '''Automated cmd-file writer. Takes class attributes self.python, self.script_path, self.options and self.pose_options to write command for .run() method.'''
@@ -642,6 +644,24 @@ class MDAnalysis(Runner):
         # be aware that this compiling of commands requires the user to specify the input in pose_options!
         cmds = [f"{self.python} {self.script_path} {options}" for options in options_list]
         return cmds
+
+    def integrate_scores(self, poses: Poses, scores: pd.DataFrame, prefix: str) -> None:
+        '''Merges 'scores' from collect_scores() call into poses.df'''
+        startlen = len(poses)
+        dn = poses.df["poses_description"].head(5)
+
+        # add prefix to scores
+        scores.add_prefix(prefix)
+
+        # merge
+        poses.df.merge(scores, left_on="poses_description", right_on=f"{prefix}_description")
+
+        # check if merge was successful
+        if len(poses.df < startlen):
+            raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']\nposes_description: {dn}\nmerge_col {prefix}_description: {scores[f'{prefix}_descrption'].head(5)}")
+
+        return None
+
 
     def collect_scores(self, work_dir: str, poses: Poses) -> pd.DataFrame:
         '''Collect scores of MDAnalysis scripts.'''
