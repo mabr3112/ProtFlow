@@ -607,6 +607,7 @@ class MDAnalysis(Runner):
 
         # integrate and return
         self.integrate_scores(poses, scores, prefix)
+        poses.save_scores()
         return poses
 
     def write_cmds(self, poses: Poses) -> list[str]:
@@ -651,13 +652,13 @@ class MDAnalysis(Runner):
         dn = poses.df["poses_description"].head(5)
 
         # add prefix to scores
-        scores.add_prefix(prefix)
+        scores = scores.add_prefix(prefix + "_")
 
         # merge
         poses.df.merge(scores, left_on="poses_description", right_on=f"{prefix}_description")
 
         # check if merge was successful
-        if len(poses.df < startlen):
+        if len(poses.df) < startlen:
             raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']\nposes_description: {dn}\nmerge_col {prefix}_description: {scores[f'{prefix}_descrption'].head(5)}")
 
         return None
