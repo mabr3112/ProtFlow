@@ -655,7 +655,7 @@ class MDAnalysis(Runner):
         scores = scores.add_prefix(prefix + "_")
 
         # merge
-        poses.df.merge(scores, left_on="poses_description", right_on=f"{prefix}_description")
+        poses.df = poses.df.merge(scores, left_on="poses_description", right_on=f"{prefix}_description")
 
         # check if merge was successful
         if len(poses.df) < startlen:
