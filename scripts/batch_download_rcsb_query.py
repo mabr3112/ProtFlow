@@ -163,10 +163,16 @@ def main(args):
     ############### store pdb locations in .csv file for later easier retrieval #################
     # aggregate locations into DataFrame
     inverted_index = {pdb_id: batch_dir for batch_dir, pdb_ids in index_dict.items() for pdb_id in pdb_ids} # standard dict inversion
+
+    # collect paths
+    pdb_ids = list(inverted_index.keys())
+    relative_paths = [f"{os.path.join(relpath, pdb_id)}.{args.format}" for relpath, pdb_id in zip(list(inverted_index.values()), pdb_ids)]
+
+    # create index
     index_dict_full = {
         "pdb_id": list(inverted_index.keys()),
-        "relative_path": list(inverted_index.values()),
-        "absolute_path": [os.path.join(args.output_dir, relpath) for relpath in list(inverted_index.values())]
+        "relative_path": relative_paths,
+        "absolute_path": [os.path.join(os.path.abspath(args.output_dir), relpath) for relpath in relative_paths]
     }
 
     # store DataFrame in output_dir
