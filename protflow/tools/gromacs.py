@@ -663,13 +663,11 @@ class MDAnalysis(Runner):
 
         return None
 
-
     def collect_scores(self, work_dir: str, poses: Poses) -> pd.DataFrame:
         '''Collect scores of MDAnalysis scripts.'''
         # Every command writes its scores into its own directories.
         scores_list = []
         for pose in poses:
-            print(pose.index)
             pose_scores_fn = f"{work_dir}/{pose['poses_description']}/mdanalysis_scores.json"
             scores_list.append(pd.read_json(pose_scores_fn))
         scores_df = pd.concat(scores_list, ignore_index=True).reset_index(drop=True)

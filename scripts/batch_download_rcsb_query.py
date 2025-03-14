@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import time
 import logging
 import requests
 
@@ -11,6 +12,22 @@ import pandas as pd
 
 # custom
 import protflow
+
+def compile_pagination(n_rows: int, rows_per_page: int = 500) -> list[tuple[int, int]]:
+    '''compiles pagination for query chaining.'''
+    # Calculate how many full pages we have and leftover rows
+    full_pages, last_page_rows = divmod(n_rows, rows_per_page)
+
+    pages = [
+        (start, rows_per_page)
+        for start in range(0, full_pages * rows_per_page, rows_per_page)
+    ]
+
+    # Only add a last page if there's a remainder
+    if last_page_rows > 0:
+        pages.append((full_pages * rows_per_page, last_page_rows))
+
+    return pages
 
 def main(args):
     '''does stuff'''
@@ -39,6 +56,7 @@ def main(args):
     # RCSB Search API endpoint
     url = "https://search.rcsb.org/rcsbsearch/v2/query"
 
+    ############################# INQUIRY QUERY ###########################
     # Send the POST request with the JSON payload
     try:
         response = requests.post(url, json=query_dict, timeout=900)
@@ -49,10 +67,6 @@ def main(args):
     # process result
     if response.status_code == 200: # successful request
         results = response.json()
-        # Save the results to a file on your computer
-        with open(os.path.join(args.output_dir, "rcsb_results.json"), "w", encoding="UTF-8") as f:
-            json.dump(results, f, indent=2)
-        logging.info(f"Successfully retrieved {len(results.get('result_set', []))} results from RCSB query.")
     else: # request has hit an error
         raise RuntimeError(response.status_code, response.text)
 
@@ -61,10 +75,47 @@ def main(args):
         logging.info(f"Query yielded no hits. Query file: {args.query_file}")
         sys.exit(0)
 
+    ########################### COLLECTION QUERY ###############################
+    # get results with proper pagination
+    num_results = results["total_count"]
+    pages = compile_pagination(n_rows=num_results, rows_per_page=500)
+    logging.info(f"Retrieving {num_results} pdb_ids from query in {len(pages)} batches with 500 pdb_ids per batch.")
+
+    pdb_ids = []
+    for i, page in enumerate(pages):
+        query_dict["request_options"]["paginate"]["start"] = page[0]
+        query_dict["request_options"]["paginate"]["rows"] = page[1]
+
+        # Send the POST request with the JSON payload
+        try:
+            response = requests.post(url, json=query_dict, timeout=900)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            raise RuntimeError(f"RCSB query failed: {e}") from e
+
+        # process result
+        if response.status_code == 200: # successful request
+            results = response.json()
+        else: # request has hit an error
+            raise RuntimeError(response.status_code, response.text)
+
+        # aggregate
+        pdb_ids.extend([result["identifier"] for result in results.get("result_set", [])])
+
+        # let's be polite
+        time.sleep(0.1)
+
     ############## download pdbs into organized folder structure ################
     # count number of hits and prepare download
-    pdb_ids = [entry["identifier"] for entry in results.get("result_set", [])]
     logging.info(f"Found {len(pdb_ids)} entries.")
+
+    if args.pdb_ids_only:
+        outf = os.path.join(args.output_dir, "pdb_id_list.json")
+        logging.info(f"--pdb_ids_only specified. Storing list of pdb_ids as .json formatted file at {outf}")
+        with open(outf, 'w', encoding="UTF-8") as f:
+            json.dump(pdb_ids, f)
+        logging.info("Done.")
+        sys.exit(0)
 
     # split pdb_ids into batches
     pdb_batches = protflow.jobstarters.split_list(pdb_ids, args.batch_size)
@@ -139,6 +190,7 @@ if __name__ == "__main__":
     argparser.add_argument("--format", type=str, default="cif", help="{cif, pdb, fa} File format of downloads.")
     argparser.add_argument("--jobstarter", type=str, default="sbatch", help="{sbatch, local} Specify which jobstarter class to use for batch downloads.")
     argparser.add_argument("--num_workers", type=int, default=32, help="Number of parallel processes to start for download.")
+    argparser.add_argument("--pdb_ids_only", action="store_true", help="Set this flag, if you would only like to create a list of pdb_ids that match for the query. Ideal for testing.")
     arguments = argparser.parse_args()
 
     # check arguments (either input_json or input_pdb + reference_pdb)
