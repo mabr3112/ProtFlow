@@ -9,7 +9,7 @@ import pandas as pd
 
 # customs
 import protflow
-from protflow.runners import Runner, RunnerOutput
+from protflow.runners import Runner
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.config import PROTFLOW_DIR, PROTFLOW_ENV
@@ -162,7 +162,7 @@ class Gromacs(Runner):
         cmds = []
         for pose, pose_dir in zip(poses, pose_dirs):
             pbc_fn = os.path.join(pose_dir, pose["poses_description"] + "_pbc.gro")
-            cmd = f"cd {pose_dir}; {self.gromacs_path} editconf -f {pose} -o {pbc_fn} -bt dodecahedron -d 1.0" #TODO implement this as md_params parameter!
+            cmd = f"cd {pose_dir}; {self.gromacs_path} editconf -f {pose[f'{prefix}_processed_poses']} -o {pbc_fn} -bt dodecahedron -d 1.0" #TODO implement this as md_params parameter!
             cmds.append(cmd)
             pbc_fn_list.append(pbc_fn)
         poses.df[f"{prefix}_pbc_poses"] = pbc_fn_list
@@ -584,7 +584,8 @@ class MDAnalysis(Runner):
         scorefile = os.path.join(work_dir, f"{prefix}_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
-            return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+            self.integrate_scores(poses, scores, prefix)
+            return poses
 
         # write commands
         cmds = self.write_cmds(poses)
@@ -605,7 +606,9 @@ class MDAnalysis(Runner):
         scores = self.collect_scores(work_dir, poses)
 
         # integrate and return
-        return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+        self.integrate_scores(poses, scores, prefix)
+        poses.save_scores()
+        return poses
 
     def write_cmds(self, poses: Poses) -> list[str]:
         '''Automated cmd-file writer. Takes class attributes self.python, self.script_path, self.options and self.pose_options to write command for .run() method.'''
@@ -643,13 +646,29 @@ class MDAnalysis(Runner):
         cmds = [f"{self.python} {self.script_path} {options}" for options in options_list]
         return cmds
 
+    def integrate_scores(self, poses: Poses, scores: pd.DataFrame, prefix: str) -> None:
+        '''Merges 'scores' from collect_scores() call into poses.df'''
+        startlen = len(poses)
+        dn = poses.df["poses_description"].head(5)
+
+        # add prefix to scores
+        scores = scores.add_prefix(prefix + "_")
+
+        # merge
+        poses.df = poses.df.merge(scores, left_on="poses_description", right_on=f"{prefix}_description")
+
+        # check if merge was successful
+        if len(poses.df) < startlen:
+            raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']\nposes_description: {dn}\nmerge_col {prefix}_description: {scores[f'{prefix}_descrption'].head(5)}")
+
+        return None
+
     def collect_scores(self, work_dir: str, poses: Poses) -> pd.DataFrame:
         '''Collect scores of MDAnalysis scripts.'''
         # Every command writes its scores into its own directories.
         scores_list = []
         for pose in poses:
-            print(pose.index)
             pose_scores_fn = f"{work_dir}/{pose['poses_description']}/mdanalysis_scores.json"
             scores_list.append(pd.read_json(pose_scores_fn))
-        scores_df = pd.concat([scores_list], ignore_index=True).reset_index(drop=True)
+        scores_df = pd.concat(scores_list, ignore_index=True).reset_index(drop=True)
         return scores_df
