@@ -50,7 +50,13 @@ DSSP_PATH = "" # "/path/to/mambaforge/envs/dssp/bin/mkdssp"
 
 # boltz
 BOLTZ_PATH = "" #/path/to/CONDA/envs/boltz_env/bin/boltz
+BOLTZ_PYTHON_PATH = "" # "/path/to/anaconda3/envs/boltz/bin/python3"
 BOLTZ_PRE_CMD = ""
 
 # gromacs
 GROMACS_PATH = "" #/path/to/gromacs/bin/
+
+# PLACER
+PLACER_SCRIPT_PATH = "" # ""/path/to/PLACER/run_PLACER.py"
+PLACER_PYTHON_PATH = "" # "/path/to/mambaforge/envs/placer/bin/python"
+PLACER_PRE_CMD = ""
