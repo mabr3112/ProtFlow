@@ -544,7 +544,7 @@ class LigandMPNN(Runner):
 
                 # arguments that can be parsed as residues (from ResidueSelection objects):
                 elif mpnn_arg in ["redesigned_residues", "fixed_residues", "transmembrane_buried", "transmembrane_interface"]:
-                    opts.append(f"--{mpnn_arg}='{parse_residues(pose[mpnn_arg_col])}'")
+                    opts.append(f"--{mpnn_arg}={parse_residues(pose[mpnn_arg_col])}")
 
                 # all other arguments:
                 else:
