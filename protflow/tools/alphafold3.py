@@ -71,6 +71,7 @@ import logging
 from glob import glob
 import shutil
 import json
+import random
 import string
 from typing import Union, Any
 
@@ -200,7 +201,7 @@ class AlphaFold3(Runner):
     def __str__(self):
         return "colabfold.py"
 
-    def run(self, poses: Poses, prefix: str, nstruct: int = 1, json_column: str = None, num_copies: int = 1, msa_paired: str = None, msa_unpaired: str = None, templates: Union[str, list, dict] = None, modifications: Union[str, list, dict] = None, col_as_input: bool = False, single_sequence_mode: bool = False, use_templates: bool = True, additional_entities: Union[str, list, dict] = None, bonded_atom_pairs: Union[str, list] = None, user_ccd: Union[str, list] = None, options: str = None, pose_options: str = None, jobstarter: JobStarter = None, overwrite: bool = False, return_top_n_models: int = 1, convert_cif_to_pdb: bool = True) -> Poses:
+    def run(self, poses: Poses, prefix: str, nstruct: int = 1, json_column: str = None, num_copies: int = 1, msa_paired: str = None, msa_unpaired: str = None, templates: Union[str, list, dict] = None, modifications: Union[str, list, dict] = None, col_as_input: bool = False, single_sequence_mode: bool = False, use_templates: bool = True, additional_entities: Union[str, list, dict] = None, bonded_atom_pairs: Union[str, list] = None, user_ccd: Union[str, list] = None, options: str = None, pose_options: str = None, jobstarter: JobStarter = None, overwrite: bool = False, return_top_n_models: int = 1, convert_cif_to_pdb: bool = True, random_seed: bool = False) -> Poses:
         """
         run Method
         ==========
@@ -315,7 +316,7 @@ class AlphaFold3(Runner):
                     shutil.copy(json_path, os.path.join(json_in, os.path.basename(json_path)))
                 json_dirs.append(json_in)
         else:
-            json_dirs = create_input_json_dir(json_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd)
+            json_dirs = create_input_json_dir(json_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd, random_seed)
 
         # prepare pose options
         pose_options = self.prep_pose_options(poses=poses, pose_options=pose_options)
@@ -451,7 +452,7 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
         scores = pd.DataFrame(scores)
         scores["sequence"] = data["sequences"][0]["protein"]["sequence"]
         return scores
-    
+
     def convert_cif_to_pdb(input: str, format: str, output:str):
         openbabel_fileconverter(input_file=input, output_format=format, output_file=output)
         return output
@@ -474,7 +475,7 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
     return scores
 
 
-def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd) -> list:
+def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd, random_seed: bool) -> list:
     def _prep_option(option: Any, row: pd.Series, col_as_input: bool) -> Any:
         if option is None:
             return None
@@ -558,9 +559,10 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
             sequences.append(row_additional_entities)
 
         # create input dict
+        seeds = [random.randint(1, 100000) for _ in range(nstruct)] if random_seed else list(range(0, nstruct))
         record = {
             "name": row["poses_description"],
-            "modelSeeds": list(range(0, nstruct)),
+            "modelSeeds": seeds,
             "sequences": sequences,
         }
 
