@@ -574,6 +574,8 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
         elif row_bonded_atom_pairs:
             raise ValueError(f"Input to :bonded_atom_pairs: must be a nested list of bonds or a dictionary in the AF3 input format, not {type(user_ccd)}!")
 
+        print(row_user_ccd)
+        print(type(row_user_ccd))
         if row_user_ccd and isinstance(row_user_ccd, str) and os.path.isfile(row_user_ccd):
             record.update(import_custom_ccd(row_user_ccd))
         elif row_user_ccd and isinstance(row_user_ccd, str):
