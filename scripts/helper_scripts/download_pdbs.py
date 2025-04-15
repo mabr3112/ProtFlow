@@ -7,7 +7,7 @@ import requests
 
 def main(args):
     '''do stuff'''
-    os.makedirs(args.output_dir)
+    os.makedirs(args.output_dir, exist_ok=True)
     # setup logging
     logging.basicConfig(
         level=logging.INFO,  # Change to DEBUG for more details

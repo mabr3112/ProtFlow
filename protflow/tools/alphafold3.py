@@ -71,8 +71,9 @@ import logging
 from glob import glob
 import shutil
 import json
+import random
 import string
-from typing import Union
+from typing import Union, Any
 
 # dependencies
 import pandas as pd
@@ -200,7 +201,7 @@ class AlphaFold3(Runner):
     def __str__(self):
         return "colabfold.py"
 
-    def run(self, poses: Poses, prefix: str, nstruct: int = 1, json_column: str = None, num_copies: int = 1, msa_paired: str = None, msa_unpaired: str = None, templates: Union[str, list, dict] = None, modifications: Union[str, list, dict] = None, col_as_input: bool = False, single_sequence_mode: bool = False, use_templates: bool = True, additional_entities: Union[str, list, dict] = None, bonded_atom_pairs: Union[str, list] = None, user_ccd: Union[str, list] = None, options: str = None, pose_options: str = None, jobstarter: JobStarter = None, overwrite: bool = False, return_top_n_models: int = 1, convert_cif_to_pdb: bool = True) -> Poses:
+    def run(self, poses: Poses, prefix: str, nstruct: int = 1, json_column: str = None, num_copies: int = 1, msa_paired: str = None, msa_unpaired: str = None, templates: Union[str, list, dict] = None, modifications: Union[str, list, dict] = None, col_as_input: bool = False, single_sequence_mode: bool = False, use_templates: bool = True, additional_entities: Union[str, list, dict] = None, bonded_atom_pairs: Union[str, list] = None, user_ccd: Union[str, list] = None, options: str = None, pose_options: str = None, jobstarter: JobStarter = None, overwrite: bool = False, return_top_n_models: int = 1, convert_cif_to_pdb: bool = True, random_seed: bool = False) -> Poses:
         """
         run Method
         ==========
@@ -315,7 +316,7 @@ class AlphaFold3(Runner):
                     shutil.copy(json_path, os.path.join(json_in, os.path.basename(json_path)))
                 json_dirs.append(json_in)
         else:
-            json_dirs = create_input_json_dir(json_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd)
+            json_dirs = create_input_json_dir(json_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd, random_seed)
 
         # prepare pose options
         pose_options = self.prep_pose_options(poses=poses, pose_options=pose_options)
@@ -451,7 +452,7 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
         scores = pd.DataFrame(scores)
         scores["sequence"] = data["sequences"][0]["protein"]["sequence"]
         return scores
-    
+
     def convert_cif_to_pdb(input: str, format: str, output:str):
         openbabel_fileconverter(input_file=input, output_format=format, output_file=output)
         return output
@@ -474,8 +475,14 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
     return scores
 
 
-def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd) -> list:
-    
+def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd, random_seed: bool) -> list:
+    def _prep_option(option: Any, row: pd.Series, col_as_input: bool) -> Any:
+        if option is None:
+            return None
+        if col_as_input:
+            return row[option]
+        return option
+
     def check_entity(entity: dict):
         if not isinstance(entity, dict): 
             raise ValueError(f"Additional entities must be provided in dict format, not {type(entity)}! Affected entity is {entity}")
@@ -483,38 +490,37 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
             raise ValueError(f"Input entity must contain about type like 'protein', 'ligand', 'dna' or 'rna'. Affected entity: {entity}")
 
     def import_custom_ccd(path):
-        with open(path, "r") as f:
+        with open(path, "r", encoding="UTF-8") as f:
             ccd = f.read()
         return {"userCCD": ccd}
 
     # load sequences
     seqs = [str(load_sequence_from_fasta(pose, return_multiple_entries=False).seq) for pose in poses.poses_list()]
-    
+
     records = []
     for seq, (_, row) in zip(seqs, poses.df.iterrows()):
-        if col_as_input:
-            if msa_paired: msa_paired = row[msa_paired]
-            if msa_unpaired: msa_unpaired = row[msa_unpaired]
-            if modifications: modifications = row[modifications]
-            if templates: templates = row[templates]
-            if additional_entities: additional_entities = row[additional_entities]
-            if bonded_atom_pairs: bonded_atom_pairs = row[bonded_atom_pairs]
-            if user_ccd: user_ccd = row[user_ccd]
+        row_msa_paired = _prep_option(msa_paired, row, col_as_input)
+        row_msa_unpaired = _prep_option(msa_unpaired, row, col_as_input)
+        row_modifications = _prep_option(modifications, row, col_as_input)
+        row_templates = _prep_option(templates, row, col_as_input)
+        row_additional_entities = _prep_option(additional_entities, row, col_as_input)
+        row_bonded_atom_pairs = _prep_option(bonded_atom_pairs, row, col_as_input)
+        row_user_ccd = _prep_option(user_ccd, row, col_as_input)
 
         # prevent MSA generation if set
         if single_sequence_mode:
-            msa_paired = ""
-            msa_unpaired = ""
-        
+            row_msa_paired = ""
+            row_msa_unpaired = ""
+
         # prevent usage of templates if not set
         if not use_templates:
-            templates = []
+            row_templates = []
 
         # add modifications and templates if provided
-        if modifications and isinstance(modifications, dict):
-            modifications = [modifications]
-        if templates and isinstance(templates, dict):
-            templates = [templates]
+        if row_modifications and isinstance(row_modifications, dict):
+            row_modifications = [row_modifications]
+        if row_templates and isinstance(row_templates, dict):
+            row_templates = [row_templates]
 
         # assign a unique id for each copy
         id = list(string.ascii_uppercase)[:num_copies]
@@ -527,42 +533,56 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
         }
 
         # AF3 will create MSAs automatically if options are not specified
-        if isinstance(msa_unpaired, str): pose_data["protein"].update({"unpairedMsaPath": msa_unpaired})
-        if isinstance(msa_paired, str): pose_data["protein"].update({"pairedMsaPath": msa_paired})
+        if isinstance(row_msa_unpaired, str):
+            pose_data["protein"].update({"unpairedMsaPath": row_msa_unpaired})
+        if isinstance(row_msa_paired, str):
+            pose_data["protein"].update({"pairedMsaPath": row_msa_paired})
 
         # AF3 will use templates automatically if options are not specified
-        if isinstance(templates, list): pose_data["protein"].update({"templates": templates})
+        if isinstance(row_templates, list):
+            pose_data["protein"].update({"templates": row_templates})
 
         # add modifications
-        if modifications: pose_data["protein"].update({"modifications": modifications})
+        if row_modifications:
+            pose_data["protein"].update({"modifications": row_modifications})
 
         # add additional data
         sequences = [pose_data]
 
-        if additional_entities and isinstance(additional_entities, list):
-            for entity in additional_entities: check_entity(entity)
-            sequences = sequences + additional_entities
-        elif additional_entities and isinstance(additional_entities, dict):
-            check_entity(additional_entities)
-            sequences.append(additional_entities)
+        # handle additional entities for col as input and direct input
+        if row_additional_entities and isinstance(row_additional_entities, list):
+            for entity in row_additional_entities:
+                check_entity(entity)
+            sequences = sequences + row_additional_entities
+        elif row_additional_entities and isinstance(row_additional_entities, dict):
+            check_entity(row_additional_entities)
+            sequences.append(row_additional_entities)
 
         # create input dict
+        seeds = [random.randint(1, 100000) for _ in range(nstruct)] if random_seed else list(range(0, nstruct))
         record = {
             "name": row["poses_description"],
-            "modelSeeds": [_ for _ in range(0, nstruct)],
+            "modelSeeds": seeds,
             "sequences": sequences,
         }
 
         # add additional settings
-        if bonded_atom_pairs and isinstance(bonded_atom_pairs, dict): record.update(bonded_atom_pairs)
-        elif bonded_atom_pairs and isinstance(bonded_atom_pairs, list): record.update({"bondedAtomPairs": bonded_atom_pairs})
-        elif bonded_atom_pairs:
+        if row_bonded_atom_pairs and isinstance(row_bonded_atom_pairs, dict):
+            record.update(row_bonded_atom_pairs)
+        elif row_bonded_atom_pairs and isinstance(row_bonded_atom_pairs, list):
+            record.update({"bondedAtomPairs": row_bonded_atom_pairs})
+        elif row_bonded_atom_pairs:
             raise ValueError(f"Input to :bonded_atom_pairs: must be a nested list of bonds or a dictionary in the AF3 input format, not {type(user_ccd)}!")
 
-        if user_ccd and isinstance(user_ccd, str) and os.path.isfile(user_ccd): record.update(import_custom_ccd(user_ccd))
-        elif user_ccd and isinstance(user_ccd, str): record.update({"userCCD": user_ccd})
-        elif user_ccd and isinstance(user_ccd, dict): record.update(user_ccd)
-        elif user_ccd:
+        print(row_user_ccd)
+        print(type(row_user_ccd))
+        if row_user_ccd and isinstance(row_user_ccd, str) and os.path.isfile(row_user_ccd):
+            record.update(import_custom_ccd(row_user_ccd))
+        elif row_user_ccd and isinstance(row_user_ccd, str):
+            record.update({"userCCD": row_user_ccd})
+        elif row_user_ccd and isinstance(row_user_ccd, dict):
+            record.update(row_user_ccd)
+        elif row_user_ccd:
             raise ValueError(f"Input to :user_ccd: must be the path to a mmcif file, a string containing mmcif data or a dictionary in the AF3 input format, not {type(user_ccd)}!")
 
         records.append(record)
@@ -575,7 +595,7 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
     for i, sublist in enumerate(records):
         os.makedirs(json_dir := os.path.join(out_dir, f"input_{i}"), exist_ok=True)
         for record in sublist:
-            with open(os.path.join(json_dir, f"{record['name']}.json"), "w") as file:
+            with open(os.path.join(json_dir, f"{record['name']}.json"), "w", encoding="UTF-8") as file:
                 json.dump(record, file, indent=4)
         json_dirs.append(json_dir)
 
