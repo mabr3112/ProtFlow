@@ -94,7 +94,7 @@ def main(args):
         if args.return_superimposed_poses:
             out_dir = os.path.dirname(args.output_path)
             os.makedirs(super_dir := os.path.join(out_dir, "superimposed"), exist_ok=True)
-            path = os.path.join(super_dir, f"{description_from_path(target)}.pdb")
+            path = os.path.join(super_dir, f"{description_from_path(mobile)}.pdb")
             save_structure_to_pdbfile(superimposed, save_path=path)
 
 
