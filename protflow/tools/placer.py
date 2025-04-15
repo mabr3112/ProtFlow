@@ -266,7 +266,7 @@ class PLACER(Runner):
         os.makedirs(out_dir := os.path.join(work_dir, "output"), exist_ok=True)
 
         # Look for output-file in pdb-dir. If output is present and correct, then skip Colabfold.
-        scorefile = os.path.join(work_dir, f"af3_scores.{poses.storage_format}")
+        scorefile = os.path.join(work_dir, f"placer_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
@@ -435,6 +435,7 @@ def collect_scores(work_dir: str) -> pd.DataFrame:
         os.makedirs(pose_dir := os.path.join(work_dir, in_pose), exist_ok=True)
         #out_poses = load_structure_from_pdbfile(os.path.join(work_dir, f"{in_pose}_model.pdb"), all_models=True)
         # no idea why, but BioPython can't handle the models produced by PLACER, so this is a workaround
+        df["multimodel_path"] = os.path.abspath(os.path.join(work_dir, f"{in_pose}_model.pdb"))
         df["location"] = split_model_sections(os.path.join(work_dir, f"{in_pose}_model.pdb"), in_pose, pose_dir)
         df["description"] = [description_from_path(path) for path in df["location"].to_list()]
         scores.append(df)
