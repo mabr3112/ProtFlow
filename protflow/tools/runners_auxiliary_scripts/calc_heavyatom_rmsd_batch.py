@@ -82,10 +82,10 @@ def main(args):
     for target in target_dict:
         opts = target_dict[target]
         rms, superimposed = motif_superimpose_calc_rmsd(
-            mobile = load_structure_from_pdbfile(opts["ref_pdb"]),
-            target = load_structure_from_pdbfile(target),
-            mobile_atoms = ResidueSelection(opts["reference_motif"]),
-            target_atoms = ResidueSelection(opts["target_motif"]),
+            mobile = load_structure_from_pdbfile(target),
+            target = load_structure_from_pdbfile(opts["ref_pdb"]),
+            mobile_atoms = ResidueSelection(opts["target_motif"]),
+            target_atoms = ResidueSelection(opts["reference_motif"]),
             atom_list = atoms,
             output_superimposed=args.return_superimposed_poses
         )
@@ -94,7 +94,7 @@ def main(args):
         if args.return_superimposed_poses:
             out_dir = os.path.dirname(args.output_path)
             os.makedirs(super_dir := os.path.join(out_dir, "superimposed"), exist_ok=True)
-            path = os.path.join(super_dir, f"{description_from_path(mobile)}.pdb")
+            path = os.path.join(super_dir, f"{description_from_path(target)}.pdb")
             save_structure_to_pdbfile(superimposed, save_path=path)
 
 
