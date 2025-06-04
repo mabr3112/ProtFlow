@@ -124,7 +124,7 @@ class PlottingTrajectory():
 
         # get colors from colormap
         colors = [mcolors.to_hex(color) for color in plt.get_cmap(self.colormap).colors]
-        fig, ax = plt.subplots(1, 1, figsize=(3+0.8*(len(self.data)), 5))
+        fig, ax = plt.subplots(1, 1, figsize=(3+0.8*(len(self.data)), 5), constrained_layout=True)
 
         #for ax, col, name, label, dim in zip(ax_list, cols, titles, y_labels, dims):
         ax.set_title(self.title, size=15, y=1.05)
@@ -141,10 +141,17 @@ class PlottingTrajectory():
             ax.vlines(i+1, np.min(d), np.max(d), color="k", linestyle="-", lw=2)
 
         handles = [mpatches.Patch(color=c, label=f"{l[0]} (n={len(l[1])})") for c, l in zip(colors, [x for x in self.data])]
-        fig.legend(handles=handles, loc='right', bbox_to_anchor=(0.45+(1-len(self.data)*0.05),0.5),
-                  fancybox=True, shadow=True, ncol=1, fontsize=13)
+        fig.legend(
+            handles=handles,
+            loc='center left',
+            bbox_to_anchor=(1.02, 0.5),  # just outside the axes to the right
+            fancybox=True,
+            shadow=True,
+            fontsize=13,
+            ncol=1  # vertical stack on the right
+        )
 
-        if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches="tight")
+        if out_path: fig.savefig(out_path, dpi=300, format="png", bbox_inches='tight')
         if show_fig: fig.show()
         return None
 
