@@ -87,7 +87,7 @@ def main(args):
     runner_dict = {
         "ESMFold": {
             "runner": ESMFold() if protflow.config.ESMFOLD_PYTHON_PATH else None,
-            "poses_options": {"poses": "input_files/fastas/", "glob_suffix": "*.fasta"},
+            "poses_options": {"poses": "input_files/esmfold/", "glob_suffix": "*.fasta"},
             "runner_options": {"jobstarter": jobstarter or js_dict['slurm_gpu_jobstarter']},
             "config": [protflow.config.ESMFOLD_PYTHON_PATH]
         },
