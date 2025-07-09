@@ -442,7 +442,7 @@ class LocalJobStarter(JobStarter):
             with open(output_file, 'w', encoding="UTF-8") as file:
                 # Start the process
                 process = subprocess.Popen(command, env=env, executable="/bin/bash", shell=True, stdout=file, stderr=subprocess.STDOUT)
-            process.command = command # giving process a custom attribute for later error tractability
+            process.command = command # type: ignore ### giving process a custom attribute for later error tractability
             return process
 
         def update_active_processes(active_processes: list) -> list:
@@ -584,9 +584,9 @@ def split_list(input_list: list, element_length: int = None, n_sublists: int = N
     """
     # safety
     if element_length and n_sublists:
-        raise ValueError(f"Only either element_length or n_sublists can be specified, but not both!")
+        raise ValueError("Only either element_length or n_sublists can be specified, but not both!")
     if not element_length and not n_sublists:
-        raise ValueError(f"At least one of arguments 'element_length or n_sublists has to be given!")
+        raise ValueError("At least one of arguments 'element_length or n_sublists has to be given!")
 
     # handling n_sublists
     if n_sublists:
