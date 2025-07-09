@@ -235,7 +235,7 @@ class Rosetta(Runner):
         if not rosetta_application:
             if os.path.isfile(script_path) and os.access(script_path, os.X_OK):
                 return script_path
-            raise ValueError(f"Rosetta Executable not setup properly. Either provide executable through Runner.script_path or give directly to run(rosetta_application)")
+            raise ValueError(f"No Rosetta executable was specified. Either provide an executable with the 'rosetta_application' parameter in the Rosetta.run() method, or specify an executable when setting up the rosetta runner with the attribute Runner.script_path.")
 
         # if rosetta_application is provided, check if it is executable:
         if os.path.isfile(rosetta_application) and os.access(rosetta_application, os.X_OK):
@@ -368,7 +368,7 @@ class Rosetta(Runner):
         fail_on_missing_output_poses = fail_on_missing_output_poses or self.fail_on_missing_output_poses
         if len(scores.index) < len(poses.df.index) * nstruct and fail_on_missing_output_poses == True:
             raise RuntimeError("Number of output poses is smaller than number of input poses * nstruct. Some runs might have crashed!")
-    
+
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -483,6 +483,9 @@ def collect_scores(work_dir: str) -> pd.DataFrame:
     This function is designed to streamline the process of collecting and organizing Rosetta output data, making it easier for researchers and developers to analyze the results of Rosetta simulations within the ProtFlow framework.
     """
     scorefiles = glob(os.path.join(work_dir, "r*_*_score.json"))
+    if not scorefiles:
+        raise ValueError(f"No scorefiles found, probably Rosetta crashed. To investigate, check all process logs at {work_dir}")
+
     scores_l = []
     for scorefile in scorefiles:
         scores_l.append(pd.read_json(scorefile, typ='series'))

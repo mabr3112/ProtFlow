@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     # setup args
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    argparser.add_argument("--query_file", type=str, required=True, help="Path to the file that contains the query (copied from RCSB advanced query page)")
+    argparser.add_argument("--query_file", type=str, required=True, help="Path to .json file that contains the query (copied from RCSB advanced query page). To get the advanced query: build the query on the RCSB website. Then click on the button 'Search API'. Copy the dictionary into a file and name it 'whatever.json'. ")
     argparser.add_argument("--output_dir", type=str, required=True, help="Path to root directory of where the files should be stored.")
     argparser.add_argument("--batch_size", type=int, default=1000, help="Size of the batches in which pdb files should be grouped.")
     argparser.add_argument("--format", type=str, default="cif", help="{cif, pdb, fa} File format of downloads.")
