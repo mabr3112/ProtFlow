@@ -1,3 +1,5 @@
+[![Run tests](https://github.com/mabr3112/ProtFlow/actions/workflows/pytest.yaml/badge.svg?branch=master)](https://github.com/mabr3112/ProtFlow/actions/workflows/pytest.yaml)
+
 # ProtFlow
 A Python package for running protein design tools on SLURM clusters.
 
