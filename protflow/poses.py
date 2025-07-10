@@ -1434,7 +1434,7 @@ class Poses:
             self.df['poses'] = fasta_paths
 
     ########################################## Filtering ###############################################
-    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, plot_cols: list[str] = None, overwrite: bool = True, storage_format: str = None) -> "Poses":
+    def filter_poses_by_rank(self, n: float, score_col: str, group_col: str = None, remove_layers: int = None, layer_col: str = "poses_description", sep = "_", ascending: bool = True, prefix: str = None, plot: bool = False, plot_cols: list[str] = None, overwrite: bool = True, storage_format: str = None) -> "Poses":
         """
         Filters poses based on their rank in a specified score column, with options to handle layers and generate plots.
 
@@ -1444,6 +1444,8 @@ class Poses:
             The number of top-ranked poses to keep. If n < 1, it represents a fraction of the total poses.
         score_col : str
             The column in the DataFrame containing the scores used for ranking.
+        group_col : str, optional
+            Group dataframe by this column and filter individual groups.
         remove_layers : int, optional
             The number of layers to remove from the pose descriptions before ranking. This helps in grouping similar poses.
         layer_col : str, optional
@@ -1491,6 +1493,10 @@ class Poses:
         - Logs the filtering process, including any errors or warnings related to the ranking criteria.
 
         """
+
+        if group_col and remove_layers:
+            raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
+    
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
             if self.filter_dir is None:
@@ -1513,7 +1519,7 @@ class Poses:
 
         # Filter df down to the number of poses specified with <n>
         orig_len = str(len(self.df))
-        filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
+        filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, group_col=group_col, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
         logging.info(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses according to {score_col}.")
 
         # save filtered dataframe if prefix is provided
@@ -2413,7 +2419,7 @@ def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
         if not column in df.columns:
             raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
 
-def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_layers: int = None, layer_col: str = "poses_description", sep: str = "_", ascending: bool = True) -> pd.DataFrame:
+def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, group_col: str = None, remove_layers: int = None, layer_col: str = "poses_description", sep: str = "_", ascending: bool = True) -> pd.DataFrame:
     """
     Filters the DataFrame to retain only the top-ranked rows based on a specified column.
 
@@ -2425,6 +2431,8 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_la
         The column in the DataFrame used for ranking.
     n : Union[float, int]
         The number of top-ranked rows to retain. If n < 1, it represents a fraction of the total rows.
+    group_col : str, optional
+        Group dataframe by this column, then filter individual groups.
     remove_layers : int, optional
         The number of layers to remove from the column values before ranking. This helps in grouping similar rows.
     layer_col : str, optional
@@ -2477,12 +2485,34 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_la
             raise ValueError(f"ERROR: Argument <n> of filter functions cannot be smaller than 0. It has to be positive number. If n < 1, the top n fraction is taken from the DataFrame. if n > 1, the top n rows are taken from the DataFrame")
 
         return int(filter_n)
+    
+    def filter_groups(df: pd.DataFrame, col: str, n: float, group_col: str, ascending: bool) -> pd.DataFrame:
+        '''
+        groups a dataframe, then filters individual groups.
+        '''
+        # check if group col exists in df
+        col_in_df(df, group_col)
+
+        # group by group column, filter top n rows per group
+        filtered = []
+        for _, group_df in df.groupby(group_col, sort=False):
+            filtered.append(group_df.sort_values(by=col, ascending=ascending).head(determine_filter_n(group_df, n)))
+
+        return pd.concat(filtered).reset_index(drop=True)
+
 
     # make sure <col> exists columns in <df>
     col_in_df(df, col)
 
+    if group_col and remove_layers:
+        raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
+
+    # if group_col is set, group dataframe and filter individual groups
+    if group_col:
+        filtered_df = filter_groups(df=df, col=col, n=n, group_col=group_col, ascending=ascending)
+
     # if remove_layers is set, compile list of unique pose descriptions after removing one index layer:
-    if remove_layers:
+    elif remove_layers:
         if not isinstance(remove_layers, int):
             raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
 
@@ -2493,10 +2523,7 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_la
         df["tmp_layer_column"] = df[layer_col].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
 
         # group by temporary description column, filter top n rows per group
-        filtered = []
-        for _, group_df in df.groupby("tmp_layer_column", sort=False):
-            filtered.append(group_df.sort_values(by=col, ascending=ascending).head(determine_filter_n(group_df, n)))
-        filtered_df = pd.concat(filtered).reset_index(drop=True)
+        filtered_df = filter_groups(df=df, col=col, n=n, group_col="tmp_layer_column", ascending=ascending)
 
         #drop temporary description column
         filtered_df.drop("tmp_layer_column", axis=1, inplace=True)
