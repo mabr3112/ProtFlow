@@ -47,8 +47,8 @@ import re
 import pandas as pd
 
 # custom
-from protflow.poses import Poses, get_format, FORMAT_STORAGE_DICT
-from protflow.jobstarters import JobStarter
+from .poses import Poses, get_format, FORMAT_STORAGE_DICT
+from .jobstarters import JobStarter
 
 class RunnerOutput:
     """

@@ -79,7 +79,7 @@ import Bio.PDB.Model
 import Bio.PDB.Structure
 
 # customs
-from protflow.residues import ResidueSelection
+from ..residues import ResidueSelection
 
 def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Union[Structure, Model]:
     """
