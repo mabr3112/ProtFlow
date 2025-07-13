@@ -80,14 +80,12 @@ import pandas as pd
 import numpy as np
 
 # custom
-import protflow.config
-import protflow.jobstarters
-import protflow.tools
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from protflow.poses import Poses, col_in_df, description_from_path
-from protflow.jobstarters import JobStarter, split_list
-from protflow.utils.biopython_tools import load_sequence_from_fasta
-from protflow.utils.openbabel_tools import openbabel_fileconverter
+from .. import config
+from ..runners import Runner, RunnerOutput, prepend_cmd
+from ..poses import Poses, col_in_df, description_from_path
+from ..jobstarters import JobStarter, split_list
+from ..utils.biopython_tools import load_sequence_from_fasta
+from ..utils.openbabel_tools import openbabel_fileconverter
 
 class AlphaFold3(Runner):
     """
@@ -156,7 +154,7 @@ class AlphaFold3(Runner):
 
     The ColabFold class is intended for researchers and developers who need to perform AlphaFold2 predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.ALPHAFOLD3_SCRIPT_PATH, python_path: str = protflow.config.ALPHAFOLD3_PYTHON_PATH, pre_cmd:str=protflow.config.ALPHAFOLD3_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = config.ALPHAFOLD3_SCRIPT_PATH, python_path: str = config.ALPHAFOLD3_PYTHON_PATH, pre_cmd:str=config.ALPHAFOLD3_PRE_CMD, jobstarter: str = None) -> None:
         """
         __init__ Method
         ===============

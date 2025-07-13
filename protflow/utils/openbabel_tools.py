@@ -59,12 +59,11 @@ Authors
 -------
 Markus Braun, Adrian Tripp
 """
-
 # Imports
-# dependencies
-
-from openbabel import openbabel
 import os
+
+# dependencies
+from openbabel import openbabel
 
 # customs
 def openbabel_fileconverter(input_file: str, output_format:str, output_file:str=None, input_format:str=None) -> str:

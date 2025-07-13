@@ -61,16 +61,17 @@ Version
 -------
 1.0.0
 """
-# dependencies
+# imports
+import os
 import logging
-import matplotlib
-from matplotlib import pyplot as plt
+
+# dependencies
+import numpy as np
+import pandas as pd
 from matplotlib import rc
+from matplotlib import pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
-import pandas as pd
-import numpy as np
-import os
 
 class PlottingTrajectory():
     def __init__(self, y_label: str, location: str, title: str = "Refinement Trajectory", dims = None):
