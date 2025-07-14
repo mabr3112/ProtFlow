@@ -147,7 +147,7 @@ class GenericMetric(Runner):
 
     The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str = os.path.join(PROTFLOW_ENV, "python3"), module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+    def __init__(self, python_path: str = PROTFLOW_ENV, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         """
         Initialize the BackboneRMSD class.
 
@@ -432,7 +432,7 @@ class GenericMetric(Runner):
         cmds = [f"{python_path} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --module {module} --function {function}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
         if options:
             options_path = os.path.join(poses.work_dir, prefix, f"{prefix}_options.json")
-            with open(options_path, "w") as f:
+            with open(options_path, "w", encoding="UTF-8") as f:
                 json.dump(options, f)
             cmds = [f"{cmd} --options {options_path}" for cmd in cmds]
 
@@ -488,9 +488,6 @@ def main(args):
 
 if __name__ == "__main__":
     import argparse
-    import pandas as pd
-    import os
-    import json
 
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--poses", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
