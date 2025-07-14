@@ -1065,7 +1065,6 @@ def main(args):
         df = pd.DataFrame(out_dict)
         df.to_json(args.out)
 
-
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--poses", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
