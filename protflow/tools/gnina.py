@@ -478,7 +478,8 @@ def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve
 
     # read .pdb files
     scorefiles = glob(f"{work_dir}/*.score")
-    if not scorefiles: raise FileNotFoundError(f"No .score files were found in the output directory of gnina {work_dir}. Gnina might have crashed (check output log), or path might be wrong!")
+    if not scorefiles:
+        raise FileNotFoundError(f"No .score files were found in the output directory of gnina {work_dir}. Gnina might have crashed (check output log), or path might be wrong!")
 
     scores = pd.concat([extract_gnina_table(scorefile) for scorefile in scorefiles]).reset_index(drop=True)
 

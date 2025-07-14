@@ -542,6 +542,7 @@ def translate_entity(entity: Bio.PDB.Entity, vector: np.array) -> None:
     --------
     None
         The entity is modified in place.
+    
     """
     # Ensure the vector is a NumPy array
     vector = np.array(vector, dtype=float)

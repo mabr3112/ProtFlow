@@ -140,25 +140,6 @@ class SbatchArrayJobstarter(JobStarter):
     completion. It also supports options for GPU usage and automatic cleanup of command files after job 
     completion.
 
-    Methods
-    -------
-    __init__(max_cores: int = 100, remove_cmdfile: bool = False, options: str = None, gpus: bool = False)
-        Initializes the SbatchArrayJobstarter with optional parameters for maximum cores, command file removal, 
-        SBATCH options, and GPU usage.
-    
-    start(cmds: list, jobname: str, wait: bool = True, output_path: str = "./") -> None
-        Writes the commands to a command file and submits the job array to SLURM. If the number of commands 
-        exceeds the maximum allowed for a single array, it splits them into multiple arrays.
-    
-    parse_options(options: object) -> str
-        Parses the SBATCH options from a string or list format.
-    
-    set_options(options: object, gpus: int) -> None
-        Sets the SBATCH options, including GPU configuration if specified.
-    
-    wait_for_job(jobname: str, interval: float = 5) -> None
-        Waits for the SLURM jobs to be finished, checking the job status at regular intervals.
-
     Parameters
     ----------
     max_cores : int, optional
@@ -346,18 +327,6 @@ class LocalJobStarter(JobStarter):
     locally on the machine. It handles the execution of commands using subprocesses, manages 
     the maximum number of concurrent processes, and captures the output and error logs for 
     each command.
-
-    Methods
-    -------
-    __init__(max_cores: int = 1)
-        Initializes the LocalJobStarter with an optional parameter for maximum cores.
-    
-    start(cmds: list, jobname: str, wait: bool = True, output_path: str = None) -> None
-        Submits a list of commands to be run locally, managing the execution and logging 
-        of each command.
-    
-    wait_for_job(jobname: str, interval: float) -> None
-        (No-op) Method for waiting for started jobs.
 
     Parameters
     ----------
