@@ -72,9 +72,9 @@ from typing import Any
 
 # import dependencies
 import pandas as pd
-import protflow
 
 # import customs
+from protflow import jobstarters
 from protflow.config import PROTFLOW_ENV
 from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 from protflow.residues import ResidueSelection
@@ -260,7 +260,7 @@ class BackboneRMSD(Runner):
         if atoms == "all":
             self.atoms = "all"
         if not isinstance(atoms, list) or not all((isinstance(atom, str) for atom in atoms)):
-            raise TypeError(f"Atoms needs to be a list, atom names (list elements) must be string.")
+            raise TypeError("Atoms needs to be a list, atom names (list elements) must be string.")
         self.atoms = atoms
 
     def set_chains(self, chains:list[str]) -> None:
@@ -304,7 +304,7 @@ class BackboneRMSD(Runner):
         elif isinstance(chains, str) and len(chains) == 1:
             self.chains = [chains]
         elif not isinstance(chains, list) or not all((isinstance(chain, str) for chain in chains)):
-            raise TypeError(f"Chains needs to be a list, chain names (list elements) must be string.")
+            raise TypeError("Chains needs to be a list, chain names (list elements) must be string.")
         else:
             self.chains = chains
 
@@ -429,7 +429,7 @@ class BackboneRMSD(Runner):
         # split poses into number of max_cores lists
         num_json_files = jobstarter.max_cores
         pose_dict = {os.path.abspath(row["poses"]): os.path.abspath(row[ref_col]) for row in poses}
-        pose_sublists = protflow.jobstarters.split_list(poses.poses_list(), n_sublists=num_json_files)
+        pose_sublists = jobstarters.split_list(poses.poses_list(), n_sublists=num_json_files)
 
         # setup inputs to calc_rmsd.py
         json_files = []
@@ -447,7 +447,7 @@ class BackboneRMSD(Runner):
 
             # write scorefile and cmd
             scorefiles.append((sf := f"{work_dir}/rmsd_input_{str(i)}_scores.json"))
-            cmds.append(f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
+            cmds.append(f"{PROTFLOW_ENV} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
 
         # add options to cmds:
         chains = chains or self.chains
@@ -771,7 +771,7 @@ class MotifRMSD(Runner):
         super_str = "--return_superimposed_poses" if return_superimposed_poses else ""
 
         # start add_chains_batch.py
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {super_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{PROTFLOW_ENV} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {super_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,
@@ -871,7 +871,7 @@ class MotifRMSD(Runner):
 class MotifSeparateSuperpositionRMSD(Runner):
     """
     MotifSeparateSuperpositionRMSD Class
-    ===============
+    ====================================
 
     The `MotifSeparateSuperpositionRMSD` class is a specialized class designed to facilitate the separate superposition and calculation of RMSD values for specific motifs within protein structures in the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with motif-specific superposition and RMSD calculations.
 
@@ -1209,7 +1209,7 @@ class MotifSeparateSuperpositionRMSD(Runner):
         rmsd_include_het_atoms_str = "--rmsd_include_het_atoms" if rmsd_include_het_atoms == True or self.rmsd_include_het_atoms == True else ""
 
         # start add_chains_batch.py
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {super_atoms_str} {rmsd_atoms_str} {super_include_het_atoms_str} {rmsd_include_het_atoms_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{PROTFLOW_ENV} {script_path} --input_json {json_f} --output_path {output_path} {super_atoms_str} {rmsd_atoms_str} {super_include_het_atoms_str} {rmsd_include_het_atoms_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,

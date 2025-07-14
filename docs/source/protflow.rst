@@ -1,26 +1,16 @@
-protflow package
-================
+ProtFlow documentation
+======================
 
 Subpackages
 -----------
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
 
    protflow.metrics
    protflow.tools
    protflow.utils
 
-Submodules
-----------
-
-protflow.config module
-----------------------
-
-.. automodule:: protflow.config
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 protflow.config\_template module
 --------------------------------

@@ -90,20 +90,6 @@ class ResidueSelection:
     residues : tuple
         A tuple representing the parsed residues selection.
 
-    Methods
-    -------
-    from_selection(selection) -> "ResidueSelection"
-        Constructs a ResidueSelection instance from the provided selection.
-    
-    to_string(delim: str = ",", ordering: str = None) -> str
-        Converts the ResidueSelection to a string.
-
-    to_list(ordering: str = None) -> list[str]
-        Converts the ResidueSelection to a list of strings.
-
-    to_dict() -> dict
-        Converts the ResidueSelection to a dictionary. Note: This destroys the ordering of specific residues 
-        on the same chain in a motif.
 
     Examples
     --------

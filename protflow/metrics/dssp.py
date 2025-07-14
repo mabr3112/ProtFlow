@@ -29,16 +29,15 @@ Version
 # import general
 import os
 import glob
-import logging
 
 # import dependencies
 import pandas as pd
 
 # import customs
-import protflow
+from protflow import jobstarters
 from protflow.poses import Poses
 from protflow.poses import description_from_path
-from protflow.runners import Runner, RunnerOutput, col_in_df
+from protflow.runners import Runner, RunnerOutput
 from protflow.jobstarters import JobStarter
 from protflow.config import DSSP_PATH
 
@@ -143,7 +142,7 @@ class DSSP(Runner):
             num_cmds = len(poses.df.index)
 
         # create batch commands
-        cmd_sublists = protflow.jobstarters.split_list(cmds, n_sublists=num_cmds)
+        cmd_sublists = jobstarters.split_list(cmds, n_sublists=num_cmds)
         cmds = []
         for sublist in cmd_sublists:
             cmds.append("; ".join(sublist))
@@ -274,7 +273,7 @@ def collect_scores(output_dir: str) -> pd.DataFrame:
         num_aa = sum(sec_struct_dict.values())
         results = {f"{key}_content": value / num_aa for key, value in sec_struct_dict.items()}
         results["num_aa"] = num_aa
-        
+
         results["description"] = description_from_path(score_path)
 
         return pd.Series(results)

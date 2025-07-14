@@ -77,7 +77,6 @@ import pandas as pd
 
 # custom
 import protflow.config
-import protflow.jobstarters
 from protflow.runners import Runner, RunnerOutput, prepend_cmd
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
@@ -235,7 +234,7 @@ class Rosetta(Runner):
         if not rosetta_application:
             if os.path.isfile(script_path) and os.access(script_path, os.X_OK):
                 return script_path
-            raise ValueError(f"No Rosetta executable was specified. Either provide an executable with the 'rosetta_application' parameter in the Rosetta.run() method, or specify an executable when setting up the rosetta runner with the attribute Runner.script_path.")
+            raise ValueError("No Rosetta executable was specified. Either provide an executable with the 'rosetta_application' parameter in the Rosetta.run() method, or specify an executable when setting up the rosetta runner with the attribute Runner.script_path.")
 
         # if rosetta_application is provided, check if it is executable:
         if os.path.isfile(rosetta_application) and os.access(rosetta_application, os.X_OK):
@@ -249,7 +248,7 @@ class Rosetta(Runner):
             raise ValueError(f"Provided rosetta_applicatiaon is not executable: {combined_path}")
 
         # otherwise raise error for not properly setting up the rosetta script paths.
-        raise ValueError(f"No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
+        raise ValueError("No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
 
     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list|str = None, overwrite: bool = False, fail_on_missing_output_poses: bool = False) -> Poses:
         """

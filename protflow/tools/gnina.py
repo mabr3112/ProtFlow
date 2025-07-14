@@ -67,28 +67,20 @@ Version
 0.1.0
 """
 # general imports
-import json
 import os
 import logging
 from glob import glob
-import shutil
 
 # dependencies
 import pandas as pd
-import Bio
-import Bio.SeqIO
 
 # custom
 import protflow.config
-from protflow.residues import ResidueSelection
-import protflow.tools
-import protflow.runners
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
-from protflow.runners import Runner, RunnerOutput, parse_generic_options, col_in_df, options_flags_to_string
+from protflow.runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string
 from protflow.tools.protein_edits import ChainRemover
 from protflow.utils.biopython_tools import load_structure_from_pdbfile, save_structure_to_pdbfile
-
 
 class GNINA(Runner):
     """
@@ -301,9 +293,9 @@ class GNINA(Runner):
                 save_structure_to_pdbfile(model, save_path=os.path.join(separate_ligands_dir, filename))
                 paths.append(filename)
                 descriptions.append(os.path.splitext(os.path.basename(ligand))[0])
-        
+
         ligand_df = pd.DataFrame({"ligand_path": paths, "poses_description": descriptions})
-            
+
         input_df = poses.df[["poses", "poses_description"]]
         input_df = input_df.merge(ligand_df, on="poses_description")
 
@@ -325,7 +317,6 @@ class GNINA(Runner):
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
     
     def prepare_ligand_autobox(self, poses: Poses, ligand_chain, prefix):
-
         ChainRemover(jobstarter=protflow.jobstarters.LocalJobStarter())
         original_work_dir = poses.work_dir
         new_work_dir = os.path.join(poses.work_dir, prefix)
@@ -334,9 +325,8 @@ class GNINA(Runner):
         poses = ChainRemover.run(poses=poses, prefix=f"{prefix}_ligand", preserve_chains=ligand_chain)
         poses.df["poses"] = poses.df[f"{prefix}_input_location"]
         poses = ChainRemover.run(poses=poses, prefix=f"{prefix}_noligand", chains=ligand_chain)
-        poses.set_work_dir(original_work_dir)        
+        poses.set_work_dir(original_work_dir)
         return poses
-
 
     def write_cmd(self, pose_path:str, output_dir:str, options:str, pose_options:str):
         """
@@ -442,9 +432,9 @@ def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve
     def extract_gnina_table(file_path):
 
         description = os.path.splitext(os.path.basename(file_path))[0]
-        with open(file_path, 'r') as file:
+        with open(file_path, 'r', encoding="UTF-8") as file:
             lines = file.readlines()
-            
+
         # Find the start of the table
         table_start = None
         for i, line in enumerate(lines):
@@ -488,7 +478,8 @@ def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve
 
     # read .pdb files
     scorefiles = glob(f"{work_dir}/*.score")
-    if not scorefiles: raise FileNotFoundError(f"No .score files were found in the output directory of gnina {work_dir}. Gnina might have crashed (check output log), or path might be wrong!")
+    if not scorefiles:
+        raise FileNotFoundError(f"No .score files were found in the output directory of gnina {work_dir}. Gnina might have crashed (check output log), or path might be wrong!")
 
     scores = pd.concat([extract_gnina_table(scorefile) for scorefile in scorefiles]).reset_index(drop=True)
 
