@@ -29,7 +29,6 @@ Version
 # import general
 import os
 import glob
-import logging
 
 # import dependencies
 import pandas as pd
@@ -38,7 +37,7 @@ import pandas as pd
 import protflow
 from protflow.poses import Poses
 from protflow.poses import description_from_path
-from protflow.runners import Runner, RunnerOutput, col_in_df
+from protflow.runners import Runner, RunnerOutput
 from protflow.jobstarters import JobStarter
 from protflow.config import DSSP_PATH
 

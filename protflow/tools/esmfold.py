@@ -64,7 +64,6 @@ Version
 -------
 0.1.0    
 """
-
 # general imports
 import os
 import logging
@@ -76,13 +75,11 @@ import numpy as np
 import pandas as pd
 
 # custom
+from protflow import config, runners
 from protflow.poses import Poses
-import protflow.config
-import protflow.jobstarters
-import protflow.tools
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from protflow.jobstarters import JobStarter
-from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
+from ..runners import Runner, RunnerOutput, prepend_cmd
+from ..jobstarters import JobStarter
+from ..config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 
 class ESMFold(Runner):
     """
@@ -150,7 +147,7 @@ class ESMFold(Runner):
 
     The ESMFold class is intended for researchers and developers who need to perform ESMFold simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str = protflow.config.ESMFOLD_PYTHON_PATH, pre_cmd: str = protflow.config.ESMFOLD_PRE_CMD, jobstarter: JobStarter = None) -> None:
+    def __init__(self, python_path: str = config.ESMFOLD_PYTHON_PATH, pre_cmd: str = config.ESMFOLD_PRE_CMD, jobstarter: JobStarter = None) -> None:
         """
         Initialize the ESMFold class with necessary configurations.
 
@@ -280,7 +277,7 @@ class ESMFold(Runner):
         # check if interfering options were set
         forbidden_options = ['--fasta', '--output_dir']
         if options and any(opt in options for opt in forbidden_options) :
-            raise KeyError(f"Options must not contain '--fasta' or '--output_dir'!")
+            raise KeyError("Options must not contain '--fasta' or '--output_dir'!")
 
         # write ESMFold cmds:
         cmds = [self.write_cmd(pose, output_dir=esm_preds_dir, options=options) for pose in pose_fastas]
@@ -299,7 +296,7 @@ class ESMFold(Runner):
         )
 
         # collect scores
-        logging.info(f"Predictions finished, starting to collect scores.")
+        logging.info("Predictions finished, starting to collect scores.")
         scores = collect_scores(work_dir=work_dir)
 
         if len(scores.index) < len(poses.df.index):
@@ -418,9 +415,9 @@ class ESMFold(Runner):
         This method is designed to facilitate the execution of ESMFold by constructing the necessary command line instructions, ensuring that all required parameters and options are included.
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, None)
+        opts, flags = runners.parse_generic_options(options, None)
 
-        return f"{self.python_path} {protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {protflow.runners.options_flags_to_string(opts, flags, sep='--')}"
+        return f"{self.python_path} {config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {runners.options_flags_to_string(opts, flags, sep='--')}"
 
 def collect_scores(work_dir:str) -> pd.DataFrame:
     """

@@ -67,19 +67,22 @@ Version
 """
 
 # import general
-import logging
 import os
-from typing import Any
+import logging
+import argparse
+
 
 # import dependencies
+import numpy as np
 import pandas as pd
-import protflow
 
 # import customs
 from protflow.config import PROTFLOW_ENV
-from protflow.runners import Runner, RunnerOutput, col_in_df
+from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter, split_list
+from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.utils import vdw_radii
 
 class LigandClashes(Runner):
     """
@@ -457,9 +460,8 @@ class LigandClashes(Runner):
             results = scores,
             prefix = prefix,
         )
-        logging.info(f"Ligand clash detection completed. Returning scores.")
+        logging.info("Ligand clash detection completed. Returning scores.")
         return output.return_poses()
-    
 
 class LigandContacts(Runner):
     """
@@ -926,7 +928,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
 
     # import VdW radii
     vdw_dict = vdw_radii()
-    
+
     # check for ligand chain
     pose_chains = list(chain.id for chain in pose.get_chains())
     if ligand_chain not in pose_chains:
@@ -943,7 +945,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
             pose_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms])
     else:
         raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
-    
+
     # get ligand atoms
     if exclude_ligand_elements:
         ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if not atom.element.lower() in exclude_ligand_elements])
@@ -1045,13 +1047,11 @@ def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max
         return np.sum((dgram > min_dist) & (dgram < max_dist))
 
 def main(args):
-
     input_poses = args.poses.split(",")
     if args.atoms: atoms = args.atoms.split(",")
     else: atoms = None
     if args.exclude_elements: exclude_elements = args.exclude_elements.split(";")
     else: exclude_elements = []
-
 
     if args.mode == "clash_vdw":
         clashes = [_calc_ligand_clashes_vdw(pose, args.ligand_chain, args.factor, atoms, exclude_elements, args.clash_distance) for pose in input_poses]
@@ -1067,12 +1067,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    import argparse
-    import numpy as np
-    import pandas as pd
-    from protflow.utils.biopython_tools import load_structure_from_pdbfile
-    from protflow.utils.utils import vdw_radii
-
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--poses", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
     argparser.add_argument("--out", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")

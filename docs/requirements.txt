@@ -2,4 +2,5 @@ pandas
 numpy
 biopython
 matplotlib
+openbabel
 sphinx_rtd_theme

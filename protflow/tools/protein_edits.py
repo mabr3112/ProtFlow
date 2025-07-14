@@ -83,7 +83,6 @@ import json
 import os
 
 # dependencies
-from numpy import isin
 import pandas as pd
 
 # customs
@@ -358,7 +357,7 @@ class ChainAdder(Runner):
             return os.path.isdir(work_dir) and all((os.path.isfile(os.path.join(work_dir, pose.rsplit("/", maxsplit=1)[-1])) for pose in poses.poses_list()))
 
         if (target_motif or reference_motif) and (target_chains or reference_chains):
-            raise ValueError(f"Either motif or chains can be specified for superimposition, but never both at the same time! Decide whether to superimpose over a selected chain or a selected motif.")
+            raise ValueError("Either motif or chains can be specified for superimposition, but never both at the same time! Decide whether to superimpose over a selected chain or a selected motif.")
 
         # runner setup
         script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/add_chains_batch.py"
@@ -412,7 +411,7 @@ class ChainAdder(Runner):
         Returns dictionary (dict) that holds the kwargs for superimposition: {'target_motif': [target_motif_list], ...}'''
         # safety
         if (target_motif or reference_motif) and (target_chains or reference_chains):
-            raise ValueError(f"Either motif or chains can be specified for superimposition, but not both!")
+            raise ValueError("Either motif or chains can be specified for superimposition, but not both!")
 
         # setup copy_chain and reference_pdb in output:
         col_in_df(poses.df, ref_col)
@@ -498,7 +497,7 @@ class ChainAdder(Runner):
             if motif in pose:
                 # assumes motif is a column in pose (row in poses.df) that points to a ResidueSelection object
                 return pose[motif].to_string()
-            raise ValueError(f"If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
+            raise ValueError("If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
         raise TypeError(f"Unsupportet parameter type for motif: {type(motif)} - Only ResidueSelection or str allowed!")
 
     def add_sequence(self, prefix: str, poses: Poses, seq: str = None, seq_col: str = None, sep: str = ":") -> None:
@@ -554,21 +553,21 @@ class ChainAdder(Runner):
         """
         poses.check_prefix(prefix)
         if not all(pose.endswith(".fa") or pose.endswith(".fasta") for pose in poses.poses_list()):
-            raise ValueError(f"Poses must be .fasta files (.fa also fine)!")
+            raise ValueError("Poses must be .fasta files (.fa also fine)!")
         out_dir = f"{poses.work_dir}/prefix/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir, exist_ok=True)
 
         # prep seq input
         if seq and seq_col:
-            raise ValueError(f"Either :seq: or :seq_col: can be passed to specify a sequence, but not both!")
+            raise ValueError("Either :seq: or :seq_col: can be passed to specify a sequence, but not both!")
         if seq:
             seqs = [seq for _ in poses]
         elif seq_col:
             col_in_df(poses.df, seq_col)
             seqs = poses.df[seq_col].to_list()
         else:
-            raise ValueError(f"One of the parameters :seq: :seq_col: has to be passed to specify the sequence to add.")
+            raise ValueError("One of the parameters :seq: :seq_col: has to be passed to specify the sequence to add.")
 
         # separator (add sequence, or add protomer?)
         sep = "" if sep is None else sep
@@ -637,7 +636,7 @@ class ChainAdder(Runner):
         # setup directory and function
         poses.check_prefix(prefix)
         if not all(pose.endswith(".fa") or pose.endswith(".fasta") for pose in poses.poses_list()):
-            raise ValueError(f"Poses must be .fasta files (.fa also fine)!")
+            raise ValueError("Poses must be .fasta files (.fa also fine)!")
         out_dir = f"{poses.work_dir}/prefix/"
         if not os.path.isdir(out_dir):
             os.makedirs(out_dir, exist_ok=True)
@@ -716,7 +715,7 @@ def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
             return [pose[chain_arg] for pose in poses]
     if isinstance(chain_arg, list) and len(chain_arg) == len(poses):
         return chain_arg
-    raise ValueError(f"Inappropriate value for parameter :chain_arg:. Specify the chain (e.g. 'A'), the column where the chains are listed (e.g. 'chain_col') or give a list of chains the same length as poses.df (e.g. ['A', ...])")
+    raise ValueError("Inappropriate value for parameter :chain_arg:. Specify the chain (e.g. 'A'), the column where the chains are listed (e.g. 'chain_col') or give a list of chains the same length as poses.df (e.g. ['A', ...])")
 
 def parse_chain(chain, pose: pd.Series) -> str:
     '''Sets up chain for add_chains_batch.py'''
@@ -900,9 +899,9 @@ class ChainRemover(Runner):
             return os.path.isdir(work_dir) and all(os.path.isfile(fn) for fn in files_list)
 
         if chains and preserve_chains:
-            raise ValueError(f":chains: and :preserve_chains: are mutually exclusive!")
+            raise ValueError(":chains: and :preserve_chains: are mutually exclusive!")
         if not chains and not preserve_chains:
-            raise ValueError(f"Either :chains: or :preserve_chains: must be set!")
+            raise ValueError("Either :chains: or :preserve_chains: must be set!")
 
         # setup runner
         script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/remove_chains_batch.py"
@@ -991,7 +990,7 @@ class SequenceRemover(Runner):
         '''
         # sanity
         if not all(fp.endswith(".fa") or fp.endswith(".fasta") for fp in poses.poses_list()):
-            raise ValueError(f"Your poses must be .fasta or .fa files. If you would like to remove chains from .pdb files, use the ChainRemover class.")
+            raise ValueError("Your poses must be .fasta or .fa files. If you would like to remove chains from .pdb files, use the ChainRemover class.")
 
         # prep parameters
         chains = self._prep_chains(chains or self.chains, poses)
@@ -1071,7 +1070,7 @@ class SequenceAdder(Runner):
         '''
         # sanity
         if not all(fp.endswith(".fa") or fp.endswith(".fasta") for fp in poses.poses_list()):
-            raise ValueError(f"Your poses must be .fasta or .fa files. If you would like to remove chains from .pdb files, use the ChainRemover class.")
+            raise ValueError("Your poses must be .fasta or .fa files. If you would like to remove chains from .pdb files, use the ChainRemover class.")
         sequence = sequence or self.sequence
         sequence_col = self._prep_sequence_col(sequence_col or self.sequence_col, poses)
         _mutually_exclusive(sequence, "sequence", sequence_col, "sequence_col")

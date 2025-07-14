@@ -72,9 +72,9 @@ from typing import Any
 
 # import dependencies
 import pandas as pd
-import protflow
 
 # import customs
+from protflow import jobstarters
 from protflow.config import PROTFLOW_ENV
 from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 from protflow.residues import ResidueSelection
@@ -260,7 +260,7 @@ class BackboneRMSD(Runner):
         if atoms == "all":
             self.atoms = "all"
         if not isinstance(atoms, list) or not all((isinstance(atom, str) for atom in atoms)):
-            raise TypeError(f"Atoms needs to be a list, atom names (list elements) must be string.")
+            raise TypeError("Atoms needs to be a list, atom names (list elements) must be string.")
         self.atoms = atoms
 
     def set_chains(self, chains:list[str]) -> None:
@@ -304,7 +304,7 @@ class BackboneRMSD(Runner):
         elif isinstance(chains, str) and len(chains) == 1:
             self.chains = [chains]
         elif not isinstance(chains, list) or not all((isinstance(chain, str) for chain in chains)):
-            raise TypeError(f"Chains needs to be a list, chain names (list elements) must be string.")
+            raise TypeError("Chains needs to be a list, chain names (list elements) must be string.")
         else:
             self.chains = chains
 
@@ -429,7 +429,7 @@ class BackboneRMSD(Runner):
         # split poses into number of max_cores lists
         num_json_files = jobstarter.max_cores
         pose_dict = {os.path.abspath(row["poses"]): os.path.abspath(row[ref_col]) for row in poses}
-        pose_sublists = protflow.jobstarters.split_list(poses.poses_list(), n_sublists=num_json_files)
+        pose_sublists = jobstarters.split_list(poses.poses_list(), n_sublists=num_json_files)
 
         # setup inputs to calc_rmsd.py
         json_files = []

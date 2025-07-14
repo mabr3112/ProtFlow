@@ -67,13 +67,13 @@ Version
 """
 
 # import general
-import logging
 import os
 import json
+import logging
+import importlib
 
 # import dependencies
 import pandas as pd
-import protflow
 
 # import customs
 from protflow.config import PROTFLOW_ENV
@@ -462,16 +462,15 @@ class GenericMetric(Runner):
     
 
 def main(args):
-
     input_poses = args.poses.split(",")
 
     # import function
-    module = importlib.import_module(args.module)
-    function = getattr(module, args.function)
+    module_ = importlib.import_module(args.module)
+    function = getattr(module_, args.function)
 
     # calculate data
     if args.options:
-        with open(args.options, "r") as f:
+        with open(args.options, "r", encoding="UTF-8") as f:
             options = json.load(f)
         data = [function(pose, **options) for pose in input_poses]
     else:
@@ -489,7 +488,6 @@ def main(args):
 
 if __name__ == "__main__":
     import argparse
-    import importlib
     import pandas as pd
     import os
     import json

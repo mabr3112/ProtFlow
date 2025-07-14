@@ -70,7 +70,6 @@ Version
 0.1.0
 """
 # general imports
-import re
 import os
 import logging
 from glob import glob
@@ -82,10 +81,9 @@ from typing import Union, Any
 
 # dependencies
 import pandas as pd
-import numpy as np
 
 # custom
-from .. import config
+from .. import config, runners
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..poses import Poses, col_in_df, description_from_path
 from ..jobstarters import JobStarter, split_list
@@ -296,9 +294,12 @@ class AlphaFold3(Runner):
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
         if overwrite:
-            if os.path.isdir(json_dir := os.path.join(work_dir, "input_json")): shutil.rmtree(json_dir)
-            if os.path.isdir(preds_dir := os.path.join(work_dir, "af3_preds")): shutil.rmtree(preds_dir)
-            if os.path.isdir(pdb_dir := os.path.join(work_dir, "output_pdbs")): shutil.rmtree(pdb_dir)
+            if os.path.isdir(json_dir := os.path.join(work_dir, "input_json")):
+                shutil.rmtree(json_dir)
+            if os.path.isdir(preds_dir := os.path.join(work_dir, "af3_preds")):
+                shutil.rmtree(preds_dir)
+            if os.path.isdir(pdb_dir := os.path.join(work_dir, "output_pdbs")):
+                shutil.rmtree(pdb_dir)
 
         # setup af3-specific directories:
         os.makedirs(json_dir := os.path.join(work_dir, "input_json"), exist_ok=True)
@@ -345,7 +346,7 @@ class AlphaFold3(Runner):
         )
 
         # collect scores
-        logging.info(f"Predictions finished, starting to collect scores.")
+        logging.info("Predictions finished, starting to collect scores.")
         scores = collect_scores(work_dir=preds_dir, convert_cif_to_pdb_dir=pdb_dir if convert_cif_to_pdb else None, return_top_n_models=return_top_n_models)
 
         if len(scores.index) < len(poses.df.index):
@@ -359,52 +360,52 @@ class AlphaFold3(Runner):
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
     def write_cmd(self, input_dir: str, output_dir: str, options: str = None, pose_options: str = None):
-    """
-    write_cmd Method
-    ================
+        """
+        write_cmd Method
+        ================
 
-    Builds the shell command to invoke AlphaFold3 using the given
-    input/output directories and specified options.
+        Builds the shell command to invoke AlphaFold3 using the given
+        input/output directories and specified options.
 
-    Detailed Description
-    --------------------
-    This method transforms provided global and pose-specific options into
-    CLI-compliant flags and arguments, links them with the Python executable
-    and the AF3 inference script, and returns a fully formatted command string.
-    Useful for batching jobs or debugging the exact call being issued.
+        Detailed Description
+        --------------------
+        This method transforms provided global and pose-specific options into
+        CLI-compliant flags and arguments, links them with the Python executable
+        and the AF3 inference script, and returns a fully formatted command string.
+        Useful for batching jobs or debugging the exact call being issued.
 
-    Parameters:
-        input_dir (str): Directory containing input JSON files for prediction.
-        output_dir (str): Destination directory where AF3 will save results.
-        options (str, optional): Global options passed to AF3, e.g. `"num_recycles=3"`.
-        pose_options (str, optional): Pose-specific options passed individually.
+        Parameters:
+            input_dir (str): Directory containing input JSON files for prediction.
+            output_dir (str): Destination directory where AF3 will save results.
+            options (str, optional): Global options passed to AF3, e.g. `"num_recycles=3"`.
+            pose_options (str, optional): Pose-specific options passed individually.
 
-    Returns:
-        str: Fully assembled shell command ready for execution.
+        Returns:
+            str: Fully assembled shell command ready for execution.
 
-    Raises:
-        None
+        Raises:
+            None
 
-    Examples
-    --------
-    .. code-block:: python
+        Examples
+        --------
+        .. code-block:: python
 
-        cmd = af3.write_cmd(
-            input_dir="json_batch_0",
-            output_dir="preds_batch_0",
-            options="num_recycles=5",
-        )
-        print(cmd)
-        # "python /path/to/alphafold3.py --input_dir json_batch_0 --output_dir preds_batch_0 --num_recycles 5 --use_templates False"
+            cmd = af3.write_cmd(
+                input_dir="json_batch_0",
+                output_dir="preds_batch_0",
+                options="num_recycles=5",
+            )
+            print(cmd)
+            # "python /path/to/alphafold3.py --input_dir json_batch_0 --output_dir preds_batch_0 --num_recycles 5 --use_templates False"
 
-    Further Details
-    ---------------
-        - Parses both key=value pairs and boolean flags.
-        - Ensures flags are prepended with `--` syntax compatible with AF3 scripts.
-        - Intended to be used internally to generate jobstarter commands.
-    """
+        Further Details
+        ---------------
+            - Parses both key=value pairs and boolean flags.
+            - Ensures flags are prepended with `--` syntax compatible with AF3 scripts.
+            - Intended to be used internally to generate jobstarter commands.
+        """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
+        opts, flags = runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --" + " --".join(flags) if flags else ""
         return f"{self.python_path} {self.script_path} --input_dir {input_dir} --output_dir {output_dir} {opts} {flags}"
@@ -463,7 +464,7 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
         ranks.sort_values("ranking_score", ascending=False, inplace=True)
         ranks.reset_index(drop=True, inplace=True)
         data = os.path.join(out_dir, f"{os.path.basename(out_dir)}_data.json")
-        with open(data, 'r') as file:
+        with open(data, 'r', encoding="UTF-8") as file:
             data = file.read()
         data = json.loads(data)
         scores = []
@@ -480,8 +481,8 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
         scores["sequence"] = data["sequences"][0]["protein"]["sequence"]
         return scores
 
-    def convert_cif_to_pdb(input: str, format: str, output:str):
-        openbabel_fileconverter(input_file=input, output_format=format, output_file=output)
+    def convert_cif_to_pdb(input_cif: str, output_format: str, output:str):
+        openbabel_fileconverter(input_file=input_cif, output_format=output_format, output_file=output)
         return output
 
     # collect all output directories, ignore mmseqs dirs
@@ -494,11 +495,10 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
         scores.append(data)
     scores = pd.concat(scores)
     scores.reset_index(drop=True, inplace=True)
-    print(scores)
 
     if convert_cif_to_pdb_dir:
         os.makedirs(convert_cif_to_pdb_dir, exist_ok=True)
-        scores["location"] = scores.apply(lambda row: convert_cif_to_pdb(row["location"], format="pdb", output=os.path.abspath(os.path.join(convert_cif_to_pdb_dir, f"{row["description"]}.pdb"))), axis=1)
+        scores["location"] = scores.apply(lambda row: convert_cif_to_pdb(input_cif=row["location"], output_format="pdb", output=os.path.abspath(os.path.join(convert_cif_to_pdb_dir, f"{row["description"]}.pdb"))), axis=1)
     return scores
 
 
@@ -626,11 +626,11 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
             row_templates = [row_templates]
 
         # assign a unique id for each copy
-        id = list(string.ascii_uppercase)[:num_copies]
+        id_ = list(string.ascii_uppercase)[:num_copies]
 
         # create record for input pose
         pose_data = {"protein": {
-            "id": id,
+            "id": id_,
             "sequence": seq,
             }
         }

@@ -69,20 +69,15 @@ import os
 import logging
 from glob import glob
 import shutil
-from typing import Union
 
 # dependencies
 import pandas as pd
-import numpy as np
 
 # custom
 import protflow.config
-import protflow.jobstarters
-import protflow.tools
 from protflow.runners import Runner, RunnerOutput, prepend_cmd
 from protflow.poses import Poses, description_from_path
 from protflow.jobstarters import JobStarter, split_list
-from protflow.utils.biopython_tools import load_structure_from_pdbfile, save_structure_to_pdbfile
 
 class PLACER(Runner):
     """

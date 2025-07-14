@@ -80,21 +80,19 @@ import Bio
 import Bio.SeqIO
 
 # custom
-import protflow.config
+from protflow import config, jobstarters
 from protflow.residues import ResidueSelection
-import protflow.tools
-import protflow.runners
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.runners import Runner, RunnerOutput, regex_expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string, prepend_cmd
 from protflow.config import PROTFLOW_ENV
 
 LIGANDMPNN_CHECKPOINT_DICT = {
-    "protein_mpnn": f"/model_params/proteinmpnn_v_48_020.pt",
-    "ligand_mpnn": f"/model_params/ligandmpnn_v_32_010_25.pt",
-    "per_residue_label_membrane_mpnn": f"/model_params/per_residue_label_membrane_mpnn_v_48_020.pt",
-    "global_label_membrane_mpnn": f"/model_params/global_label_membrane_mpnn_v_48_020.pt",
-    "soluble_mpnn": f"/model_params/solublempnn_v_48_020.pt"
+    "protein_mpnn": "/model_params/proteinmpnn_v_48_020.pt",
+    "ligand_mpnn": "/model_params/ligandmpnn_v_32_010_25.pt",
+    "per_residue_label_membrane_mpnn": "/model_params/per_residue_label_membrane_mpnn_v_48_020.pt",
+    "global_label_membrane_mpnn": "/model_params/global_label_membrane_mpnn_v_48_020.pt",
+    "soluble_mpnn": "/model_params/solublempnn_v_48_020.pt"
 }
 
 class LigandMPNN(Runner):
@@ -160,7 +158,7 @@ class LigandMPNN(Runner):
     -------
     0.1.0
     """
-    def __init__(self, script_path:str=protflow.config.LIGANDMPNN_SCRIPT_PATH, python_path:str=protflow.config.LIGANDMPNN_PYTHON_PATH, pre_cmd:str=protflow.config.LIGANDMPNN_PRE_CMD, jobstarter:JobStarter=None) -> None:
+    def __init__(self, script_path:str=config.LIGANDMPNN_SCRIPT_PATH, python_path:str=config.LIGANDMPNN_PYTHON_PATH, pre_cmd:str=config.LIGANDMPNN_PRE_CMD, jobstarter:JobStarter=None) -> None:
         """
         Initializes the LigandMPNN class.
 
@@ -259,7 +257,7 @@ class LigandMPNN(Runner):
         pose_opt_cols = pose_opt_cols or {}
         run_batch = self.check_for_batch_run(pose_options, pose_opt_cols)
         if run_batch:
-            logging.info(f"Setting up ligandmpnn for batched design.")
+            logging.info("Setting up ligandmpnn for batched design.")
 
         # check if sidechain packing was specified in options
         pack_sidechains = "pack_side_chains" in options if options else False
@@ -431,7 +429,7 @@ class LigandMPNN(Runner):
             os.makedirs(json_dir, exist_ok=True)
 
         # split cmds list into n=num_batches sublists
-        cmd_sublists = protflow.jobstarters.split_list(cmds, n_sublists=num_batches)
+        cmd_sublists = jobstarters.split_list(cmds, n_sublists=num_batches)
 
         # concatenate cmds: parse _multi arguments into .json files and keep all other arguments in options.
         batch_cmds = []
@@ -526,7 +524,7 @@ class LigandMPNN(Runner):
 
         # check if fixed_residues and redesigned_residues were set properly (gets checked in LigandMPNN too, so maybe this is redundant.)
         if "fixed_residues" in pose_opt_cols and "redesigned_residues" in pose_opt_cols:
-            raise ValueError(f"Cannot define both <fixed_res_column> and <design_res_column>!")
+            raise ValueError("Cannot define both <fixed_res_column> and <design_res_column>!")
 
         # check if all specified columns exist in poses.df:
         for col in list(pose_opt_cols.values()):
@@ -598,7 +596,7 @@ class LigandMPNN(Runner):
             - **Command Construction:** The method assembles the final command string, including paths, model checkpoints, options, and other necessary parameters.
         """
         # parse ligandmpnn_dir:
-        ligandmpnn_dir = protflow.config.LIGANDMPNN_SCRIPT_PATH.rsplit("/", maxsplit=1)[0]
+        ligandmpnn_dir = config.LIGANDMPNN_SCRIPT_PATH.rsplit("/", maxsplit=1)[0]
 
         # check if specified model is correct.
         available_models = ["protein_mpnn", "ligand_mpnn", "soluble_mpnn", "global_label_membrane_mpnn", "per_residue_label_membrane_mpnn"]
@@ -620,7 +618,7 @@ class LigandMPNN(Runner):
             model_checkpoint_options = opts[f"checkpoint_{model}"]
 
         # safety
-        logging.debug(f"Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
+        logging.debug("Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
         if "parse_atoms_with_zero_occupancy" not in opts:
             opts["parse_atoms_with_zero_occupancy"] = "1"
         elif opts["parse_atoms_with_zero_occupancy"] != "1":
@@ -906,23 +904,23 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
 
     def create_bias_dict(resdict: dict, bias: float):
         bias_dict = {}
-        for res, id in resdict.items():
-            bias_dict[res] = {id: bias}
+        for res, idx in resdict.items():
+            bias_dict[res] = {idx: bias}
         return bias_dict
-    
+
     def combine_dicts(dict_list: list[dict]):
         out_dict = {}
         for in_dict in dict_list:
             out_dict.update(in_dict)
         return out_dict
-    
+
     from protflow.tools.residue_selectors import DistanceSelector
     from protflow.metrics.selection_identity import SelectionIdentity
 
     # check input
     if not shell_distances == sorted(shell_distances):
         raise KeyError(f"shell_distances must be in ascending order like {sorted(shell_distances)}, not {shell_distances}!")
-    
+
     # set python path
     python_path = os.path.join(PROTFLOW_ENV, "python")
 
@@ -959,11 +957,11 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
     # write json files for each dict
     os.makedirs(dict_dir := os.path.join(working_dir, "bias_dicts"), exist_ok=True)
     dict_paths = []
-    for i, row in poses.df.iterrows():
-        with open(dict_path := os.path.join(dict_dir, f"{row['poses_description']}_bias_dict.json"), 'w') as f:
+    for _, row in poses.df.iterrows():
+        with open(dict_path := os.path.join(dict_dir, f"{row['poses_description']}_bias_dict.json"), 'w', encoding="UTF-8") as f:
             json.dump(row[f"{prefix}_overall_bias_dict"], f, indent=4)
         dict_paths.append(dict_path)
-    
+
     # save paths to json files in poses dataframe
     poses.df[f"{prefix}_overall_bias_json"] = dict_paths
 
@@ -987,5 +985,3 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
     poses.set_work_dir(original_work_dir)
 
     return poses
-
-
