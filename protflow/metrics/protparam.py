@@ -82,7 +82,7 @@ class ProtParam(Runner):
     '''
     Class handling the calculation of protparams from sequence using the BioPython Bio.SeqUtils.ProtParam module
     '''
-    def __init__(self, jobstarter: str = None, default_python = os.path.join(PROTFLOW_ENV, "python3")): # pylint: disable=W0102
+    def __init__(self, jobstarter: str = None, default_python = PROTFLOW_ENV): # pylint: disable=W0102
         """
         Initialize the ProtParam class.
 

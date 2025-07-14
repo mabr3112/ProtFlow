@@ -162,7 +162,7 @@ class ChainAdder(Runner):
 
     The ChainAdder class is intended for researchers and developers who need to add chains to protein structures as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, default_python=os.path.join(PROTFLOW_ENV, "python3"), jobstarter: JobStarter = None):
+    def __init__(self, default_python=PROTFLOW_ENV, jobstarter: JobStarter = None):
         """
         Initialize the ChainAdder class.
 
@@ -786,7 +786,7 @@ class ChainRemover(Runner):
 
     The ChainRemover class is intended for researchers and developers who need to remove chains from protein structures as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, default_python=os.path.join(PROTFLOW_ENV, "python3"), jobstarter: JobStarter = None):
+    def __init__(self, default_python=PROTFLOW_ENV, jobstarter: JobStarter = None):
         """
         Initialize the ChainRemover class.
 
