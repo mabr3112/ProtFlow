@@ -219,7 +219,7 @@ class TMalign(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = self._check_install(application or os.path.join(PROTFLOW_ENV, "TMalign"))
+        self.application = self._check_install(application or os.path.join(os.path.dirname(PROTFLOW_ENV), "TMalign"))
 
     def __str__(self):
         return "TMalign"
@@ -648,7 +648,7 @@ class TMscore(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = application or os.path.join(PROTFLOW_ENV, "TMscore")
+        self.application = application or os.path.join(os.path.dirname(PROTFLOW_ENV), "TMscore")
 
     def __str__(self):
         return self.name

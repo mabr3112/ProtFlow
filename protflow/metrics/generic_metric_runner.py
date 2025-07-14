@@ -447,7 +447,7 @@ class GenericMetric(Runner):
         scores = pd.concat([pd.read_json(output) for output in out_files]).reset_index(drop=True)
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
-        
+
         logging.info(f"Saving scores of generic metric runner with function {function} at {scorefile}.")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -459,7 +459,7 @@ class GenericMetric(Runner):
         )
         logging.info(f"{function} completed. Returning scores.")
         return output.return_poses()
-    
+
 
 def main(args):
     input_poses = args.poses.split(",")

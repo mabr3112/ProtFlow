@@ -120,7 +120,7 @@ class SelectionIdentity(Runner):
         overwrite: bool = False) -> Poses
         Run the selection identity calculations on the given poses.
     """
-    def __init__(self, residue_selection: Union[str, ResidueSelection] = None, onelettercode: bool = False, python_path: str = os.path.join(PROTFLOW_ENV, "python"), jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+    def __init__(self, residue_selection: Union[str, ResidueSelection] = None, onelettercode: bool = False, python_path: str = PROTFLOW_ENV, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         self.set_python_path(python_path)
         self.set_residue_selection(residue_selection)
         self.set_onelettercode(onelettercode)

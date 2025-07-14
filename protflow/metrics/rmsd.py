@@ -447,7 +447,7 @@ class BackboneRMSD(Runner):
 
             # write scorefile and cmd
             scorefiles.append((sf := f"{work_dir}/rmsd_input_{str(i)}_scores.json"))
-            cmds.append(f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
+            cmds.append(f"{PROTFLOW_ENV} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
 
         # add options to cmds:
         chains = chains or self.chains
@@ -771,7 +771,7 @@ class MotifRMSD(Runner):
         super_str = "--return_superimposed_poses" if return_superimposed_poses else ""
 
         # start add_chains_batch.py
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {super_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{PROTFLOW_ENV} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {super_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,
@@ -1209,7 +1209,7 @@ class MotifSeparateSuperpositionRMSD(Runner):
         rmsd_include_het_atoms_str = "--rmsd_include_het_atoms" if rmsd_include_het_atoms == True or self.rmsd_include_het_atoms == True else ""
 
         # start add_chains_batch.py
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {script_path} --input_json {json_f} --output_path {output_path} {super_atoms_str} {rmsd_atoms_str} {super_include_het_atoms_str} {rmsd_include_het_atoms_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{PROTFLOW_ENV} {script_path} --input_json {json_f} --output_path {output_path} {super_atoms_str} {rmsd_atoms_str} {super_include_het_atoms_str} {rmsd_include_het_atoms_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,

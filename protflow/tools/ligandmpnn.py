@@ -901,7 +901,6 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
 
     This method is designed to streamline the creation of distance-based conservation bias commands  for LigandMPNN within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein design simulations.
     """
-
     def create_bias_dict(resdict: dict, bias: float):
         bias_dict = {}
         for res, idx in resdict.items():
@@ -922,7 +921,7 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
         raise KeyError(f"shell_distances must be in ascending order like {sorted(shell_distances)}, not {shell_distances}!")
 
     # set python path
-    python_path = os.path.join(PROTFLOW_ENV, "python")
+    python_path = PROTFLOW_ENV
 
     # create output directory
     os.makedirs(working_dir := os.path.abspath(os.path.join(poses.work_dir, prefix)), exist_ok=True)
