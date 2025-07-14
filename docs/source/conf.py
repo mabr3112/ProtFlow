@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath('../../protflow/'))  # Adjust the path to you
 # -- Project information -----------------------------------------------------
 
 project = 'ProtFlow'
-copyright = '2024, Markus Braun'
+copyright = '2024, Markus Braun, Adrian Tripp'
 author = 'Markus Braun'
 
 # The full version, including alpha/beta/rc tags
