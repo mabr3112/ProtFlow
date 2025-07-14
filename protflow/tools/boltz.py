@@ -4,7 +4,6 @@ import re
 import os
 import logging
 import shutil
-import yaml
 import glob
 import json
 

@@ -17,6 +17,7 @@ setup(
         'numpy',
         'Bio',
         'matplotlib',
+        'pyyaml'
     ],
     # Other metadata
 )
