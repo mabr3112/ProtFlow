@@ -1,7 +1,5 @@
 """protflow.metrics subpackage init"""
-# import modules
-from . import dssp, fpocket, generic_metric_runner, ligand, propka, protparam
-from . import rmsd, selection_identity, tmscore
+from . import dssp, fpocket, generic_metric_runner, ligand, propka, protparam, rmsd, selection_identity, tmscore
 
 # import runners directly
 from .dssp import DSSP
