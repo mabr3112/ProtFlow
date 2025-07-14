@@ -81,8 +81,8 @@ from Bio.PDB.Structure import Structure
 import pandas as pd
 
 # customs
-from protflow.utils.biopython_tools import get_atoms, load_structure_from_pdbfile
-from protflow.utils.utils import vdw_radii
+from .biopython_tools import get_atoms, load_structure_from_pdbfile
+from .utils import vdw_radii
 
 def get_mutations_list(wt: str, variant:str) -> None:
     '''Not implemented.'''

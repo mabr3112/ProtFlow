@@ -80,12 +80,12 @@ import pandas as pd
 import Bio.PDB
 
 # customs
-from protflow import jobstarters
-from protflow.jobstarters import JobStarter
-from protflow.residues import ResidueSelection
-from protflow.utils.utils import parse_fasta_to_dict
-from protflow.utils.biopython_tools import load_structure_from_pdbfile, get_sequence_from_pose
-import protflow.utils.plotting as plots
+from . import jobstarters
+from .jobstarters import JobStarter
+from .residues import ResidueSelection
+from .utils.utils import parse_fasta_to_dict
+from .utils.biopython_tools import load_structure_from_pdbfile, get_sequence_from_pose
+from .utils import plotting as plots
 
 FORMAT_STORAGE_DICT = {
     "json": "to_json",

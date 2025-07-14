@@ -85,14 +85,12 @@ import pandas as pd
 import numpy as np
 
 # custom
-import protflow.config
-import protflow.jobstarters
-import protflow.tools
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from protflow.poses import Poses, col_in_df, description_from_path
-from protflow.jobstarters import JobStarter, split_list
-from protflow.utils.biopython_tools import load_sequence_from_fasta
-from protflow.utils.openbabel_tools import openbabel_fileconverter
+from .. import config
+from ..runners import Runner, RunnerOutput, prepend_cmd
+from ..poses import Poses, col_in_df, description_from_path
+from ..jobstarters import JobStarter, split_list
+from ..utils.biopython_tools import load_sequence_from_fasta
+from ..utils.openbabel_tools import openbabel_fileconverter
 
 class AlphaFold3(Runner):
     """
@@ -149,8 +147,7 @@ class AlphaFold3(Runner):
         # Inspect results
         print(poses.df)
     """
-
-    def __init__(self, script_path: str = protflow.config.ALPHAFOLD3_SCRIPT_PATH, python_path: str = protflow.config.ALPHAFOLD3_PYTHON_PATH, pre_cmd:str=protflow.config.ALPHAFOLD3_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str = config.ALPHAFOLD3_SCRIPT_PATH, python_path: str = config.ALPHAFOLD3_PYTHON_PATH, pre_cmd:str=config.ALPHAFOLD3_PRE_CMD, jobstarter: str = None) -> None:
         """
         __init__ Method
         ===============

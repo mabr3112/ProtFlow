@@ -1,2 +1,2 @@
 '''Init of protflow.utils'''
-import protflow
+from . import biopython_tools, metrics, openbabel_tools, plotting, pymol_tools, utils

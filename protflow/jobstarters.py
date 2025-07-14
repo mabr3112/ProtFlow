@@ -34,15 +34,13 @@ Note
 This module is designed to be extended with additional jobstarters for different scheduling systems as needed. If you want to implement your own JobStarter and need assistance, please contact any of the authors of ProtFlow for assistance. We are happy about every contribution!
 
 """
-from multiprocessing import ProcessError
-from typing import Union
-import time
-import subprocess
-import itertools
 import os
+import time
 import logging
-
+import itertools
+import subprocess
 import numpy as np
+from multiprocessing import ProcessError
 
 class JobStarter:
     """

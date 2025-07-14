@@ -1,3 +1,5 @@
+"""Module Docstring is missing!"""
+# imports
 import re
 import os
 import logging
@@ -5,14 +7,14 @@ import shutil
 import yaml
 import glob
 import json
+
+# dependencies
 from Bio import SeqIO
 import pandas as pd
-import protflow.config
-import protflow.jobstarters
-import protflow.tools
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter
+from .. import config, jobstarters
+from ..poses import Poses
+from ..runners import Runner, RunnerOutput, prepend_cmd
+from ..jobstarters import JobStarter
 
 # config file: 
 # BOLTZ_SCRIPT_PATH = "/home/az3556/boltz/src/boltz/main.py"
@@ -20,7 +22,7 @@ from protflow.jobstarters import JobStarter
 # BOLTZ_PRE_CMD = ""
 
 class Boltz(Runner):
-    def __init__(self, script_path: str = protflow.config.BOLTZ_SCRIPT_PATH, python_path: str = protflow.config.BOLTZ_PYTHON_PATH, pre_cmd: str = protflow.config.BOLTZ_PRE_CMD, jobstarter: str = None) -> None: 
+    def __init__(self, script_path: str = config.BOLTZ_SCRIPT_PATH, python_path: str = config.BOLTZ_PYTHON_PATH, pre_cmd: str = config.BOLTZ_PRE_CMD, jobstarter: str = None) -> None: 
         if not script_path:
             raise ValueError(f"No path is set for main.py. Set the path in config.py under BOLTZ_SCRIPT_PATH.")
 
