@@ -29,6 +29,7 @@ extensions = [
     'sphinx_rtd_theme'
 ]
 autodoc_mock_imports = ['openbabel', 'protflow.config', 'config']
+suppress_warnings = ["autodoc.mocked_object"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
