@@ -871,7 +871,7 @@ class MotifRMSD(Runner):
 class MotifSeparateSuperpositionRMSD(Runner):
     """
     MotifSeparateSuperpositionRMSD Class
-    ===============
+    ====================================
 
     The `MotifSeparateSuperpositionRMSD` class is a specialized class designed to facilitate the separate superposition and calculation of RMSD values for specific motifs within protein structures in the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with motif-specific superposition and RMSD calculations.
 
