@@ -75,8 +75,6 @@ import pandas as pd
 
 # custom
 import protflow.config
-import protflow.jobstarters
-import protflow.tools
 from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter

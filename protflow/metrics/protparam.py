@@ -72,7 +72,7 @@ import numpy as np
 
 # import customs
 from protflow.config import PROTFLOW_ENV
-from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
+from protflow.utils.biopython_tools import determine_protparams
 from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
@@ -82,7 +82,7 @@ class ProtParam(Runner):
     '''
     Class handling the calculation of protparams from sequence using the BioPython Bio.SeqUtils.ProtParam module
     '''
-    def __init__(self, jobstarter: str = None, default_python = os.path.join(PROTFLOW_ENV, "python3")): # pylint: disable=W0102
+    def __init__(self, jobstarter: str = None, default_python = PROTFLOW_ENV): # pylint: disable=W0102
         """
         Initialize the ProtParam class.
 
@@ -207,7 +207,10 @@ class ProtParam(Runner):
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
 
-        if not seq_col:
+        if seq_col:
+            # if not running on poses but on arbitrary sequences, get the sequences from the dataframe
+            seqs = poses.df[seq_col].to_list()
+        else:
             # check poses file extension
             pose_type = poses.determine_pose_type()
             if len(pose_type) > 1:
@@ -217,21 +220,20 @@ class ProtParam(Runner):
             elif pose_type[0] in [".fa", ".fasta"]:
                 # directly use fasta files as input
                 # TODO: this assumes that it is a single entry fasta file (as it should be!)
-                seqs = [load_sequence_from_fasta(fasta=pose, return_multiple_entries=False).seq for pose in poses.df['poses'].to_list()]     
+                seqs = [load_sequence_from_fasta(fasta=pose, return_multiple_entries=False).seq for pose in poses.df['poses'].to_list()]
             elif pose_type[0] == ".pdb":
                 # extract sequences from pdbs
                 seqs = [get_sequence_from_pose(load_structure_from_pdbfile(path_to_pdb=pose)) for pose in poses.df['poses'].to_list()]
-        else:
-            # if not running on poses but on arbitrary sequences, get the sequences from the dataframe
-            seqs = poses.df[seq_col].to_list()
+            else:
+                raise ValueError(f"Unrecognized pose type: {pose_type[0]}. Poses have to be either .pdb or .fa files!")
 
         names = poses.df['poses_description'].to_list()
 
+        # instantiate mock DataFrame
         input_df = pd.DataFrame({"name": names, "sequence": seqs})
 
-        num_json_files = jobstarter.max_cores
-        if num_json_files > len(input_df.index):
-            num_json_files = len(input_df.index)
+        # parse number of json files to run jobs in parallel
+        num_json_files = min(jobstarter.max_cores, len(input_df.index))
 
         json_files = []
         # create multiple input dataframes to run in parallel
@@ -241,7 +243,7 @@ class ProtParam(Runner):
                 df.to_json(name)
                 json_files.append(name)
         else:
-            name = os.path.join(work_dir, f"input_1.json")
+            name = os.path.join(work_dir, "input_1.json")
             input_df.to_json(name)
             json_files.append(name)
 
@@ -274,10 +276,10 @@ class ProtParam(Runner):
         return output.return_poses()
 
 def main(args):
-
+    '''Runs protparams.'''
     in_df = pd.read_json(args.input_json)
     out_df = []
-    for i, series in in_df.iterrows():
+    for _, series in in_df.iterrows():
         params = determine_protparams(seq=series['sequence'], pH=args.pH)
         params['description'] = series['name']
         out_df.append(params)
@@ -288,8 +290,6 @@ def main(args):
 
 if __name__ == "__main__":
     import argparse
-    import pandas as pd
-    from protflow.utils.biopython_tools import determine_protparams
 
     # setup args
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -299,6 +299,6 @@ if __name__ == "__main__":
     argparser.add_argument("--output_path", type=str, help="path were output .json file is saved.")
     argparser.add_argument("--pH", type=float, default=7, help="pH for charge calculation")
 
-    args = argparser.parse_args()
+    arguments = argparser.parse_args()
 
-    main(args)
+    main(arguments)

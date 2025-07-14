@@ -76,14 +76,6 @@ protflow.tools.rosetta module
    :undoc-members:
    :show-inheritance:
 
-protflow.tools.rosettascripts module
-------------------------------------
-
-.. automodule:: protflow.tools.rosettascripts
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 Module contents
 ---------------
 

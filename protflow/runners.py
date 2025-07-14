@@ -71,12 +71,6 @@ class RunnerOutput:
     index_sep : str, optional
         Separator used in the index (default is "_").
 
-    Methods
-    -------
-    check_data_formatting(results: pd.DataFrame)
-        Checks if the input DataFrame has the correct format. It must contain 'description' and 'location' columns.
-    return_poses()
-        Integrates the output of a runner into a Poses class by merging the formatted runner output into `Poses.df` and returns the updated Poses instance.
     """
     def __init__(self, poses: Poses, results: pd.DataFrame, prefix: str, index_layers: int = 0, index_sep: str = "_"):
         self.results = self.check_data_formatting(results)
@@ -475,17 +469,21 @@ def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[di
     by a specified separator within each input string, with options and their values separated by spaces.
 
     Parameters:
-    - options (str): A string of generic options, where different options are separated by the specified separator and each option's
-      value (if any) is separated by space.
-    - pose_options (str): A string of pose-specific options, formatted like the `options` parameter. These options take precedence
-      over generic options.
-    - sep (str, optional): The separator used to distinguish between different options in both input strings. Defaults to "--".
+    -----------
+    options : str 
+        A string of generic options, where different options are separated by the specified separator and each option's value (if any) is separated by space.
+    pose_options : str 
+        A string of pose-specific options, formatted like the `options` parameter. These options take precedence over generic options.
+    sep : str, optional
+        The separator used to distinguish between different options in both input strings. Defaults to "--".
 
     Returns:
-    - tuple: A 2-element tuple where the first element is a dictionary of merged options (key-value pairs) and the second element
-      is a list of unique flags (options without values) from both input strings.
+    --------
+    tuple 
+        A 2-element tuple where the first element is a dictionary of merged options (key-value pairs) and the second element is a list of unique flags (options without values) from both input strings.
 
-    Example:
+    Examples:
+    ---------
     >>> parse_generic_options("--width 800 --height 600", "--color blue --verbose")
     ({'width': '800', 'height': '600', 'color': 'blue'}, ['verbose'])
 

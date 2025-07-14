@@ -70,6 +70,7 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/.doctrees/
 
 # PyBuilder
 .pybuilder/
@@ -160,7 +161,6 @@ cython_debug/
 #.idea/
 protflow/dev_testing.ipynb
 
-docs/
 protflow/config.py
 dev_stuff/
 examples/outputs/

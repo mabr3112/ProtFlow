@@ -46,11 +46,11 @@ Version
 -------
 0.1.0    
 """
-
-# customs
+# imports
 from typing import Union
 from itertools import product
 
+# customs
 import protflow.residues
 from protflow.poses import Poses, col_in_df
 from protflow.residues import ResidueSelection
@@ -193,9 +193,9 @@ class ChainSelector(ResidueSelector):
         if not chains:
             self.chains = None
         elif not isinstance(chains, list):
-            raise ValueError(f"Parameter :chains: must be a list containing the chains to select as single characters, e.g. chains=['A', 'C']")
+            raise ValueError("Parameter :chains: must be a list containing the chains to select as single characters, e.g. chains=['A', 'C']")
         elif not all(isinstance(chain, str) or len(chain) > 1 for chain in chains):
-            raise ValueError(f"Parameter :chains: must be a list containing the chains to select as single characters, e.g. chains=['A', 'C']")
+            raise ValueError("Parameter :chains: must be a list containing the chains to select as single characters, e.g. chains=['A', 'C']")
         self.chains = chains
         self.chain = None
 
@@ -215,7 +215,7 @@ class ChainSelector(ResidueSelector):
         if not chain:
             self.chain = None
         elif not isinstance(chain, str) or len(chain) > 1:
-            raise ValueError(f"Parameter :chain: must be a string of a single character denoting the chain that should be selected. e.g. chain='B' ")
+            raise ValueError("Parameter :chain: must be a string of a single character denoting the chain that should be selected. e.g. chain='B' ")
         self.chain = chain
         self.chains = None
 
@@ -244,7 +244,7 @@ class ChainSelector(ResidueSelector):
         # prep inputs
         chains = self.prep_chain_input(chain, chains)
         if not (poses := poses or self.poses):
-            raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
+            raise ValueError("You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
 
         # select Residues
         poses.df[prefix] = [self.select_single(pose_path=pose, chains=chains) for pose in poses.poses_list()]
@@ -310,7 +310,7 @@ class ChainSelector(ResidueSelector):
         if self.chain and self.chains:
             raise ValueError(f"Either chain, or chains can be set, but not both. chain: {self.chain}, chains: {self.chains}")
         if all(not param for param in [chain, chains, self.chain, self.chains]):
-            raise ValueError(f"Set one of parameters :chain: or :chains: to select a chain with ChainSelector!")
+            raise ValueError("Set one of parameters :chain: or :chains: to select a chain with ChainSelector!")
 
         # handle priorities (method parameters over class parameters)
         class_chains = self.chains if self.chains else [self.chain]
@@ -355,7 +355,7 @@ class TrueSelector(ResidueSelector):
         """
         # prep inputs and run
         if not (poses := poses or self.poses):
-            raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
+            raise ValueError("You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
         poses.check_prefix(prefix)
         poses.df[prefix] = [self.select_single(pose) for pose in poses.poses_list()]
 
@@ -402,7 +402,7 @@ class NotSelector(ResidueSelector):
         """
         super().__init__(poses)
         if residue_selection and contig:
-            raise ValueError(f"NotSelector Class cannot be initialized with both parameters :contig: or :residue_selection: set.\n Either choose a residue_selection, or give the residue selectio as a contig, but not both.")
+            raise ValueError("NotSelector Class cannot be initialized with both parameters :contig: or :residue_selection: set.\n Either choose a residue_selection, or give the residue selectio as a contig, but not both.")
         self.set_residue_selection(residue_selection)
         self.set_contig(contig)
 
@@ -489,9 +489,9 @@ class NotSelector(ResidueSelector):
         """
         # error handling
         if not (poses := poses or self.poses):
-            raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
+            raise ValueError("You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
         if residue_selection and contig:
-            raise ValueError(f"NotSelector Class cannot be initialized with both parameters :contig: or :residue_selection: set.\n Either choose a residue_selection, or give the residue selectio as a contig, but not both.")
+            raise ValueError("NotSelector Class cannot be initialized with both parameters :contig: or :residue_selection: set.\n Either choose a residue_selection, or give the residue selectio as a contig, but not both.")
 
         # prep inputs and run
         poses.check_prefix(prefix)
@@ -646,7 +646,7 @@ class DistanceSelector(ResidueSelector):
             self.noncenter_atoms = noncenter_atoms
         else:
             raise ValueError("Input to noncenter_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
-        
+
     def set_operator(self, operator: str) -> None:
         """
         Sets the operator for the select() method.
@@ -661,10 +661,10 @@ class DistanceSelector(ResidueSelector):
             >>> selector.set_operator(operator="<")
         """
         if not operator in ["<", ">", "<=", ">="]:
-            raise ValueError(f"Operator must be '<', '>', '<=' or '>='!")
+            raise ValueError("Operator must be '<', '>', '<=' or '>='!")
         else:
             self.operator = operator
-        
+
     def extract_center(self, center: Union[ResidueSelection, str, list], poses: Poses) -> list:
         """
         Extracts centers from input.
@@ -741,38 +741,34 @@ class DistanceSelector(ResidueSelector):
         """
         poses.check_prefix(prefix)
         if not (poses := poses or self.poses):
-            raise ValueError(f"You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
+            raise ValueError("You must set poses for your .select() method. Either with :poses: parameter of .select() or the ResidueSelector.set_poses() method to the class.")
 
         if not (distance := distance or self.distance): 
-            raise ValueError(f"You must set a distance for your .select() method. Either with :distance: parameter of .select() or the ResidueSelector.set_distance() method to the class.")
+            raise ValueError("You must set a distance for your .select() method. Either with :distance: parameter of .select() or the ResidueSelector.set_distance() method to the class.")
 
         if not (operator := operator or self.operator):
-            raise ValueError(f"You must set an operator for your .select() method. Either with :operator: parameter of .select() or the ResidueSelector.set_operator() method to the class.")
+            raise ValueError("You must set an operator for your .select() method. Either with :operator: parameter of .select() or the ResidueSelector.set_operator() method to the class.")
 
         include_center = include_center or self.include_center
 
         # pick class center if center is not set
         if not (center := center or self.center): 
-            raise ValueError(f"You must set a center for your .select() method. Either with :center: parameter of .select() or the ResidueSelector.set_center() method to the class.")
+            raise ValueError("You must set a center for your .select() method. Either with :center: parameter of .select() or the ResidueSelector.set_center() method to the class.")
         centers = self.extract_center(center, poses)
 
         if not len(centers) == len(poses.poses_list()):
-            raise ValueError(f"Number of input ResidueSelections ({len(center)}) must be the same as the number of poses ({len(self.poses.poses_list())})!")
+            raise ValueError("Number of input ResidueSelections ({len(center)}) must be the same as the number of poses ({len(self.poses.poses_list())})!")
 
         center_atoms = center_atoms or self.center_atoms
         if isinstance(center_atoms, str):
             center_atoms = [center_atoms]
-        elif isinstance(center_atoms, list):
-            center_atoms = center_atoms
-        elif center_atoms:
+        elif not isinstance(center_atoms, list):
             raise ValueError("Input to center_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
-        
+
         noncenter_atoms = noncenter_atoms or self.noncenter_atoms
         if isinstance(noncenter_atoms, str):
             noncenter_atoms = [noncenter_atoms]
-        elif isinstance(noncenter_atoms, list):
-            noncenter_atoms = noncenter_atoms
-        elif noncenter_atoms:
+        elif not isinstance(noncenter_atoms, list):
             raise ValueError("Input to neighbor_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
 
         # select Residues

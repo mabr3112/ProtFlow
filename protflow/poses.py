@@ -284,11 +284,6 @@ class Poses:
         KeyError
             If the provided storage format is not supported.
 
-        Attributes
-        ----------
-        storage_format : str
-            The format for storing protein data.
-
         Notes
         -----
         This method configures the storage format for protein data. It ensures that the format is one of the supported formats and raises an error if the format is invalid.
@@ -321,16 +316,6 @@ class Poses:
         set_scorefile : bool, optional
             If True, also sets the path for the scorefile in the specified working directory (default is True).
 
-        Attributes
-        ----------
-        work_dir : str
-            The working directory for storing data and results.
-        scores_dir : str
-            Directory for storing score files.
-        filter_dir : str
-            Directory for storing filtered results.
-        plots_dir : str
-            Directory for storing plot files.
 
         Further Details
         ---------------
@@ -432,10 +417,6 @@ class Poses:
         jobstarter : JobStarter
             An instance of the JobStarter class used to manage job submissions.
 
-        Attributes
-        ----------
-        default_jobstarter : JobStarter
-            The default job starter for managing jobs.
 
         Further Details
         ---------------
@@ -826,7 +807,7 @@ class Poses:
         """
         logging.warning(f"Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/")
         if not hasattr(self, "work_dir"):
-            raise AttributeError(f"Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
+            raise AttributeError("Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
 
         # read multilie-fasta file and split into individual poses
         fasta_dict = parse_fasta_to_dict(path, encoding=encoding)
@@ -1500,7 +1481,7 @@ class Poses:
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
             if self.filter_dir is None:
-                raise AttributeError(f"Filter directory was not set! Did you set a working directory? work_dir can be set with Poses.set_work_dir() and sets up a filter_dir automatically.")
+                raise AttributeError("Filter directory was not set! Did you set a working directory? work_dir can be set with Poses.set_work_dir() and sets up a filter_dir automatically.")
             os.makedirs(self.filter_dir, exist_ok=True)
 
             # make sure output format is available

@@ -96,18 +96,17 @@ Version
 # import general
 import os
 import glob
-import logging
 
 # import dependencies
 import pandas as pd
 
 # import customs
-import protflow
-from protflow.poses import Poses
-from protflow.runners import Runner, RunnerOutput, col_in_df
-from protflow.jobstarters import JobStarter
-from protflow.config import PROTFLOW_ENV
-from protflow.utils.metrics import calc_sc_tm
+from .. import jobstarters, runners
+from ..poses import Poses
+from ..runners import Runner, RunnerOutput, col_in_df
+from ..jobstarters import JobStarter
+from ..config import PROTFLOW_ENV
+from ..utils.metrics import calc_sc_tm
 
 class TMalign(Runner):
     """
@@ -220,7 +219,7 @@ class TMalign(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = self._check_install(application or os.path.join(PROTFLOW_ENV, "TMalign"))
+        self.application = self._check_install(application or os.path.join(os.path.dirname(PROTFLOW_ENV), "TMalign"))
 
     def __str__(self):
         return "TMalign"
@@ -303,7 +302,7 @@ class TMalign(Runner):
         )
 
         scorefile = os.path.join(work_dir, f"{prefix}_TM.{poses.storage_format}")
-        
+
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
             if sc_tm_score:
@@ -325,7 +324,7 @@ class TMalign(Runner):
             num_cmds = len(poses.df.index)
 
         # create batch commands
-        cmd_sublists = protflow.jobstarters.split_list(cmds, n_sublists=num_cmds)
+        cmd_sublists = jobstarters.split_list(cmds, n_sublists=num_cmds)
         cmds = []
         for sublist in cmd_sublists:
             cmds.append("; ".join(sublist))
@@ -394,7 +393,7 @@ class TMalign(Runner):
         This method is designed to streamline the preparation of reference structures for TMalign processes, ensuring that all references are correctly formatted and validated.
         """
         if not isinstance(ref, str):
-            raise ValueError(f"Parameter :ref: must be string and either refer to a .pdb file or to a column in poses.df!")
+            raise ValueError("Parameter :ref: must be string and either refer to a .pdb file or to a column in poses.df!")
         if ref.endswith(".pdb"):
             return [ref for _ in poses]
 
@@ -447,12 +446,12 @@ class TMalign(Runner):
         This method is designed to streamline the construction of commands for TMalign processes, ensuring that all necessary options are correctly formatted and included.
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options, sep="-")
+        opts, flags = runners.parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
         flags = " -" + " -".join(flags) if flags else ""
 
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options)
+        opts, flags = runners.parse_generic_options(options, pose_options)
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()]) if opts else ""
         flags = " -" + " -".join(flags) if flags else ""
 
@@ -649,7 +648,7 @@ class TMscore(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = application or os.path.join(PROTFLOW_ENV, "TMscore")
+        self.application = application or os.path.join(os.path.dirname(PROTFLOW_ENV), "TMscore")
 
     def __str__(self):
         return self.name
@@ -741,7 +740,7 @@ class TMscore(Runner):
             num_cmds = len(poses.df.index)
 
         # create batch commands
-        cmd_sublists = protflow.jobstarters.split_list(cmds, n_sublists=num_cmds)
+        cmd_sublists = jobstarters.split_list(cmds, n_sublists=num_cmds)
         cmds = []
         for sublist in cmd_sublists:
             cmds.append("; ".join(sublist))
@@ -810,12 +809,12 @@ class TMscore(Runner):
         This method is designed to streamline the construction of commands for TMscore processes, ensuring that all necessary options are correctly formatted and included.
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options, sep="-")
+        opts, flags = runners.parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
         flags = " -" + " -".join(flags) if flags else ""
 
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options)
+        opts, flags = runners.parse_generic_options(options, pose_options)
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()]) if opts else ""
         flags = " -" + " -".join(flags) if flags else ""
 

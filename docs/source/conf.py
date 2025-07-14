@@ -12,11 +12,12 @@ sys.path.insert(0, os.path.abspath('../../protflow/'))  # Adjust the path to you
 # -- Project information -----------------------------------------------------
 
 project = 'ProtFlow'
-copyright = '2024, Your Name'
-author = 'Your Name'
+copyright = '2024, Markus Braun, Adrian Tripp'
+author = 'Markus Braun'
 
 # The full version, including alpha/beta/rc tags
-release = '1.0.0'
+version = '0.1.0'
+release = '0.1.0'
 
 # -- General configuration ---------------------------------------------------
 
@@ -28,6 +29,8 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx_rtd_theme'
 ]
+autodoc_mock_imports = ['openbabel', 'protflow.config', 'config']
+suppress_warnings = ["autodoc.mocked_object"]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
