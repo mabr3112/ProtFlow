@@ -74,7 +74,6 @@ import pandas as pd
 # custom
 import protflow.config
 import protflow.jobstarters
-import protflow.tools
 from protflow.poses import Poses
 from protflow.runners import Runner, RunnerOutput, prepend_cmd
 from protflow.jobstarters import JobStarter
@@ -243,7 +242,7 @@ class AttnPacker(Runner):
         # prepend pre-cmd if defined:
         if self.pre_cmd:
             cmds = prepend_cmd(cmds = cmds, pre_cmd=self.pre_cmd)
-            
+ 
         # run:
         logging.info(f"Starting attnpacker.py on {len(poses)} poses with {jobstarter.max_cores} cores.")
         jobstarter.start(
@@ -258,7 +257,7 @@ class AttnPacker(Runner):
 
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
-        
+
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -322,8 +321,8 @@ class AttnPacker(Runner):
 
         return f"{self.python_path} {protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/run_attnpacker.py {options}"
 
-def collect_scores(dir: str):
-    scorefiles = glob.glob(os.path.join(dir, "*_attnpacker_out.json"))
+def collect_scores(scores_dir: str):
+    scorefiles = glob.glob(os.path.join(scores_dir, "*_attnpacker_out.json"))
     df = [pd.read_json(score, typ="series") for score in scorefiles]
     df = pd.DataFrame(df)
     df.reset_index(drop=True, inplace=True)

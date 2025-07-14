@@ -3,3 +3,4 @@ numpy
 biopython
 matplotlib
 sphinx_rtd_theme
+pyyaml

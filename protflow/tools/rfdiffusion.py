@@ -70,10 +70,10 @@ import logging
 from glob import glob
 import re
 from typing import Any
-import numpy as np
 import random # for delay before rfdiffusion runs
 
 # dependencies
+import numpy as np
 import pandas as pd
 
 # custom
@@ -291,7 +291,7 @@ class RFdiffusion(Runner):
 
         # sanity checks
         if multiplex_poses == 1:
-            logging.warning(f"Multiplex_poses must be higher than 1 to be effective!")
+            logging.warning("Multiplex_poses must be higher than 1 to be effective!")
 
         # log number of diffusions per backbone
         if multiplex_poses:
@@ -468,6 +468,8 @@ class RFdiffusion(Runner):
         # parse description:
         if pose:
             desc = os.path.splitext(os.path.basename(pose))[0]
+        else:
+            desc = "protein"
 
         # parse options:
         start_opts = self.parse_rfdiffusion_opts(options, pose_opts)

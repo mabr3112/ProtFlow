@@ -1,18 +1,19 @@
+"""Module Docstring is missing!"""
+# imports
 import re
 import os
 import logging
 import shutil
-import yaml
 import glob
 import json
+
+# dependencies
 from Bio import SeqIO
 import pandas as pd
-import protflow.config
-import protflow.jobstarters
-import protflow.tools
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter
+from .. import config, jobstarters
+from ..poses import Poses
+from ..runners import Runner, RunnerOutput, prepend_cmd
+from ..jobstarters import JobStarter
 
 # config file: 
 # BOLTZ_SCRIPT_PATH = "/home/az3556/boltz/src/boltz/main.py"
@@ -20,7 +21,7 @@ from protflow.jobstarters import JobStarter
 # BOLTZ_PRE_CMD = ""
 
 class Boltz(Runner):
-    def __init__(self, script_path: str = protflow.config.BOLTZ_SCRIPT_PATH, python_path: str = protflow.config.BOLTZ_PYTHON_PATH, pre_cmd: str = protflow.config.BOLTZ_PRE_CMD, jobstarter: str = None) -> None: 
+    def __init__(self, script_path: str = config.BOLTZ_SCRIPT_PATH, python_path: str = config.BOLTZ_PYTHON_PATH, pre_cmd: str = config.BOLTZ_PRE_CMD, jobstarter: str = None) -> None: 
         if not script_path:
             raise ValueError(f"No path is set for main.py. Set the path in config.py under BOLTZ_SCRIPT_PATH.")
 
@@ -41,7 +42,7 @@ class Boltz(Runner):
         overwrite: bool = False,
         **kwargs
     ) -> Poses:
-            
+
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
@@ -58,7 +59,8 @@ class Boltz(Runner):
         if overwrite:
             for folder in ["boltz_preds", "input_files", "output_files"]:
                 dir_path = os.path.join(work_dir, folder)
-                if os.path.isdir(dir_path): shutil.rmtree(dir_path)
+                if os.path.isdir(dir_path):
+                    shutil.rmtree(dir_path)
 
         os.makedirs(output_dir := os.path.join(work_dir, "boltz_preds"), exist_ok=True)
         os.makedirs(input_files := os.path.join(work_dir, "input_files"), exist_ok=True)
@@ -71,7 +73,7 @@ class Boltz(Runner):
             logging.info(f"Processing input file: {file_path}")
             processed_file = create_input_files(input_files, file_path)
             input_paths.append(processed_file)
-        
+
         input_path = input_files  
         logging.info(f"input_files contents: {os.listdir(input_files)}")
         cmds = [self.write_cmd(
@@ -85,13 +87,13 @@ class Boltz(Runner):
 
         logging.info(f"Starting Boltz predictions of {len(poses)} sequences on {jobstarter.max_cores} cores.")
         jobstarter.start(cmds=cmds, jobname="boltz_prediction", wait=True, output_path=work_dir)
-        
+
         logging.info("Renaming output files.")
         rename_boltz_outputs(output_dir=output_dir)
 
         logging.info("Copying structure files to output_files folder.")
         copy_structure_files(work_dir)
-        
+
         scores = collect_scores(working_dir=work_dir, input_files=input_paths)
         if isinstance(scores, dict):
             scores = pd.DataFrame(scores)
@@ -125,16 +127,16 @@ class Boltz(Runner):
     def handle_yaml(self, yaml_file, input_files):
         """Handles YAML file without converting to FASTA."""
         os.makedirs(input_files, exist_ok=True)
-        
-        with open(yaml_file, "r") as file:
+
+        with open(yaml_file, "r", encoding="UTF-8") as file:
             yaml_data = yaml.safe_load(file)
 
         fasta_files = []
         for entry in yaml_data.get("entries", []):
             fasta_files.append(entry)
-        
+
         return fasta_files
-    
+
     def write_cmd(self, input_path: str, output_dir: str, **kwargs) -> str:
         valid_options = ["output_format", "cache", "checkpoint", "devices", "accelerator", "recycling_steps", "sampling_steps", "diffusion_samples", "step_scale", "output_format", "num_workers", "override", "use_msa_server", "msa_server_url", "msa_pairing_strategy", "write_full_pae", "write_full_pde"]
         filtered_kwargs = {key: value for key, value in kwargs.items() if key in valid_options and value not in [None, False]}
@@ -156,8 +158,8 @@ def collect_scores(working_dir: str, input_files: list) -> pd.DataFrame:
         "pair_chains_iptm": {},
         "description": {},
         "location": {}
-    } 
-    index = 0  
+    }
+    index = 0
     processed_structures = set()
     for input_file in input_files:
         input_base_name = os.path.basename(input_file).split('.')[0].replace('confidence_', '')
@@ -182,7 +184,7 @@ def collect_scores(working_dir: str, input_files: list) -> pd.DataFrame:
                 if not matching_structure:
                     print(f"Warning: No matching structure found for {json_file}")
                     continue
-                with open(json_file, "r") as f:
+                with open(json_file, "r", encoding="UTF-8") as f:
                     score_data = json.load(f)
                 scores_dict["confidence_score"][str(index)] = score_data.get("confidence_score", 0)
                 scores_dict["ptm"][str(index)] = score_data.get("ptm", 0)
@@ -197,7 +199,7 @@ def collect_scores(working_dir: str, input_files: list) -> pd.DataFrame:
                 scores_dict["pair_chains_iptm"][str(index)] = score_data.get("pair_chains_iptm", {})
                 scores_dict["description"][str(index)] = output_base_name
                 scores_dict["location"][str(index)] = os.path.abspath(matching_structure)
-                index += 1  
+                index += 1
             except Exception as e:
                 print(f"Error reading {json_file}: {e}")
     scores = pd.DataFrame(scores_dict)
@@ -225,9 +227,9 @@ def create_input_files(input_files: str, file_path: str) -> str:
     os.makedirs(input_files, exist_ok=True)
     if file_extension in [".fasta", ".fa"]:
         input_filename = os.path.join(input_files, os.path.basename(file_path))
-        with open(file_path, "r") as original_fasta_file:
+        with open(file_path, "r", encoding="UTF-8") as original_fasta_file:
             records = list(SeqIO.parse(original_fasta_file, "fasta"))
-        with open(input_filename, "w") as fasta_file:
+        with open(input_filename, "w", encoding="UTF-8") as fasta_file:
             for seq_record in records:
                 header_parts = seq_record.description.split("|")
                 chain_id = "A"
