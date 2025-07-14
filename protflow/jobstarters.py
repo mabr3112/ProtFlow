@@ -49,32 +49,6 @@ class JobStarter:
     This class defines the interface for all job starters. Subclasses should implement methods
     to start jobs and wait for their completion. It also includes a method to set the maximum
     number of cores available for the jobs.
-
-    Methods
-    -------
-    __init__(max_cores: int = None)
-        Initializes the JobStarter with an optional maximum number of cores.
-    
-    start(cmds: list, jobname: str, wait: bool, output_path: str) -> None
-        Submits a list of commands as jobs to the scheduling system. This method should be
-        implemented by subclasses.
-    
-    wait_for_job(jobname: str, interval: float) -> None
-        Waits for a job to complete before proceeding. This method should be implemented
-        by subclasses.
-    
-    set_max_cores(cores: int) -> None
-        Sets the maximum number of cores available for the jobs.
-
-    Parameters
-    ----------
-    max_cores : int, optional
-        The maximum number of cores that can be used for the jobs. Default is None.
-
-    Raises
-    ------
-    NotImplementedError
-        If the 'start' or 'wait_for_job' methods are not implemented in a subclass.
     
     Examples
     --------
@@ -582,9 +556,9 @@ def split_list(input_list: list, element_length: int = None, n_sublists: int = N
     """
     # safety
     if element_length and n_sublists:
-        raise ValueError(f"Only either element_length or n_sublists can be specified, but not both!")
+        raise ValueError("Only either element_length or n_sublists can be specified, but not both!")
     if not element_length and not n_sublists:
-        raise ValueError(f"At least one of arguments 'element_length or n_sublists has to be given!")
+        raise ValueError("At least one of arguments 'element_length or n_sublists has to be given!")
 
     # handling n_sublists
     if n_sublists:
