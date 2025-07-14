@@ -16,7 +16,12 @@ from protflow.jobstarters import JobStarter
 from protflow.config import PROTFLOW_DIR, PROTFLOW_ENV
 from protflow.utils import biopython_tools as bpt
 
-GROMACS_PARAMS_DIR = os.path.join(PROTFLOW_DIR, "protflow/utils/gromacs/params")
+# this weird joining of paths is necessary because config is a mock import in the documentation build. 
+# DO NOT CHANGE IT if you don't know what that means.
+if isinstance(PROTFLOW_DIR, (str, bytes, os.PathLike)):
+    GROMACS_PARAMS_DIR = os.path.join(PROTFLOW_DIR, "protflow/utils/gromacs/params")
+else:
+    GROMACS_PARAMS_DIR = f"{PROTFLOW_DIR}/protflow/utils/gromacs/params"
 
 class Gromacs(Runner):
     '''Class Docs'''
