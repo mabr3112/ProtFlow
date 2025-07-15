@@ -277,7 +277,7 @@ class ESMFold(Runner):
         # check if interfering options were set
         forbidden_options = ['--fasta', '--output_dir']
         if options and any(opt in options for opt in forbidden_options) :
-            raise KeyError("Options must not contain '--fasta' or '--output_dir'!")
+            raise KeyError("Options must not contain '--fasta' or '--output_dir'!\nThese will be set automatically.")
 
         # write ESMFold cmds:
         cmds = [self.write_cmd(pose, output_dir=esm_preds_dir, options=options) for pose in pose_fastas]
@@ -297,7 +297,7 @@ class ESMFold(Runner):
 
         # collect scores
         logging.info("Predictions finished, starting to collect scores.")
-        scores = collect_scores(work_dir=work_dir)
+        scores = collect_esmfold_scores(work_dir=work_dir)
 
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
@@ -419,7 +419,7 @@ class ESMFold(Runner):
 
         return f"{self.python_path} {config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {runners.options_flags_to_string(opts, flags, sep='--')}"
 
-def collect_scores(work_dir:str) -> pd.DataFrame:
+def collect_esmfold_scores(work_dir:str) -> pd.DataFrame:
     """
     Collect and process the scores from ESMFold output.
 
@@ -433,7 +433,7 @@ def collect_scores(work_dir:str) -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing the collected scores and corresponding file locations.
 
     Examples:
-        Here is an example of how to use the `collect_scores` method:
+        Here is an example of how to use the `collect_esmfold_scores` method:
 
         .. code-block:: python
 
@@ -443,7 +443,7 @@ def collect_scores(work_dir:str) -> pd.DataFrame:
             esmfold = ESMFold()
 
             # Collect scores from ESMFold output
-            scores_df = esmfold.collect_scores(
+            scores_df = collect_esmfold_scores(
                 work_dir="/path/to/work_dir",
                 scorefile="/path/to/scorefile.json"
             )
