@@ -70,7 +70,6 @@ def parse_input_json(json_path: str) -> dict:
 
     return input_dict
 
-
 def main(args):
     '''Executor'''
     # parse targets from input_json

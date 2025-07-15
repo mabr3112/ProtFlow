@@ -309,12 +309,10 @@ def all_against_all_sequence_identity(input_seqs: list[str]) -> list:
 
     return list(np.max(similarity_matrix, axis=1))
 
-def entropy(prob_distribution: np.array) -> float:
+def entropy(prob_distribution: np.ndarray, axis: int = -1) -> float:
     """
-    Compute the entropy of a given probability distribution.
-
-    This function calculates the entropy of a probability distribution, which is a
-    measure of the uncertainty or randomness in the distribution.
+    Compute element-wise Shannon entropy H(p) = –∑ p·log₂ p along the given axis,
+    safely ignoring any p == 0 terms.
 
     Parameters
     ----------
@@ -323,8 +321,8 @@ def entropy(prob_distribution: np.array) -> float:
 
     Returns
     -------
-    float
-        The calculated entropy of the probability distribution.
+    np.ndarray
+        The calculated entropies of the probability distribution.
 
     Example
     -------
@@ -334,13 +332,19 @@ def entropy(prob_distribution: np.array) -> float:
     >>> print(ent)
     # Output: 1.1567796494470395
     """
-    # Filter out zero probabilities to avoid log(0)
-    prob_distribution = prob_distribution[prob_distribution > 0]
+    # sanity
+    prob_distribution = np.asarray(prob_distribution)
 
-    # Compute entropy
-    H = np.sum(prob_distribution * np.log2(prob_distribution)) # pylint: disable=C0103
+    # Suppress log(0) warnings; log₂(0)→–inf, but we’ll zero it out next.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        plogp = prob_distribution * np.log2(prob_distribution)
 
-    return -H
+    # Wherever p was zero, force p·log₂p → 0
+    plogp = np.where(prob_distribution > 0, plogp, 0.0)
+
+    # calculate entropy element wise
+    H = -np.sum(plogp, axis=axis)
+    return H
 
 def calc_sc_tm(input_df: pd.DataFrame, name: str, ref_col: str, tm_col: str) -> pd.DataFrame:
     """

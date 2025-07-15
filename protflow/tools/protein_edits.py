@@ -795,7 +795,7 @@ class ChainRemover(Runner):
         the ProtFlow framework.
 
         Parameters:
-            default_python (str, optional): The path to the default Python executable. Defaults to `os.path.join(PROTFLOW_ENV, "python3")`.
+            default_python (str, optional): The path to the default Python executable. Defaults to PROTFLOW_ENV.
             jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
 
         Attributes:
