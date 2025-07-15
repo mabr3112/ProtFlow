@@ -106,11 +106,11 @@ class ESM(Runner):
         )
 
         # collect scores and return
-        scores = collect_esm_scores(output_dir=work_dir)
+        scores = collect_esm_scores(output_dir=esm_output_dir)
 
         # add location col (original poses location)
         location_mapping = dict(zip(poses.df["poses_description"].to_list(), poses.df["poses"].to_list()))
-        scores["location"] = scores["label"].map(location_mapping)
+        scores["location"] = scores["description"].map(location_mapping)
 
         # save scores
         scores.to_json(scorefile)
@@ -139,8 +139,8 @@ class ESM(Runner):
 
         # safetycheck include parameter
         allowed_include_opts = {"mean", "per_tok", "bos", "contacts", "logits", "logprobs", "perres_probabilities", "perres_entropy", "mean_entropy"}
-        if allowed_include_opts - set(include):
-            raise ValueError(f"Unsupported option for parameter 'include': {allowed_include_opts - set(include)}")
+        if set(include) - allowed_include_opts:
+            raise ValueError(f"Unsupported option for parameter 'include': {set(include) - allowed_include_opts}")
         return options
 
     def _write_cmds(self, prediction_inputs: list[str], options: dict, model: str, output_dir: str) -> list[str]:
@@ -150,7 +150,7 @@ class ESM(Runner):
 
         # compile path to script
         script_path = os.path.join(config.AUXILIARY_RUNNER_SCRIPTS_DIR, "run_esm.py")
-        return [f"{self.python} {script_path} {opts_str} {model} {input_fa} {output_dir}" for input_fa in prediction_inputs]
+        return [f"{self.pre_cmd}; {self.python} {script_path} {opts_str} {model} {input_fa} {output_dir}" for input_fa in prediction_inputs]
 
     def output_exists(self, scorefilepath: str) -> bool:
         '''Simple check for collected scores of esm runner.'''
@@ -228,13 +228,15 @@ class ESM(Runner):
 def collect_esm_scores(output_dir: str) -> pd.DataFrame:
     """Function to collect ESM scores from esm run.py output folder."""
     # collect all output files
-    raw_scorefiles = glob(f"{output_dir}/*.pt")
+    raw_scorefiles = glob(f"{output_dir}/*.npy")
+    if not raw_scorefiles:
+        raise FileNotFoundError(f"No output files found of run_esm.py at directory {output_dir}\nEither run_esm.py crashed or the directory is wrong. Check any output logs of run_esm.py in and around the directory {output_dir}")
 
     # collect scores
     ser_list = []
     for raw_scorefile in raw_scorefiles:
         # load file
-        raw_scores = np.load(raw_scorefile).item()
+        raw_scores = np.load(raw_scorefile, allow_pickle=True).item()
 
         # collect metadata
         scores_dict = {
@@ -244,7 +246,7 @@ def collect_esm_scores(output_dir: str) -> pd.DataFrame:
 
         # collect scores
         for label in list(raw_scores.keys()):
-            if label == "label":
+            if label == "description":
                 continue
             scores_dict[label] = raw_scores[label]
 
@@ -253,4 +255,6 @@ def collect_esm_scores(output_dir: str) -> pd.DataFrame:
 
     # merge into singular dataframe
     out_df = pd.DataFrame(ser_list)
+    print(out_df.head())
+    print(out_df.columns)
     return out_df

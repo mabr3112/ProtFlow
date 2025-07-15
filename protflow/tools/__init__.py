@@ -18,3 +18,4 @@ from .protein_generator import ProteinGenerator
 from .rfdiffusion import RFdiffusion
 from .rosetta import Rosetta
 from .esm import ESM
+from .protein_edits import ChainAdder, ChainRemover, SequenceAdder, SequenceRemover
