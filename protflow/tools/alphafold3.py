@@ -469,7 +469,7 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
 
     if convert_cif_to_pdb_dir:
         os.makedirs(convert_cif_to_pdb_dir, exist_ok=True)
-        scores["location"] = scores.apply(lambda row: convert_cif_to_pdb(row["location"], format="pdb", output=os.path.abspath(os.path.join(convert_cif_to_pdb_dir, f"{row["description"]}.pdb"))), axis=1)
+        scores["location"] = scores.apply(lambda row: convert_cif_to_pdb(row["location"], format="pdb", output=os.path.abspath(os.path.join(convert_cif_to_pdb_dir, f"{row['description']}.pdb"))), axis=1)
     return scores
 
 
