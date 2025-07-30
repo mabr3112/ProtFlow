@@ -643,7 +643,7 @@ def regex_expand_options_flags(options_str: str, sep: str = "--") -> tuple[dict,
 
     return opts, set(flags)
 
-def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
+def options_flags_to_string(options: dict, flags: list, sep="--", no_quotes: bool = False) -> str:
     """
     Converts options dictionary and flags list into a single string.
 
@@ -657,6 +657,10 @@ def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
         A list of flags (standalone options without values).
     sep : str, optional
         The separator used to distinguish different options and flags (default is "--").
+    no_quotes: bool, optional
+        (default: False) Setting this option to True will disable the quoting of commandline arguments that are separated by whitespaces.
+        For example, if your option is "--my_list='1 4 6 14'" then you'd want your list quoted. 
+        setting no_quotes=True would result in "--my_list=1 4 6 14", which can cause errors. 
 
     Returns
     -------
@@ -683,7 +687,7 @@ def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
         return value
 
     # assemble options
-    out_str = " " + " ".join([f"{sep}{key}={value_in_quotes(value)}" for key, value in options.items()]) if options else ""
+    out_str = " " + " ".join([f"{sep}{key}={value if no_quotes else value_in_quotes(value)}" for key, value in options.items()]) if options else ""
 
     # if flags are present, assemble those too and return
     if flags and len(flags) > 1:

@@ -259,7 +259,7 @@ class LigandMPNN(Runner):
         pose_opt_cols = pose_opt_cols or {}
         run_batch = self.check_for_batch_run(pose_options, pose_opt_cols)
         if run_batch:
-            logging.info(f"Setting up ligandmpnn for batched design.")
+            logging.info("Setting up ligandmpnn for batched design.")
 
         # check if sidechain packing was specified in options
         pack_sidechains = "pack_side_chains" in options if options else False
@@ -463,7 +463,7 @@ class LigandMPNN(Runner):
                 full_opts_flags[0][multi_col] = col_json_path
 
             # reassemble command and put into batch_cmds
-            batch_cmd = f"{cmd_start} {options_flags_to_string(*full_opts_flags, sep='--')}"
+            batch_cmd = f"{cmd_start} {options_flags_to_string(*full_opts_flags, sep='--', no_quotes=True)}"
             batch_cmds.append(batch_cmd)
 
         return batch_cmds
@@ -526,7 +526,7 @@ class LigandMPNN(Runner):
 
         # check if fixed_residues and redesigned_residues were set properly (gets checked in LigandMPNN too, so maybe this is redundant.)
         if "fixed_residues" in pose_opt_cols and "redesigned_residues" in pose_opt_cols:
-            raise ValueError(f"Cannot define both <fixed_res_column> and <design_res_column>!")
+            raise ValueError("Cannot define both <fixed_res_column> and <design_res_column>!")
 
         # check if all specified columns exist in poses.df:
         for col in list(pose_opt_cols.values()):
@@ -620,7 +620,7 @@ class LigandMPNN(Runner):
             model_checkpoint_options = opts[f"checkpoint_{model}"]
 
         # safety
-        logging.debug(f"Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
+        logging.debug("Setting parse_atoms_with_zero_occupancy to 1 to ensure that the run does not crash.")
         if "parse_atoms_with_zero_occupancy" not in opts:
             opts["parse_atoms_with_zero_occupancy"] = "1"
         elif opts["parse_atoms_with_zero_occupancy"] != "1":
@@ -903,26 +903,25 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
 
     This method is designed to streamline the creation of distance-based conservation bias commands  for LigandMPNN within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein design simulations.
     """
+    from protflow.tools.residue_selectors import DistanceSelector
+    from protflow.metrics.selection_identity import SelectionIdentity
 
     def create_bias_dict(resdict: dict, bias: float):
         bias_dict = {}
-        for res, id in resdict.items():
-            bias_dict[res] = {id: bias}
+        for res, id_ in resdict.items():
+            bias_dict[res] = {id_: bias}
         return bias_dict
-    
+
     def combine_dicts(dict_list: list[dict]):
         out_dict = {}
         for in_dict in dict_list:
             out_dict.update(in_dict)
         return out_dict
-    
-    from protflow.tools.residue_selectors import DistanceSelector
-    from protflow.metrics.selection_identity import SelectionIdentity
 
     # check input
     if not shell_distances == sorted(shell_distances):
         raise KeyError(f"shell_distances must be in ascending order like {sorted(shell_distances)}, not {shell_distances}!")
-    
+
     # set python path
     python_path = os.path.join(PROTFLOW_ENV, "python")
 
@@ -951,7 +950,9 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
         selid.run(poses=poses, prefix=f"{prefix}_selection_{dist}_ids", residue_selection=f"{prefix}_selection_{dist}", onelettercode=True)
 
         # create bias dictionary
-        poses.df[f"{prefix}_{dist}_bias_dicts"] = poses.df.apply(lambda row: create_bias_dict(row[f"{prefix}_selection_{dist}_ids_selection_identities"], bias), axis=1)
+        poses.df[f"{prefix}_{dist}_bias_dicts"] = poses.df.apply(
+            lambda row: create_bias_dict(row[f"{prefix}_selection_{dist}_ids_selection_identities"], bias), axis=1
+        )
 
     # write bias dict for all shells
     poses.df[f"{prefix}_overall_bias_dict"] = poses.df.apply(lambda row: combine_dicts([row[f"{prefix}_{dist}_bias_dicts"] for dist in shell_distances]), axis=1)
@@ -959,11 +960,11 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
     # write json files for each dict
     os.makedirs(dict_dir := os.path.join(working_dir, "bias_dicts"), exist_ok=True)
     dict_paths = []
-    for i, row in poses.df.iterrows():
-        with open(dict_path := os.path.join(dict_dir, f"{row['poses_description']}_bias_dict.json"), 'w') as f:
+    for _, row in poses.df.iterrows():
+        with open(dict_path := os.path.join(dict_dir, f"{row['poses_description']}_bias_dict.json"), 'w', encoding="UTF-8") as f:
             json.dump(row[f"{prefix}_overall_bias_dict"], f, indent=4)
         dict_paths.append(dict_path)
-    
+
     # save paths to json files in poses dataframe
     poses.df[f"{prefix}_overall_bias_json"] = dict_paths
 
@@ -987,5 +988,3 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
     poses.set_work_dir(original_work_dir)
 
     return poses
-
-
