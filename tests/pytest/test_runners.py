@@ -15,7 +15,6 @@ test_opts2_recompiled = " -out:path:all=/home/mabr3112/projects/riff_diff/rad/di
 esm_opts = "--fasta /home/mabr3112/projects/riff_diff/rad/diffusion/nnewpot_d5_dw50/esm/input_fastas/fasta_0007.fa --output_dir /home/mabr3112/projects/riff_diff/rad/diffusion/nnewpot_d5_dw50/esm/esm_preds --fake_flag1 --fake_flag2"
 esm_opts_parsed = ({'fasta': '/home/mabr3112/projects/riff_diff/rad/diffusion/nnewpot_d5_dw50/esm/input_fastas/fasta_0007.fa', 'output_dir': '/home/mabr3112/projects/riff_diff/rad/diffusion/nnewpot_d5_dw50/esm/esm_preds'}, {'fake_flag1', 'fake_flag2'})
 esm_opts_recompiled = "--fasta=/home/mabr3112/projects/riff_diff/rad/diffusion/nnewpot_d5_dw50/esm/input_fastas/fasta_0007.fa --output_dir=/home/mabr3112/projects/riff_diff/rad/diffusion/nnewpot_d5_dw50/esm/esm_preds --fake_flag1 --fake_flag2"
-
 ####################### tests ##################################
 @pytest.mark.parametrize("cmds, pre_cmd, expect", [
     (["A", "B", "C"], "pre", ['pre; A', 'pre; B', 'pre; C'])
@@ -38,7 +37,8 @@ def test_regex_expand_options_flags(options_str: str, sep: str, expect: str):
 ])
 def test_options_flags_to_string(opts: dict, flags: list, sep: str, expect: str):
     output = options_flags_to_string(options=opts, flags=flags, sep=sep)
-    assert output.strip() == expect.strip()
+    assert len(output.strip().split()) == len(expect.strip().split()) # workaround, because sets do not have order --> flags do not always occur in same order
+    assert set(output.strip().split()) == set(expect.strip().split()) # workaround, because sets do not have order --> flags do not always occur in same order
 
 @pytest.mark.parametrize("opts, sep, expect", [
     (esm_opts, "--", esm_opts_parsed)
