@@ -2185,14 +2185,9 @@ def scale_series(ser: pd.Series) -> pd.Series:
     ser = ser.copy()
     # check if all values in <score_col> are the same, set all values to 0 if yes as no scaling is possible
     if ser.nunique() == 1:
-        ser[:] = 0
-        return ser
-    # scale series to values between 0 and 1
-    factor = ser.max() - ser.min()
-    ser = ser / factor
-    ser = ser + (1 - ser.max())
-
-    return ser
+        return pd.Series(0, index=ser.index)
+    # scale all values between 0 and 1
+    return (ser - ser.min()) / (ser.max() - ser.min())
 
 def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], weights: list[float], scale: bool = False) -> pd.Series:
     """
@@ -2311,7 +2306,7 @@ def get_format(path: str):
         "feather": pd.read_feather,
         "parquet": pd.read_parquet
     }
-    return loading_function_dict[path.split(".")[-1]]
+    return loading_function_dict[path.split(".")[-1].lower()]
 
 def load_poses(poses_path: str) -> Poses:
     """
@@ -2394,8 +2389,7 @@ def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
     """
     if isinstance(column, list):
         for col in column:
-            if not col in df.columns:
-                raise KeyError(f"Could not find {col} in poses dataframe! Are you sure you provided the right column name?")
+            col_in_df(df, col)
     else:
         if not column in df.columns:
             raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
@@ -2460,10 +2454,10 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, group_col
         determines if n is a fraction or an integer and sets cutoff for dataframe filtering accordingly.
         '''
         filter_n = float(n)
-        if filter_n < 1:
-            filter_n = round(len(df) * filter_n)
-        elif filter_n <= 0:
+        if filter_n <= 0:
             raise ValueError(f"ERROR: Argument <n> of filter functions cannot be smaller than 0. It has to be positive number. If n < 1, the top n fraction is taken from the DataFrame. if n > 1, the top n rows are taken from the DataFrame")
+        elif filter_n < 1:
+            filter_n = round(len(df) * filter_n)
 
         return int(filter_n)
     
