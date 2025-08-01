@@ -255,11 +255,18 @@ class LigandMPNN(Runner):
         This method is designed to streamline the execution of LigandMPNN processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein design simulations.
         """
         self.index_layers = 1
+
+        # integrate redesigned and fixed residue parameters into pose_opt_cols:
+        if fixed_res_col is not None:
+            pose_opt_cols["fixed_residues"] = fixed_res_col
+        if design_res_col is not None:
+            pose_opt_cols["redesigned_residues"] = design_res_col
+
         # run in batch mode if pose_options are not set:
         pose_opt_cols = pose_opt_cols or {}
         run_batch = self.check_for_batch_run(pose_options, pose_opt_cols)
         if run_batch:
-            logging.info("Setting up ligandmpnn for batched design.")
+            logging.info(f"Setting up ligandmpnn run {prefix} for batched design.")
 
         # check if sidechain packing was specified in options
         pack_sidechains = "pack_side_chains" in options if options else False
@@ -280,11 +287,6 @@ class LigandMPNN(Runner):
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
 
-        # integrate redesigned and fixed residue parameters into pose_opt_cols:
-        if fixed_res_col is not None:
-            pose_opt_cols["fixed_residues"] = fixed_res_col
-        if design_res_col is not None:
-            pose_opt_cols["redesigned_residues"] = design_res_col
 
         # parse pose_opt_cols into pose_options format.
         pose_opt_cols_options = self.parse_pose_opt_cols(poses=poses, pose_opt_cols=pose_opt_cols, output_dir=work_dir)
@@ -333,7 +335,6 @@ class LigandMPNN(Runner):
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
-
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
     def check_for_batch_run(self, pose_options: str, pose_opt_cols):
@@ -368,9 +369,10 @@ class LigandMPNN(Runner):
         Further Details:
             - **Batch Mode Check:** The method checks if the `pose_options` is None and if the `pose_opt_cols` contains only multi-residue columns, which are necessary for batch processing.
         """
-        return pose_options is None and self.multi_cols_only(pose_opt_cols)
+        #no_incompatible_options = pose_options or fixed_res_col or design_res_col # checks if any of those options is set
+        return not pose_options and self.multi_cols_only(pose_opt_cols)
 
-    def multi_cols_only(self, pose_opt_cols:dict) -> bool:
+    def multi_cols_only(self, pose_opt_cols: dict) -> bool:
         '''checks if only multi_res cols are in pose_opt_cols dict. Only _multi arguments can be used for ligandmpnn_batch runs.'''
         multi_cols = ["omit_AA_per_residue", "bias_AA_per_residue", "redesigned_residues", "fixed_residues"]
         return True if pose_opt_cols is None else all((col in multi_cols for col in pose_opt_cols))
@@ -418,6 +420,8 @@ class LigandMPNN(Runner):
             - **JSON Directory:** The method sets up a directory for storing JSON files that contain mappings for multi-residue options.
             - **Command Concatenation:** Each command sublist is processed to extract and convert multi-residue options into JSON files, which are then referenced in the batch commands.
         """
+        def _strip_quotes(in_opt):
+            return in_opt.strip("'").strip('"') if isinstance(in_opt, str) else in_opt
         multi_cols = {
             "omit_AA_per_residue": "omit_AA_per_residue_multi",
             "bias_AA_per_residue": "bias_AA_per_residue_multi", 
@@ -433,15 +437,15 @@ class LigandMPNN(Runner):
         # split cmds list into n=num_batches sublists
         cmd_sublists = protflow.jobstarters.split_list(cmds, n_sublists=num_batches)
 
-        # concatenate cmds: parse _multi arguments into .json files and keep all other arguments in options.
+        # concatenate cmds: parse _multi arguments into .json files and keep all other arguments in option.
         batch_cmds = []
         for i, cmd_list in enumerate(cmd_sublists, start=1):
-            full_cmd_list = [cmd.split(" ") for cmd in cmd_list]
-            opts_flags_list = [regex_expand_options_flags(" ".join(cmd_split[2:])) for cmd_split in full_cmd_list]
+            full_cmd_list = [cmd.split(" ", 2)[-1] for cmd in cmd_list] # splits off the first two things of the command: [{python} {ligmpnn.py} {rest of command}] and extracts {rest of command}
+            opts_flags_list = [regex_expand_options_flags(cmd) for cmd in full_cmd_list]
             opts_list = [x[0] for x in opts_flags_list] # regex_expand_options_flags() returns (options, flags)
 
             # take first cmd for general options and flags
-            full_opts_flags = opts_flags_list[0]
+            full_opts_flags: tuple[dict, set] = opts_flags_list[0]
             cmd_start = " ".join(full_cmd_list[0][:2]) # keep /path/to/python3 /path/to/run.py
 
             # extract lists for _multi options
@@ -451,15 +455,17 @@ class LigandMPNN(Runner):
                     continue
 
                 # extract pdb-file to argument mapping as dictionary:
-                col_dict = {opts["pdb_path"]: opts[col] for opts in opts_list}
+                col_dict = {opts["pdb_path"]: _strip_quotes(opts[col]) for opts in opts_list} # remove all quotes from strings for LigandMPNN to read options correctly.
 
                 # write col_dict to json
                 col_json_path = f"{json_dir}/{col}_{i}.json"
                 with open(col_json_path, 'w', encoding="UTF-8") as f:
                     json.dump(col_dict, f)
 
-                # remove single option from full_opts_flags and set cmd_json file as _multi option:
+                # remove single option from full_opts_flags
                 del full_opts_flags[0][col]
+
+                # set cmd_json file as _multi option:
                 full_opts_flags[0][multi_col] = col_json_path
 
             # reassemble command and put into batch_cmds
