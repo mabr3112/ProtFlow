@@ -257,13 +257,13 @@ class LigandMPNN(Runner):
         self.index_layers = 1
 
         # integrate redesigned and fixed residue parameters into pose_opt_cols:
+        pose_opt_cols = pose_opt_cols or {}
         if fixed_res_col is not None:
             pose_opt_cols["fixed_residues"] = fixed_res_col
         if design_res_col is not None:
             pose_opt_cols["redesigned_residues"] = design_res_col
 
         # run in batch mode if pose_options are not set:
-        pose_opt_cols = pose_opt_cols or {}
         run_batch = self.check_for_batch_run(pose_options, pose_opt_cols)
         if run_batch:
             logging.info(f"Setting up ligandmpnn run {prefix} for batched design.")
@@ -375,7 +375,7 @@ class LigandMPNN(Runner):
     def multi_cols_only(self, pose_opt_cols: dict) -> bool:
         '''checks if only multi_res cols are in pose_opt_cols dict. Only _multi arguments can be used for ligandmpnn_batch runs.'''
         multi_cols = ["omit_AA_per_residue", "bias_AA_per_residue", "redesigned_residues", "fixed_residues"]
-        return True if pose_opt_cols is None else all((col in multi_cols for col in pose_opt_cols))
+        return not pose_opt_cols or all((col in multi_cols for col in pose_opt_cols))
 
     def setup_batch_run(self, cmds:list[str], num_batches:int, output_dir:str) -> list[str]:
         """
