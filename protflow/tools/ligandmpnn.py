@@ -440,8 +440,8 @@ class LigandMPNN(Runner):
         # concatenate cmds: parse _multi arguments into .json files and keep all other arguments in option.
         batch_cmds = []
         for i, cmd_list in enumerate(cmd_sublists, start=1):
-            full_cmd_list = [cmd.split(" ", 2)[-1] for cmd in cmd_list] # splits off the first two things of the command: [{python} {ligmpnn.py} {rest of command}] and extracts {rest of command}
-            opts_flags_list = [regex_expand_options_flags(cmd) for cmd in full_cmd_list]
+            full_cmd_list = [cmd.split(" ", 2) for cmd in cmd_list] # splits off the first two things of the command: [{python} {ligmpnn.py} {rest of command}] and extracts {rest of command}
+            opts_flags_list = [regex_expand_options_flags(cmd[-1]) for cmd in full_cmd_list]
             opts_list = [x[0] for x in opts_flags_list] # regex_expand_options_flags() returns (options, flags)
 
             # take first cmd for general options and flags
