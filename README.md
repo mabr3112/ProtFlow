@@ -22,6 +22,7 @@ Install in the protflow environment to limit interference with other systems.
 ```
 cd ProtFlow
 conda activate protflow
+pip install openbabel-wheel
 pip install -e .
 ```
 
