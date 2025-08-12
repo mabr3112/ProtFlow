@@ -103,9 +103,9 @@ class ProteinGenerator(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If the types of arguments are not as expected.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        TypeError: If the types of arguments are not as expected.
 
     Examples
     --------

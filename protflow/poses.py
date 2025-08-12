@@ -684,6 +684,7 @@ class Poses:
         KeyError
             If the prefix is already used in the poses DataFrame.
 
+
         Further Details
         ---------------
         This method verifies whether the specified prefix is already in use within the poses DataFrame. It is useful for ensuring that new prefixes do not conflict with existing ones, maintaining data integrity.
@@ -729,6 +730,7 @@ class Poses:
         ------
         KeyError
             If the DataFrame does not contain the mandatory columns 'input_poses', 'poses', and 'poses_description'.
+
 
         Further Details
         ---------------
@@ -1092,6 +1094,7 @@ class Poses:
         KeyError
             If the pose description is not found in the poses DataFrame.
 
+
         Further Details
         ---------------
         This method locates the pose file based on its description and loads it as a Bio.PDB Structure object. It is useful for accessing specific pose structures for further analysis or manipulation.
@@ -1325,6 +1328,7 @@ class Poses:
         TypeError
             If the objects in the specified motif column are not of type ResidueSelection.
 
+
         Further Details
         ---------------
         This method sets a column in the poses DataFrame to be used as motifs for further analysis. The motifs must be instances of the ResidueSelection class.
@@ -1373,6 +1377,7 @@ class Poses:
         ------
         RuntimeError
             If the poses are not of type PDB.
+
 
         Further Details
         ---------------
@@ -1571,6 +1576,7 @@ class Poses:
         ValueError
             If all poses are removed based on the filtering criteria.
 
+
         Further Details
         ---------------
         This method filters the poses DataFrame based on a specified value in a score column, using the provided comparison operator. It supports optional plot generation for visualizing the filtering process and allows saving the filtered poses to a file with a specified prefix and storage format.
@@ -1679,17 +1685,20 @@ class Poses:
         scale_output : bool, optional
             If True, scales the composite score to a range between 0 and 1 (default is False).
 
+            
         Returns
         -------
         Poses
             The updated Poses instance with the new composite score column.
 
+            
         Raises
         ------
         ValueError
             If the number of scoreterms and weights do not match.
         TypeError
             If any score column contains non-numeric values.
+
 
         Further Details
         ---------------
@@ -1700,6 +1709,7 @@ class Poses:
         2. Normalize the column by subtracting the median and dividing by the standard deviation.
         3. Optionally scale the normalized values to a range between 0 and 1.
 
+        
         Example
         -------
         .. code-block:: python
@@ -1718,6 +1728,7 @@ class Poses:
                 scale_output=True
             )
 
+            
         Notes
         -----
         - The method ensures that the number of scoreterms and weights match.
@@ -2221,6 +2232,7 @@ def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], wei
     TypeError
         If any score column contains non-numeric values.
 
+
     Further Details
     ---------------
     This function combines multiple score columns in a DataFrame into a single composite score. Each score column is normalized by subtracting the median and dividing by the standard deviation. The normalized scores are then weighted according to the specified weights and summed to create the composite score. Optionally, the composite score can be scaled to a range between 0 and 1.
@@ -2363,6 +2375,7 @@ def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
     ------
     KeyError
         If any of the specified columns are not found in the DataFrame.
+
 
     Further Details
     ---------------

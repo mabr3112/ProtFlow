@@ -101,9 +101,10 @@ class FPocket(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If provided options are not of the expected type.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        TypeError: If provided options are not of the expected type.
+
 
     Examples
     --------
@@ -162,6 +163,7 @@ class FPocket(Runner):
         Raises:
             ValueError: If the fpocket_path is not provided or is invalid.
 
+
         Examples:
             Here is an example of how to initialize the FPocket class:
 
@@ -211,6 +213,7 @@ class FPocket(Runner):
             FileNotFoundError: If required files or directories are not found during the execution process.
             ValueError: If invalid arguments are provided to the method.
             TypeError: If options or pose_options are not of the expected type.
+
 
         Examples:
             Here is an example of how to use the `run` method:
