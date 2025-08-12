@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-docs =[
+docs = [
     "sphinx>=7.3",
     "sphinx_rtd_theme",
     "myst-parser>=2.0",
