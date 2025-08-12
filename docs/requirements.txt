@@ -2,5 +2,6 @@ pandas
 numpy
 biopython
 matplotlib
-sphinx_rtd_theme
 pyyaml
+sphinx_rtd_theme
+sphinx-build

@@ -28,7 +28,7 @@ keywords = ["protein design", "bioinformatics", "SLURM", "workflow"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "Programming Language :: Python :: >3.11"
+    "Programming Language :: Python :: >=3.11"
 ]
 
 [project.urls]
