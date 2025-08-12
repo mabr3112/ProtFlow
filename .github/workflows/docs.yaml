@@ -1,4 +1,4 @@
-name: Build docs
+name: Docs
 
 on:
   push:
@@ -26,5 +26,4 @@ jobs:
         python -m pip install --upgrade pip
         pip install -e .[docs]
     - name: Build docs
-      run: sphinx-build -b html -n -W docs _build/html
-
+      run: sphinx-build -b html -n -W docs/source docs/_build/html

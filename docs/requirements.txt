@@ -1,7 +1,0 @@
-pandas
-numpy
-biopython
-matplotlib
-pyyaml
-sphinx_rtd_theme
-sphinx-build
