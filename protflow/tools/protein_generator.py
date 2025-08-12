@@ -74,10 +74,10 @@ import numpy as np
 import pandas as pd
 
 # custom
-import protflow.config
-from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
+from protflow.runners import Runner, RunnerOutput, parse_generic_options
+from .. import config
 
 class ProteinGenerator(Runner):
     """
@@ -145,15 +145,15 @@ class ProteinGenerator(Runner):
 
     The ProteinGenerator class is intended for researchers and developers who need to perform protein generation as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path:str=protflow.config.PROTEIN_GENERATOR_SCRIPT_PATH, python_path:str=protflow.config.PROTEIN_GENERATOR_PYTHON_PATH, jobstarter:JobStarter=None) -> None:
+    def __init__(self, script_path:str=config.PROTEIN_GENERATOR_SCRIPT_PATH, python_path:str=config.PROTEIN_GENERATOR_PYTHON_PATH, jobstarter:JobStarter=None) -> None:
         """
         Initialize the ProteinGenerator class with paths to the necessary scripts and Python executable.
 
         This constructor sets up the `ProteinGenerator` class, configuring the paths to the protein generator script and the Python executable. It also sets the jobstarter and initializes essential attributes for the class.
 
         Parameters:
-            script_path (str, optional): The path to the protein generator script. Defaults to the value set in protflow.config.PROTEIN_GENERATOR_SCRIPT_PATH.
-            python_path (str, optional): The path to the Python executable. Defaults to the value set in protflow.config.PROTEIN_GENERATOR_PYTHON_PATH.
+            script_path (str, optional): The path to the protein generator script. Defaults to the value set in config.PROTEIN_GENERATOR_SCRIPT_PATH.
+            python_path (str, optional): The path to the Python executable. Defaults to the value set in config.PROTEIN_GENERATOR_PYTHON_PATH.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
 
         Raises:
@@ -358,7 +358,7 @@ class ProteinGenerator(Runner):
         desc = pose_path.rsplit("/", maxsplit=1)[-1].lsplit(".", maxsplit=1)[0]
 
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options)
+        opts, flags = parse_generic_options(options, pose_options)
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 

@@ -5,8 +5,6 @@ import os
 import shutil
 import pandas as pd
 
-# import config
-import protflow.config
 
 # import jobstarters
 from protflow.jobstarters import SbatchArrayJobstarter
@@ -30,7 +28,8 @@ from protflow.metrics.protparam import ProtParam
 from protflow.metrics.tmscore import TMalign
 from protflow.metrics.tmscore import TMscore
 
-
+# import config
+from protflow import config
 from protflow.utils.plotting import sequence_logo
 
 
@@ -86,13 +85,13 @@ def main(args):
 
     runner_dict = {
         "ESMFold": {
-            "runner": ESMFold() if protflow.config.ESMFOLD_PYTHON_PATH else None,
+            "runner": ESMFold() if config.ESMFOLD_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/esmfold/", "glob_suffix": "*.fasta"},
             "runner_options": {"jobstarter": jobstarter or js_dict['slurm_gpu_jobstarter']},
-            "config": [protflow.config.ESMFOLD_PYTHON_PATH]
+            "config": [config.ESMFOLD_PYTHON_PATH]
         },
         "Rosetta": {
-            "runner": Rosetta() if protflow.config.ROSETTA_BIN_PATH else None,
+            "runner": Rosetta() if config.ROSETTA_BIN_PATH else None,
             "poses_options": {"poses": "input_files/pdbs/", "glob_suffix": "*.pdb"},
             "runner_options": {
                 "rosetta_application": "rosetta_scripts.linuxgccrelease",
@@ -100,38 +99,38 @@ def main(args):
                 "options": "-parser:protocol input_files/rosettascripts/empty.xml -beta",
                 "jobstarter": jobstarter
             },
-            "config": [protflow.config.ROSETTA_BIN_PATH]
+            "config": [config.ROSETTA_BIN_PATH]
         },
         "AttnPacker": {
-            "runner": AttnPacker() if protflow.config.ATTNPACKER_DIR_PATH and protflow.config.ATTNPACKER_PYTHON_PATH else None,
+            "runner": AttnPacker() if config.ATTNPACKER_DIR_PATH and config.ATTNPACKER_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/pdbs/", "glob_suffix": "*.pdb"},
             "runner_options": {"overwrite": True, "jobstarter": jobstarter},
-            "config": [protflow.config.ATTNPACKER_DIR_PATH, protflow.config.ATTNPACKER_PYTHON_PATH]
+            "config": [config.ATTNPACKER_DIR_PATH, config.ATTNPACKER_PYTHON_PATH]
         },
         "LigandMPNN": {
-            "runner": LigandMPNN() if protflow.config.LIGANDMPNN_SCRIPT_PATH and protflow.config.LIGANDMPNN_PYTHON_PATH else None,
+            "runner": LigandMPNN() if config.LIGANDMPNN_SCRIPT_PATH and config.LIGANDMPNN_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/pdbs/", "glob_suffix": "*.pdb"},
             "runner_options": {
                 "model_type": "ligand_mpnn",
                 "nseq": 2,
                 "jobstarter": jobstarter
             },
-            "config": [protflow.config.LIGANDMPNN_SCRIPT_PATH, protflow.config.LIGANDMPNN_PYTHON_PATH]
+            "config": [config.LIGANDMPNN_SCRIPT_PATH, config.LIGANDMPNN_PYTHON_PATH]
         },
         "RFdiffusion": {
-            "runner": RFdiffusion() if protflow.config.RFDIFFUSION_SCRIPT_PATH and protflow.config.RFDIFFUSION_PYTHON_PATH else None,
+            "runner": RFdiffusion() if config.RFDIFFUSION_SCRIPT_PATH and config.RFDIFFUSION_PYTHON_PATH else None,
             "poses_options": {"poses": "input_files/rfdiffusion/", "glob_suffix": "*.pdb"},
             "runner_options": {
                 "options": "diffuser.T=50 potentials.guide_scale=5 'contigmap.contigs=[Q1-21/0 20/A1-5/10-50/B1-5/10-50/C1-5/10-50/D1-5/20]' contigmap.length=200-200 'contigmap.inpaint_seq=[A1/A2/A4/A5/B1/B2/B4/B5/C1/C2/C4/C5/D1/D2/D4/D5]' potentials.substrate=LIG",
                 "jobstarter": jobstarter
             },
-            "config": [protflow.config.RFDIFFUSION_SCRIPT_PATH, protflow.config.RFDIFFUSION_PYTHON_PATH]
+            "config": [config.RFDIFFUSION_SCRIPT_PATH, config.RFDIFFUSION_PYTHON_PATH]
         },
         "Colabfold": {
-            "runner": Colabfold() if protflow.config.COLABFOLD_SCRIPT_PATH else None,
+            "runner": Colabfold() if config.COLABFOLD_SCRIPT_PATH else None,
             "poses_options": {"poses": "input_files/fastas/", "glob_suffix": "*.fasta"},
             "runner_options": {"jobstarter": jobstarter},
-            "config": [protflow.config.COLABFOLD_SCRIPT_PATH]
+            "config": [config.COLABFOLD_SCRIPT_PATH]
         },
         "TMscore": {
             "runner": TMscore(),
@@ -140,7 +139,7 @@ def main(args):
                 "ref_col": "reference",
                 "jobstarter": jobstarter
             },
-            "config": [protflow.config.RFDIFFUSION_SCRIPT_PATH, protflow.config.RFDIFFUSION_PYTHON_PATH]
+            "config": [config.RFDIFFUSION_SCRIPT_PATH, config.RFDIFFUSION_PYTHON_PATH]
         },
         "TMalign": {
             "runner": TMalign(),
@@ -163,7 +162,7 @@ def main(args):
     }
     test = LigandMPNN()
 
-    if not protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR or not os.path.isdir(protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR):
+    if not config.AUXILIARY_RUNNER_SCRIPTS_DIR or not os.path.isdir(config.AUXILIARY_RUNNER_SCRIPTS_DIR):
         logging.warning(f"AUXILIARY_RUNNER_SCRIPTS_DIR was not properly set in config.py!")
         runner_dict['AUXILIARY_RUNNER_SCRIPTS_DIR'] = "NOT SET UP CORRECTLY!"
 

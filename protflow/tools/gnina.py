@@ -75,12 +75,12 @@ from glob import glob
 import pandas as pd
 
 # custom
-import protflow.config
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
-from protflow.runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string
 from protflow.tools.protein_edits import ChainRemover
+from protflow.runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string
 from protflow.utils.biopython_tools import load_structure_from_pdbfile, save_structure_to_pdbfile
+from .. import config
 
 class GNINA(Runner):
     """
@@ -145,7 +145,7 @@ class GNINA(Runner):
     -------
     0.1.0
     """
-    def __init__(self, script_path:str=protflow.config.GNINA_PATH, jobstarter:JobStarter=None) -> None:
+    def __init__(self, script_path:str=config.GNINA_PATH, jobstarter:JobStarter=None) -> None:
         """
         Initializes the LigandMPNN class.
 
