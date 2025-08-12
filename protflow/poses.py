@@ -806,7 +806,7 @@ class Poses:
 
         """
         logging.warning(f"Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/")
-        if not hasattr(self, "work_dir"):
+        if not self.work_dir:
             raise AttributeError("Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
 
         # read multilie-fasta file and split into individual poses
@@ -817,14 +817,14 @@ class Poses:
         fasta_dict = {re.sub(symbols_to_replace, "_", description): seq for description, seq in fasta_dict.items()}
 
         # setup fasta directory self.work_dir/input_fastas_split/
-        output_dir = os.path.abspath(f"{self.work_dir}/input_fastas_split/")
+        output_dir = os.path.abspath(os.path.join(self.work_dir, "input_fastas_split"))
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 
         # write individual poses in fasta directory:
         out_poses = []
         for description, seq in fasta_dict.items():
-            fp = f"{output_dir}/{description}.fa"
+            fp = os.path.join(output_dir, f"{description}.fa")
             try:
                 # check if files are already there. If contents do not match, write the new fasta-file
                 subfasta_dict = parse_fasta_to_dict(path, encoding=encoding)
@@ -1073,7 +1073,7 @@ class Poses:
         return self.df["poses"].to_list()
 
     ########################################## Operations ###############################################
-    def get_pose(self, pose_description: str) -> Bio.PDB.Structure.Structure:
+    def get_pose(self, pose_description: str, all_models: bool = False) -> Bio.PDB.Model.Model | Bio.PDB.Structure.Structure:
         """
         Retrieves a pose structure based on its description.
 
@@ -1081,11 +1081,13 @@ class Poses:
         ----------
         pose_description : str
             The description of the pose to be retrieved.
+        all_models : bool, optional
+            If all models in the input PDB should be returned (all_models = True) or just the first (all_models = False). If False, a Bio.PDB Model is returned, if True, a Bio.PDB Structure is returned.
 
         Returns
         -------
-        Bio.PDB.Structure.Structure
-            The Bio.PDB Structure object corresponding to the specified pose description.
+        Bio.PDB.Model.Model or Bio.PDB.Structure.Structure
+            The Bio.PDB Model or Structure object corresponding to the specified pose description.
 
         Raises
         ------
@@ -1114,9 +1116,9 @@ class Poses:
         - Ensures that the returned pose is loaded as a Bio.PDB Structure object for further processing.
 
         """
-        if pose_description not in self.df["poses_description"]:
+        if pose_description not in self.df["poses_description"].to_list():
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
-        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
+        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0], all_models=all_models)
     
     def reindex_poses(self, prefix:str, remove_layers:int=1, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
         """
