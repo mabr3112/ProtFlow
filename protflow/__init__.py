@@ -1,3 +1,3 @@
 '''Package initialization'''
-from . import poses, jobstarters, runners, residues, tools, metrics, utils, config
+from . import config, poses, jobstarters, runners, residues, tools, metrics, utils
 #from .runners import runners
