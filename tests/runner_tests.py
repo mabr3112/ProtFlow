@@ -30,7 +30,6 @@ from protflow.metrics.tmscore import TMscore
 
 # import config
 from protflow import config
-from protflow.utils.plotting import sequence_logo
 
 
 #TODO: @Adrian: For Attnpacker, ligandmpnn and AF please write Tutorials as Jupyter Notebooks in 'examples' Folder.
