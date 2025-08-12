@@ -1121,7 +1121,7 @@ class Poses:
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
         return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
     
-    def reindex_poses(self, prefix:str, remove_layers:int=1, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
+    def reindex_poses(self, prefix:str, group_col:str=None, remove_layers:int=None, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
         """
         Removes index layers from poses. Saves reindexed poses to an output directory.
 
@@ -1129,6 +1129,8 @@ class Poses:
         ----------
         prefix : str
             The directory where the duplicated poses will be saved and the prefix for the DataFrame columns containing the original paths and descriptions.
+        group_col : str, optional
+            The poses dataframe column on which to group to create new descriptions. Must be a column in 'poses_description' or 'poses' format (e.g. from a previous state, before runners appended index layers)
         remove_layers : int, optional
             The number of index layers to remove. 
         force_reindex : bool, optional
@@ -1138,16 +1140,19 @@ class Poses:
             
         Further Details
         ---------------
-        This method removes index layers from poses (_0001, 0002, etc). Subtracts the set number of layers from the description column and groups the poses accordingly.
+        This method removes index layers from poses (_0001, _0002, etc). If a group column is provided, the poses are assigned names according to the group. If remove_layers is above 0, subtracts the set number of layers from the description column and groups the poses accordingly.
         If force_reindex is True, adds one index layer to all poses. 
 
         Notes
         -----
         - The method creates the output directory if it does not exist.
+        - Raises a KeyError if both group_col and remove_layers are set..
         - Raises a RuntimeError if multiple poses with identical description after index layer removal are found and force_reindex is False..
 
         """
-
+        if group_col and remove_layers:
+            raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
+        
         out_dir = os.path.join(self.work_dir, prefix)
         os.makedirs(out_dir, exist_ok=True)
         self.df[f"{prefix}_pre_reindexing_poses_description"] = self.df['poses_description']
@@ -1158,6 +1163,9 @@ class Poses:
         if remove_layers:
             if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
             self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        elif group_col:
+            col_in_df(self.df, group_col)
+            self.df["tmp_layer_column"] = [description_from_path(path) for path in self.df[group_col]]
         else: self.df["tmp_layer_column"] = self.df['poses_description']
 
         self.df.sort_values(["tmp_layer_column", "poses_description"], inplace=True) # sort to make sure that all poses are in the same order after grouping
