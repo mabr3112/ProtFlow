@@ -57,6 +57,14 @@ BOLTZ_PRE_CMD = ""
 GROMACS_PATH = "" #/path/to/gromacs/bin/
 
 # PLACER
-PLACER_SCRIPT_PATH = "" # ""/path/to/PLACER/run_PLACER.py"
+PLACER_SCRIPT_PATH = "" # "/path/to/PLACER/run_PLACER.py"
 PLACER_PYTHON_PATH = "" # "/path/to/mambaforge/envs/placer/bin/python"
 PLACER_PRE_CMD = ""
+
+# ESM
+ESM_PYTHON_PATH = "" # "/path/to/package_manager/envs/your_esm_env/bin/python"
+ESM_PRE_CMD = ""
+
+# protein generator
+PROTEIN_GENERATOR_PYTHON_PATH = ""
+PROTEIN_GENERATOR_SCRIPT_PATH = ""

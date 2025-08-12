@@ -134,7 +134,7 @@ class RunnerOutput:
 
         # check for duplicate columns
         if any(x in list(self.poses.df.columns) for x in list(self.results.columns)):
-            logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
+            logging.info("WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
 
         # if poses are empty, concatenate DataFrames:
         if len(self.poses.poses_list()) == 0:
@@ -152,11 +152,11 @@ class RunnerOutput:
         # check if merger was successful:
         if len(merged_df) == 0:
             print(self.poses.df["poses_description"].to_list()[:3], self.results[f"{self.prefix}_select_col"].to_list()[:3])
-            raise ValueError(f"Merging DataFrames failed. This means there was no overlap found between poses.df['poses_description'] and results[new_df_col]")
+            raise ValueError("Merging DataFrames failed. This means there was no overlap found between poses.df['poses_description'] and results[new_df_col]")
         if len(merged_df) < startlen:
             print(self.poses.df["poses_description"].to_list()[:3], self.results[f"{self.prefix}_select_col"].to_list()[:3])
             logging.error(self.poses.df["poses_description"].to_list()[:3], self.results[f"{self.prefix}_select_col"].to_list()[:3])
-            raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']")
+            raise ValueError("Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']")
 
         # reset poses and poses_description column
         merged_df["poses"] = [os.path.abspath(pose) for pose in merged_df[f"{self.prefix}_location"].to_list()]
@@ -212,7 +212,7 @@ class Runner:
         >>>     def __str__(self):
         >>>         return "MyRunner"
         """
-        raise NotImplementedError(f"Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
+        raise NotImplementedError("Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
 
     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -> Poses:
         """
@@ -246,7 +246,7 @@ class Runner:
         >>>         # Custom implementation for running jobs
         >>>         pass
         """
-        raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
+        raise NotImplementedError("Runner Method 'run' was not overwritten yet!")
 
     def search_path(self, input_path: str, path_name: str, is_dir: bool = False) -> str:
         """
@@ -396,7 +396,7 @@ class Runner:
         run_jobstarter, runner_jobstarter, poses_jobstarter = jobstarters
         jobstarter = run_jobstarter or (runner_jobstarter or poses_jobstarter) # select jobstarter, priorities: Runner.run(jobstarter) > Runner.jobstarter > poses.jobstarter
         if not jobstarter or not isinstance(jobstarter, JobStarter):
-            raise ValueError(f"No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
+            raise ValueError("No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
 
         # setup directory
         work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")

@@ -132,9 +132,9 @@ class TMalign(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If the TMalign executable is not found in the specified environment.
-        - ValueError: If invalid arguments are provided to the methods or if required reference columns are missing.
-        - RuntimeError: If no TM scores are found in the output files.
+        FileNotFoundError: If the TMalign executable is not found in the specified environment.
+        ValueError: If invalid arguments are provided to the methods or if required reference columns are missing.
+        RuntimeError: If no TM scores are found in the output files.
 
     Examples
     --------
@@ -571,9 +571,9 @@ class TMscore(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If the TMscore executable is not found in the specified environment.
-        - ValueError: If invalid arguments are provided to the methods or if required reference columns are missing.
-        - RuntimeError: If no TM scores are found in the output files.
+        FileNotFoundError: If the TMscore executable is not found in the specified environment.
+        ValueError: If invalid arguments are provided to the methods or if required reference columns are missing.
+        RuntimeError: If no TM scores are found in the output files.
 
     Examples
     --------

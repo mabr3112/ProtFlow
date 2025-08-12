@@ -120,9 +120,9 @@ class ChainAdder(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If motifs or chains are not of the expected type.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        TypeError: If motifs or chains are not of the expected type.
 
     Examples
     --------
@@ -746,8 +746,8 @@ class ChainRemover(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
 
     Examples
     --------
@@ -795,7 +795,7 @@ class ChainRemover(Runner):
         the ProtFlow framework.
 
         Parameters:
-            default_python (str, optional): The path to the default Python executable. Defaults to `os.path.join(PROTFLOW_ENV, "python3")`.
+            default_python (str, optional): The path to the default Python executable. Defaults to PROTFLOW_ENV.
             jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
 
         Attributes:

@@ -170,3 +170,5 @@ config.py
 manuscript
 config_copy.py
 tests/dev_testing.ipynb
+tests/test_esm
+.vscode/

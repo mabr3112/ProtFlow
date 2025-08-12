@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "protflow"
+version = "0.1.0"
+requires-python = ">=3.11"
+description = "ProtFlow, a package to orchestrate protein design workflows."
+readme = "README.md"
+dependencies = [
+    "pandas",
+    "numpy",
+    "Bio",
+    "matplotlib",
+    "pyyaml",
+    "openbabel-wheel>=3.1.1.16"
+]
+
+authors = [
+    {name = "Markus Braun"},
+    {name = "Adrian Tripp"}
+]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["protein design", "bioinformatics", "SLURM", "workflow"]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: >=3.11"
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx>=7.3",
+    "sphinx_rtd_theme",
+    "myst-parser>=2.0",
+    "sphinx-autodoc-typehints>=2.1",
+    "sphinx-copybutton>=0.5"
+]
+
+[project.urls]
+Repository = "https://github.com/mabr3112/ProtFlow"
+Documentation = "https://protflow.readthedocs.io/en/latest/"
+Issues = "https://github.com/mabr3112/ProtFlow/issues"

@@ -107,6 +107,7 @@ class ProtParam(Runner):
         FileNotFoundError
             If the default Python executable is not found in the specified path.
 
+
         Examples
         --------
         Here is an example of how to initialize the `ProtParam` class:
@@ -155,9 +156,9 @@ class ProtParam(Runner):
 
         Raises
         ------
-            - FileNotFoundError: If required files or directories are not found during the execution process.
-            - ValueError: If invalid arguments are provided to the methods.
-            - TypeError: If the input poses are not of the expected type.
+            FileNotFoundError: If required files or directories are not found during the execution process.
+            ValueError: If invalid arguments are provided to the methods.
+            TypeError: If the input poses are not of the expected type.
 
         Examples
         --------
