@@ -76,10 +76,10 @@ import shutil
 import pandas as pd
 
 # custom
-import protflow.config
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
+from protflow.runners import Runner, RunnerOutput, prepend_cmd, parse_generic_options
+from .. import config
 
 class Rosetta(Runner):
     """
@@ -150,14 +150,14 @@ class Rosetta(Runner):
 
     The Rosetta class is intended for researchers and developers who need to perform Rosetta simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.ROSETTA_BIN_PATH, pre_cmd:str=protflow.config.ROSETTA_PRE_CMD, jobstarter: str = None, fail_on_missing_output_poses: bool = False) -> None:
+    def __init__(self, script_path: str = config.ROSETTA_BIN_PATH, pre_cmd:str=config.ROSETTA_PRE_CMD, jobstarter: str = None, fail_on_missing_output_poses: bool = False) -> None:
         """
         Initialize the Rosetta class with the necessary configuration.
 
         This method sets up the Rosetta class with the provided script path and job starter configuration. It initializes the necessary parameters and prepares the environment for executing Rosetta processes.
 
         Parameters:
-            script_path (str, optional): The path to the Rosetta executable scripts. Defaults to the path specified in `protflow.config.ROSETTA_BIN_PATH`.
+            script_path (str, optional): The path to the Rosetta executable scripts. Defaults to the path specified in `config.ROSETTA_BIN_PATH`.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
 
         Raises:
@@ -427,7 +427,7 @@ class Rosetta(Runner):
         This method is designed to facilitate the construction of command strings for running Rosetta applications, making it easier for researchers and developers to execute and manage Rosetta simulations within the ProtFlow framework.
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options, sep="-")
+        opts, flags = parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
         flags = " -" + " -".join(flags) if flags else ""
 
@@ -437,7 +437,7 @@ class Rosetta(Runner):
             raise KeyError(f"options and pose_options must not contain any of {forbidden_options}")
 
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options)
+        opts, flags = parse_generic_options(options, pose_options)
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()]) if opts else ""
         flags = " -" + " -".join(flags) if flags else ""
         overwrite = " -overwrite" if overwrite else ""

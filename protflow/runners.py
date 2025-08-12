@@ -533,9 +533,10 @@ def col_in_df(df: pd.DataFrame, column: str) -> None:
 
 def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
     """
-    Parses options and flags from an input string.
+    Simple parsing function to parse options and flags from an input string.
 
-    This function splits an input string into options and flags based on a specified separator.
+    Splits an input string into options and flags only based on a specified separator!
+    If your command has more complex patterns in its options, then switch to "regex_expand_options_flags". 
     Options are key-value pairs, while flags are standalone keys without values.
 
     Parameters
@@ -684,7 +685,7 @@ def options_flags_to_string(options: dict, flags: list, sep="--") -> str:
     out_str = " " + " ".join([f"{sep}{key}={value_in_quotes(value)}" for key, value in options.items()]) if options else ""
 
     # if flags are present, assemble those too and return
-    if flags and len(flags) > 1:
+    if flags and len(flags) >= 1:
         out_str += f" {sep}" + f" {sep}".join(flags)
     return out_str
 

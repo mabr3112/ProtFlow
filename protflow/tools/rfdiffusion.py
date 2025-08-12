@@ -79,9 +79,9 @@ import pandas as pd
 # custom
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
-import protflow.config
 from protflow.residues import ResidueSelection
 from protflow.runners import Runner, RunnerOutput, col_in_df, prepend_cmd
+from .. import config
 
 class RFdiffusion(Runner):
     """
@@ -150,7 +150,7 @@ class RFdiffusion(Runner):
 
     The RFdiffusion class is intended for researchers and developers who need to perform RFdiffusion simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.RFDIFFUSION_SCRIPT_PATH, python_path: str = protflow.config.RFDIFFUSION_PYTHON_PATH, pre_cmd : str = protflow.config.RFDIFFUSION_PRE_CMD, jobstarter: JobStarter = None) -> None:
+    def __init__(self, script_path: str = config.RFDIFFUSION_SCRIPT_PATH, python_path: str = config.RFDIFFUSION_PYTHON_PATH, pre_cmd : str = config.RFDIFFUSION_PRE_CMD, jobstarter: JobStarter = None) -> None:
         """
         Initialize the RFdiffusion class.
 
@@ -162,8 +162,8 @@ class RFdiffusion(Runner):
 
         Parameters
         ----------
-        script_path (str, optional): The path to the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`protflow.config.RFDIFFUSION_SCRIPT_PATH`).
-        python_path (str, optional): The path to the Python executable used to run the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`protflow.config.RFDIFFUSION_PYTHON_PATH`).
+        script_path (str, optional): The path to the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`config.RFDIFFUSION_SCRIPT_PATH`).
+        python_path (str, optional): The path to the Python executable used to run the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`config.RFDIFFUSION_PYTHON_PATH`).
         jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. If not provided, the default is `None`.
 
         Returns

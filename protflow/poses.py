@@ -808,7 +808,7 @@ class Poses:
 
         """
         logging.warning(f"Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/")
-        if not hasattr(self, "work_dir"):
+        if not self.work_dir:
             raise AttributeError("Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
 
         # read multilie-fasta file and split into individual poses
@@ -819,14 +819,14 @@ class Poses:
         fasta_dict = {re.sub(symbols_to_replace, "_", description): seq for description, seq in fasta_dict.items()}
 
         # setup fasta directory self.work_dir/input_fastas_split/
-        output_dir = os.path.abspath(f"{self.work_dir}/input_fastas_split/")
+        output_dir = os.path.abspath(os.path.join(self.work_dir, "input_fastas_split"))
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 
         # write individual poses in fasta directory:
         out_poses = []
         for description, seq in fasta_dict.items():
-            fp = f"{output_dir}/{description}.fa"
+            fp = os.path.join(output_dir, f"{description}.fa")
             try:
                 # check if files are already there. If contents do not match, write the new fasta-file
                 subfasta_dict = parse_fasta_to_dict(path, encoding=encoding)
@@ -1075,7 +1075,7 @@ class Poses:
         return self.df["poses"].to_list()
 
     ########################################## Operations ###############################################
-    def get_pose(self, pose_description: str) -> Bio.PDB.Structure.Structure:
+    def get_pose(self, pose_description: str, all_models: bool = False) -> Bio.PDB.Model.Model | Bio.PDB.Structure.Structure:
         """
         Retrieves a pose structure based on its description.
 
@@ -1083,11 +1083,13 @@ class Poses:
         ----------
         pose_description : str
             The description of the pose to be retrieved.
+        all_models : bool, optional
+            If all models in the input PDB should be returned (all_models = True) or just the first (all_models = False). If False, a Bio.PDB Model is returned, if True, a Bio.PDB Structure is returned.
 
         Returns
         -------
-        Bio.PDB.Structure.Structure
-            The Bio.PDB Structure object corresponding to the specified pose description.
+        Bio.PDB.Model.Model or Bio.PDB.Structure.Structure
+            The Bio.PDB Model or Structure object corresponding to the specified pose description.
 
         Raises
         ------
@@ -1117,9 +1119,9 @@ class Poses:
         - Ensures that the returned pose is loaded as a Bio.PDB Structure object for further processing.
 
         """
-        if pose_description not in self.df["poses_description"]:
+        if pose_description not in self.df["poses_description"].to_list():
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
-        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
+        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0], all_models=all_models)
     
     def reindex_poses(self, prefix:str, group_col:str=None, remove_layers:int=None, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
         """
@@ -2204,14 +2206,9 @@ def scale_series(ser: pd.Series) -> pd.Series:
     ser = ser.copy()
     # check if all values in <score_col> are the same, set all values to 0 if yes as no scaling is possible
     if ser.nunique() == 1:
-        ser[:] = 0
-        return ser
-    # scale series to values between 0 and 1
-    factor = ser.max() - ser.min()
-    ser = ser / factor
-    ser = ser + (1 - ser.max())
-
-    return ser
+        return pd.Series(0, index=ser.index)
+    # scale all values between 0 and 1
+    return (ser - ser.min()) / (ser.max() - ser.min())
 
 def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], weights: list[float], scale: bool = False) -> pd.Series:
     """
@@ -2331,7 +2328,7 @@ def get_format(path: str):
         "feather": pd.read_feather,
         "parquet": pd.read_parquet
     }
-    return loading_function_dict[path.split(".")[-1]]
+    return loading_function_dict[path.split(".")[-1].lower()]
 
 def load_poses(poses_path: str) -> Poses:
     """
@@ -2415,8 +2412,7 @@ def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
     """
     if isinstance(column, list):
         for col in column:
-            if not col in df.columns:
-                raise KeyError(f"Could not find {col} in poses dataframe! Are you sure you provided the right column name?")
+            col_in_df(df, col)
     else:
         if not column in df.columns:
             raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
@@ -2481,10 +2477,10 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, group_col
         determines if n is a fraction or an integer and sets cutoff for dataframe filtering accordingly.
         '''
         filter_n = float(n)
-        if filter_n < 1:
-            filter_n = round(len(df) * filter_n)
-        elif filter_n <= 0:
+        if filter_n <= 0:
             raise ValueError(f"ERROR: Argument <n> of filter functions cannot be smaller than 0. It has to be positive number. If n < 1, the top n fraction is taken from the DataFrame. if n > 1, the top n rows are taken from the DataFrame")
+        elif filter_n < 1:
+            filter_n = round(len(df) * filter_n)
 
         return int(filter_n)
     

@@ -383,7 +383,7 @@ class LocalJobStarter(JobStarter):
             with open(output_file, 'w', encoding="UTF-8") as file:
                 # Start the process
                 process = subprocess.Popen(command, env=env, executable="/bin/bash", shell=True, stdout=file, stderr=subprocess.STDOUT)
-            process.command = command # giving process a custom attribute for later error tractability
+            process.command = command # type: ignore ### giving process a custom attribute for later error tractability
             return process
 
         def update_active_processes(active_processes: list) -> list:
