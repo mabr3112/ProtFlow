@@ -28,7 +28,16 @@ keywords = ["protein design", "bioinformatics", "SLURM", "workflow"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "Programming Language :: Python :: >3.11"
+    "Programming Language :: Python :: >=3.11"
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx>=7.3",
+    "sphinx_rtd_theme",
+    "myst-parser>=2.0",
+    "sphinx-autodoc-typehints>=2.1",
+    "sphinx-copybutton>=0.5"
 ]
 
 [project.urls]

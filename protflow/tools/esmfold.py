@@ -105,9 +105,9 @@ class ESMFold(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - KeyError: If forbidden options are included in the command options.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        KeyError: If forbidden options are included in the command options.
 
     Examples
     --------
