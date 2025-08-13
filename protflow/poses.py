@@ -1264,7 +1264,7 @@ class Poses:
         new_poses_col : str, optional
             The column in the DataFrame containing the new pose file paths (default is 'input_poses').
         force_reset_df : bool, optional
-            If True, forces a reset of the DataFrame even if the number of new poses does not match the original (default is False).
+            If True, forces a reset of the DataFrame (removing all columns except for the essential 'input_poses', 'poses' and 'poses_description').
 
         Further Details
         ---------------
@@ -1289,38 +1289,22 @@ class Poses:
         - Logs warnings and information about the reset process, ensuring data integrity.
 
         """
-        def unique_ordered_list(original_list):
-            seen = set()  # Initialize an empty set to track seen elements
-            unique_list = []
-            for item in original_list:
-                if item not in seen:  # Check membership in the set, which is O(1) (faster lookup in sets than in lists)
-                    unique_list.append(item)
-                    seen.add(item)  # Add the item to the set
-            return unique_list
-
         col_in_df(self.df, new_poses_col)
 
-        new_poses = self.df[new_poses_col].to_list()
-        # handle multiline .fa inputs for poses!
-        for pose in new_poses:
-            if not pose.endswith(".fa") and not pose.endswith(".fasta"):
-                continue
-            if len(parse_fasta_to_dict(pose)) > 1:
-                new_poses.remove(pose)
-                new_poses += self.split_multiline_fasta(pose)
-
         # create unique poses
-        new_poses = unique_ordered_list(new_poses)
+        new_poses_df = self.df.copy()
+        new_poses_df.drop_duplicates(new_poses_col, inplace=True)
+        new_poses_df["poses"] = new_poses_df[new_poses_col]
+        new_poses_df["input_poses"] = new_poses_df[new_poses_col]
+        new_poses_df["poses_description"] = [description_from_path(pose) for pose in new_poses_df["poses"].to_list()]
 
-        if not len(new_poses) == len(self.df.index):
-            logging.warning(f"Different number of new poses ({len(new_poses)}) than number of original poses ({len(self.df.index)})!")
-            if force_reset_df:
-                logging.warning(f"Resetting poses dataframe. Be aware of the consequences like possibly reading in false outputs when reusing prefixes!")
-                self.df = pd.DataFrame({"input_poses": new_poses, "poses": new_poses, "poses_description": self.parse_descriptions(new_poses)})
-            else: raise RuntimeError(f"Could not preserve original dataframe. You can set <force_reset_df> if you want to delete it, but be aware of the consequences like possibly reading in false outputs when reusing prefixes!")
+        if force_reset_df:
+            self.df = new_poses_df[["poses", "input_poses", "poses_description"]] # delete old dataframe
         else:
-            self.df['poses'] = new_poses
-            self.df['poses_description'] = self.parse_descriptions(poses=self.df['poses'].to_list())
+            if len(new_poses_df.index) == len(self.df.index):
+                self.df = new_poses_df # preserve old dataframe
+            else:
+                raise RuntimeError(f"Could not preserve original dataframe. You can set <force_reset_df> if you want to delete it, but be aware of the consequences like possibly reading in false outputs when reusing prefixes!")
 
     def set_motif(self, motif_col: str) -> None:
         """
