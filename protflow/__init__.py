@@ -37,7 +37,7 @@ def _xdg_config_dir() -> Path:
     return Path(base) / "protflow"
 
 def _xdg_config_path() -> Path:
-    return _xdg_config_dir / "config.py"
+    return _xdg_config_dir() / "config.py"
 
 def _saved_config_pointer_path() -> Path:
     return _xdg_config_dir() / "config.path"

@@ -364,7 +364,7 @@ class ProteinGenerator(Runner):
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 
-        return f"{self.pre_cmd + " "}{self.python_path} {self.script_path} --out {output_dir}/{desc} {opts} {flags}"
+        return f"{self.pre_cmd + ' '}{self.python_path} {self.script_path} --out {output_dir}/{desc} {opts} {flags}"
 
     def collect_scores(self, scores_dir: str) -> pd.DataFrame:
         """

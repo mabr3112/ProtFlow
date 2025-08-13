@@ -111,8 +111,10 @@ def set_config(argv: list[str] | None = None) -> None:
     if not target.is_file():
         print(f"Not found: {target}\nWrong path specified?", file=sys.stderr)
         sys.exit(2)
+
     pointer.parent.mkdir(parents=True, exist_ok=True)
     tmp = pointer.with_suffix(".tmp")
+    tmp.write_text(str(target))
     tmp.replace(pointer)
     print(f"Saved default config path: {target}")
     print(f"(Pointer file: {pointer})")
