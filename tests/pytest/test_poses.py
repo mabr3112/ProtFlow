@@ -22,7 +22,8 @@ def sample_df():
         'score': [10, 20, 30, 40, 50, 60],
         'score2': [20, 40, 60, 80, 100, 120],
         'group': ['A', 'A', 'A', 'B', 'B', 'B'],
-        'input_poses': ['pose1_0001_0001.pdb', 'pose1_0001_0002.pdb', 'pose2_0001_0001.pdb', 'pose2_0001_0003.pdb', 'pose3_0001_0001.pdb', 'pose4_0001_0001.pdb'],
+        'group2': ["pose1.pdb", "pose2.pdb", "pose3.pdb", "pose4.pdb", "pose5.pdb", "pose6.pdb"],
+        'input_poses': ['pose1.pdb', 'pose1.pdb', 'pose2.pdb', 'pose2.pdb', 'pose3.pdb', 'pose4.pdb'],
         'poses': ['pose1_0001_0001.pdb', 'pose1_0001_0002.pdb', 'pose2_0001_0001.pdb', 'pose2_0001_0003.pdb', 'pose3_0001_0001.pdb', 'pose4_0001_0001.pdb']
     })
 
@@ -513,7 +514,7 @@ def test_change_poses_dir_validate_existing_with_copy(tmp_path, sample_df):
     # copy
     p.change_poses_dir(dst.as_posix(), copy=True)
     assert all(Path(x).parent == dst for x in p.df["poses"])
-    assert set(p.poses_list()) == set([path.as_posix() for path in dst.iterdir()])
+    assert set(p.df["poses"].to_list()) == set([path.as_posix() for path in dst.iterdir()])
 
 
 def test_get_pose_loads_structure_by_description(tmp_path, monkeypatch):
@@ -535,21 +536,137 @@ def test_get_pose_loads_structure_by_description(tmp_path, monkeypatch):
         p.get_pose("missing")
 
 
-def test_reindex_poses_force_and_conflict(tmp_path, sample_df):
+@pytest.mark.parametrize("group_col,remove_layers,expect", [
+    ("input_poses", None, ['pose1_0001.pdb', 'pose1_0002.pdb', 'pose2_0001.pdb', 'pose2_0002.pdb', 'pose3_0001.pdb', 'pose4_0001.pdb']),
+    (None, 1, ['pose1_0001_0001.pdb', 'pose1_0001_0002.pdb', 'pose2_0001_0001.pdb', 'pose2_0001_0002.pdb', 'pose3_0001_0001.pdb', 'pose4_0001_0001.pdb']),
+])
+
+
+def test_reindex_poses_force_and_conflict(tmp_path, sample_df, group_col, remove_layers, expect):
     sample_df = create_temp_poses(tmp_path, sample_df)
-    p = Poses(poses=sample_df, work_dir=tmp_path)
-    # two poses share same name if one layer is removed
-    # removing 1 layer without force => conflict error
+    p = Poses(poses=sample_df, work_dir=tmp_path.as_posix())
+    # poses share same name if using input_poses as group_col => conflict error
     with pytest.raises(RuntimeError):
-        p.reindex_poses(prefix="reindexed", remove_layers=1, force_reindex=False)
+        p.reindex_poses(prefix="reindexed", group_col=group_col, remove_layers=remove_layers, force_reindex=False)
 
     # with force=True: writes to work_dir/prefix and appends new index
-    p.reindex_poses(prefix="reindexed", remove_layers=1, force_reindex=True)
-    out_dir = tmp_path / "reindexed"
-    assert all(out_dir in Path(x).parents for x in p.df["poses"])
-    # descriptions should have single layer with new index
-    assert set(p.df["poses_description"]) == {"x_0001", "x_0002"} or all("_" in d for d in p.df["poses_description"])
+    p.reindex_poses(prefix="reindexed", group_col=group_col, remove_layers=remove_layers, force_reindex=True)
 
+    out_dir = tmp_path / "reindexed"
+    # descriptions should have single layer with new index
+    assert p.df["poses"].to_list() == [(out_dir / filename).as_posix() for filename in expect]
+
+
+def test_reindex_poses_group_col_and_remove_layers():
+    p = Poses()
+    # check if error is raised if both group col and remove layers are set
+    with pytest.raises(KeyError):
+        p.reindex_poses(prefix="reindexed", group_col="input_poses", remove_layers=2)
+
+@pytest.mark.parametrize("group_col,remove_layers,expect", [
+    ("group2", None, ["pose1.pdb", "pose2.pdb", "pose3.pdb", "pose4.pdb", "pose5.pdb", "pose6.pdb"])
+])
+
+
+def test_reindex_poses(tmp_path, sample_df, group_col, remove_layers, expect):
+    # check without force reindex
+    sample_df = create_temp_poses(tmp_path, sample_df)
+    p = Poses(poses=sample_df, work_dir=tmp_path.as_posix())
+
+    p.reindex_poses(prefix="reindexed", group_col=group_col, remove_layers=remove_layers)
+
+    out_dir = tmp_path / "reindexed"
+    # check if filenames match
+    assert p.df["poses"].to_list() == [(out_dir / filename).as_posix() for filename in expect]
+
+
+def test_duplicate_poses_creates_copies_and_updates_df(tmp_path, sample_df):
+    sample_df = create_temp_poses(tmp_path, sample_df)
+    p = Poses(poses=sample_df, work_dir=tmp_path)
+    out = tmp_path / "dups"
+    p.duplicate_poses(out.as_posix(), n_duplicates=3, overwrite=True)
+    # df length == 3 copies
+    assert len(p.df) == len(sample_df) * 3
+
+
+def test_reset_poses_unique_and_force(sample_df):
+    p = Poses(poses=sample_df) 
+    # without force_reset_df -> mismatch raises
+    with pytest.raises(RuntimeError):
+        p.reset_poses()
+
+    # with force_reset_df -> rebuild df
+    p.reset_poses(force_reset_df=True)
+    assert set(p.df.columns) == set(["poses", "poses_description", "input_poses"])
+    assert set(p.df["poses"]) == set(sample_df["input_poses"])
+
+
+def test_set_motif_type_check_and_registers_column(sample_df, monkeypatch):
+    # mock ResidueSelection type used for isinstance checks
+    from protflow import poses as poses_mod
+    class DummyRS: pass
+    monkeypatch.setattr(poses_mod, "ResidueSelection", DummyRS)
+
+    p = Poses(poses=sample_df)
+    p.df["motifs"] = [DummyRS() for _ in p.poses_list()]
+    p.set_motif("motifs")
+    assert "motifs" in p.motifs
+
+    p.df.loc[0, "motifs"] = "not_a_motif"
+    with pytest.raises(TypeError):
+        p.set_motif("motifs")
+
+
+def test_convert_pdb_to_fasta_writes_files_and_optionally_updates(tmp_path, monkeypatch):
+    # input .pdbs
+    f1 = tmp_path / "a.pdb"; f1.write_text("ATOM")
+    f2 = tmp_path / "b.pdb"; f2.write_text("ATOM")
+    p = Poses(work_dir=tmp_path.as_posix())
+    p.df = pd.DataFrame({
+        "input_poses": [f1.as_posix(), f2.as_posix()],
+        "poses": [f1.as_posix(), f2.as_posix()],
+        "poses_description": ["a","b"]
+    })
+    # mock sequence extraction chain
+    with patch("protflow.poses.load_structure_from_pdbfile") as load_mock, \
+         patch("protflow.poses.get_sequence_from_pose", side_effect=["AAAA", "BBBB", "CCCC", "DDDD"]) as seq_mock: # 4 elements in side effect because convert_pdb is called twice!
+        p.convert_pdb_to_fasta(prefix="conv", update_poses=False)
+        fasta_dir = tmp_path / "conv_fasta_location"
+        assert (fasta_dir / "a.fasta").read_text().strip().endswith("AAAA")
+        assert (fasta_dir / "b.fasta").read_text().strip().endswith("BBBB")
+        assert "conv_fasta_location" in p.df.columns[3]  # new column added
+
+        # update_poses=True replaces poses with fasta paths
+        p.convert_pdb_to_fasta(prefix="conv2", update_poses=True)
+        assert all(Path(x).suffix == ".fasta" for x in p.df["poses"])
+
+
+def test_convert_pdb_to_fasta_raises_if_not_pdb(tmp_path):
+    f = tmp_path / "a.fa"; f.write_text(">a\nAAAA")
+    p = Poses(work_dir=tmp_path.as_posix())
+    p.df = pd.DataFrame({
+        "input_poses": [f.as_posix()],
+        "poses": [f.as_posix()],
+        "poses_description": ["a"]
+    })
+    with pytest.raises(RuntimeError):
+        p.convert_pdb_to_fasta(prefix="x")
+
+
+def test_filter_poses_by_rank_writes_filtered_file(tmp_path, sample_df):
+    p = Poses(poses=sample_df, work_dir=tmp_path.as_posix())
+    p.filter_poses_by_rank(n=1, score_col="score", prefix="top", plot=False, overwrite=True, ascending=False)
+    out = tmp_path / "filter" / "top_filter.json"  # default storage_format is json
+    assert out.is_file()
+    # df should now be filtered to one row (highest score overall)
+    assert len(p.df) == 1
+    assert p.df["score"].iloc[0] == sample_df["score"].max()
+
+
+def test_filter_poses_by_value_prefix_requires_workdir(sample_df):
+    p = Poses(poses=sample_df)  # no work_dir -> no filter_dir
+    with pytest.raises(AttributeError):
+        p.filter_poses_by_value(score_col="s", value=1.5, operator=">", prefix="cut")
 
 
 ###############################################################################
@@ -562,4 +679,6 @@ def create_temp_poses(path, df):
     df["poses"] = path / df["poses"]
     for file, name in zip(df["poses"], df["poses_description"]):
         file.write_text(f"#{name}") # create tmp files containing description as input
+    df["poses"] = [pose.as_posix() for pose in df["poses"]]
+
     return df
