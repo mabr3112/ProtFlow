@@ -11,25 +11,18 @@ import json
 # dependencies
 from Bio import SeqIO
 import pandas as pd
-from .. import config, jobstarters
+from .. import load_config_path, require_config
 from ..poses import Poses
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..jobstarters import JobStarter
 
-# config file: 
-# BOLTZ_SCRIPT_PATH = "/home/az3556/boltz/src/boltz/main.py"
-# BOLTZ_PYTHON_PATH = "/home/az3556/anaconda3/envs/protflow/bin/python3.11" #needs python 3.9 or higher
-# BOLTZ_PRE_CMD = ""
-
 class Boltz(Runner):
-    def __init__(self, script_path: str = config.BOLTZ_SCRIPT_PATH, python_path: str = config.BOLTZ_PYTHON_PATH, pre_cmd: str = config.BOLTZ_PRE_CMD, jobstarter: str = None) -> None: 
-        if not script_path:
-            raise ValueError(f"No path is set for main.py. Set the path in config.py under BOLTZ_SCRIPT_PATH.")
-
-        self.script_path = script_path
-        self.python_path = python_path
+    def __init__(self, script_path: str|None = None, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: str = None) -> None:
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "BOLTZ_SCRIPT_PATH")
+        self.python_path = python_path or load_config_path(config, "BOLTZ_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "BOLTZ_PRE_CMD", is_pre_cmd=True)
         self.name = "boltz.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 

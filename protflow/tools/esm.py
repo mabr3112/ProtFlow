@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 
 # customs
-from .. import config, runners
+from .. import load_config_path, require_config, runners
 from ..jobstarters import split_list
 from ..runners import Runner, RunnerOutput
 from ..jobstarters import JobStarter
@@ -25,13 +25,18 @@ class ESM(Runner):
     '''ESM runner baseclass'''
     def __init__(
             self,
-            python_path: str = config.ESM_PYTHON_PATH,
-            pre_cmd: str = config.ESM_PRE_CMD,
+            python_path: str|None = None,
+            pre_cmd: str|None = None,
             jobstarter: JobStarter = None
         ) -> None:
         '''ESM baseclass docstring.'''
-        self.python = self.search_path(python_path, "ESM_PYTHON_PATH")
-        self.pre_cmd = pre_cmd
+        # setup config
+        config = require_config()
+        self.python = python_path or load_config_path(config, "ESM_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "ESM_PRE_CMD", is_pre_cmd=True)
+        self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "run_esm.py")
+
+        # setup runner
         self.index_layers = 0
         self.jobstarter = jobstarter
 
@@ -149,8 +154,7 @@ class ESM(Runner):
         opts_str = runners.options_flags_to_string(options=options, flags=[], sep="--")
 
         # compile path to script
-        script_path = os.path.join(config.AUXILIARY_RUNNER_SCRIPTS_DIR, "run_esm.py")
-        return [f"{self.pre_cmd}; {self.python} {script_path} {opts_str} {model} {input_fa} {output_dir}" for input_fa in prediction_inputs]
+        return [f"{self.pre_cmd}; {self.python} {self.script_path} {opts_str} {model} {input_fa} {output_dir}" for input_fa in prediction_inputs]
 
     def output_exists(self, scorefilepath: str) -> bool:
         '''Simple check for collected scores of esm runner.'''

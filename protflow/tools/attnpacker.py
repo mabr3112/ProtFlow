@@ -76,7 +76,7 @@ import protflow.jobstarters
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from .. import config
+from .. import require_config, load_config_path
 
 class AttnPacker(Runner):
     """
@@ -142,11 +142,22 @@ class AttnPacker(Runner):
 
     The AttnPacker class is intended for researchers and developers who need to perform packing simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = config.ATTNPACKER_DIR_PATH, python_path: str = config.ATTNPACKER_PYTHON_PATH, pre_cmd : str = config.ATTNPACKER_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(
+            self,
+            attnpacker_dir: str|None = None,
+            python_path: str|None = None,
+            pre_cmd: str|None = None,
+            jobstarter: str = None
+        ) -> None:
         '''sbatch_options are set automatically, but can also be manually set. Manual setting is not recommended.'''
-        self.script_path = self.search_path(script_path, "ATTNPACKER_DIR_PATH", is_dir=True)
-        self.python_path = self.search_path(python_path, "ATTNPACKER_PYTHON_PATH")
-        self.pre_cmd = pre_cmd
+        # config setup
+        config = require_config()
+        self.attnpacker_dir = attnpacker_dir or load_config_path(config, "ATTNPACKER_DIR_PATH")
+        self.python_path = python_path or load_config_path(config, "ATTNPACKER_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "ATTNPACKER_PRE_CMD")
+        self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "run_attnpacker.py")
+
+        # runner setup
         self.name = "attnpacker.py"
         self.jobstarter = jobstarter
         self.index_layers = 1
@@ -317,9 +328,9 @@ class AttnPacker(Runner):
             raise KeyError(f"Options and pose_options must not contain '--attnpacker_dir', '--output_dir', '--input_pdb' or '--scorefile'!")
         """
 
-        options = f"--attnpacker_dir {self.script_path} --output_dir {output_dir} --input_json {json_path}"
+        options = f"--attnpacker_dir {self.attnpacker_dir} --output_dir {output_dir} --input_json {json_path}"
 
-        return f"{self.python_path} {config.AUXILIARY_RUNNER_SCRIPTS_DIR}/run_attnpacker.py {options}"
+        return f"{self.python_path} {self.script_path} {options}"
 
 def collect_scores(scores_dir: str):
     scorefiles = glob.glob(os.path.join(scores_dir, "*_attnpacker_out.json"))

@@ -66,21 +66,19 @@ Version
 """
 
 # import general
-import json
 import os
+import json
 from typing import Any
 
 # import dependencies
 import pandas as pd
 
 # import customs
-from protflow import jobstarters
-from protflow.config import PROTFLOW_ENV
-from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
-from protflow.residues import ResidueSelection
-from protflow.runners import Runner, RunnerOutput, col_in_df
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter, split_list
+from ..poses import Poses
+from ..residues import ResidueSelection
+from ..jobstarters import JobStarter, split_list
+from ..runners import Runner, RunnerOutput, col_in_df
+from .. import jobstarters, load_config_path, require_config
 
 class BackboneRMSD(Runner):
     """
@@ -182,6 +180,12 @@ class BackboneRMSD(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
+        # setup config
+        config = require_config()
+        self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
+        self.python = os.path.join(load_config_path(config, "PROFLOW_ENV"), "python")
+
+        # runner setup
         self.set_ref_col(ref_col)
         self.set_atoms(atoms)
         self.set_chains(chains)
@@ -447,7 +451,7 @@ class BackboneRMSD(Runner):
 
             # write scorefile and cmd
             scorefiles.append((sf := f"{work_dir}/rmsd_input_{str(i)}_scores.json"))
-            cmds.append(f"{PROTFLOW_ENV} {script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
+            cmds.append(f"{self.python} {self.script_dir}/calc_rmsd.py --input_json {json_file} --output_path {sf}")
 
         # add options to cmds:
         chains = chains or self.chains
@@ -591,6 +595,11 @@ class MotifRMSD(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the motif RMSD calculation process by providing specific values for the reference column, target motif, reference motif, target chains, reference chains, jobstarter, and overwrite option.
         """
+        # setup config
+        config = require_config()
+        self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
+
         #TODO implement MotifRMSD calculation based on Chain input (Should work now with a ChainSelector)!
         self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
@@ -722,7 +731,7 @@ class MotifRMSD(Runner):
         return_superimposed_poses = return_superimposed_poses or self.return_superimposed_poses
 
         # setup runner
-        script_path = f"{script_dir}/calc_heavyatom_rmsd_batch.py"
+        script_path = f"{self.script_dir}/calc_heavyatom_rmsd_batch.py"
         work_dir, jobstarter = self.generic_run_setup(
             poses = poses,
             prefix = prefix,
@@ -731,7 +740,7 @@ class MotifRMSD(Runner):
 
         # check if script exists
         if not os.path.isfile(script_path):
-            raise ValueError(f"Cannot find script 'calc_heavyatom_rmsd_batch.py' at specified directory: '{script_dir}'. Set path to '/PATH/protflow/tools/runners_auxiliary_scripts/' for variable AUXILIARY_RUNNER_SCRIPTS_DIR in config.py file.")
+            raise ValueError(f"Cannot find script 'calc_heavyatom_rmsd_batch.py' at specified directory: '{self.script_dir}'. Set path to '/PATH/protflow/tools/runners_auxiliary_scripts/' for variable AUXILIARY_RUNNER_SCRIPTS_DIR in config.py file.")
 
         # check if outputs are present
         overwrite = overwrite or self.overwrite
@@ -771,7 +780,7 @@ class MotifRMSD(Runner):
         super_str = "--return_superimposed_poses" if return_superimposed_poses else ""
 
         # start add_chains_batch.py
-        cmds = [f"{PROTFLOW_ENV} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {super_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{self.python} {script_path} --input_json {json_f} --output_path {output_path} {atoms_str} {super_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,
@@ -990,6 +999,11 @@ class MotifSeparateSuperpositionRMSD(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the motif RMSD calculation process by providing specific values for the reference column, target motif, reference motif, target chains, reference chains, jobstarter, and overwrite option.
         """
+        # setup config
+        config = require_config()
+        self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
+        self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+
         #TODO implement MotifRMSD calculation based on Chain input (Should work now with a ChainSelector)!
         self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
@@ -1156,7 +1170,7 @@ class MotifSeparateSuperpositionRMSD(Runner):
         rmsd_include_het_atoms = rmsd_include_het_atoms or self.rmsd_include_het_atoms
 
         # setup runner
-        script_path = os.path.join(script_dir, "calc_heavyatom_rmsd_batch_separate.py")
+        script_path = os.path.join(self.script_dir, "calc_heavyatom_rmsd_batch_separate.py")
         work_dir, jobstarter = self.generic_run_setup(
             poses = poses,
             prefix = prefix,
@@ -1165,7 +1179,7 @@ class MotifSeparateSuperpositionRMSD(Runner):
 
         # check if script exists
         if not os.path.isfile(script_path):
-            raise ValueError(f"Cannot find script 'calc_heavyatom_rmsd_batch_separate.py' at specified directory: '{script_dir}'. Set path to '/PATH/protflow/tools/runners_auxiliary_scripts/' for variable AUXILIARY_RUNNER_SCRIPTS_DIR in config.py file.")
+            raise ValueError(f"Cannot find script 'calc_heavyatom_rmsd_batch_separate.py' at specified directory: '{self.script_dir}'. Set path to '/PATH/protflow/tools/runners_auxiliary_scripts/' for variable AUXILIARY_RUNNER_SCRIPTS_DIR in config.py file.")
 
         # check if outputs are present
         overwrite = overwrite or self.overwrite
@@ -1209,7 +1223,7 @@ class MotifSeparateSuperpositionRMSD(Runner):
         rmsd_include_het_atoms_str = "--rmsd_include_het_atoms" if rmsd_include_het_atoms == True or self.rmsd_include_het_atoms == True else ""
 
         # start add_chains_batch.py
-        cmds = [f"{PROTFLOW_ENV} {script_path} --input_json {json_f} --output_path {output_path} {super_atoms_str} {rmsd_atoms_str} {super_include_het_atoms_str} {rmsd_include_het_atoms_str}" for json_f, output_path in zip(json_files, output_files)]
+        cmds = [f"{self.python} {script_path} --input_json {json_f} --output_path {output_path} {super_atoms_str} {rmsd_atoms_str} {super_include_het_atoms_str} {rmsd_include_het_atoms_str}" for json_f, output_path in zip(json_files, output_files)]
         jobstarter.start(
             cmds = cmds,
             jobname = prefix,
@@ -1229,7 +1243,7 @@ class MotifSeparateSuperpositionRMSD(Runner):
 
         return outputs.return_poses()
 
-    def setup_input_dict(self, poses: Poses, ref_col: str, ref_motif: Any = None, target_motif: Any = None, rmsd_ref_motif: Any = None, rmsd_target_motif: Any = None, separate_superposition_and_rmsd: bool = False) -> dict:
+    def setup_input_dict(self, poses: Poses, ref_col: str, ref_motif: Any = None, target_motif: Any = None, rmsd_ref_motif: Any = None, rmsd_target_motif: Any = None) -> dict:
         """
         Set up the input dictionary for motif RMSD calculations.
 

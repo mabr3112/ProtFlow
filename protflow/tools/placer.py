@@ -77,7 +77,7 @@ import pandas as pd
 from protflow.runners import Runner, RunnerOutput, prepend_cmd, parse_generic_options
 from protflow.poses import Poses, description_from_path
 from protflow.jobstarters import JobStarter, split_list
-from .. import config
+from .. import require_config, load_config_path
 
 class PLACER(Runner):
     """
@@ -138,7 +138,7 @@ class PLACER(Runner):
 
     The PLACER class is intended for researchers and developers who need to perform PLACER predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = config.PLACER_SCRIPT_PATH, python_path: str = config.PLACER_PYTHON_PATH, pre_cmd:str=config.PLACER_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str|None = None, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: str = None) -> None:
         """
         __init__ Method
         ===============
@@ -170,13 +170,14 @@ class PLACER(Runner):
             # Initialize the PLACER class
             PLACER = PLACER(script_path='/path/to/run_PLACER.py', jobstarter=jobstarter)
         """
-        if not script_path:
-            raise ValueError(f"No path is set for {self}. Set the patconfig.py file under COLABFOLD_DIR_PATH.")
+        # setup config
+        config = require_config()
+        self.python_path = python_path or load_config_path(config, "PLACER_PYTHON_PATH")
+        self.script_path = script_path or load_config_path(config, "PLACER_SCRIPT_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "PLACER_PRE_CMD")
 
-        self.python_path = python_path
-        self.script_path = script_path
+        # setup runner
         self.name = "placer.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 

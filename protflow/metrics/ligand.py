@@ -77,12 +77,12 @@ import numpy as np
 import pandas as pd
 
 # import customs
-from protflow.config import PROTFLOW_ENV
-from protflow.runners import Runner, RunnerOutput
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter, split_list
-from protflow.utils.biopython_tools import load_structure_from_pdbfile
-from protflow.utils.utils import vdw_radii
+from .. import require_config, load_config_path
+from ..runners import Runner, RunnerOutput
+from ..poses import Poses
+from ..jobstarters import JobStarter, split_list
+from ..utils.biopython_tools import load_structure_from_pdbfile
+from ..utils.utils import vdw_radii
 
 class LigandClashes(Runner):
     """
@@ -184,6 +184,8 @@ class LigandClashes(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
+        # setup config
+        self.python = os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "python")
         self.set_ligand_chain(ligand_chain)
         self.set_atoms(atoms)
         self.set_factor(factor)
@@ -441,7 +443,7 @@ class LigandClashes(Runner):
         # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
         poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
         out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, _ in enumerate(poses_sublists)]
-        cmds = [f"{PROTFLOW_ENV} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --mode clash_vdw --factor {factor} --ligand_chain {ligand_chain} {atoms_str} {exclude_ligand_elements_str} {clash_distance_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
+        cmds = [f"{self.python} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --mode clash_vdw --factor {factor} --ligand_chain {ligand_chain} {atoms_str} {exclude_ligand_elements_str} {clash_distance_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
 
         # run command
         jobstarter.start(
@@ -563,6 +565,8 @@ class LigandContacts(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
+        # setup config
+        self.python = os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "python")
         self.set_ligand_chain(ligand_chain)
         self.set_atoms(atoms)
         self.set_min_dist(min_dist)
@@ -856,7 +860,7 @@ class LigandContacts(Runner):
         # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
         poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
         out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, _ in enumerate(poses_sublists)]
-        cmds = [f"{PROTFLOW_ENV} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --min_dist {min_dist} --max_dist {max_dist} --mode contacts --ligand_chain {ligand_chain} {atoms_str} {exclude_elements_str} {normalize_by_num_atoms_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
+        cmds = [f"{self.python} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --min_dist {min_dist} --max_dist {max_dist} --mode contacts --ligand_chain {ligand_chain} {atoms_str} {exclude_elements_str} {normalize_by_num_atoms_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
 
         # run command
         jobstarter.start(

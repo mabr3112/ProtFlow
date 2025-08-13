@@ -26,7 +26,7 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
 
     # either motif or chains can be specified:
     if (target_motif or reference_motif) and (target_chains or reference_chains):
-        raise ValueError(f"Both motif and chain are specified for superimposition. Only specify either chain or motif, but not both!")
+        raise ValueError("Both motif and chain are specified for superimposition. Only specify either chain or motif, but not both!")
 
     # parsing motifs
     if (target_motif or reference_motif):
@@ -46,7 +46,7 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
         reference_atoms = None
 
     else:
-        raise ValueError(f"Impossible parameter combination reached.")
+        raise ValueError("Impossible parameter combination reached.")
 
     return target_atoms, reference_atoms
 

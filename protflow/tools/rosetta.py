@@ -76,10 +76,10 @@ import shutil
 import pandas as pd
 
 # custom
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter
-from protflow.runners import Runner, RunnerOutput, prepend_cmd, parse_generic_options
-from .. import config
+from ..poses import Poses
+from ..jobstarters import JobStarter
+from ..runners import Runner, RunnerOutput, prepend_cmd, parse_generic_options
+from .. import require_config, load_config_path
 
 class Rosetta(Runner):
     """
@@ -150,7 +150,7 @@ class Rosetta(Runner):
 
     The Rosetta class is intended for researchers and developers who need to perform Rosetta simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = config.ROSETTA_BIN_PATH, pre_cmd:str=config.ROSETTA_PRE_CMD, jobstarter: str = None, fail_on_missing_output_poses: bool = False) -> None:
+    def __init__(self, script_path: str|None = None, pre_cmd: str|None = None, jobstarter: str = None, fail_on_missing_output_poses: bool = False) -> None:
         """
         Initialize the Rosetta class with the necessary configuration.
 
@@ -180,9 +180,13 @@ class Rosetta(Runner):
 
         This method ensures that the Rosetta class is correctly initialized with the necessary configurations to run Rosetta applications within the ProtFlow framework.
         """
-        self.script_path = self.search_path(script_path, "ROSETTA_BIN_PATH", is_dir=True)
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "ROSETTA_BIN_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "ROSETTA_PRE_CMD")
+
+        # setup runner
         self.name = "rosetta.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
         self.fail_on_missing_output_poses = fail_on_missing_output_poses

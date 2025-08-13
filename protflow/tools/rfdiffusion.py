@@ -77,11 +77,11 @@ import numpy as np
 import pandas as pd
 
 # custom
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter
-from protflow.residues import ResidueSelection
-from protflow.runners import Runner, RunnerOutput, col_in_df, prepend_cmd
-from .. import config
+from ..poses import Poses
+from ..jobstarters import JobStarter
+from ..residues import ResidueSelection
+from ..runners import Runner, RunnerOutput, col_in_df, prepend_cmd
+from .. import require_config, load_config_path
 
 class RFdiffusion(Runner):
     """
@@ -150,7 +150,7 @@ class RFdiffusion(Runner):
 
     The RFdiffusion class is intended for researchers and developers who need to perform RFdiffusion simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = config.RFDIFFUSION_SCRIPT_PATH, python_path: str = config.RFDIFFUSION_PYTHON_PATH, pre_cmd : str = config.RFDIFFUSION_PRE_CMD, jobstarter: JobStarter = None) -> None:
+    def __init__(self, script_path: str|None = None, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter = None) -> None:
         """
         Initialize the RFdiffusion class.
 
@@ -204,9 +204,13 @@ class RFdiffusion(Runner):
 
         This method is designed for initializing the RFdiffusion class with the necessary configurations, making it ready for executing RFdiffusion processes within the ProtFlow framework.
         """
-        self.script_path = self.search_path(script_path, "RFDIFFUSION_SCRIPT_PATH")
-        self.python_path = self.search_path(python_path, "RFDIFFUSION_PYTHON_PATH")
-        self.pre_cmd = pre_cmd
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "RFDIFFUSION_SCRIPT_PATH")
+        self.python_path = python_path or load_config_path(config, "RFDIFFUSION_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "RFDIFFUSION_PRE_CMD", is_pre_cmd=True)
+
+        # setup runner
         self.name = "rfdiffusion.py"
         self.index_layers = 1
         self.jobstarter = jobstarter

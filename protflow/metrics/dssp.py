@@ -34,13 +34,11 @@ import glob
 import pandas as pd
 
 # import customs
-from protflow import jobstarters
-from protflow.poses import Poses
-from protflow.poses import description_from_path
-from protflow.runners import Runner, RunnerOutput
-from protflow.jobstarters import JobStarter
-from protflow.config import DSSP_PATH
-
+from .. import jobstarters, require_config, load_config_path
+from ..poses import Poses
+from ..poses import description_from_path
+from ..runners import Runner, RunnerOutput
+from ..jobstarters import JobStarter
 
 class DSSP(Runner):
     """
@@ -76,12 +74,14 @@ class DSSP(Runner):
     The `DSSP` class manages all aspects of running DSSP calculations, from setting up the environment and executing the alignment commands to collecting and processing the resulting data. The processed output is organized into a structured format for further analysis, ensuring seamless integration with the rest of the ProtFlow framework.
     """
 
-    def __init__(self, jobstarter: JobStarter = None, application: str = DSSP_PATH):
+    def __init__(self, jobstarter: JobStarter = None, application: str|None = None):
+        # setup config
+        self.application = self._check_install(application or load_config_path(require_config(), "DSSP_PATH"))
 
+        # setup runner
         self.jobstarter = jobstarter
         self.name = "dssp.py"
         self.index_layers = 0
-        self.application = self._check_install(application)
 
     def __str__(self):
         return "DSSP"
