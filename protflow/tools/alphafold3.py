@@ -83,7 +83,7 @@ from typing import Union, Any
 import pandas as pd
 
 # custom
-from .. import config, runners
+from .. import require_config, load_config_path, runners
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..poses import Poses, col_in_df, description_from_path
 from ..jobstarters import JobStarter, split_list
@@ -145,7 +145,13 @@ class AlphaFold3(Runner):
         # Inspect results
         print(poses.df)
     """
-    def __init__(self, script_path: str = config.ALPHAFOLD3_SCRIPT_PATH, python_path: str = config.ALPHAFOLD3_PYTHON_PATH, pre_cmd:str=config.ALPHAFOLD3_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(
+            self,
+            script_path: str|None = None,
+            python_path: str|None = None,
+            pre_cmd: str|None = None,
+            jobstarter: str = None
+        ) -> None:
         """
         __init__ Method
         ===============
@@ -185,13 +191,14 @@ class AlphaFold3(Runner):
             - The `AlphaFold3` instance acts as a controller for generating input JSONs, building inference commands, launching jobs, and collecting results.
             - Requires the AlphaFold3 inference script to be properly installed and available in the environment path or specified within the `write_cmd` method.
         """
-        if not script_path:
-            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under COLABFOLD_DIR_PATH.")
+        # setup configs
+        config = require_config()
+        self.python_path = python_path or load_config_path(config, path_var="ALPHAFOLD3_PYTHON_PATH")
+        self.script_path = script_path or load_config_path(config, path_var="ALPHAFOLD3_SCRIPT_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, path_var="ALPHAFOLD3_PRE_CMD", is_pre_cmd=True)
 
-        self.python_path = python_path
-        self.script_path = script_path
+        # runner setups
         self.name = "alphafold3.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 

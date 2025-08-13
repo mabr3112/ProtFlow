@@ -77,7 +77,7 @@ import pandas as pd
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.runners import Runner, RunnerOutput, parse_generic_options
-from .. import config
+from .. import require_config, load_config_path
 
 class ProteinGenerator(Runner):
     """
@@ -145,7 +145,7 @@ class ProteinGenerator(Runner):
 
     The ProteinGenerator class is intended for researchers and developers who need to perform protein generation as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path:str=config.PROTEIN_GENERATOR_SCRIPT_PATH, python_path:str=config.PROTEIN_GENERATOR_PYTHON_PATH, jobstarter:JobStarter=None) -> None:
+    def __init__(self, script_path: str|None = None, python_path: str|None = None, pre_cmd: str|None = None, jobstarter:JobStarter=None) -> None:
         """
         Initialize the ProteinGenerator class with paths to the necessary scripts and Python executable.
 
@@ -184,10 +184,12 @@ class ProteinGenerator(Runner):
             - **Python Path:** The path to the Python executable is necessary for running the script and should be set accordingly.
             - **JobStarter:** If provided, the JobStarter instance is used to manage job execution, otherwise it can be set later.
         """
-        if not script_path:
-            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under PROTEIN_GENERATOR_SCRIPT_PATH.")
-        self.script_path = script_path
-        self.python_path = python_path
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "PROTEIN_GENERATOR_SCRIPT_PATH")
+        self.python_path = python_path or load_config_path(config, "PROTEIN_GENERATOR_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "PROTEIN_GENERATOR_PRE_CMD")
+
         self.name = "protein_generator.py"
         self.jobstarter = jobstarter
         self.index_layers = 1
@@ -362,7 +364,7 @@ class ProteinGenerator(Runner):
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --".join(flags)
 
-        return f"{self.python_path} {self.script_path} --out {output_dir}/{desc} {opts} {flags}"
+        return f"{self.pre_cmd + ' '}{self.python_path} {self.script_path} --out {output_dir}/{desc} {opts} {flags}"
 
     def collect_scores(self, scores_dir: str) -> pd.DataFrame:
         """

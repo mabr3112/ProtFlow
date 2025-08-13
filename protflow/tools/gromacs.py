@@ -8,32 +8,31 @@ import re
 import pandas as pd
 
 # customs
-from protflow import poses as ps
-from protflow import config, runners
 from protflow.runners import Runner
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
-from protflow.config import PROTFLOW_DIR, PROTFLOW_ENV
 from protflow.utils import biopython_tools as bpt
 
-# this weird joining of paths is necessary because config is a mock import in the documentation build. 
-# DO NOT CHANGE IT if you don't know what that means.
-if isinstance(PROTFLOW_DIR, (str, bytes, os.PathLike)):
-    GROMACS_PARAMS_DIR = os.path.join(PROTFLOW_DIR, "protflow/utils/gromacs/params")
-else:
-    GROMACS_PARAMS_DIR = f"{PROTFLOW_DIR}/protflow/utils/gromacs/params"
+# locals
+from .. import poses as ps
+from .. import runners, load_config_path, require_config
 
 class Gromacs(Runner):
     '''Class Docs'''
-    def __init__(self, gromacs_path: str = config.GROMACS_PATH, jobstarter: JobStarter = None, pre_cmd: str = None, md_params: "MDParams" = None):
+    def __init__(self, gromacs_path: str|None = None, gromacs_dir: str|None = None, jobstarter: JobStarter = None, pre_cmd: str = None, md_params: "MDParams" = None):
         '''Init Docs'''
-        self.gromacs_path = self.search_path(os.path.join(gromacs_path, "gmx"), "GROMACS_PATH")
-        self.gromacs_dir = self.search_path(gromacs_path, "GROMACS_PATH", is_dir=True)
-        self.pre_cmd = pre_cmd
-        self.name = "esmfold.py"
+        # setup config
+        config = require_config()
+        self.gromacs_path = gromacs_path or load_config_path(config, "GROMACS_PATH") # might have to add 'gmx' here?
+        self.gromacs_dir = gromacs_dir or load_config_path(config, "GROMACS_DIR")
+        self.pre_cmd = pre_cmd or load_config_path(config, "GROMACS_PRE_CMD")
+
+        # setup runner
+        self.name = "gromacs"
         self.index_layers = 0
         self.jobstarter = jobstarter
 
+        # setup mdparams!
         self.md_params = md_params or MDParams()
         self.overwrite_prep = False
         self.overwrite_equilibration = False
@@ -494,20 +493,22 @@ class MDParams:
     '''Dataclass that links MD parameter fiels (.mdp).'''
     def __init__(
             self,
-            ions = f"{GROMACS_PARAMS_DIR}/default_ions.mdp",
-            em = f"{GROMACS_PARAMS_DIR}/default_em.mdp",
-            nvt = f"{GROMACS_PARAMS_DIR}/default_nvt.mdp",
-            npt = f"{GROMACS_PARAMS_DIR}/default_npt.mdp",
-            md = f"{GROMACS_PARAMS_DIR}/default_md_1ns.mdp",
+            ions: str|None = None,
+            em: str|None = None,
+            nvt: str|None = None,
+            npt: str|None = None,
+            md: str|None = None,
             water_model = "tip3p",
             force_field = "amber99sb-ildn"
         ) -> None:
-
-        self.ions = ions
-        self.em = em
-        self.nvt = nvt
-        self.npt = npt
-        self.md = md
+        """Looks up gromacs params in protflow/utils/gromacs/params by default!"""
+        config = require_config()
+        gromacs_params_dir = os.path.join(load_config_path(config, "PROTFLOW_DIR"), "protflow/utils/gromacs/params")
+        self.ions = ions or os.path.join(gromacs_params_dir, "default_ions.mdp")
+        self.em = em or os.path.join(gromacs_params_dir, "em.mdp")
+        self.nvt = nvt or os.path.join(gromacs_params_dir, "nvt.mdp")
+        self.npt = npt or os.path.join(gromacs_params_dir, "npt.mdp")
+        self.md = md or os.path.join(gromacs_params_dir, "md.mdp")
         self.water_model = water_model
         self.force_field = force_field
 
@@ -537,8 +538,9 @@ def is_valid_variable(var: str) -> None:
 
 class MDAnalysis(Runner):
     '''MDAnalysis class docs'''
-    def __init__(self, python: str = f"{PROTFLOW_ENV}/python", script_path: str = None, jobstarter: JobStarter = None):
-        self.python = python
+    def __init__(self, python: str|None = None, script_path: str = None, jobstarter: JobStarter = None):
+        config = require_config()
+        self.python = python or load_config_path(config, "PROTFLOW_ENV")
         self.set_script(script_path)
         self.index_layers = 0
         self.jobstarter = jobstarter

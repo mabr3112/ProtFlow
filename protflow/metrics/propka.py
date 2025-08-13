@@ -74,10 +74,10 @@ import os
 import pandas as pd
 
 # import customs
-from protflow.config import PROPKA_PATH
-from protflow.runners import Runner, RunnerOutput
-from protflow.poses import Poses, description_from_path
-from protflow.jobstarters import JobStarter
+from .. import load_config_path, require_config
+from ..runners import Runner, RunnerOutput
+from ..poses import Poses, description_from_path
+from ..jobstarters import JobStarter
 
 class Propka(Runner):
     """
@@ -145,7 +145,7 @@ class Propka(Runner):
 
     The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, propka_path: str = PROPKA_PATH, options: str = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+    def __init__(self, propka_path: str|None = None, options: str = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         """
         Initialize the BackboneRMSD class.
 
@@ -179,11 +179,14 @@ class Propka(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
-        self.set_propka_path(propka_path)
+        self.set_propka_path(propka_path or load_config_path(require_config(), "PROPKA_PATH"))
 
         self.set_jobstarter(jobstarter)
         self.set_options(options)
         self.overwrite = overwrite
+
+    def __str__(self):
+        return "Propka"
 
     ########################## Input ################################################
 
@@ -354,7 +357,8 @@ class Propka(Runner):
         return output.return_poses()
 
 def collect_scores(work_dir:str, poses:list) -> pd.DataFrame:
-
+    '''Propka scorecollector
+    TODO: Document!'''
     def extract_data(file) -> list:
         # Define the start and end markers
         start_marker = "SUMMARY OF THIS PREDICTION"

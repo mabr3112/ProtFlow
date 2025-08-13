@@ -72,29 +72,24 @@ This module is part of the ProtFlow package and is designed to work in tandem wi
 Author
 ------
 Markus Braun, Adrian Tripp
-
-Version
--------
-0.1.0
 """
-
 # imports
-import json
 import os
+import json
 
 # dependencies
 import pandas as pd
 
 # customs
-from protflow import jobstarters
-from protflow.jobstarters import JobStarter, split_list
-from protflow.poses import Poses
-from protflow.residues import ResidueSelection
-from protflow.runners import Runner, RunnerOutput, col_in_df
-from protflow.config import PROTFLOW_ENV
-from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR
-from protflow.utils.utils import parse_fasta_to_dict, _mutually_exclusive
-from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from ..poses import Poses
+from ..residues import ResidueSelection
+from ..jobstarters import JobStarter, split_list
+from ..runners import Runner, RunnerOutput, col_in_df
+from .. import jobstarters, require_config, load_config_path
+from ..utils.utils import parse_fasta_to_dict, _mutually_exclusive
+from ..utils.biopython_tools import load_structure_from_pdbfile
+
+# locals
 
 class ChainAdder(Runner):
     """
@@ -162,7 +157,7 @@ class ChainAdder(Runner):
 
     The ChainAdder class is intended for researchers and developers who need to add chains to protein structures as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, default_python=PROTFLOW_ENV, jobstarter: JobStarter = None):
+    def __init__(self, python: str|None = None, jobstarter: JobStarter = None):
         """
         Initialize the ChainAdder class.
 
@@ -172,7 +167,7 @@ class ChainAdder(Runner):
 
         Parameters
         ----------
-        default_python : str, optional
+        python : str, optional
             The path to the default Python executable, by default `os.path.join(PROTFLOW_ENV, "python3")`.
         jobstarter : JobStarter, optional
             An instance of the JobStarter class to manage job execution, by default None.
@@ -207,7 +202,10 @@ class ChainAdder(Runner):
         FileNotFoundError
             If the specified Python executable is not found.
         """
-        self.python = self.search_path(default_python, "PROTFLOW_ENV")
+        # setup config
+        config = require_config()
+        self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "add_chains_batch.py")
         self.jobstarter = jobstarter
 
     def __str__(self):
@@ -360,7 +358,7 @@ class ChainAdder(Runner):
             raise ValueError("Either motif or chains can be specified for superimposition, but never both at the same time! Decide whether to superimpose over a selected chain or a selected motif.")
 
         # runner setup
-        script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/add_chains_batch.py"
+        script_path = self.script_path
         work_dir, jobstarter = self.generic_run_setup(
             poses = poses,
             prefix = prefix,
@@ -786,7 +784,7 @@ class ChainRemover(Runner):
 
     The ChainRemover class is intended for researchers and developers who need to remove chains from protein structures as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, default_python=PROTFLOW_ENV, jobstarter: JobStarter = None):
+    def __init__(self, python: str|None = None, jobstarter: JobStarter = None):
         """
         Initialize the ChainRemover class.
 
@@ -795,7 +793,7 @@ class ChainRemover(Runner):
         the ProtFlow framework.
 
         Parameters:
-            default_python (str, optional): The path to the default Python executable. Defaults to PROTFLOW_ENV.
+            python (str, optional): The path to the default Python executable. Defaults to PROTFLOW_ENV.
             jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
 
         Attributes:
@@ -821,7 +819,10 @@ class ChainRemover(Runner):
         Raises:
             FileNotFoundError: If the specified Python executable is not found.
         """
-        self.python = self.search_path(default_python, "PROTFLOW_ENV")
+        # setup config
+        config = require_config()
+        self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "remove_chains_batch.py")
         self.jobstarter = jobstarter
 
     def __str__(self):
@@ -904,7 +905,7 @@ class ChainRemover(Runner):
             raise ValueError("Either :chains: or :preserve_chains: must be set!")
 
         # setup runner
-        script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/remove_chains_batch.py"
+        script_path = self.script_path
         work_dir, jobstarter = self.generic_run_setup(
             poses = poses,
             prefix = prefix,
@@ -951,15 +952,22 @@ class ChainRemover(Runner):
         return poses.change_poses_dir(work_dir, copy=False)
 
 class SequenceRemover(Runner):
-    def __init__(self, chains: list[int] = None, sep: str = None, python: str = PROTFLOW_ENV, jobstarter: JobStarter = None):
+    '''Runner Class to remove sequences from .fasta files'''
+    def __init__(self, chains: list[int] = None, sep: str = None, python: str|None = None, jobstarter: JobStarter = None):
         '''
         Parameters:
         chains: list of chain idx to remove.
         '''
+        # setup config
+        config = require_config()
+        self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "remove_sequence_batch.py")
         self.chains = chains
         self.sep = sep
         self.jobstarter = jobstarter
-        self.python = python
+
+    def __str__(self):
+        return "SequenceRemover"
 
     def _outputs_exist(self, poses: Poses, work_dir: str) -> bool:
         return os.path.isfile(f"{work_dir}/done.txt") and all(os.path.isfile(f"{work_dir}/chains_removed/{description}.fa") for description in poses.df["poses_description"].to_list())
@@ -1018,8 +1026,8 @@ class SequenceRemover(Runner):
             input_json_list.append(fp)
 
         # write cmd
-        script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/remove_sequence_batch.py"
-        cmds = [f"{self.python}/python3 {script_path} --input_json {input_json} --output_dir {work_dir}" for input_json in input_json_list]
+        script_path = self.script_path # TODO: check why sep is not accessed in this runner!
+        cmds = [f"{self.python} {script_path} --input_json {input_json} --output_dir {work_dir}" for input_json in input_json_list]
 
         # execute with jobstarter
         jobstarter.start(cmds=cmds, jobname=prefix, output_path=work_dir)
@@ -1029,17 +1037,25 @@ class SequenceRemover(Runner):
         return RunnerOutput(poses, output_df, prefix=prefix).return_poses()
 
 class SequenceAdder(Runner):
-    def __init__(self, sequence: list[int] = None, sequence_col: str = None, python: str = PROTFLOW_ENV, jobstarter: JobStarter = None):
+    """ProtFlow Runner to add sequences to .fasta files. (useful for predicting complexes and so on.)"""
+    def __init__(self, sequence: list[int] = None, sequence_col: str = None, python: str|None = None, jobstarter: JobStarter = None):
         '''
         Parameters:
         sequence: Either string of sequence that should be added.
         sequence_col: column in poses.df that contains the sequences to be added. sequence and sequence_col are mutually exclusive.
         '''
+        # setup config
+        config = require_config()
+        self.python = python or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "add_sequence_batch.py")
+
         _mutually_exclusive(sequence, "sequence", sequence_col, "sequence_col", none_ok=True)
         self.sequence = sequence
         self.sequence_col = sequence_col
         self.jobstarter = jobstarter
-        self.python = python
+
+    def __str__(self):
+        return "SequenceAdder"
 
     def _outputs_exist(self, poses: Poses, work_dir: str) -> bool:
         return os.path.isfile(f"{work_dir}/done.txt") and all(os.path.isfile(f"{work_dir}/sequence_added/{description}.fa") for description in poses.df["poses_description"].to_list())
@@ -1102,8 +1118,8 @@ class SequenceAdder(Runner):
             input_json_list.append(fp)
 
         # write cmd
-        script_path = f"{AUXILIARY_RUNNER_SCRIPTS_DIR}/add_sequence_batch.py"
-        cmds = [f"{self.python}/python3 {script_path} --input_json {input_json} --output_dir {work_dir}" for input_json in input_json_list]
+        script_path = self.script_path
+        cmds = [f"{self.python} {script_path} --input_json {input_json} --output_dir {work_dir}" for input_json in input_json_list]
 
         # execute with jobstarter
         jobstarter.start(cmds=cmds, jobname=prefix, output_path=work_dir)

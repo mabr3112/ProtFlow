@@ -71,18 +71,18 @@ import pandas as pd
 import numpy as np
 
 # import customs
-from protflow.config import PROTFLOW_ENV
-from protflow.utils.biopython_tools import determine_protparams
-from protflow.runners import Runner, RunnerOutput
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter
-from protflow.utils.biopython_tools import get_sequence_from_pose, load_sequence_from_fasta, load_structure_from_pdbfile
+from .. import load_config_path, require_config
+from ..utils.biopython_tools import determine_protparams
+from ..runners import Runner, RunnerOutput
+from ..poses import Poses
+from ..jobstarters import JobStarter
+from ..utils.biopython_tools import get_sequence_from_pose, load_sequence_from_fasta, load_structure_from_pdbfile
 
 class ProtParam(Runner):
     '''
     Class handling the calculation of protparams from sequence using the BioPython Bio.SeqUtils.ProtParam module
     '''
-    def __init__(self, jobstarter: str = None, default_python = PROTFLOW_ENV): # pylint: disable=W0102
+    def __init__(self, jobstarter: JobStarter = None, python: str|None = None): # pylint: disable=W0102
         """
         Initialize the ProtParam class.
 
@@ -126,7 +126,7 @@ class ProtParam(Runner):
         The `__init__` method ensures that the ProtParam class is ready to perform protein sequence parameter calculations within the ProtFlow framework, setting up the environment and configurations necessary for successful execution.
         """
         self.jobstarter = jobstarter
-        self.python = self.search_path(default_python, "PROTFLOW_ENV")
+        self.python = python or os.path.join(load_config_path(require_config(), "PROFLOW_ENV"), "python")
 
     def __str__(self):
         return "protparam.py"

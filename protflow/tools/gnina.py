@@ -66,6 +66,7 @@ Version
 -------
 0.1.0
 """
+#TODO: Remove current, broken runner!!!
 # general imports
 import os
 import logging
@@ -80,7 +81,7 @@ from protflow.jobstarters import JobStarter
 from protflow.tools.protein_edits import ChainRemover
 from protflow.runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string
 from protflow.utils.biopython_tools import load_structure_from_pdbfile, save_structure_to_pdbfile
-from .. import config
+from .. import require_config, load_config_path
 
 class GNINA(Runner):
     """
@@ -145,7 +146,7 @@ class GNINA(Runner):
     -------
     0.1.0
     """
-    def __init__(self, script_path:str=config.GNINA_PATH, jobstarter:JobStarter=None) -> None:
+    def __init__(self, script_path: str|None = None, jobstarter: JobStarter|None = None) -> None:
         """
         Initializes the LigandMPNN class.
 
@@ -161,9 +162,11 @@ class GNINA(Runner):
         of jobs in high-performance computing (HPC) environments. This method ensures that all configurations are correctly set up before running any
         LigandMPNN tasks.
         """
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "GNINA_PATH")
 
-
-        self.script_path = self.search_path(script_path, "GNINA_PATH")
+        # setup runner
         self.name = "gnina.py"
         self.index_layers = 1
         self.jobstarter = jobstarter

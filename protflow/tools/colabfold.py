@@ -76,7 +76,7 @@ import pandas as pd
 import numpy as np
 
 # custom
-from .. import config, runners
+from .. import require_config, load_config_path, runners
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..poses import Poses, col_in_df
 from ..jobstarters import JobStarter
@@ -148,7 +148,7 @@ class Colabfold(Runner):
 
     The ColabFold class is intended for researchers and developers who need to perform AlphaFold2 predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = config.COLABFOLD_SCRIPT_PATH, pre_cmd:str=config.COLABFOLD_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter|None = None) -> None:
         """
         __init__ Method
         ===============
@@ -180,12 +180,13 @@ class Colabfold(Runner):
             # Initialize the ColabFold class
             colabfold = ColabFold(script_path='/path/to/colabfold.py', jobstarter=jobstarter)
         """
-        if not script_path:
-            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under COLABFOLD_DIR_PATH.")
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "COLABFOLD_SCRIPT_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "COLABFOLD_PRE_CMD", is_pre_cmd=True)
 
-        self.script_path = script_path
+        # setup runner
         self.name = "colabfold.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 

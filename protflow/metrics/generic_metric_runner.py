@@ -76,10 +76,10 @@ import importlib
 import pandas as pd
 
 # import customs
-from protflow.config import PROTFLOW_ENV
-from protflow.runners import Runner, RunnerOutput
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter, split_list
+from ..poses import Poses
+from ..runners import Runner, RunnerOutput
+from .. import load_config_path, require_config
+from ..jobstarters import JobStarter, split_list
 
 class GenericMetric(Runner):
     """
@@ -147,7 +147,7 @@ class GenericMetric(Runner):
 
     The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str = PROTFLOW_ENV, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+    def __init__(self, python_path: str|None = None, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         """
         Initialize the BackboneRMSD class.
 
@@ -181,13 +181,19 @@ class GenericMetric(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
+        # setup config
+        config = require_config()
+        self.set_python_path(python_path or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python"))
+
+        # setup runner
         self.set_module(module)
         self.set_function(function)
-        self.set_python_path(python_path)
-
         self.set_jobstarter(jobstarter)
         self.set_options(options)
         self.overwrite = overwrite
+
+    def __str__(self):
+        return "GenericMetric"
 
     ########################## Input ################################################
     def set_module(self, module: str) -> None:
@@ -226,6 +232,7 @@ class GenericMetric(Runner):
         self.module = module
 
     def set_python_path(self, python_path: str) -> None:
+        '''helper function to set default python path for metric execution'''
         self.python_path = python_path
 
     def set_function(self, function: str) -> None:
@@ -296,11 +303,11 @@ class GenericMetric(Runner):
             - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
             - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
         """
-        if isinstance(jobstarter, JobStarter) or jobstarter == None:
+        if isinstance(jobstarter, JobStarter) or jobstarter is None:
             self.jobstarter = jobstarter
         else:
             raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
-        
+
     def set_options(self, options: dict) -> None:
         """
         Set the jobstarter configuration for the BackboneRMSD runner.
@@ -334,7 +341,7 @@ class GenericMetric(Runner):
             - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
             - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
         """
-        if isinstance(options, dict) or options == None:
+        if isinstance(options, dict) or options is None:
             self.options = options
         else:
             raise ValueError(f"Parameter :options: must be of type dict. type(options= = {type(options)})")
@@ -412,7 +419,7 @@ class GenericMetric(Runner):
         module = module or self.module
         function = function or self.function
         options = options or self.options
-        if not (isinstance(options, dict) or options == None):
+        if not (isinstance(options, dict) or options is None):
             raise ValueError(f"Parameter :options: must be of type dict. type(options= = {type(options)})")
 
         logging.info(f"Running metric {function} of module {module} in {work_dir} on {len(poses.df.index)} poses.")
@@ -476,7 +483,7 @@ def main(args):
     else:
         data = [function(pose) for pose in input_poses]
     description = [os.path.splitext(os.path.basename(pose))[0] for pose in input_poses]
-    location = [pose for pose in input_poses]
+    location = list(input_poses)
 
     # create results dataframe
     results = pd.DataFrame({"data": data, "description": description, "location": location})

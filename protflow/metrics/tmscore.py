@@ -101,12 +101,11 @@ import glob
 import pandas as pd
 
 # import customs
-from .. import jobstarters, runners
 from ..poses import Poses
-from ..runners import Runner, RunnerOutput, col_in_df
 from ..jobstarters import JobStarter
-from ..config import PROTFLOW_ENV
 from ..utils.metrics import calc_sc_tm
+from ..runners import Runner, RunnerOutput, col_in_df
+from .. import jobstarters, runners, load_config_path, require_config
 
 class TMalign(Runner):
     """
@@ -219,7 +218,7 @@ class TMalign(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = self._check_install(application or os.path.join(os.path.dirname(PROTFLOW_ENV), "TMalign"))
+        self.application = self._check_install(application or os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "TMalign"))
 
     def __str__(self):
         return "TMalign"
@@ -648,7 +647,7 @@ class TMscore(Runner):
         self.jobstarter = jobstarter
         self.name = "tmscore.py"
         self.index_layers = 0
-        self.application = application or os.path.join(os.path.dirname(PROTFLOW_ENV), "TMscore")
+        self.application = application or os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "TMscore")
 
     def __str__(self):
         return self.name

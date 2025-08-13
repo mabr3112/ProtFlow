@@ -75,11 +75,10 @@ import numpy as np
 import pandas as pd
 
 # custom
-from protflow import config, runners
+from protflow import require_config, load_config_path, runners
 from protflow.poses import Poses
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..jobstarters import JobStarter
-from ..config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
 
 class ESMFold(Runner):
     """
@@ -147,7 +146,7 @@ class ESMFold(Runner):
 
     The ESMFold class is intended for researchers and developers who need to perform ESMFold simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str = config.ESMFOLD_PYTHON_PATH, pre_cmd: str = config.ESMFOLD_PRE_CMD, jobstarter: JobStarter = None) -> None:
+    def __init__(self, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter|None = None) -> None:
         """
         Initialize the ESMFold class with necessary configurations.
 
@@ -182,9 +181,14 @@ class ESMFold(Runner):
 
         This method prepares the ESMFold class for running folding simulations, ensuring that all necessary configurations and paths are correctly set up.
         """
-        self.script_path = self.search_path(script_dir, "AUXILIARY_RUNNER_SCRIPTS_DIR", is_dir=True)
-        self.python_path = self.search_path(python_path, "ESMFOLD_PYTHON_PATH")
-        self.pre_cmd = pre_cmd
+        # setup config
+        config = require_config()
+        self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
+        self.script_path = os.path.join(self.script_dir, "esmfold_inference.py")
+        self.python_path = python_path or load_config_path(config, "ESMFOLD_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "ESM_PRE_CMD")
+
+        # runner setup
         self.name = "esmfold.py"
         self.index_layers = 0
         self.jobstarter = jobstarter
@@ -417,7 +421,7 @@ class ESMFold(Runner):
         # parse options
         opts, flags = runners.parse_generic_options(options, None)
 
-        return f"{self.python_path} {config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {runners.options_flags_to_string(opts, flags, sep='--')}"
+        return f"{self.python_path} {self.script_path} --fasta {pose_path} --output_dir {output_dir} {runners.options_flags_to_string(opts, flags, sep='--')}"
 
 def collect_esmfold_scores(work_dir:str) -> pd.DataFrame:
     """
