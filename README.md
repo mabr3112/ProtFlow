@@ -32,7 +32,7 @@ protflow-init-config
 
 # The Configuration File
 <p align="center">
-    <img src="docs/assets/protflow_config_v2.drawio.png" alt="ProtFlow config.py file" width="420">
+    <img src="https://raw.githubusercontent.com/mabr3112/ProtFlow/refs/heads/develop/docs/assets/protflow_config_v2.drawio.png" alt="ProtFlow config.py file" width="420">
 </p>
 You will need to link protflow's runners to the individual python environments you have set up on your system. By Default, ProtFlow looks for environment paths in the file 'config.py' which we instantiated during the installation above.
 
@@ -60,7 +60,7 @@ protflow-check-config
 
 # Overview
 <p align="center">
-    <img src="docs/assets/ProtFlow_organigram_v1.png" alt="ProtFlow Organigram" width="680">
+    <img src="https://raw.githubusercontent.com/mabr3112/ProtFlow/refs/heads/develop/docs/assets/ProtFlow_organigram_v1.png" alt="ProtFlow Organigram" width="680">
 </p>
 
 
