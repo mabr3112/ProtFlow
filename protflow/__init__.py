@@ -155,7 +155,7 @@ def load_config_path(config: object, path_var: str, is_pre_cmd: bool = False) ->
         raise ProtFlowConfigError(config, path_var) from exc
 
     # if the loaded config setting is a pre_cmd, return without checking
-    if is_pre_cmd:
+    if is_pre_cmd or path_var.upper().endswith("PRE_CMD"):
         return var
 
     # variable must be set

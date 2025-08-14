@@ -183,7 +183,7 @@ class BackboneRMSD(Runner):
         # setup config
         config = require_config()
         self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
-        self.python = os.path.join(load_config_path(config, "PROFLOW_ENV"), "python")
+        self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
 
         # runner setup
         self.set_ref_col(ref_col)

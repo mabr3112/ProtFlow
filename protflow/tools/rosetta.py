@@ -183,7 +183,7 @@ class Rosetta(Runner):
         # setup config
         config = require_config()
         self.script_path = script_path or load_config_path(config, "ROSETTA_BIN_PATH")
-        self.pre_cmd = pre_cmd or load_config_path(config, "ROSETTA_PRE_CMD")
+        self.pre_cmd = pre_cmd or load_config_path(config, "ROSETTA_PRE_CMD", is_pre_cmd=True)
 
         # setup runner
         self.name = "rosetta.py"
