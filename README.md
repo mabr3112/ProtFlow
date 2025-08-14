@@ -34,8 +34,9 @@ protflow-init-config
 <p align="center">
     <img src="https://raw.githubusercontent.com/mabr3112/ProtFlow/refs/heads/develop/docs/assets/protflow_config_v2.drawio.png" alt="ProtFlow config.py file" width="420">
 </p>
-You will need to link protflow's runners to the individual python environments you have set up on your system. By Default, ProtFlow looks for environment paths in the file 'config.py' which we instantiated during the installation above. If you try to initialize a runner for which you have not set paths in your config.py file, protflow will throw an error directing you to where you will need to set the required paths.
-
+You will need to link protflow's runners to the individual python environments you have set up on your system. By Default, ProtFlow looks for environment paths in the file 'config.py' which we instantiated during the installation above. 
+If you try to initialize a runner for which you have not set paths in your config.py file, protflow will throw an error directing you to where you will need to set the required paths.<br><br>
+  
 By default ``protflow-init-config`` will set up config.py in ~/.config/protflow/config.py.
 If you want to link your protflow installation to a different config.py file elswhere, there is a simple cli-tool, ``protflow-set-config``.
 Linking your protflow to a different config.py might come in handy if you want to share it system wide on a computing cluster with multiple users.
