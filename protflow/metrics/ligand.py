@@ -194,6 +194,9 @@ class LigandClashes(Runner):
         self.set_clash_distance(clash_distance)
         self.overwrite = overwrite
 
+    def __str__(self):
+        return "LigandClashes"
+    
     ########################## Input ################################################
     def set_ligand_chain(self, ligand_chain: str) -> None:
         """
@@ -574,6 +577,9 @@ class LigandContacts(Runner):
         self.set_exclude_elements(exclude_elements)
         self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
+
+    def __str__(self):
+        return "LigandContacts"
 
     ########################## Input ################################################
     def set_ligand_chain(self, ligand_chain: str) -> None:
@@ -958,8 +964,9 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
         if not clash_distance:
             ligand_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose[ligand_chain].get_atoms()])
 
-    if np.any(np.isnan(ligand_vdw)) and not clash_distance:
-        raise RuntimeError("Could not find Van der Waals radii for all elements in ligand. Check protflow.utils.vdw_radii and add it, if applicable!")
+    if not clash_distance:
+        if np.any(np.isnan(ligand_vdw)): #pylint: disable=E0601
+            raise RuntimeError("Could not find Van der Waals radii for all elements in ligand. Check protflow.utils.vdw_radii and add it, if applicable!")
 
     # calculate distances between all atoms of ligand and protein
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
@@ -967,7 +974,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
         return int(np.sum((dgram < clash_distance)))
 
     # calculate distance cutoff for each atom pair, considering VdW radii 
-    distance_cutoff = pose_vdw[:, np.newaxis] + ligand_vdw[np.newaxis, :]
+    distance_cutoff = pose_vdw[:, np.newaxis] + ligand_vdw[np.newaxis, :] #pylint: disable=E0601
     # multiply distance cutoffs with set parameter
     distance_cutoff = distance_cutoff * factor
 
@@ -1036,7 +1043,7 @@ def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max
     elif isinstance(atoms, list) and all(isinstance(atom, str) for atom in atoms):
         pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms and atom.element.lower() not in exclude_elements])
     else:
-        raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
+        raise ValueError("Invalid Value for parameter :atoms:. For all atoms set to one of {None, False, 'all'} or specify list of atoms e.g. ['N', 'CA', 'CO']")
     ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if atom.element.lower() not in exclude_elements])
 
     # calculate complete dgram
