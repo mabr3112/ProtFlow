@@ -34,8 +34,7 @@ protflow-init-config
 <p align="center">
     <img src="assets/protflow_config_v2.drawio.png" alt="ProtFlow config.py file" width="420">
 </p>
-You will need to link protflow's runners to the individual python environments you have set up on your system.
-By Default, ProtFlow looks for environment paths in the file 'config.py' which we instantiated during the installation above.
+You will need to link protflow's runners to the individual python environments you have set up on your system. By Default, ProtFlow looks for environment paths in the file 'config.py' which we instantiated during the installation above.
 
 If you try to initialize a runner for which you have not set paths in your config.py file, protflow will throw an error directing you to where you will need to set the required paths.
 
