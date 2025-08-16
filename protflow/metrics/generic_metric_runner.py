@@ -76,10 +76,10 @@ import importlib
 import pandas as pd
 
 # import customs
-from ..poses import Poses
-from ..runners import Runner, RunnerOutput
-from .. import load_config_path, require_config
-from ..jobstarters import JobStarter, split_list
+from protflow.poses import Poses
+from protflow.runners import Runner, RunnerOutput
+from protflow import load_config_path, require_config
+from protflow.jobstarters import JobStarter, split_list
 
 class GenericMetric(Runner):
     """
@@ -490,8 +490,6 @@ def main(args):
 
     # save output
     results.to_json(args.out)
-
-
 
 if __name__ == "__main__":
     import argparse
