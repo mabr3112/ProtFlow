@@ -3,7 +3,7 @@
 Configuration
 =============
 
-.. figure:: assets/protflow_config_v2.png
+.. figure:: ../../assets/protflow_config_v2.png
     :alt: The ProtFlow configuration file
     :align: center
     :width: 420px

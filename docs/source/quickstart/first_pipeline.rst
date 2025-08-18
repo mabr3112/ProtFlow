@@ -1,4 +1,4 @@
-.. _first_pipeline
+.. _first_pipeline:
 
 Build your first ProtFlow pipeline
 ==================================

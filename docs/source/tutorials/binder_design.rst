@@ -1,4 +1,4 @@
-.. _binder_design
+.. _binder_design:
 
 Binder Design Tutorial
 ======================
