@@ -3,34 +3,34 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
+.. _home:
+
 Welcome to ProtFlow's documentation!
 ====================================
 
-Introduction
-------------
-
-ProtFlow is a python package designed to streamline protein design workflows and enhance your productivity. ProtFlow is essentially a python wrapper around common protein design tools that allows their seamless integration into automated pipelines. ProtFlow uses JobStarters to run protein design tools on different platforms such as slurm based computing clusters or local machines. If you want a JobStarter tailored to your specific computing system please contact us!
+ProtFlow is a python package to automate protein design workflows and enhance your productivity. ProtFlow is essentially a python wrapper around common protein design tools that allows their seamless integration into automated pipelines. ProtFlow uses JobStarters to run protein design tools on different platforms such as slurm based computing clusters or local machines. If you want a JobStarter tailored to your specific computing system please contact us!
 
 Key Features
 ^^^^^^^^^^^^
 
-- **Protein Design Toolbox**: Wraps around protein design tools and facilitates input and output management into pandas DataFrames.
-- **Integrated Protein Metrics**: ProtFlow implements several common metrics used in protein design such as RMSD and TMscore.
-- **Integrated Plotting**: Quick and easy to use plotting functions for quick check-up of your design success.
-
-Contents:
----------
+- **The Poses class**: Provides a container for your proteins and stores all information collected during your design pipeline in pandas DataFrames.
+- **Runners**: Implement protein design tools. Want to include your favorite tool? Just implement a Runner class and ProtFlow will take care of the rest.
+- **JobStarters**: Handle execution of design tools on your computing system. You can tailor JobStarters to your system and swiftly plug them into any ProtFlow pipeline.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Getting Started:
 
-   quickstart
+   quickstart/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Tutorials:
+
+   tutorials/index
+
+.. toctree::
+   :maxdepth: 2
+   :caption: ProtFlow API docs:
+
    protflow
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
