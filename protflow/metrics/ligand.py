@@ -77,12 +77,12 @@ import numpy as np
 import pandas as pd
 
 # import customs
-from .. import require_config, load_config_path
-from ..runners import Runner, RunnerOutput
-from ..poses import Poses
-from ..jobstarters import JobStarter, split_list
-from ..utils.biopython_tools import load_structure_from_pdbfile
-from ..utils.utils import vdw_radii
+from protflow import require_config, load_config_path
+from protflow.runners import Runner, RunnerOutput
+from protflow.poses import Poses
+from protflow.jobstarters import JobStarter, split_list
+from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.utils import vdw_radii
 
 class LigandClashes(Runner):
     """
