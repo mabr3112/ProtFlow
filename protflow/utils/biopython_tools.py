@@ -85,36 +85,46 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
     """
     Load a structure from a PDB file using BioPython's PDBParser.
 
-    This function parses a PDB file and returns a structure object. It allows 
+    This function parses a PDB file and returns a structure object. It allows
     the option to load all models from the PDB file or a specific model.
 
     Parameters:
-    path_to_pdb (str): Path to the PDB file to be parsed.
-    all_models (bool, optional): If True, all models from the PDB file are 
-                                 returned. If False, only the specified model 
-                                 is returned. Defaults to False.
-    model (int, optional): The index of the model to return. Only used if 
-                           all_models is False. Defaults to 0 (first model).
-    quiet (bool, optional): If True, suppresses output from the PDBParser. 
-                            Defaults to True.
-    handle (str, optional): String handle that is passed to the PDBParser's get_structure() method and sets the id of the structure.
+    -----------
+        path_to_pdb (str):
+            Path to the PDB file to be parsed.
+        all_models (bool, optional):
+            If True, all models from the PDB file are returned.
+            If False, only the specified model is returned. Defaults to False.
+        model (int, optional):
+            The index of the model to return. Only used if all_models is False.
+            Defaults to 0 (first model).
+        quiet (bool, optional):
+            If True, suppresses output from the PDBParser. Defaults to True.
+        handle (str, optional):
+            String handle that is passed to the PDBParser's get_structure()
+            method and sets the id of the structure.
 
     Returns:
-    Bio.PDB.Structure: The parsed structure object from the PDB file. If 
-                       all_models is True, returns a Structure containing all 
-                       models. Otherwise, returns a single Model object at the 
-                       specified index.
+    --------
+        Bio.PDB.Structure:
+            The parsed structure object from the PDB file. If all_models is True,
+            returns a Structure containing all models. Otherwise, returns a single
+            Model object at the specified index.
 
     Raises:
-    FileNotFoundError: If the specified PDB file does not exist.
-    ValueError: If the specified model index is out of range for the PDB file.
+    -------
+        FileNotFoundError:
+            If the specified PDB file does not exist.
+        ValueError:
+            If the specified model index is out of range for the PDB file.
 
     Example:
-    To load the first model from a PDB file:
-    >>> structure = load_structure_from_pdbfile("example.pdb")
+    --------
+        To load the first model from a PDB file:
+        >>> structure = load_structure_from_pdbfile("example.pdb")
 
-    To load all models from a PDB file:
-    >>> all_structures = load_structure_from_pdbfile("example.pdb", all_models=True)
+        To load all models from a PDB file:
+        >>> all_structures = load_structure_from_pdbfile("example.pdb", all_models=True)
     """
     # sanity
     if not os.path.isfile(path_to_pdb):
@@ -146,6 +156,7 @@ def save_structure_to_pdbfile(pose: Structure, save_path: str, multimodel: bool 
         The file path where the PDB file will be written. The file will be created if it does not exist, or overwritten if it does.
     multimodel : bool
         If the structure to be saved is a multimodel PDB file, write all models. Only works if input is a Structure object, not a model!
+    
     Returns:
     --------
     None
@@ -352,16 +363,30 @@ def superimpose(mobile: Structure, target: Structure, mobile_atoms: list = None,
 
 def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None, include_het_atoms: bool = False) -> list:
     '''
-    Extract specified atoms from specified chains in a given structure.
-    
+    Extract specific atoms from one or more chains in a Biopython ``Structure``.
+
     Parameters:
-    - structure (Bio.PDB.Structure): The structure from which atoms are to be extracted.
-    - atoms (list of str): A list of atom names to extract.
-    - chains (list of str, optional): A list of chain identifiers from which atoms will be extracted.
-      If None, atoms will be extracted from all chains in the structure.
-    
+    -----------
+        structure (Bio.PDB.Structure.Structure):
+            The input structure that will be searched.
+        atoms (list[str]):
+            Atom names to extract (e.g. ``["N", "CA", "C", "O"]``).  
+            If an empty list or ``None`` is supplied, **all** atoms in each
+            selected residue are returned.
+        chains (list[str], optional):
+            Chain identifiers to restrict the search (e.g. ``["A", "B"]``).  
+            When *None* (default), every chain in *structure* is processed.
+        include_het_atoms (bool, optional):
+            If ``True``, hetero-atoms and ligands are included in addition to
+            standard amino-acid residues.  
+            Defaults to ``False`` (only ATOM records where ``residue.id[0] == " "``).
+
     Returns:
-    - list: A list of Bio.PDB.Atom objects corresponding to the specified atoms.
+    --------
+        list[Bio.PDB.Atom.Atom]:
+            A list of ``Atom`` objects matching the query, in the order they
+            appear in the structure.
+
     '''
     # Gather all chains from the structure
     chains = [structure[chain] for chain in chains] if chains else [chain for chain in structure]
@@ -507,13 +532,17 @@ def translate_entity(entity: Bio.PDB.Entity, vector: np.array) -> None:
     Translates all atom coordinates in the given entity by the specified vector.
 
     Parameters:
-    - entity: Bio.PDB.Entity.Entity
+    -----------
+    entity : Bio.PDB.Entity.Entity
         The entity (Structure, Model, Chain, or Residue) whose coordinates will be translated.
-    - vector: array-like of shape (3,)
+    vector : array-like of shape (3,)
         The translation vector (dx, dy, dz).
 
     Returns:
-    - None. The entity is modified in place.
+    --------
+    None
+        The entity is modified in place.
+    
     """
     # Ensure the vector is a NumPy array
     vector = np.array(vector, dtype=float)

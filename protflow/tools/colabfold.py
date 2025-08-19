@@ -67,22 +67,19 @@ Version
 # general imports
 import re
 import os
+import shutil
 import logging
 from glob import glob
-import shutil
-import sys
 
 # dependencies
 import pandas as pd
 import numpy as np
 
 # custom
-import protflow.config
-import protflow.jobstarters
-import protflow.tools
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from protflow.poses import Poses, col_in_df
-from protflow.jobstarters import JobStarter
+from .. import require_config, load_config_path, runners
+from ..runners import Runner, RunnerOutput, prepend_cmd
+from ..poses import Poses, col_in_df
+from ..jobstarters import JobStarter
 
 class Colabfold(Runner):
     """
@@ -109,9 +106,9 @@ class Colabfold(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If pose options are not of the expected type.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        TypeError: If pose options are not of the expected type.
 
     Examples
     --------
@@ -151,7 +148,7 @@ class Colabfold(Runner):
 
     The ColabFold class is intended for researchers and developers who need to perform AlphaFold2 predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.COLABFOLD_SCRIPT_PATH, pre_cmd:str=protflow.config.COLABFOLD_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter|None = None) -> None:
         """
         __init__ Method
         ===============
@@ -183,12 +180,13 @@ class Colabfold(Runner):
             # Initialize the ColabFold class
             colabfold = ColabFold(script_path='/path/to/colabfold.py', jobstarter=jobstarter)
         """
-        if not script_path:
-            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under COLABFOLD_DIR_PATH.")
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "COLABFOLD_SCRIPT_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "COLABFOLD_PRE_CMD", is_pre_cmd=True)
 
-        self.script_path = script_path
+        # setup runner
         self.name = "colabfold.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 
@@ -312,7 +310,7 @@ class Colabfold(Runner):
         )
 
         # collect scores
-        logging.info(f"Predictions finished, starting to collect scores.")
+        logging.info("Predictions finished, starting to collect scores.")
         scores = collect_scores(work_dir=work_dir, num_return_poses=return_top_n_poses)
 
         if len(scores.index) < len(poses.df.index):
@@ -393,7 +391,7 @@ class Colabfold(Runner):
 
         # if all inputs are .a3m files, predict them directly
         if all(pose.endswith(".a3m") for pose in poses):
-            logging.info(f"Predicting poses directly from .a3m files!")
+            logging.info("Predicting poses directly from .a3m files!")
             return self.prep_a3m_for_prediction(poses, fasta_dir, max_filenum)
 
         # determine how to split the poses into <max_gpus> fasta files:
@@ -437,7 +435,7 @@ class Colabfold(Runner):
             cmd = colabfold.write_cmd(pose_path='/path/to/pose.fa', output_dir='/path/to/output_dir', options='--num_designs=10', pose_options='--input_pdb=input.pdb')
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
+        opts, flags = runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --" + " --".join(flags) if flags else ""
 
@@ -566,9 +564,7 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
 
     def calculate_interaction_pae(pae_dict: dict, binder_start: int, binder_end: int, target_start: int, target_end: int) -> tuple[float,float,float]:
         # stack dict into numpy array for fast calculations
-        print(f"pae_dict type = {type(pae_dict)}")
         paes = np.stack(list(pae_dict.values()))
-        print(f"pae_dict shape: ", paes.shape)
 
         # sum up pae's at binder-target residue pairs
         pae_interaction1 = np.mean(paes[binder_start:binder_end, target_start:target_end])
@@ -577,9 +573,7 @@ def calculate_poses_interaction_pae(prefix:str, poses:Poses, pae_list_col:str, b
         # sum up pae's at binder and target individually
         pae_binder = np.mean(paes[binder_start:binder_end, binder_start:binder_end])
         pae_target = np.mean(paes[target_start:target_end, target_start:target_end])
-        print(f"pae_target: {pae_target}, pae_binder: {pae_binder}")
         pae_interaction_total = (pae_interaction1 + pae_interaction2) / 2
-        print(f"pae_interaction_total: {pae_interaction_total}")
         return (pae_interaction_total, pae_binder, pae_target)
 
     # check for prefix

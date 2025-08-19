@@ -67,21 +67,21 @@ Version
 """
 
 # import general
-import logging
 import os
+import logging
 from typing import Union
 
 # import dependencies
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # import customs
-from protflow.config import PROTFLOW_ENV
-from protflow.runners import Runner, RunnerOutput
-from protflow.residues import ResidueSelection
-from protflow.poses import Poses, col_in_df, description_from_path
-from protflow.jobstarters import JobStarter
-from protflow.utils.biopython_tools import load_structure_from_pdbfile, three_to_one_AA_code
+from .. import load_config_path, require_config
+from ..runners import Runner, RunnerOutput
+from ..residues import ResidueSelection
+from ..poses import Poses, col_in_df, description_from_path
+from ..jobstarters import JobStarter
+from ..utils.biopython_tools import load_structure_from_pdbfile, three_to_one_AA_code
 
 class SelectionIdentity(Runner):
     """
@@ -120,13 +120,19 @@ class SelectionIdentity(Runner):
         overwrite: bool = False) -> Poses
         Run the selection identity calculations on the given poses.
     """
-    def __init__(self, residue_selection: Union[str, ResidueSelection] = None, onelettercode: bool = False, python_path: str = os.path.join(PROTFLOW_ENV, "python"), jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
-        self.set_python_path(python_path)
+    def __init__(self, residue_selection: Union[str, ResidueSelection] = None, onelettercode: bool = False, python_path: str|None = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+        # setup config
+        config = require_config()
+        self.set_python_path(python_path or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python"))
+
+        # setup runner
         self.set_residue_selection(residue_selection)
         self.set_onelettercode(onelettercode)
-
         self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
+
+    def __str__(self):
+        return "SelectionIdentity"
 
     ########################## Input ################################################
 
@@ -254,7 +260,7 @@ class SelectionIdentity(Runner):
         elif isinstance(residue_selection, ResidueSelection):
             residue_selections = [residue_selection for _ in poses.poses_list()]
         else:
-            raise ValueError(f"Parameter :residue_selection: must either be a ResidueSelection or a poses dataframe column containing ResidueSelections!")
+            raise ValueError("Parameter :residue_selection: must either be a ResidueSelection or a poses dataframe column containing ResidueSelections!")
         
         logging.info(f"Running metric selection_identity in {work_dir} on {len(poses.df.index)} poses.")
 
@@ -305,7 +311,7 @@ class SelectionIdentity(Runner):
             results = scores,
             prefix = prefix,
         )
-        logging.info(f"selection_identity completed. Returning scores.")
+        logging.info("selection_identity completed. Returning scores.")
         return output.return_poses()
     
 
@@ -340,7 +346,6 @@ def main(args):
 
 if __name__ == "__main__":
     import argparse
-    import pandas as pd
     from protflow.residues import ResidueSelection
 
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

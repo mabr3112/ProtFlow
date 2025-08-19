@@ -69,20 +69,15 @@ import os
 import logging
 from glob import glob
 import shutil
-from typing import Union
 
 # dependencies
 import pandas as pd
-import numpy as np
 
 # custom
-import protflow.config
-import protflow.jobstarters
-import protflow.tools
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
+from protflow.runners import Runner, RunnerOutput, prepend_cmd, parse_generic_options
 from protflow.poses import Poses, description_from_path
 from protflow.jobstarters import JobStarter, split_list
-from protflow.utils.biopython_tools import load_structure_from_pdbfile, save_structure_to_pdbfile
+from .. import require_config, load_config_path
 
 class PLACER(Runner):
     """
@@ -143,7 +138,7 @@ class PLACER(Runner):
 
     The PLACER class is intended for researchers and developers who need to perform PLACER predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.PLACER_SCRIPT_PATH, python_path: str = protflow.config.PLACER_PYTHON_PATH, pre_cmd:str=protflow.config.PLACER_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(self, script_path: str|None = None, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: str = None) -> None:
         """
         __init__ Method
         ===============
@@ -155,7 +150,7 @@ class PLACER(Runner):
         This method sets up the paths to the PLACER script and initializes default values for various attributes required for running predictions. It also allows for the optional configuration of a job starter.
 
         Parameters:
-            script_path (str, optional): The path to the PLACER script. Defaults to `protflow.config.PLACER_SCRIPT_PATH`.
+            script_path (str, optional): The path to the PLACER script. Defaults to `config.PLACER_SCRIPT_PATH`.
             jobstarter (JobStarter, optional): An instance of the `JobStarter` class for managing job execution. Defaults to None.
 
         Returns:
@@ -175,13 +170,14 @@ class PLACER(Runner):
             # Initialize the PLACER class
             PLACER = PLACER(script_path='/path/to/run_PLACER.py', jobstarter=jobstarter)
         """
-        if not script_path:
-            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under COLABFOLD_DIR_PATH.")
+        # setup config
+        config = require_config()
+        self.python_path = python_path or load_config_path(config, "PLACER_PYTHON_PATH")
+        self.script_path = script_path or load_config_path(config, "PLACER_SCRIPT_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "PLACER_PRE_CMD")
 
-        self.python_path = python_path
-        self.script_path = script_path
+        # setup runner
         self.name = "placer.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 
@@ -299,7 +295,7 @@ class PLACER(Runner):
         )
 
         # collect scores
-        logging.info(f"Predictions finished, starting to collect scores.")
+        logging.info("Predictions finished, starting to collect scores.")
         scores = collect_scores(work_dir=out_dir)
 
         if len(scores.index) < len(poses.df.index):
@@ -345,7 +341,7 @@ class PLACER(Runner):
             cmd = PLACER.write_cmd(pose_path='/path/to/pose.pdb', output_dir='/path/to/output_dir', nstruct=100, options='--ignore_ligand_hydrogens', pose_options='--ligand_file /path/to/ligand.mol2')
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
+        opts, flags = parse_generic_options(options=options, pose_options=pose_options, sep="--")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --" + " --".join(flags) if flags else ""
         return f"{self.python_path} {self.script_path} --ifile {pose_path} --odir {output_dir} --nsamples {nstruct} {opts} {flags}"
@@ -399,32 +395,31 @@ def collect_scores(work_dir: str) -> pd.DataFrame:
         """
         os.makedirs(output_dir, exist_ok=True)
         
-        with open(input_file, 'r') as f:
+        with open(input_file, 'r', encoding="UTF-8") as f:
             lines = f.readlines()
-        
+
         model_counter = 0
         model_data = []
         paths = []
-        
+
         for line in lines:
             model_data.append(line)
             if line.startswith("ENDMDL"):
                 output_file = os.path.join(output_dir, f"{filename}_{str(model_counter+1).zfill(4)}.pdb")
-                with open(output_file, 'w') as out_f:
+                with open(output_file, 'w', encoding="UTF-8") as out_f:
                     out_f.writelines(model_data)
                 paths.append(os.path.abspath(output_file))
                 model_counter += 1
                 model_data = []
 
         return paths
-            
 
 
     # collect all output directories, ignore mmseqs dirs
     out_csvs = glob(os.path.join(work_dir, "*.csv"))
     if not out_csvs:
         raise FileNotFoundError(f"Could not find any csv files at {work_dir}")
-    
+
     # combine all score files
     out_df = pd.concat([pd.read_csv(csv) for csv in out_csvs])
 

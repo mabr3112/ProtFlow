@@ -69,18 +69,15 @@ Version
 # import general
 import logging
 import os
-import json
-import glob
 
 # import dependencies
 import pandas as pd
-import protflow
 
 # import customs
-from protflow.config import PROPKA_PATH
-from protflow.runners import Runner, RunnerOutput
-from protflow.poses import Poses, description_from_path
-from protflow.jobstarters import JobStarter, split_list
+from .. import load_config_path, require_config
+from ..runners import Runner, RunnerOutput
+from ..poses import Poses, description_from_path
+from ..jobstarters import JobStarter
 
 class Propka(Runner):
     """
@@ -148,7 +145,7 @@ class Propka(Runner):
 
     The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, propka_path: str = PROPKA_PATH, options: str = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+    def __init__(self, propka_path: str|None = None, options: str = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         """
         Initialize the BackboneRMSD class.
 
@@ -182,11 +179,14 @@ class Propka(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
-        self.set_propka_path(propka_path)
+        self.set_propka_path(propka_path or load_config_path(require_config(), "PROPKA_PATH"))
 
         self.set_jobstarter(jobstarter)
         self.set_options(options)
         self.overwrite = overwrite
+
+    def __str__(self):
+        return "Propka"
 
     ########################## Input ################################################
 
@@ -232,11 +232,11 @@ class Propka(Runner):
             - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
             - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
         """
-        if isinstance(jobstarter, JobStarter) or jobstarter == None:
+        if isinstance(jobstarter, JobStarter) or jobstarter is None:
             self.jobstarter = jobstarter
         else:
             raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
-        
+
 
     ########################## Calculations ################################################
     def run(self, poses: Poses, prefix: str, options: str = None, propka_path: str = None, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
@@ -328,7 +328,7 @@ class Propka(Runner):
 
         # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
         cmds = [f"{os.path.abspath(propka_path)} {os.path.abspath(pose)} {options}" for pose in poses.poses_list()]
-        
+
         # run command
         jobstarter.start(
             cmds = cmds,
@@ -343,7 +343,7 @@ class Propka(Runner):
         scores = collect_scores(work_dir, poses.poses_list())
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
-        
+
         logging.info(f"Saving scores of Propka metric at {scorefile}.")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -353,11 +353,12 @@ class Propka(Runner):
             results = scores,
             prefix = prefix,
         )
-        logging.info(f"Propka completed. Returning scores.")
+        logging.info("Propka completed. Returning scores.")
         return output.return_poses()
-    
-def collect_scores(work_dir:str, poses:list) -> pd.DataFrame:
 
+def collect_scores(work_dir:str, poses:list) -> pd.DataFrame:
+    '''Propka scorecollector
+    TODO: Document!'''
     def extract_data(file) -> list:
         # Define the start and end markers
         start_marker = "SUMMARY OF THIS PREDICTION"
@@ -365,32 +366,32 @@ def collect_scores(work_dir:str, poses:list) -> pd.DataFrame:
 
         results = {"residue_pkA": {}, "residue_id": {}}
         # Open the file
-        with open(file, 'r') as f:
-            extract = False            
+        with open(file, 'r', encoding="UTF-8") as f:
+            extract = False
             for line in f:
                 stripped_line = line.strip()
-                
+
                 # Check for the start marker
                 if stripped_line.startswith(start_marker):
                     extract = True
                     continue  # Skip adding the start line itself
-                
+
                 # Check for the end marker
                 if stripped_line.startswith(end_marker) and extract:
                     break  # Stop extraction
-                
+
                 # If in extraction mode, collect the line
                 if extract and not "Group" in line:
                     data = line.split()
-                    id = data[0]
+                    idx = data[0]
                     resnum = data[1]
                     chain = data[2]
                     pkA = float(data[3])
-                    results["residue_id"].update({f"{chain}{resnum}": id})
+                    results["residue_id"].update({f"{chain}{resnum}": idx})
                     results["residue_pkA"].update({f"{chain}{resnum}": pkA})
-                    
+
         return results
-    
+
     scores = []
     for pose in poses:
         description = description_from_path(pose)
@@ -403,6 +404,3 @@ def collect_scores(work_dir:str, poses:list) -> pd.DataFrame:
         scores.append(data)
     scores = pd.DataFrame(scores)
     return scores
-
-
-

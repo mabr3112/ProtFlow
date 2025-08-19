@@ -67,19 +67,22 @@ Version
 """
 
 # import general
-import logging
 import os
-from typing import Any
+import logging
+import argparse
+
 
 # import dependencies
+import numpy as np
 import pandas as pd
-import protflow
 
 # import customs
-from protflow.config import PROTFLOW_ENV
-from protflow.runners import Runner, RunnerOutput, col_in_df
+from protflow import require_config, load_config_path
+from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter, split_list
+from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.utils import vdw_radii
 
 class LigandClashes(Runner):
     """
@@ -181,6 +184,8 @@ class LigandClashes(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
+        # setup config
+        self.python = os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "python")
         self.set_ligand_chain(ligand_chain)
         self.set_atoms(atoms)
         self.set_factor(factor)
@@ -189,6 +194,9 @@ class LigandClashes(Runner):
         self.set_clash_distance(clash_distance)
         self.overwrite = overwrite
 
+    def __str__(self):
+        return "LigandClashes"
+    
     ########################## Input ################################################
     def set_ligand_chain(self, ligand_chain: str) -> None:
         """
@@ -261,7 +269,7 @@ class LigandClashes(Runner):
         if atoms == "all":
             self.atoms = "all"
         if not isinstance(atoms, list) or not all((isinstance(atom, str) for atom in atoms)):
-            raise TypeError(f"Atoms needs to be a list, atom names (list elements) must be string.")
+            raise TypeError("Atoms needs to be a list, atom names (list elements) must be string.")
         self.atoms = atoms
 
     def set_factor(self, factor: float) -> None:
@@ -339,7 +347,7 @@ class LigandClashes(Runner):
             self.jobstarter = jobstarter
         else:
             raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
-        
+
     def set_exclude_ligand_elements(self, exclude_ligand_elements: list[str]):
         self.exclude_ligand_elements = exclude_ligand_elements
 
@@ -437,9 +445,9 @@ class LigandClashes(Runner):
 
         # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
         poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
-        out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, sublist in enumerate(poses_sublists)]
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --mode clash_vdw --factor {factor} --ligand_chain {ligand_chain} {atoms_str} {exclude_ligand_elements_str} {clash_distance_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
-        
+        out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, _ in enumerate(poses_sublists)]
+        cmds = [f"{self.python} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --mode clash_vdw --factor {factor} --ligand_chain {ligand_chain} {atoms_str} {exclude_ligand_elements_str} {clash_distance_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
+
         # run command
         jobstarter.start(
             cmds = cmds,
@@ -457,9 +465,8 @@ class LigandClashes(Runner):
             results = scores,
             prefix = prefix,
         )
-        logging.info(f"Ligand clash detection completed. Returning scores.")
+        logging.info("Ligand clash detection completed. Returning scores.")
         return output.return_poses()
-    
 
 class LigandContacts(Runner):
     """
@@ -561,6 +568,8 @@ class LigandContacts(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
+        # setup config
+        self.python = os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "python")
         self.set_ligand_chain(ligand_chain)
         self.set_atoms(atoms)
         self.set_min_dist(min_dist)
@@ -568,6 +577,9 @@ class LigandContacts(Runner):
         self.set_exclude_elements(exclude_elements)
         self.set_jobstarter(jobstarter)
         self.overwrite = overwrite
+
+    def __str__(self):
+        return "LigandContacts"
 
     ########################## Input ################################################
     def set_ligand_chain(self, ligand_chain: str) -> None:
@@ -641,7 +653,7 @@ class LigandContacts(Runner):
         if atoms == "all":
             self.atoms = "all"
         if not isinstance(atoms, list) or not all((isinstance(atom, str) for atom in atoms)):
-            raise TypeError(f"Atoms needs to be a list, atom names (list elements) must be string.")
+            raise TypeError("Atoms needs to be a list, atom names (list elements) must be string.")
         self.atoms = atoms
 
     def set_min_dist(self, min_dist: float) -> None:
@@ -820,8 +832,7 @@ class LigandContacts(Runner):
             - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the RMSD calculation process to their specific needs, including specifying atoms and chains for RMSD calculations.
 
         This method is designed to streamline the execution of backbone RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze RMSD calculations.
-        """        
-
+        """
         # prep variables
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
@@ -834,14 +845,14 @@ class LigandContacts(Runner):
         ligand_chain = ligand_chain or self.ligand_chain
         min_dist = min_dist or self.min_dist
         max_dist = max_dist or self.max_dist
-        if any(attr == None for attr in [ligand_chain, min_dist, max_dist]):
+        if any(attr is None for attr in [ligand_chain, min_dist, max_dist]):
             raise ValueError(f"ligand_chain, min_dist and max_dist must be set, but are {[ligand_chain, min_dist, max_dist]}!")
         atoms = atoms or self.atoms
         exclude_elements = exclude_elements or self.exclude_elements
-        
+
         atoms_str = f"--atoms {','.join(atoms)}" if atoms else ""
         exclude_elements_str = f"--exclude_elements {','.join(exclude_elements)}" if exclude_elements else ""
-        normalize_by_num_atoms_str = f"--normalize_by_num_atoms" if normalize_by_num_atoms else ""
+        normalize_by_num_atoms_str = "--normalize_by_num_atoms" if normalize_by_num_atoms else ""
 
         scorefile = os.path.join(work_dir, f"{prefix}_ligand_contacts.{poses.storage_format}")
 
@@ -854,9 +865,9 @@ class LigandContacts(Runner):
 
         # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
         poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
-        out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, sublist in enumerate(poses_sublists)]
-        cmds = [f"{os.path.join(PROTFLOW_ENV, 'python3')} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --min_dist {min_dist} --max_dist {max_dist} --mode contacts --ligand_chain {ligand_chain} {atoms_str} {exclude_elements_str} {normalize_by_num_atoms_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
-        
+        out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, _ in enumerate(poses_sublists)]
+        cmds = [f"{self.python} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --min_dist {min_dist} --max_dist {max_dist} --mode contacts --ligand_chain {ligand_chain} {atoms_str} {exclude_elements_str} {normalize_by_num_atoms_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
+
         # run command
         jobstarter.start(
             cmds = cmds,
@@ -874,10 +885,9 @@ class LigandContacts(Runner):
             results = scores,
             prefix = prefix,
         )
-        logging.info(f"Ligand contact detection completed. Returning scores.")
+        logging.info("Ligand contact detection completed. Returning scores.")
         return output.return_poses()
-    
-    
+
 def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, atoms: list[str] = None, exclude_ligand_elements: list[str] = None, clash_distance: float = None) -> int:
     """
     Calculate ligand clashes for a PDB file given a ligand chain.
@@ -918,7 +928,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
 
     # verify inputs
     pose = load_structure_from_pdbfile(pose)
-    
+
     if exclude_ligand_elements:
         if not isinstance(exclude_ligand_elements, list):
             raise ValueError(f"Parameter:exclude_ligand_atoms: has to be a list of str, not {type(exclude_ligand_elements)}!")
@@ -926,7 +936,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
 
     # import VdW radii
     vdw_dict = vdw_radii()
-    
+
     # check for ligand chain
     pose_chains = list(chain.id for chain in pose.get_chains())
     if ligand_chain not in pose_chains:
@@ -942,8 +952,8 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
         if not clash_distance:
             pose_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms])
     else:
-        raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
-    
+        raise ValueError("Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
+
     # get ligand atoms
     if exclude_ligand_elements:
         ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if not atom.element.lower() in exclude_ligand_elements])
@@ -954,8 +964,9 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
         if not clash_distance:
             ligand_vdw = np.array([vdw_dict[atom.element.lower()] for atom in pose[ligand_chain].get_atoms()])
 
-    if np.any(np.isnan(ligand_vdw)) and not clash_distance:
-        raise RuntimeError("Could not find Van der Waals radii for all elements in ligand. Check protflow.utils.vdw_radii and add it, if applicable!")
+    if not clash_distance:
+        if np.any(np.isnan(ligand_vdw)): #pylint: disable=E0601
+            raise RuntimeError("Could not find Van der Waals radii for all elements in ligand. Check protflow.utils.vdw_radii and add it, if applicable!")
 
     # calculate distances between all atoms of ligand and protein
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
@@ -963,7 +974,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
         return int(np.sum((dgram < clash_distance)))
 
     # calculate distance cutoff for each atom pair, considering VdW radii 
-    distance_cutoff = pose_vdw[:, np.newaxis] + ligand_vdw[np.newaxis, :]
+    distance_cutoff = pose_vdw[:, np.newaxis] + ligand_vdw[np.newaxis, :] #pylint: disable=E0601
     # multiply distance cutoffs with set parameter
     distance_cutoff = distance_cutoff * factor
 
@@ -1032,7 +1043,7 @@ def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max
     elif isinstance(atoms, list) and all(isinstance(atom, str) for atom in atoms):
         pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms and atom.element.lower() not in exclude_elements])
     else:
-        raise ValueError(f"Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
+        raise ValueError("Invalid Value for parameter :atoms:. For all atoms set to one of {None, False, 'all'} or specify list of atoms e.g. ['N', 'CA', 'CO']")
     ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if atom.element.lower() not in exclude_elements])
 
     # calculate complete dgram
@@ -1041,17 +1052,19 @@ def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max
     # return number of contacts
     if normalize_by_num_atoms:
         return round(np.sum((dgram > min_dist) & (dgram < max_dist)) / len(ligand_atoms), 2)
-    else: 
+    else:
         return np.sum((dgram > min_dist) & (dgram < max_dist))
 
 def main(args):
-
     input_poses = args.poses.split(",")
-    if args.atoms: atoms = args.atoms.split(",")
-    else: atoms = None
-    if args.exclude_elements: exclude_elements = args.exclude_elements.split(";")
-    else: exclude_elements = []
-
+    if args.atoms:
+        atoms = args.atoms.split(",")
+    else:
+        atoms = None
+    if args.exclude_elements:
+        exclude_elements = args.exclude_elements.split(";")
+    else:
+        exclude_elements = []
 
     if args.mode == "clash_vdw":
         clashes = [_calc_ligand_clashes_vdw(pose, args.ligand_chain, args.factor, atoms, exclude_elements, args.clash_distance) for pose in input_poses]
@@ -1065,14 +1078,7 @@ def main(args):
         df = pd.DataFrame(out_dict)
         df.to_json(args.out)
 
-
 if __name__ == "__main__":
-    import argparse
-    import numpy as np
-    import pandas as pd
-    from protflow.utils.biopython_tools import load_structure_from_pdbfile
-    from protflow.utils.utils import vdw_radii
-
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--poses", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
     argparser.add_argument("--out", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")

@@ -71,12 +71,6 @@ class RunnerOutput:
     index_sep : str, optional
         Separator used in the index (default is "_").
 
-    Methods
-    -------
-    check_data_formatting(results: pd.DataFrame)
-        Checks if the input DataFrame has the correct format. It must contain 'description' and 'location' columns.
-    return_poses()
-        Integrates the output of a runner into a Poses class by merging the formatted runner output into `Poses.df` and returns the updated Poses instance.
     """
     def __init__(self, poses: Poses, results: pd.DataFrame, prefix: str, index_layers: int = 0, index_sep: str = "_"):
         self.results = self.check_data_formatting(results)
@@ -140,7 +134,7 @@ class RunnerOutput:
 
         # check for duplicate columns
         if any(x in list(self.poses.df.columns) for x in list(self.results.columns)):
-            logging.info(f"WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
+            logging.info("WARNING: Merging DataFrames that contain column duplicates. Column duplicates will be renamed!")
 
         # if poses are empty, concatenate DataFrames:
         if len(self.poses.poses_list()) == 0:
@@ -158,11 +152,11 @@ class RunnerOutput:
         # check if merger was successful:
         if len(merged_df) == 0:
             print(self.poses.df["poses_description"].to_list()[:3], self.results[f"{self.prefix}_select_col"].to_list()[:3])
-            raise ValueError(f"Merging DataFrames failed. This means there was no overlap found between poses.df['poses_description'] and results[new_df_col]")
+            raise ValueError("Merging DataFrames failed. This means there was no overlap found between poses.df['poses_description'] and results[new_df_col]")
         if len(merged_df) < startlen:
             print(self.poses.df["poses_description"].to_list()[:3], self.results[f"{self.prefix}_select_col"].to_list()[:3])
             logging.error(self.poses.df["poses_description"].to_list()[:3], self.results[f"{self.prefix}_select_col"].to_list()[:3])
-            raise ValueError(f"Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']")
+            raise ValueError("Merging DataFrames failed. Some rows in results[new_df_col] were not found in poses.df['poses_description']")
 
         # reset poses and poses_description column
         merged_df["poses"] = [os.path.abspath(pose) for pose in merged_df[f"{self.prefix}_location"].to_list()]
@@ -218,7 +212,7 @@ class Runner:
         >>>     def __str__(self):
         >>>         return "MyRunner"
         """
-        raise NotImplementedError(f"Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
+        raise NotImplementedError("Your Runner needs a name! Set in your Runner class: 'def __str__(self): return \"runner_name\"'")
 
     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter) -> Poses:
         """
@@ -252,7 +246,7 @@ class Runner:
         >>>         # Custom implementation for running jobs
         >>>         pass
         """
-        raise NotImplementedError(f"Runner Method 'run' was not overwritten yet!")
+        raise NotImplementedError("Runner Method 'run' was not overwritten yet!")
 
     def search_path(self, input_path: str, path_name: str, is_dir: bool = False) -> str:
         """
@@ -402,7 +396,7 @@ class Runner:
         run_jobstarter, runner_jobstarter, poses_jobstarter = jobstarters
         jobstarter = run_jobstarter or (runner_jobstarter or poses_jobstarter) # select jobstarter, priorities: Runner.run(jobstarter) > Runner.jobstarter > poses.jobstarter
         if not jobstarter or not isinstance(jobstarter, JobStarter):
-            raise ValueError(f"No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
+            raise ValueError("No Jobstarter was set either in the Runner, the .run() function or the Poses class.")
 
         # setup directory
         work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
@@ -475,17 +469,21 @@ def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[di
     by a specified separator within each input string, with options and their values separated by spaces.
 
     Parameters:
-    - options (str): A string of generic options, where different options are separated by the specified separator and each option's
-      value (if any) is separated by space.
-    - pose_options (str): A string of pose-specific options, formatted like the `options` parameter. These options take precedence
-      over generic options.
-    - sep (str, optional): The separator used to distinguish between different options in both input strings. Defaults to "--".
+    -----------
+    options : str 
+        A string of generic options, where different options are separated by the specified separator and each option's value (if any) is separated by space.
+    pose_options : str 
+        A string of pose-specific options, formatted like the `options` parameter. These options take precedence over generic options.
+    sep : str, optional
+        The separator used to distinguish between different options in both input strings. Defaults to "--".
 
     Returns:
-    - tuple: A 2-element tuple where the first element is a dictionary of merged options (key-value pairs) and the second element
-      is a list of unique flags (options without values) from both input strings.
+    --------
+    tuple 
+        A 2-element tuple where the first element is a dictionary of merged options (key-value pairs) and the second element is a list of unique flags (options without values) from both input strings.
 
-    Example:
+    Examples:
+    ---------
     >>> parse_generic_options("--width 800 --height 600", "--color blue --verbose")
     ({'width': '800', 'height': '600', 'color': 'blue'}, ['verbose'])
 
@@ -535,9 +533,10 @@ def col_in_df(df: pd.DataFrame, column: str) -> None:
 
 def expand_options_flags(options_str: str, sep:str="--") -> tuple[dict, set]:
     """
-    Parses options and flags from an input string.
+    Simple parsing function to parse options and flags from an input string.
 
-    This function splits an input string into options and flags based on a specified separator.
+    Splits an input string into options and flags only based on a specified separator!
+    If your command has more complex patterns in its options, then switch to "regex_expand_options_flags". 
     Options are key-value pairs, while flags are standalone keys without values.
 
     Parameters
@@ -690,7 +689,7 @@ def options_flags_to_string(options: dict, flags: list, sep="--", no_quotes: boo
     out_str = " " + " ".join([f"{sep}{key}={value if no_quotes else value_in_quotes(value)}" for key, value in options.items()]) if options else ""
 
     # if flags are present, assemble those too and return
-    if flags and len(flags) > 1:
+    if flags and len(flags) >= 1:
         out_str += f" {sep}" + f" {sep}".join(flags)
     return out_str
 

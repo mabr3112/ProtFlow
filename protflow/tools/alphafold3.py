@@ -1,60 +1,65 @@
 """
-ColabFold Module
-================
+AlphaFold3 Runner Module
+========================
 
-This module provides functionality to integrate ColabFold within the ProtFlow framework, enabling the execution of AlphaFold2 runs on ColabFold. It includes tools to handle inputs, execute runs, and process outputs in a structured and automated manner.
+This module provides the `AlphaFold3` class for running protein structure predictions using AlphaFold3
+within the ProtFlow framework. It facilitates the orchestration of input preparation, command-line
+execution, job management, and result collection for AlphaFold3, providing a streamlined interface
+for high-throughput or customized modeling workflows.
 
-Detailed Description
---------------------
-The `ColabFold` class encapsulates all necessary functionalities to run AlphaFold2 through ColabFold. It manages the configuration of essential scripts and paths, sets up the environment, and handles the execution of prediction processes. The class also includes methods for collecting and processing output data, ensuring the results are organized and accessible for further analysis within the ProtFlow ecosystem.
-
-This module streamlines the integration of ColabFold into larger computational workflows by supporting the automatic setup of job parameters, execution of ColabFold commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.
-
-Usage
------
-To use this module, create an instance of the `ColabFold` class and invoke its `run` method with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the prediction process is provided through various parameters, allowing for customized runs tailored to specific research needs.
-
-Examples
+Overview
 --------
-Here is an example of how to initialize and use the `ColabFold` class within a ProtFlow pipeline:
+AlphaFold3 is a deep learning-based protein structure prediction model. This module wraps its
+inference process in a Python interface that works with the ProtFlow ecosystem. It supports various
+features such as multi-model output, flexible JSON-based input configuration, pose-specific options,
+and automated result parsing.
 
+The primary entry point is the `AlphaFold3` class, which exposes several methods:
+    - `run()`: Executes AlphaFold3 predictions for a set of poses.
+    - `write_cmd()`: Constructs the shell command to launch the AlphaFold3 inference.
+    - `collect_results()`: Parses the output directory and collects scores and paths into a DataFrame.
+
+Typical usage involves preparing a `Poses` object, configuring input parameters, and calling
+`AlphaFold3.run()`, optionally controlling execution with a `JobStarter` object.
+
+Dependencies
+------------
+- ProtFlow (for `Poses`, `JobStarter`, and general framework integration)
+- AlphaFold3 (inference script must be available and executable)
+- pandas
+- json
+- os, subprocess, shlex (for system-level command execution)
+
+Example
+-------
 .. code-block:: python
 
     from protflow.poses import Poses
-    from protflow.jobstarters import JobStarter
-    from colabfold import ColabFold
+    from protflow.jobstarters import LocalJobStarter
+    from alphafold3_runner import AlphaFold3
 
-    # Create instances of necessary classes
-    poses = Poses()
-    jobstarter = LocalJobStarter(max_cores=4)
+    # Load poses and create an AlphaFold3 instance
+    poses = Poses("my_poses.json", work_dir="my_work_dir")
+    af3 = AlphaFold3()
 
-    # Initialize the ColabFold class
-    colabfold = ColabFold()
-
-    # Run the prediction process
-    results = colabfold.run(
+    # Run AlphaFold3 predictions
+    af3.run(
         poses=poses,
-        prefix="experiment_1",
-        jobstarter=jobstarter,
-        options="--msa-mode single-sequence",
-        pose_options=None,
-        overwrite=True
+        prefix="af3_batch_01",
+        jobstarter=LocalJobStarter(gpus=1),
     )
 
-    # Access and process the results
-    print(results)
+    print(poses.df)
 
 Further Details
 ---------------
-- **Edge Cases:** The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the prediction process.
-- **Customizability:** Users can customize the prediction process through multiple parameters, including the number of diffusions, specific options for the ColabFold script, and options for handling pose-specific parameters.
-- **Integration:** The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.
+This module is intended to integrate seamlessly with other ProtFlow components. It abstracts away
+command-line complexity while preserving fine-grained control via user-supplied options and
+custom JSON configuration.
 
-This module is intended for researchers and developers who need to incorporate ColabFold into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.
-
-Notes
------
-This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.
+AlphaFold3 itself is highly configurable via JSON inputs. This module assumes the user is familiar
+with AlphaFold3’s requirements (e.g., templates, modifications, MSA inputs) and provides convenient
+hooks to supply such input through columns in the `Poses` DataFrame or via dictionaries.
 
 Authors
 -------
@@ -65,7 +70,6 @@ Version
 0.1.0
 """
 # general imports
-import re
 import os
 import logging
 from glob import glob
@@ -77,10 +81,9 @@ from typing import Union, Any
 
 # dependencies
 import pandas as pd
-import numpy as np
 
 # custom
-from .. import config
+from .. import require_config, load_config_path, runners
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..poses import Poses, col_in_df, description_from_path
 from ..jobstarters import JobStarter, split_list
@@ -89,110 +92,113 @@ from ..utils.openbabel_tools import openbabel_fileconverter
 
 class AlphaFold3(Runner):
     """
-    ColabFold Class
-    ===============
+    AlphaFold3 Class
+    ================
 
-    The `ColabFold` class is a specialized class designed to facilitate the execution of AlphaFold2 within the ColabFold environment as part of the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with AlphaFold2 prediction processes.
+    The `AlphaFold3` class provides a streamlined interface for running AlphaFold3 structure predictions within the ProtFlow framework. It enables complex structure prediction tasks by incorporating support for paired and unpaired MSAs, templates, ligands, nucleic acids, and user-defined modifications.
 
     Detailed Description
     --------------------
-    The `ColabFold` class manages all aspects of running AlphaFold2 predictions through ColabFold. It handles the configuration of necessary scripts and executables, prepares the environment for the prediction processes, and executes the prediction commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
+    This class manages the configuration, input preparation, execution, and result parsing for AlphaFold3 predictions. It is designed to be flexible and extensible, enabling integration into high-throughput workflows with custom options for modeling complex assemblies, such as protein–DNA, protein–ligand, and multimers.
 
-    Key functionalities include:
-        - Setting up paths to ColabFold scripts and necessary directories.
-        - Configuring job starter options, either automatically or manually.
-        - Handling the execution of AlphaFold2 prediction commands with support for batch processing.
-        - Collecting and processing output data into a pandas DataFrame.
-        - Managing input FASTA files and preparing them for prediction.
-        - Overwriting previous results if specified.
+    The class supports standard input through `Poses` objects, and advanced inputs via dataframe columns or dictionaries, allowing fine-grained control over prediction components. It internally handles job management through the `JobStarter` interface and formats the output into Pandas dataframes for downstream analysis.
 
-    Returns
+    Parameters:
+        work_dir (str, optional): The working directory where results and intermediate files will be stored. If None, a default temp directory is used.
+        executable (str, optional): Path to the AlphaFold3 inference script. Defaults to "inference".
+        model (str, optional): AlphaFold3 model to use. Defaults to "multimer".
+        default_options (dict, optional): Dictionary of default inference options to apply unless overridden. Defaults to None.
+
+    Attributes:
+        work_dir (str): Directory used for running AlphaFold3 jobs.
+        executable (str): The command or path to the AlphaFold3 inference script.
+        model (str): Selected AlphaFold3 model (e.g., "multimer").
+        default_options (dict): Default options passed to the AlphaFold3 runner.
+
+    Methods:
+        run: Executes AlphaFold3 prediction jobs based on user input.
+
+    Example
     -------
-    An instance of the `ColabFold` class, configured to run AlphaFold2 prediction processes and handle outputs efficiently.
-
-    Raises
-    ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If pose options are not of the expected type.
-
-    Examples
-    --------
-    Here is an example of how to initialize and use the `ColabFold` class:
-
     .. code-block:: python
 
         from protflow.poses import Poses
-        from protflow.jobstarters import JobStarter
-        from colabfold import ColabFold
+        from protflow.jobstarters import SbatchArrayJobStarter
+        from alphafold3 import AlphaFold3
 
-        # Create instances of necessary classes
-        poses = Poses()
-        jobstarter = JobStarter()
+        # Initialize Poses and JobStarter
+        poses = Poses("my_poses.json", work_dir="my_work_dir")
+        jobstarter = SbatchArrayJobStarter(cpus=1, gpus=1)
 
-        # Initialize the ColabFold class
-        colabfold = ColabFold()
+        # Create an AlphaFold3 instance
+        af3 = AlphaFold3()
 
-        # Run the prediction process
-        results = colabfold.run(
+        # Run prediction
+        af3.run(
             poses=poses,
-            prefix="experiment_1",
+            prefix="af3",
             jobstarter=jobstarter,
-            options="inference.num_designs=10",
-            pose_options=["inference.input_pdb='input.pdb'"],
-            overwrite=True
+            additional_entities={"ligand": {"id": "Z", "smiles": "O=C(CCC1)C(=C1)C(O)c(ccc1[N+]([O-])=O)cc1"}},
+            options="--flash_attention_implementation xla --cuda_compute_7x 1",
         )
 
-        # Access and process the results
-        print(results)
-
-    Further Details
-    ---------------
-        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.
-        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the prediction process to their specific needs.
-        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
-
-    The ColabFold class is intended for researchers and developers who need to perform AlphaFold2 predictions as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+        # Inspect results
+        print(poses.df)
     """
-    def __init__(self, script_path: str = config.ALPHAFOLD3_SCRIPT_PATH, python_path: str = config.ALPHAFOLD3_PYTHON_PATH, pre_cmd:str=config.ALPHAFOLD3_PRE_CMD, jobstarter: str = None) -> None:
+    def __init__(
+            self,
+            script_path: str|None = None,
+            python_path: str|None = None,
+            pre_cmd: str|None = None,
+            jobstarter: str = None
+        ) -> None:
         """
         __init__ Method
         ===============
 
-        The `__init__` method initializes an instance of the `ColabFold` class, setting up necessary configurations for running AlphaFold2 predictions through ColabFold within the ProtFlow framework.
+        Initializes the `AlphaFold3` class instance for running AlphaFold3 predictions within the ProtFlow framework.
 
         Detailed Description
         --------------------
-        This method sets up the paths to the ColabFold script and initializes default values for various attributes required for running predictions. It also allows for the optional configuration of a job starter.
+        This constructor sets up the `AlphaFold3` class, which provides methods to configure, run, and collect AlphaFold3 predictions on protein structures. It initializes basic configuration needed to interface with the AlphaFold3 inference script and prepares the environment for subsequent method calls. Although it takes no arguments, it acts as the anchor for coordinating inputs, options, and prediction output formatting.
 
         Parameters:
-            script_path (str, optional): The path to the ColabFold script. Defaults to `protflow.config.COLABFOLD_SCRIPT_PATH`.
-            jobstarter (JobStarter, optional): An instance of the `JobStarter` class for managing job execution. Defaults to None.
-
-        Returns:
             None
 
+        Returns:
+            AlphaFold3: An instance of the `AlphaFold3` class ready to be used for prediction tasks.
+
         Raises:
-            ValueError: If the `script_path` is not provided.
+            None
 
         Examples
         --------
-        Here is an example of how to initialize the `ColabFold` class:
+        Here's how to initialize the `AlphaFold3` class:
 
         .. code-block:: python
 
-            from colabfold import ColabFold
+            from alphafold3 import AlphaFold3
 
-            # Initialize the ColabFold class
-            colabfold = ColabFold(script_path='/path/to/colabfold.py', jobstarter=jobstarter)
+            # Create an instance of the AlphaFold3 class
+            af3 = AlphaFold3()
+
+            # Now ready to call af3.run(), af3.write_cmd(), etc.
+            print(type(af3))
+            # <class 'alphafold3_runner.AlphaFold3'>
+
+        Further Details
+        ---------------
+            - The `AlphaFold3` instance acts as a controller for generating input JSONs, building inference commands, launching jobs, and collecting results.
+            - Requires the AlphaFold3 inference script to be properly installed and available in the environment path or specified within the `write_cmd` method.
         """
-        if not script_path:
-            raise ValueError(f"No path is set for {self}. Set the path in the config.py file under COLABFOLD_DIR_PATH.")
+        # setup configs
+        config = require_config()
+        self.python_path = python_path or load_config_path(config, path_var="ALPHAFOLD3_PYTHON_PATH")
+        self.script_path = script_path or load_config_path(config, path_var="ALPHAFOLD3_SCRIPT_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, path_var="ALPHAFOLD3_PRE_CMD", is_pre_cmd=True)
 
-        self.python_path = python_path
-        self.script_path = script_path
+        # runner setups
         self.name = "alphafold3.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
 
@@ -204,74 +210,80 @@ class AlphaFold3(Runner):
         run Method
         ==========
 
-        The `run` method of the `ColabFold` class executes AlphaFold2 predictions using ColabFold within the ProtFlow framework. It manages the setup, execution, and result collection processes, providing a streamlined way to integrate AlphaFold2 predictions into larger computational workflows.
+        The `run` method of the `AlphaFold3` class launches AlphaFold3 structure prediction jobs for protein and complex modeling using the provided inputs. It supports multiple input formats and prediction types, including complex assemblies with optional ligands, templates, and nucleic acids.
 
         Detailed Description
         --------------------
-        This method orchestrates the entire prediction process, from preparing input data and configuring the environment to running the prediction commands and collecting the results. The method supports batch processing of input FASTA files and handles various edge cases, such as overwriting existing results and managing job starter options.
+        This method handles end-to-end execution of AlphaFold3 predictions. It prepares the input files, formats optional arguments like ligands and MSAs, interfaces with a jobstarter to execute jobs locally or remotely, and collects results into a standardized dataframe.
+
+        The method supports:
+        - Simple protein input from FASTA sequences.
+        - Complex inputs with ligands, DNA/RNA, bonded atoms, templates, and custom modifications.
+        - Input column extraction from the Poses dataframe.
+        - Paired and unpaired multiple sequence alignments.
+        - Generation of multiple structures (nstruct) and multiple input copies (num_copies).
 
         Parameters:
-            poses (Poses): The Poses object containing the protein data. Poses have to be single-chain .fasta files!
-            prefix (str): A prefix used to name and organize the output files.
-            json_column (str, optional): Use the specified column containing paths to json files as input instead of regular poses.
-            num_copies (int, optional): How many copies of the input pose sequence should be generated. Default is 1.
-            nstruct (int, optional): How many structures should be generated for each pose. Default is 1.
-            col_as_input (bool, optional): Given input for :dna:, :rna:, :ligand:, :paired_msa:, :unpaired_msa:, :templates:, :bonded_atom_pairs: is extracted from respective poses dataframe column instead of directly using it as input. Default is False.
-            additional_entities (str or dict or list, optional): Can be either a dict specifiying additional protein, ligand, DNA or RNA input for complex prediction, a list of multiple dicts or a poses dataframe column containing dicts or list of dicts (if :col_as_input: is True). Default is None.
-            msa_paired (str, optional): Path to .a3m paired alignment file or poses dataframe column containing paths (if :col_as_input: is True). Default is None.
-            msa_unpaired (str, optional): Path to .a3m unpaired alignment file or poses dataframe column containing paths (if :col_as_input: is True). Default is None.
-            templates (str or list or dict, optional): Can be either a dict specifying template input for AlphaFold3, a list of multiple templates or a poses dataframe column containing dicts or list of dicts (if :col_as_input: is True). Default is None.
-            modifications (str or list or dict, optional): Can be either a dict specifying modifcation input for AlphaFold3, a list of multiple templates or a poses dataframe column containing dicts or list of dicts (if :col_as_input: is True). Default is None.
-            options (str, optional): Additional options for the AlphaFold2 prediction commands. Defaults to None.
-            pose_options (str, optional): Specific options for handling pose-related parameters during prediction. Defaults to None.
-            overwrite (bool, optional): If True, existing results will be overwritten. Defaults to False.
-            return_top_n_models (int, optional): The number of top poses to return based on the prediction scores. Defaults to 1.
+            poses (Poses): The Poses object containing the input sequences or structure data.
+            prefix (str): A string used to tag and organize outputs.
+            jobstarter (JobStarter, optional): JobStarter object to handle submission logic. Defaults to poses.jobstarter if not provided.
+            json_column (str, optional): Column in the poses dataframe containing AlphaFold3-compatible JSON configuration files.
+            num_copies (int, optional): Number of duplicated input poses (chains). Defaults to 1.
+            nstruct (int, optional): Number of structures generated per pose. Defaults to 1.
+            col_as_input (bool, optional): If True, MSA, template, and entity inputs are fetched from columns of the poses dataframe. Defaults to False.
+            additional_entities (str or dict or list, optional): Additional input molecules or entities, such as ligands or nucleic acids.
+            msa_paired (str, optional): Paired MSA file path or poses column with paths if `col_as_input` is True.
+            msa_unpaired (str, optional): Unpaired MSA file path or poses column with paths if `col_as_input` is True.
+            templates (str or list or dict, optional): Structural template information, either directly or from poses columns.
+            modifications (str or list or dict, optional): User-defined atom or residue modifications.
+            options (str or dict, optional): Additional global inference options as string or dictionary.
+            pose_options (str or list, optional): Per-pose options for customization.
+            overwrite (bool, optional): Whether to overwrite existing prediction results. Defaults to False.
+            return_top_n_models (int, optional): Number of top-ranked models to include in the output. Defaults to 1.
 
         Returns:
-            RunnerOutput: An object containing the results of the AlphaFold2 predictions, organized in a pandas DataFrame.
+            RunnerOutput: Object containing a DataFrame with prediction paths, scores, and metadata.
 
         Raises:
-            FileNotFoundError: If required files or directories are not found during the execution process.
-            ValueError: If invalid arguments are provided to the methods.
-            TypeError: If pose options are not of the expected type.
+            FileNotFoundError: If required input files are missing.
+            ValueError: On invalid input combinations or configurations.
+            TypeError: If inputs are not of the expected type.
 
         Examples
         --------
-        Here is an example of how to use the `run` method of the `ColabFold` class:
-
-        .. code-block:: python
+            .. code-block:: python
 
             from protflow.poses import Poses
-            from protflow.jobstarters import JobStarter
-            from colabfold import ColabFold
+            from protflow.jobstarters import SbatchArrayJobStarter
+            from alphafold3 import AlphaFold3
 
-            # Create instances of necessary classes
-            poses = Poses()
-            jobstarter = JobStarter()
+            # Initialize Poses and JobStarter
+            poses = Poses("my_poses.json", work_dir="my_work_dir")
+            jobstarter = SbatchArrayJobStarter(cpus=1, gpus=1)
 
-            # Initialize the ColabFold class
-            colabfold = ColabFold()
+            # Create an AlphaFold3 instance
+            af3 = AlphaFold3()
 
-            # Run the prediction process
-            results = colabfold.run(
+            # Run prediction
+            af3.run(
                 poses=poses,
-                prefix="experiment_1",
+                prefix="af3",
                 jobstarter=jobstarter,
-                options="inference.num_designs=10",
-                pose_options=["inference.input_pdb='input.pdb'"],
-                overwrite=True
+                additional_entities={"ligand": {"id": "Z", "smiles": "O=C(CCC1)C(=C1)C(O)c(ccc1[N+]([O-])=O)cc1"}},
+                options="--flash_attention_implementation xla --cuda_compute_7x 1",
             )
 
-            # Access and process the results
-            print(results)
-        
+            # Inspect results
+            print(poses.df)
+
+
         Further Details
         ---------------
-            - **Batch Processing:** The method can handle large sets of input sequences by batching them into smaller groups, which helps in managing computational resources effectively.
-            - **Overwrite Handling:** If `overwrite` is set to True, the method will clean up previous results, ensuring that the new predictions do not get mixed up with old data.
-            - **Job Starter Configuration:** The method allows for flexible job management by accepting a `JobStarter` instance. If not provided, it uses the default job starter associated with the poses.
-            - **Score Collection:** The method gathers the prediction scores and relevant data into a pandas DataFrame, facilitating easy analysis and integration with other ProtFlow components.
-            - **Error Handling:** Robust error handling is incorporated to manage issues such as missing files or incorrect configurations, ensuring that the process can be debugged and verified efficiently.
+            - **Flexible Input Handling:** Accepts input in both standard and column-driven formats, allowing rich dataset support.
+            - **Job Management:** Compatible with local or cluster-based execution through `JobStarter`.
+            - **Custom Complexes:** Supports modeling of multimeric or ligand/nucleic acid-bound complexes using AlphaFold3’s new features.
+            - **Top-N Models:** Automatically filters and returns the highest-scoring models based on AF3 output metrics.
+            - **Reproducibility:** All options and configurations used in prediction are logged for reproducibility.
         """
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
@@ -289,9 +301,12 @@ class AlphaFold3(Runner):
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers)
             return output.return_poses()
         if overwrite:
-            if os.path.isdir(json_dir := os.path.join(work_dir, "input_json")): shutil.rmtree(json_dir)
-            if os.path.isdir(preds_dir := os.path.join(work_dir, "af3_preds")): shutil.rmtree(preds_dir)
-            if os.path.isdir(pdb_dir := os.path.join(work_dir, "output_pdbs")): shutil.rmtree(pdb_dir)
+            if os.path.isdir(json_dir := os.path.join(work_dir, "input_json")):
+                shutil.rmtree(json_dir)
+            if os.path.isdir(preds_dir := os.path.join(work_dir, "af3_preds")):
+                shutil.rmtree(preds_dir)
+            if os.path.isdir(pdb_dir := os.path.join(work_dir, "output_pdbs")):
+                shutil.rmtree(pdb_dir)
 
         # setup af3-specific directories:
         os.makedirs(json_dir := os.path.join(work_dir, "input_json"), exist_ok=True)
@@ -338,7 +353,7 @@ class AlphaFold3(Runner):
         )
 
         # collect scores
-        logging.info(f"Predictions finished, starting to collect scores.")
+        logging.info("Predictions finished, starting to collect scores.")
         scores = collect_scores(work_dir=preds_dir, convert_cif_to_pdb_dir=pdb_dir if convert_cif_to_pdb else None, return_top_n_models=return_top_n_models)
 
         if len(scores.index) < len(poses.df.index):
@@ -356,85 +371,107 @@ class AlphaFold3(Runner):
         write_cmd Method
         ================
 
-        The `write_cmd` method constructs the command string necessary to run the ColabFold script with the specified options and input files.
+        Builds the shell command to invoke AlphaFold3 using the given
+        input/output directories and specified options.
 
         Detailed Description
         --------------------
-        This method generates the command string used to execute the ColabFold script. It incorporates various options and pose-specific parameters provided by the user.
+        This method transforms provided global and pose-specific options into
+        CLI-compliant flags and arguments, links them with the Python executable
+        and the AF3 inference script, and returns a fully formatted command string.
+        Useful for batching jobs or debugging the exact call being issued.
 
         Parameters:
-            pose_path (str): Path to the input FASTA file.
-            output_dir (str): Directory where the prediction outputs will be stored.
-            options (str, optional): Additional options for the ColabFold script. Defaults to None.
-            pose_options (str, optional): Specific options for handling pose-related parameters. Defaults to None.
+            input_dir (str): Directory containing input JSON files for prediction.
+            output_dir (str): Destination directory where AF3 will save results.
+            options (str, optional): Global options passed to AF3, e.g. `"num_recycles=3"`.
+            pose_options (str, optional): Pose-specific options passed individually.
 
         Returns:
-            str: The constructed command string.
+            str: Fully assembled shell command ready for execution.
 
         Raises:
             None
 
         Examples
         --------
-        Here is an example of how to use the `write_cmd` method:
-
         .. code-block:: python
 
-            # Write the command to run ColabFold
-            cmd = colabfold.write_cmd(pose_path='/path/to/pose.fa', output_dir='/path/to/output_dir', options='--num_designs=10', pose_options='--input_pdb=input.pdb')
+            cmd = af3.write_cmd(
+                input_dir="json_batch_0",
+                output_dir="preds_batch_0",
+                options="num_recycles=5",
+            )
+            print(cmd)
+            # "python /path/to/alphafold3.py --input_dir json_batch_0 --output_dir preds_batch_0 --num_recycles 5 --use_templates False"
+
+        Further Details
+        ---------------
+            - Parses both key=value pairs and boolean flags.
+            - Ensures flags are prepended with `--` syntax compatible with AF3 scripts.
+            - Intended to be used internally to generate jobstarter commands.
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
+        opts, flags = runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
         opts = " ".join([f"--{key} {value}" for key, value in opts.items()])
         flags = " --" + " --".join(flags) if flags else ""
         return f"{self.python_path} {self.script_path} --input_dir {input_dir} --output_dir {output_dir} {opts} {flags}"
 
 def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top_n_models: int = 1) -> pd.DataFrame:
     """
-    collect_scores Method
-    =====================
+    collect_scores Function
+    =======================
 
-    The `collect_scores` method collects and processes the prediction scores from the ColabFold output, organizing them into a pandas DataFrame for further analysis.
+    Collects and processes output from AlphaFold3 prediction directories,
+    extracting ranking and confidence values while optionally converting CIF models to PDB.
 
     Detailed Description
     --------------------
-    This method gathers the prediction scores from the output files generated by ColabFold. It processes these scores and organizes them into a structured DataFrame, which includes various statistical measures.
+    The function navigates through subdirectories of `work_dir`, reads AlphaFold3's
+    `ranking_scores.csv` and associated JSON confidence files for each model,
+    compiles the data into a Pandas DataFrame, and optionally converts CIF
+    files to PDB using Open Babel. Supports limiting output to a specified
+    number of top-ranked models.
 
     Parameters:
-        work_dir (str): The working directory where the ColabFold outputs are stored.
-        num_return_poses (int, optional): The number of top poses to return based on the prediction scores. Defaults to 1.
+        work_dir (str): Root folder containing AF3 output directories for each pose.
+        convert_cif_to_pdb_dir (str, optional): If set, converted PDB files will be saved here.
+        return_top_n_models (int, optional): Number of top models per pose to include. Default is 1.
 
     Returns:
-        pd.DataFrame: A DataFrame containing the collected and processed scores.
+        pandas.DataFrame: A DataFrame with columns including:
+            - ranking_score, pLDDT, TM-scores, RMSD, etc.
+            - location (path to model), description, sequence, etc.
 
     Raises:
-        FileNotFoundError: If no output files are found in the specified directory.
+        RuntimeError: If fewer output models are found than expected.
+        FileNotFoundError: If essential AF3 files are missing (e.g., ranking_scores.csv).
 
     Examples
     --------
-    Here is an example of how to use the `collect_scores` method:
-
     .. code-block:: python
 
-        # Collect and process the prediction scores
-        scores = collect_scores(work_dir='/path/to/work_dir', num_return_poses=5)     
-    
+        df = collect_scores(
+            work_dir="af3_preds",
+            convert_cif_to_pdb_dir="af3_pdbs",
+            return_top_n_models=1
+        )
+        print(df.loc[:, ["location", "ranking_score"]])
+
     Further Details
     ---------------
-        - **JSON and PDB File Parsing:** The method identifies and parses JSON and PDB files generated by ColabFold, extracting relevant score information from these files.
-        - **Statistical Measures:** For each set of predictions, the method calculates various statistics, including mean pLDDT, max PAE, and PTM scores, organizing these measures into the DataFrame.
-        - **Rank and Description:** The scores are ranked and annotated with descriptions to help identify the top poses based on prediction quality.
-        - **File Handling:** The method includes robust file handling to ensure that only the relevant files are processed, and any existing files are correctly identified or overwritten as needed.
-        - **Pose Location:** The final DataFrame includes the file paths to the predicted PDB files, facilitating easy access for further analysis or visualization.
+        - Ignores any folder starting with `mmseq` (MSA generation).
+        - Converts only up to `return_top_n_models` CIFs per pose.
+        - Converts and updates the `location` column if `convert_cif_to_pdb_dir` is provided.
     """
-    
+
     def load_all_models(out_dir: str) -> pd.DataFrame:
         os.makedirs(model_dir := os.path.join(out_dir, "models"), exist_ok=True)
         ranks = pd.read_csv(os.path.join(out_dir, "ranking_scores.csv"))
         ranks.sort_values("ranking_score", ascending=False, inplace=True)
         ranks.reset_index(drop=True, inplace=True)
         data = os.path.join(out_dir, f"{os.path.basename(out_dir)}_data.json")
-        with open(data, 'r') as file:
+        with open(data, 'r', encoding="UTF-8") as file:
             data = file.read()
         data = json.loads(data)
         scores = []
@@ -451,8 +488,8 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
         scores["sequence"] = data["sequences"][0]["protein"]["sequence"]
         return scores
 
-    def convert_cif_to_pdb(input: str, format: str, output:str):
-        openbabel_fileconverter(input_file=input, output_format=format, output_file=output)
+    def convert_cif_to_pdb(input_cif: str, output_format: str, output:str):
+        openbabel_fileconverter(input_file=input_cif, output_format=output_format, output_file=output)
         return output
 
     # collect all output directories, ignore mmseqs dirs
@@ -465,15 +502,90 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
         scores.append(data)
     scores = pd.concat(scores)
     scores.reset_index(drop=True, inplace=True)
-    print(scores)
 
     if convert_cif_to_pdb_dir:
         os.makedirs(convert_cif_to_pdb_dir, exist_ok=True)
-        scores["location"] = scores.apply(lambda row: convert_cif_to_pdb(row["location"], format="pdb", output=os.path.abspath(os.path.join(convert_cif_to_pdb_dir, f"{row['description']}.pdb"))), axis=1)
+        scores["location"] = scores.apply(lambda row: convert_cif_to_pdb(input_cif=row["location"], output_format="pdb", output=os.path.abspath(os.path.join(convert_cif_to_pdb_dir, f"{row['description']}.pdb"))), axis=1)
     return scores
 
 
 def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_paired, msa_unpaired, modifications, templates, single_sequence_mode, use_templates, col_as_input, additional_entities, bonded_atom_pairs, user_ccd, random_seed: bool) -> list:
+    """
+    create_input_json_dir Function
+    ==============================
+
+    Builds and writes AlphaFold3-compatible JSON input files across multiple batching
+    subdirectories, based on the content of a `Poses` object and optional customization.
+
+    Detailed Description
+    --------------------
+    This function iterates over each pose and:
+      - Extracts sequences (FASTA-based) and optional per-pose inputs.
+      - Handles column-driven inputs (`col_as_input`): MSAs, templates, modifications, etc.
+      - Supports single-sequence mode, disabling MSAs.
+      - Loads additional entities (protein, DNA, ligands) and validates formats.
+      - Assigns nstruct seeds (sequential or random).
+      - Packages all data into proper JSON files named after pose descriptions.
+      - Splits inputs into `num_batches` subdirectories (input_0, input_1, ...).
+
+    Parameters:
+        out_dir (str): Folder where batch subdirectories and JSON files will be created.
+        num_batches (int): How many batches to split the inputs into.
+        poses (Poses): `Poses` instance containing the input dataset.
+        nstruct (int): Number of models to produce per pose.
+        num_copies (int): How many duplicated sequence entries per pose.
+        msa_paired (Any): Path, column, list, or dict for paired MSA inputs.
+        msa_unpaired (Any): Same, but for unpaired MSA.
+        modifications (Any): Structural modification inputs.
+        templates (Any): Template definitions for prediction.
+        single_sequence_mode (bool): If True, disables MSA-based inference.
+        use_templates (bool): If False, disables template usage.
+        col_as_input (bool): Use DataFrame columns rather than fixed values.
+        additional_entities (Any): Extra entities (ligand, dna, rna) inputs.
+        bonded_atom_pairs (Any): Bond list or dict to define inter-entity bonds.
+        user_ccd (Any): Custom CCD provided as file path, text, or dict.
+        random_seed (bool): Whether to assign random seeds instead of sequential.
+
+    Returns:
+        list of str: Paths to each created batch directory (e.g., `["out_dir/input_0", ...]`).
+
+    Raises:
+        ValueError: If `additional_entities`, `bonded_atom_pairs`, or `user_ccd` are not correctly formatted.
+        FileNotFoundError: If provided `user_ccd` path does not exist.
+
+    Examples
+    --------
+    .. code-block:: python
+
+        batch_dirs = create_input_json_dir(
+            out_dir="batch_inputs",
+            num_batches=3,
+            poses=poses,
+            nstruct=2,
+            num_copies=1,
+            msa_paired=None,
+            msa_unpaired=None,
+            modifications=None,
+            templates=None,
+            single_sequence_mode=True,
+            use_templates=False,
+            col_as_input=False,
+            additional_entities=None,
+            bonded_atom_pairs=None,
+            user_ccd=None,
+            random_seed=True
+        )
+        print(batch_dirs)
+        # ['batch_inputs/input_0', 'batch_inputs/input_1', 'batch_inputs/input_2']
+
+    Further Details
+    ---------------
+        - Ensures each JSON file is named as `<poses_description>.json`.
+        - Wraps entity additions in proper AF3 JSON format.
+        - Automatically converts single string or dict inputs into lists for JSON.
+        - Seeds are deterministic unless `random_seed` is set to True.
+    """
+
     def _prep_option(option: Any, row: pd.Series, col_as_input: bool) -> Any:
         if option is None:
             return None
@@ -482,7 +594,7 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
         return option
 
     def check_entity(entity: dict):
-        if not isinstance(entity, dict): 
+        if not isinstance(entity, dict):
             raise ValueError(f"Additional entities must be provided in dict format, not {type(entity)}! Affected entity is {entity}")
         if not any(key in entity for key in ["protein", "ligand", "dna", "rna"]):
             raise ValueError(f"Input entity must contain about type like 'protein', 'ligand', 'dna' or 'rna'. Affected entity: {entity}")
@@ -521,11 +633,11 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
             row_templates = [row_templates]
 
         # assign a unique id for each copy
-        id = list(string.ascii_uppercase)[:num_copies]
+        id_ = list(string.ascii_uppercase)[:num_copies]
 
         # create record for input pose
         pose_data = {"protein": {
-            "id": id,
+            "id": id_,
             "sequence": seq,
             }
         }

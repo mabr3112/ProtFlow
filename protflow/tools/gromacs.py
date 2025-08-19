@@ -8,26 +8,31 @@ import re
 import pandas as pd
 
 # customs
-import protflow
 from protflow.runners import Runner
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
-from protflow.config import PROTFLOW_DIR, PROTFLOW_ENV
 from protflow.utils import biopython_tools as bpt
 
-GROMACS_PARAMS_DIR = os.path.join(PROTFLOW_DIR, "protflow/utils/gromacs/params")
+# locals
+from .. import poses as ps
+from .. import runners, load_config_path, require_config
 
 class Gromacs(Runner):
     '''Class Docs'''
-    def __init__(self, gromacs_path: str = protflow.config.GROMACS_PATH, jobstarter: JobStarter = None, pre_cmd: str = None, md_params: "MDParams" = None):
+    def __init__(self, gromacs_path: str|None = None, gromacs_dir: str|None = None, jobstarter: JobStarter = None, pre_cmd: str = None, md_params: "MDParams" = None):
         '''Init Docs'''
-        self.gromacs_path = self.search_path(os.path.join(gromacs_path, "gmx"), "GROMACS_PATH")
-        self.gromacs_dir = self.search_path(gromacs_path, "GROMACS_PATH", is_dir=True)
-        self.pre_cmd = pre_cmd
-        self.name = "esmfold.py"
+        # setup config
+        config = require_config()
+        self.gromacs_path = gromacs_path or load_config_path(config, "GROMACS_PATH") # might have to add 'gmx' here?
+        self.gromacs_dir = gromacs_dir or load_config_path(config, "GROMACS_DIR")
+        self.pre_cmd = pre_cmd or load_config_path(config, "GROMACS_PRE_CMD")
+
+        # setup runner
+        self.name = "gromacs"
         self.index_layers = 0
         self.jobstarter = jobstarter
 
+        # setup mdparams!
         self.md_params = md_params or MDParams()
         self.overwrite_prep = False
         self.overwrite_equilibration = False
@@ -60,7 +65,7 @@ class Gromacs(Runner):
         # setup pose dirs
         pose_dirs = []
         for pose in poses.poses_list():
-            pose_dir = os.path.join(work_dir, protflow.poses.description_from_path(pose))
+            pose_dir = os.path.join(work_dir, ps.description_from_path(pose))
             os.makedirs(pose_dir, exist_ok=True)
             pose_dirs.append(pose_dir)
 
@@ -112,7 +117,7 @@ class Gromacs(Runner):
         pose_dirs = []
         for pose in poses.poses_list():
             # create prep dir
-            pose_dir = os.path.join(work_dir, protflow.poses.description_from_path(pose))
+            pose_dir = os.path.join(work_dir, ps.description_from_path(pose))
             prep_dir = os.path.join(pose_dir, "prep")
             os.makedirs(prep_dir, exist_ok=True)
             pose_dirs.append(prep_dir)
@@ -136,7 +141,7 @@ class Gromacs(Runner):
         processed_poses = []
         topol_fn_list = []
         for pose, pose_dir in zip(cleaned_poses, pose_dirs):
-            processed_fn = os.path.join(pose_dir, protflow.poses.description_from_path(pose) + "_processed.gro")
+            processed_fn = os.path.join(pose_dir, ps.description_from_path(pose) + "_processed.gro")
             pdb2gmx_cmd = f"cd {pose_dir}; {self.gromacs_path} pdb2gmx -f {pose} -o {processed_fn} -ter -ignh -water {self.md_params.water_model} -ff {self.md_params.force_field}"
             cmds.append(pdb2gmx_cmd)
             processed_poses.append(processed_fn)
@@ -269,7 +274,7 @@ class Gromacs(Runner):
         pose_dirs = []
         for pose in poses.poses_list():
             # setup equilibration root dir
-            pose_dir = os.path.join(work_dir, protflow.poses.description_from_path(pose) + "/equilibration")
+            pose_dir = os.path.join(work_dir, ps.description_from_path(pose) + "/equilibration")
             os.makedirs(pose_dir, exist_ok=True)
             pose_dirs.append(pose_dir)
 
@@ -358,7 +363,7 @@ class Gromacs(Runner):
         pose_dirs = []
         for pose in poses.poses_list():
             # setup equilibration root dir
-            pose_dir = os.path.join(work_dir, protflow.poses.description_from_path(pose) + "/md")
+            pose_dir = os.path.join(work_dir, ps.description_from_path(pose) + "/md")
             os.makedirs(pose_dir, exist_ok=True)
             pose_dirs.append(pose_dir)
 
@@ -393,7 +398,7 @@ class Gromacs(Runner):
         pose_dirs = []
         for pose in poses.poses_list():
             # setup equilibration root dir
-            pose_dir = os.path.join(work_dir, protflow.poses.description_from_path(pose) + "/postprocessing")
+            pose_dir = os.path.join(work_dir, ps.description_from_path(pose) + "/postprocessing")
             os.makedirs(pose_dir, exist_ok=True)
             pose_dirs.append(pose_dir)
 
@@ -488,20 +493,22 @@ class MDParams:
     '''Dataclass that links MD parameter fiels (.mdp).'''
     def __init__(
             self,
-            ions = f"{GROMACS_PARAMS_DIR}/default_ions.mdp",
-            em = f"{GROMACS_PARAMS_DIR}/default_em.mdp",
-            nvt = f"{GROMACS_PARAMS_DIR}/default_nvt.mdp",
-            npt = f"{GROMACS_PARAMS_DIR}/default_npt.mdp",
-            md = f"{GROMACS_PARAMS_DIR}/default_md_1ns.mdp",
+            ions: str|None = None,
+            em: str|None = None,
+            nvt: str|None = None,
+            npt: str|None = None,
+            md: str|None = None,
             water_model = "tip3p",
             force_field = "amber99sb-ildn"
         ) -> None:
-
-        self.ions = ions
-        self.em = em
-        self.nvt = nvt
-        self.npt = npt
-        self.md = md
+        """Looks up gromacs params in protflow/utils/gromacs/params by default!"""
+        config = require_config()
+        gromacs_params_dir = os.path.join(load_config_path(config, "PROTFLOW_DIR"), "protflow/utils/gromacs/params")
+        self.ions = ions or os.path.join(gromacs_params_dir, "default_ions.mdp")
+        self.em = em or os.path.join(gromacs_params_dir, "em.mdp")
+        self.nvt = nvt or os.path.join(gromacs_params_dir, "nvt.mdp")
+        self.npt = npt or os.path.join(gromacs_params_dir, "npt.mdp")
+        self.md = md or os.path.join(gromacs_params_dir, "md.mdp")
         self.water_model = water_model
         self.force_field = force_field
 
@@ -531,8 +538,9 @@ def is_valid_variable(var: str) -> None:
 
 class MDAnalysis(Runner):
     '''MDAnalysis class docs'''
-    def __init__(self, python: str = f"{PROTFLOW_ENV}/python", script_path: str = None, jobstarter: JobStarter = None):
-        self.python = python
+    def __init__(self, python: str|None = None, script_path: str = None, jobstarter: JobStarter = None):
+        config = require_config()
+        self.python = python or load_config_path(config, "PROTFLOW_ENV")
         self.set_script(script_path)
         self.index_layers = 0
         self.jobstarter = jobstarter
@@ -616,11 +624,11 @@ class MDAnalysis(Runner):
         if self.pose_options:
             if not isinstance(self.pose_options, dict):
                 raise ValueError(f"MDAnalysis attribute .pose_options must be a dictionary holding {{'option': 'poses.df column name'}}\nCurrent .pose_options: {self.pose_options}")
-            protflow.poses.col_in_df(poses.df, list(self.pose_options.values()))
+            ps.col_in_df(poses.df, list(self.pose_options.values()))
         if self.pose_flags:
             if not isinstance(self.pose_flags, str):
                 raise ValueError(f"MDAnalysis attribute .pose_flags must be of type(str). Current self.pose_flags: {self.pose_flags}")
-            protflow.poses.col_in_df(poses.df, self.pose_flags)
+            ps.col_in_df(poses.df, self.pose_flags)
 
         # prepare options and flags from class attributes for every pose.
         options_list = []
@@ -636,10 +644,10 @@ class MDAnalysis(Runner):
                 pose_options_str += f" {pose[self.pose_flags]}"
 
             # ensure that pose_options overwrite options. Same with flags
-            parsed_opts, parsed_flags = protflow.runners.parse_generic_options(self.options, pose_options_str, sep="--")
+            parsed_opts, parsed_flags = runners.parse_generic_options(self.options, pose_options_str, sep="--")
 
             # parse options and flags into combined string and add to options_list
-            parsed_cmd = protflow.runners.options_flags_to_string(parsed_opts, parsed_flags)
+            parsed_cmd = runners.options_flags_to_string(parsed_opts, parsed_flags)
             options_list.append(parsed_cmd)
 
         # be aware that this compiling of commands requires the user to specify the input in pose_options!

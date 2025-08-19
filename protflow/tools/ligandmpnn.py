@@ -80,21 +80,18 @@ import Bio
 import Bio.SeqIO
 
 # custom
-import protflow.config
+from protflow import require_config, load_config_path, jobstarters
 from protflow.residues import ResidueSelection
-import protflow.tools
-import protflow.runners
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.runners import Runner, RunnerOutput, regex_expand_options_flags, parse_generic_options, col_in_df, options_flags_to_string, prepend_cmd
-from protflow.config import PROTFLOW_ENV
 
 LIGANDMPNN_CHECKPOINT_DICT = {
-    "protein_mpnn": f"/model_params/proteinmpnn_v_48_020.pt",
-    "ligand_mpnn": f"/model_params/ligandmpnn_v_32_010_25.pt",
-    "per_residue_label_membrane_mpnn": f"/model_params/per_residue_label_membrane_mpnn_v_48_020.pt",
-    "global_label_membrane_mpnn": f"/model_params/global_label_membrane_mpnn_v_48_020.pt",
-    "soluble_mpnn": f"/model_params/solublempnn_v_48_020.pt"
+    "protein_mpnn": "/model_params/proteinmpnn_v_48_020.pt",
+    "ligand_mpnn": "/model_params/ligandmpnn_v_32_010_25.pt",
+    "per_residue_label_membrane_mpnn": "/model_params/per_residue_label_membrane_mpnn_v_48_020.pt",
+    "global_label_membrane_mpnn": "/model_params/global_label_membrane_mpnn_v_48_020.pt",
+    "soluble_mpnn": "/model_params/solublempnn_v_48_020.pt"
 }
 
 class LigandMPNN(Runner):
@@ -160,7 +157,7 @@ class LigandMPNN(Runner):
     -------
     0.1.0
     """
-    def __init__(self, script_path:str=protflow.config.LIGANDMPNN_SCRIPT_PATH, python_path:str=protflow.config.LIGANDMPNN_PYTHON_PATH, pre_cmd:str=protflow.config.LIGANDMPNN_PRE_CMD, jobstarter:JobStarter=None) -> None:
+    def __init__(self, script_path: str|None = None, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter = None) -> None:
         """
         Initializes the LigandMPNN class.
 
@@ -176,11 +173,13 @@ class LigandMPNN(Runner):
         of jobs in high-performance computing (HPC) environments. This method ensures that all configurations are correctly set up before running any
         LigandMPNN tasks.
         """
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "LIGANDMPNN_SCRIPT_PATH")
+        self.python_path = python_path or load_config_path(config, "LIGANDMPNN_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "LIGANDMPNN_PRE_CMD", is_pre_cmd=True)
 
-
-        self.script_path = self.search_path(script_path, "LIGANDMPNN_SCRIPT_PATH")
-        self.python_path = self.search_path(python_path, "LIGANDMPNN_PYTHON_PATH")
-        self.pre_cmd = pre_cmd
+        # setup runner
         self.name = "ligandmpnn.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
@@ -435,7 +434,7 @@ class LigandMPNN(Runner):
             os.makedirs(json_dir, exist_ok=True)
 
         # split cmds list into n=num_batches sublists
-        cmd_sublists = protflow.jobstarters.split_list(cmds, n_sublists=num_batches)
+        cmd_sublists = jobstarters.split_list(cmds, n_sublists=num_batches)
 
         # concatenate cmds: parse _multi arguments into .json files and keep all other arguments in option.
         batch_cmds = []
@@ -604,7 +603,7 @@ class LigandMPNN(Runner):
             - **Command Construction:** The method assembles the final command string, including paths, model checkpoints, options, and other necessary parameters.
         """
         # parse ligandmpnn_dir:
-        ligandmpnn_dir = protflow.config.LIGANDMPNN_SCRIPT_PATH.rsplit("/", maxsplit=1)[0]
+        ligandmpnn_dir = os.path.dirname(self.script_path)
 
         # check if specified model is correct.
         available_models = ["protein_mpnn", "ligand_mpnn", "soluble_mpnn", "global_label_membrane_mpnn", "per_residue_label_membrane_mpnn"]
@@ -929,7 +928,7 @@ def create_distance_conservation_bias_cmds(poses: Poses, prefix: str, center: Un
         raise KeyError(f"shell_distances must be in ascending order like {sorted(shell_distances)}, not {shell_distances}!")
 
     # set python path
-    python_path = os.path.join(PROTFLOW_ENV, "python")
+    python_path = os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "python")
 
     # create output directory
     os.makedirs(working_dir := os.path.abspath(os.path.join(poses.work_dir, prefix)), exist_ok=True)

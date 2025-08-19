@@ -67,18 +67,18 @@ Version
 """
 
 # import general
-import logging
 import os
 import json
+import logging
+import importlib
 
 # import dependencies
 import pandas as pd
-import protflow
 
 # import customs
-from protflow.config import PROTFLOW_ENV
-from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
+from protflow.runners import Runner, RunnerOutput
+from protflow import load_config_path, require_config
 from protflow.jobstarters import JobStarter, split_list
 
 class GenericMetric(Runner):
@@ -147,7 +147,7 @@ class GenericMetric(Runner):
 
     The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str = os.path.join(PROTFLOW_ENV, "python3"), module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+    def __init__(self, python_path: str|None = None, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         """
         Initialize the BackboneRMSD class.
 
@@ -181,13 +181,19 @@ class GenericMetric(Runner):
             - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
             - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
         """
+        # setup config
+        config = require_config()
+        self.set_python_path(python_path or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python"))
+
+        # setup runner
         self.set_module(module)
         self.set_function(function)
-        self.set_python_path(python_path)
-
         self.set_jobstarter(jobstarter)
         self.set_options(options)
         self.overwrite = overwrite
+
+    def __str__(self):
+        return "GenericMetric"
 
     ########################## Input ################################################
     def set_module(self, module: str) -> None:
@@ -226,6 +232,7 @@ class GenericMetric(Runner):
         self.module = module
 
     def set_python_path(self, python_path: str) -> None:
+        '''helper function to set default python path for metric execution'''
         self.python_path = python_path
 
     def set_function(self, function: str) -> None:
@@ -296,11 +303,11 @@ class GenericMetric(Runner):
             - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
             - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
         """
-        if isinstance(jobstarter, JobStarter) or jobstarter == None:
+        if isinstance(jobstarter, JobStarter) or jobstarter is None:
             self.jobstarter = jobstarter
         else:
             raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
-        
+
     def set_options(self, options: dict) -> None:
         """
         Set the jobstarter configuration for the BackboneRMSD runner.
@@ -334,7 +341,7 @@ class GenericMetric(Runner):
             - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
             - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
         """
-        if isinstance(options, dict) or options == None:
+        if isinstance(options, dict) or options is None:
             self.options = options
         else:
             raise ValueError(f"Parameter :options: must be of type dict. type(options= = {type(options)})")
@@ -412,7 +419,7 @@ class GenericMetric(Runner):
         module = module or self.module
         function = function or self.function
         options = options or self.options
-        if not (isinstance(options, dict) or options == None):
+        if not (isinstance(options, dict) or options is None):
             raise ValueError(f"Parameter :options: must be of type dict. type(options= = {type(options)})")
 
         logging.info(f"Running metric {function} of module {module} in {work_dir} on {len(poses.df.index)} poses.")
@@ -432,7 +439,7 @@ class GenericMetric(Runner):
         cmds = [f"{python_path} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --module {module} --function {function}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
         if options:
             options_path = os.path.join(poses.work_dir, prefix, f"{prefix}_options.json")
-            with open(options_path, "w") as f:
+            with open(options_path, "w", encoding="UTF-8") as f:
                 json.dump(options, f)
             cmds = [f"{cmd} --options {options_path}" for cmd in cmds]
 
@@ -447,7 +454,7 @@ class GenericMetric(Runner):
         scores = pd.concat([pd.read_json(output) for output in out_files]).reset_index(drop=True)
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
-        
+
         logging.info(f"Saving scores of generic metric runner with function {function} at {scorefile}.")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -459,25 +466,24 @@ class GenericMetric(Runner):
         )
         logging.info(f"{function} completed. Returning scores.")
         return output.return_poses()
-    
+
 
 def main(args):
-
     input_poses = args.poses.split(",")
 
     # import function
-    module = importlib.import_module(args.module)
-    function = getattr(module, args.function)
+    module_ = importlib.import_module(args.module)
+    function = getattr(module_, args.function)
 
     # calculate data
     if args.options:
-        with open(args.options, "r") as f:
+        with open(args.options, "r", encoding="UTF-8") as f:
             options = json.load(f)
         data = [function(pose, **options) for pose in input_poses]
     else:
         data = [function(pose) for pose in input_poses]
     description = [os.path.splitext(os.path.basename(pose))[0] for pose in input_poses]
-    location = [pose for pose in input_poses]
+    location = list(input_poses)
 
     # create results dataframe
     results = pd.DataFrame({"data": data, "description": description, "location": location})
@@ -485,14 +491,8 @@ def main(args):
     # save output
     results.to_json(args.out)
 
-
-
 if __name__ == "__main__":
     import argparse
-    import importlib
-    import pandas as pd
-    import os
-    import json
 
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument("--poses", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")

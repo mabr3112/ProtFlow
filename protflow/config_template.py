@@ -5,7 +5,7 @@ This module contains all paths to tools integrated in ProtFlow. PRE_CMD are comm
 PROTFLOW_DIR = "" # "/path/to/ProtFlow/"
 
 # protflow environment python
-PROTFLOW_ENV = "" # "/path/to/mambaforge/envs/protflow/bin/"
+PROTFLOW_ENV = "" # "/path/to/package_manager/envs/protflow/bin/python3"
 
 # auxiliary runners directory path
 #TODO: @Markus Implement checkup if AUXILIARY_RUNNER_SCRIPTS_DIR points to the correct directory (Think about pointing to protflow directory)!
@@ -57,6 +57,14 @@ BOLTZ_PRE_CMD = ""
 GROMACS_PATH = "" #/path/to/gromacs/bin/
 
 # PLACER
-PLACER_SCRIPT_PATH = "" # ""/path/to/PLACER/run_PLACER.py"
+PLACER_SCRIPT_PATH = "" # "/path/to/PLACER/run_PLACER.py"
 PLACER_PYTHON_PATH = "" # "/path/to/mambaforge/envs/placer/bin/python"
 PLACER_PRE_CMD = ""
+
+# ESM
+ESM_PYTHON_PATH = "" # "/path/to/package_manager/envs/your_esm_env/bin/python"
+ESM_PRE_CMD = ""
+
+# protein generator
+PROTEIN_GENERATOR_PYTHON_PATH = ""
+PROTEIN_GENERATOR_SCRIPT_PATH = ""

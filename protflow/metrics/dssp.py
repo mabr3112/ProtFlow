@@ -29,19 +29,16 @@ Version
 # import general
 import os
 import glob
-import logging
 
 # import dependencies
 import pandas as pd
 
 # import customs
-import protflow
-from protflow.poses import Poses
-from protflow.poses import description_from_path
-from protflow.runners import Runner, RunnerOutput, col_in_df
-from protflow.jobstarters import JobStarter
-from protflow.config import DSSP_PATH
-
+from .. import jobstarters, require_config, load_config_path
+from ..poses import Poses
+from ..poses import description_from_path
+from ..runners import Runner, RunnerOutput
+from ..jobstarters import JobStarter
 
 class DSSP(Runner):
     """
@@ -77,12 +74,14 @@ class DSSP(Runner):
     The `DSSP` class manages all aspects of running DSSP calculations, from setting up the environment and executing the alignment commands to collecting and processing the resulting data. The processed output is organized into a structured format for further analysis, ensuring seamless integration with the rest of the ProtFlow framework.
     """
 
-    def __init__(self, jobstarter: JobStarter = None, application: str = DSSP_PATH):
+    def __init__(self, jobstarter: JobStarter = None, application: str|None = None):
+        # setup config
+        self.application = self._check_install(application or load_config_path(require_config(), "DSSP_PATH"))
 
+        # setup runner
         self.jobstarter = jobstarter
         self.name = "dssp.py"
         self.index_layers = 0
-        self.application = self._check_install(application)
 
     def __str__(self):
         return "DSSP"
@@ -143,7 +142,7 @@ class DSSP(Runner):
             num_cmds = len(poses.df.index)
 
         # create batch commands
-        cmd_sublists = protflow.jobstarters.split_list(cmds, n_sublists=num_cmds)
+        cmd_sublists = jobstarters.split_list(cmds, n_sublists=num_cmds)
         cmds = []
         for sublist in cmd_sublists:
             cmds.append("; ".join(sublist))
@@ -274,7 +273,7 @@ def collect_scores(output_dir: str) -> pd.DataFrame:
         num_aa = sum(sec_struct_dict.values())
         results = {f"{key}_content": value / num_aa for key, value in sec_struct_dict.items()}
         results["num_aa"] = num_aa
-        
+
         results["description"] = description_from_path(score_path)
 
         return pd.Series(results)

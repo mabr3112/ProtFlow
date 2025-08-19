@@ -72,10 +72,10 @@ import shutil
 import pandas as pd
 
 # custom
-from protflow.jobstarters import JobStarter
-from protflow.poses import Poses
-from protflow.runners import Runner, RunnerOutput, options_flags_to_string, parse_generic_options
-from protflow.config import FPOCKET_PATH
+from ..poses import Poses
+from ..jobstarters import JobStarter
+from .. import require_config, load_config_path
+from ..runners import Runner, RunnerOutput, options_flags_to_string, parse_generic_options
 
 class FPocket(Runner):
     """
@@ -101,9 +101,10 @@ class FPocket(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If provided options are not of the expected type.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        TypeError: If provided options are not of the expected type.
+
 
     Examples
     --------
@@ -146,7 +147,7 @@ class FPocket(Runner):
     # class attributes
     index_layers = 0
 
-    def __init__(self, fpocket_path: str = FPOCKET_PATH, jobstarter: JobStarter = None):
+    def __init__(self, fpocket_path: str|None = None, jobstarter: JobStarter = None):
         """
         Initialize the FPocket class with the specified path and jobstarter configuration.
 
@@ -161,6 +162,7 @@ class FPocket(Runner):
 
         Raises:
             ValueError: If the fpocket_path is not provided or is invalid.
+
 
         Examples:
             Here is an example of how to initialize the FPocket class:
@@ -181,10 +183,10 @@ class FPocket(Runner):
             - **Path Configuration:** Ensures the FPocket executable path is set correctly, raising an error if the path is not provided or invalid.
             - **Job Management:** Initializes the jobstarter object to manage the execution of FPocket commands, allowing for integration with job scheduling systems.
         """
-        if not fpocket_path:
-            raise ValueError(f"No path was set for {self}. Set the path in the config.py file under FPOCKET_PATH!")
+        # setup config
+        config = require_config()
         self.jobstarter = jobstarter
-        self.script_path = fpocket_path
+        self.script_path = fpocket_path or load_config_path(config, "FPOCKET_PATH")
 
     def __str__(self):
         return "fpocket"
@@ -211,6 +213,7 @@ class FPocket(Runner):
             FileNotFoundError: If required files or directories are not found during the execution process.
             ValueError: If invalid arguments are provided to the method.
             TypeError: If options or pose_options are not of the expected type.
+
 
         Examples:
             Here is an example of how to use the `run` method:

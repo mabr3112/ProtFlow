@@ -68,7 +68,6 @@ import logging
 # dependencies
 import numpy as np
 import pandas as pd
-from matplotlib import rc
 from matplotlib import pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
@@ -975,8 +974,8 @@ def sequence_logo(dataframe: pd.DataFrame, input_col:str, out_path:str, refseq:s
     def modify_input_fasta_based_on_residues(in_fasta:str, out_fasta:str, resnums:list):
         '''create a new fasta file containing only the residues according to <resnums>'''
         seq_dict = import_fasta(in_fasta)
-        for id in seq_dict:
-            seq_dict[id] = ''.join([seq_dict[id][i-1] for i in resnums])
+        for idx in seq_dict:
+            seq_dict[idx] = ''.join([seq_dict[idx][i-1] for i in resnums])
         write_fasta(seq_dict=seq_dict, fasta=out_fasta)
 
 

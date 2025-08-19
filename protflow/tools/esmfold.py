@@ -64,7 +64,6 @@ Version
 -------
 0.1.0    
 """
-
 # general imports
 import os
 import logging
@@ -76,13 +75,10 @@ import numpy as np
 import pandas as pd
 
 # custom
+from protflow import require_config, load_config_path, runners
 from protflow.poses import Poses
-import protflow.config
-import protflow.jobstarters
-import protflow.tools
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from protflow.jobstarters import JobStarter
-from protflow.config import AUXILIARY_RUNNER_SCRIPTS_DIR as script_dir
+from ..runners import Runner, RunnerOutput, prepend_cmd
+from ..jobstarters import JobStarter
 
 class ESMFold(Runner):
     """
@@ -108,9 +104,9 @@ class ESMFold(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - KeyError: If forbidden options are included in the command options.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        KeyError: If forbidden options are included in the command options.
 
     Examples
     --------
@@ -150,7 +146,7 @@ class ESMFold(Runner):
 
     The ESMFold class is intended for researchers and developers who need to perform ESMFold simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str = protflow.config.ESMFOLD_PYTHON_PATH, pre_cmd: str = protflow.config.ESMFOLD_PRE_CMD, jobstarter: JobStarter = None) -> None:
+    def __init__(self, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter|None = None) -> None:
         """
         Initialize the ESMFold class with necessary configurations.
 
@@ -185,9 +181,14 @@ class ESMFold(Runner):
 
         This method prepares the ESMFold class for running folding simulations, ensuring that all necessary configurations and paths are correctly set up.
         """
-        self.script_path = self.search_path(script_dir, "AUXILIARY_RUNNER_SCRIPTS_DIR", is_dir=True)
-        self.python_path = self.search_path(python_path, "ESMFOLD_PYTHON_PATH")
-        self.pre_cmd = pre_cmd
+        # setup config
+        config = require_config()
+        self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
+        self.script_path = os.path.join(self.script_dir, "esmfold_inference.py")
+        self.python_path = python_path or load_config_path(config, "ESMFOLD_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "ESM_PRE_CMD", is_pre_cmd=True)
+
+        # runner setup
         self.name = "esmfold.py"
         self.index_layers = 0
         self.jobstarter = jobstarter
@@ -280,7 +281,7 @@ class ESMFold(Runner):
         # check if interfering options were set
         forbidden_options = ['--fasta', '--output_dir']
         if options and any(opt in options for opt in forbidden_options) :
-            raise KeyError(f"Options must not contain '--fasta' or '--output_dir'!")
+            raise KeyError("Options must not contain '--fasta' or '--output_dir'!\nThese will be set automatically.")
 
         # write ESMFold cmds:
         cmds = [self.write_cmd(pose, output_dir=esm_preds_dir, options=options) for pose in pose_fastas]
@@ -299,8 +300,8 @@ class ESMFold(Runner):
         )
 
         # collect scores
-        logging.info(f"Predictions finished, starting to collect scores.")
-        scores = collect_scores(work_dir=work_dir)
+        logging.info("Predictions finished, starting to collect scores.")
+        scores = collect_esmfold_scores(work_dir=work_dir)
 
         if len(scores.index) < len(poses.df.index):
             raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
@@ -418,11 +419,11 @@ class ESMFold(Runner):
         This method is designed to facilitate the execution of ESMFold by constructing the necessary command line instructions, ensuring that all required parameters and options are included.
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, None)
+        opts, flags = runners.parse_generic_options(options, None)
 
-        return f"{self.python_path} {protflow.config.AUXILIARY_RUNNER_SCRIPTS_DIR}/esmfold_inference.py --fasta {pose_path} --output_dir {output_dir} {protflow.runners.options_flags_to_string(opts, flags, sep='--')}"
+        return f"{self.python_path} {self.script_path} --fasta {pose_path} --output_dir {output_dir} {runners.options_flags_to_string(opts, flags, sep='--')}"
 
-def collect_scores(work_dir:str) -> pd.DataFrame:
+def collect_esmfold_scores(work_dir:str) -> pd.DataFrame:
     """
     Collect and process the scores from ESMFold output.
 
@@ -436,7 +437,7 @@ def collect_scores(work_dir:str) -> pd.DataFrame:
         pd.DataFrame: A DataFrame containing the collected scores and corresponding file locations.
 
     Examples:
-        Here is an example of how to use the `collect_scores` method:
+        Here is an example of how to use the `collect_esmfold_scores` method:
 
         .. code-block:: python
 
@@ -446,7 +447,7 @@ def collect_scores(work_dir:str) -> pd.DataFrame:
             esmfold = ESMFold()
 
             # Collect scores from ESMFold output
-            scores_df = esmfold.collect_scores(
+            scores_df = collect_esmfold_scores(
                 work_dir="/path/to/work_dir",
                 scorefile="/path/to/scorefile.json"
             )

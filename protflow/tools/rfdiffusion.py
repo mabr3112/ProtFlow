@@ -70,18 +70,18 @@ import logging
 from glob import glob
 import re
 from typing import Any
-import numpy as np
 import random # for delay before rfdiffusion runs
 
 # dependencies
+import numpy as np
 import pandas as pd
 
 # custom
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter
-import protflow.config
-from protflow.residues import ResidueSelection
-from protflow.runners import Runner, RunnerOutput, col_in_df, prepend_cmd
+from ..poses import Poses
+from ..jobstarters import JobStarter
+from ..residues import ResidueSelection
+from ..runners import Runner, RunnerOutput, col_in_df, prepend_cmd
+from .. import require_config, load_config_path
 
 class RFdiffusion(Runner):
     """
@@ -107,9 +107,9 @@ class RFdiffusion(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If motifs are not of the expected type.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        TypeError: If motifs are not of the expected type.
 
     Examples
     --------
@@ -150,7 +150,7 @@ class RFdiffusion(Runner):
 
     The RFdiffusion class is intended for researchers and developers who need to perform RFdiffusion simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.RFDIFFUSION_SCRIPT_PATH, python_path: str = protflow.config.RFDIFFUSION_PYTHON_PATH, pre_cmd : str = protflow.config.RFDIFFUSION_PRE_CMD, jobstarter: JobStarter = None) -> None:
+    def __init__(self, script_path: str|None = None, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter = None) -> None:
         """
         Initialize the RFdiffusion class.
 
@@ -162,8 +162,8 @@ class RFdiffusion(Runner):
 
         Parameters
         ----------
-        script_path (str, optional): The path to the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`protflow.config.RFDIFFUSION_SCRIPT_PATH`).
-        python_path (str, optional): The path to the Python executable used to run the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`protflow.config.RFDIFFUSION_PYTHON_PATH`).
+        script_path (str, optional): The path to the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`config.RFDIFFUSION_SCRIPT_PATH`).
+        python_path (str, optional): The path to the Python executable used to run the RFdiffusion script. Defaults to the value specified in the ProtFlow configuration (`config.RFDIFFUSION_PYTHON_PATH`).
         jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. If not provided, the default is `None`.
 
         Returns
@@ -204,9 +204,13 @@ class RFdiffusion(Runner):
 
         This method is designed for initializing the RFdiffusion class with the necessary configurations, making it ready for executing RFdiffusion processes within the ProtFlow framework.
         """
-        self.script_path = self.search_path(script_path, "RFDIFFUSION_SCRIPT_PATH")
-        self.python_path = self.search_path(python_path, "RFDIFFUSION_PYTHON_PATH")
-        self.pre_cmd = pre_cmd
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "RFDIFFUSION_SCRIPT_PATH")
+        self.python_path = python_path or load_config_path(config, "RFDIFFUSION_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "RFDIFFUSION_PRE_CMD", is_pre_cmd=True)
+
+        # setup runner
         self.name = "rfdiffusion.py"
         self.index_layers = 1
         self.jobstarter = jobstarter
@@ -291,7 +295,7 @@ class RFdiffusion(Runner):
 
         # sanity checks
         if multiplex_poses == 1:
-            logging.warning(f"Multiplex_poses must be higher than 1 to be effective!")
+            logging.warning("Multiplex_poses must be higher than 1 to be effective!")
 
         # log number of diffusions per backbone
         if multiplex_poses:
@@ -468,6 +472,8 @@ class RFdiffusion(Runner):
         # parse description:
         if pose:
             desc = os.path.splitext(os.path.basename(pose))[0]
+        else:
+            desc = "protein"
 
         # parse options:
         start_opts = self.parse_rfdiffusion_opts(options, pose_opts)

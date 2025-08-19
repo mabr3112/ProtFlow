@@ -76,11 +76,10 @@ import shutil
 import pandas as pd
 
 # custom
-import protflow.config
-import protflow.jobstarters
-from protflow.runners import Runner, RunnerOutput, prepend_cmd
-from protflow.poses import Poses
-from protflow.jobstarters import JobStarter
+from ..poses import Poses
+from ..jobstarters import JobStarter
+from ..runners import Runner, RunnerOutput, prepend_cmd, parse_generic_options
+from .. import require_config, load_config_path
 
 class Rosetta(Runner):
     """
@@ -107,9 +106,9 @@ class Rosetta(Runner):
 
     Raises
     ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - KeyError: If forbidden options are provided to the methods.
+        FileNotFoundError: If required files or directories are not found during the execution process.
+        ValueError: If invalid arguments are provided to the methods.
+        KeyError: If forbidden options are provided to the methods.
 
     Examples
     --------
@@ -151,14 +150,14 @@ class Rosetta(Runner):
 
     The Rosetta class is intended for researchers and developers who need to perform Rosetta simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, script_path: str = protflow.config.ROSETTA_BIN_PATH, pre_cmd:str=protflow.config.ROSETTA_PRE_CMD, jobstarter: str = None, fail_on_missing_output_poses: bool = False) -> None:
+    def __init__(self, script_path: str|None = None, pre_cmd: str|None = None, jobstarter: str = None, fail_on_missing_output_poses: bool = False) -> None:
         """
         Initialize the Rosetta class with the necessary configuration.
 
         This method sets up the Rosetta class with the provided script path and job starter configuration. It initializes the necessary parameters and prepares the environment for executing Rosetta processes.
 
         Parameters:
-            script_path (str, optional): The path to the Rosetta executable scripts. Defaults to the path specified in `protflow.config.ROSETTA_BIN_PATH`.
+            script_path (str, optional): The path to the Rosetta executable scripts. Defaults to the path specified in `config.ROSETTA_BIN_PATH`.
             jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
 
         Raises:
@@ -181,9 +180,13 @@ class Rosetta(Runner):
 
         This method ensures that the Rosetta class is correctly initialized with the necessary configurations to run Rosetta applications within the ProtFlow framework.
         """
-        self.script_path = self.search_path(script_path, "ROSETTA_BIN_PATH", is_dir=True)
+        # setup config
+        config = require_config()
+        self.script_path = script_path or load_config_path(config, "ROSETTA_BIN_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "ROSETTA_PRE_CMD", is_pre_cmd=True)
+
+        # setup runner
         self.name = "rosetta.py"
-        self.pre_cmd = pre_cmd
         self.index_layers = 1
         self.jobstarter = jobstarter
         self.fail_on_missing_output_poses = fail_on_missing_output_poses
@@ -235,7 +238,7 @@ class Rosetta(Runner):
         if not rosetta_application:
             if os.path.isfile(script_path) and os.access(script_path, os.X_OK):
                 return script_path
-            raise ValueError(f"No Rosetta executable was specified. Either provide an executable with the 'rosetta_application' parameter in the Rosetta.run() method, or specify an executable when setting up the rosetta runner with the attribute Runner.script_path.")
+            raise ValueError("No Rosetta executable was specified. Either provide an executable with the 'rosetta_application' parameter in the Rosetta.run() method, or specify an executable when setting up the rosetta runner with the attribute Runner.script_path.")
 
         # if rosetta_application is provided, check if it is executable:
         if os.path.isfile(rosetta_application) and os.access(rosetta_application, os.X_OK):
@@ -249,7 +252,7 @@ class Rosetta(Runner):
             raise ValueError(f"Provided rosetta_applicatiaon is not executable: {combined_path}")
 
         # otherwise raise error for not properly setting up the rosetta script paths.
-        raise ValueError(f"No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
+        raise ValueError("No usable Rosetta executable provided. Easiest fix: provide full path to executable with parameter :rosetta_application: in the Rosetta.run() method.")
 
     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, rosetta_application: str = None, nstruct: int = 1, options: str = None, pose_options: list|str = None, overwrite: bool = False, fail_on_missing_output_poses: bool = False) -> Poses:
         """
@@ -428,7 +431,7 @@ class Rosetta(Runner):
         This method is designed to facilitate the construction of command strings for running Rosetta applications, making it easier for researchers and developers to execute and manage Rosetta simulations within the ProtFlow framework.
         """
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options, sep="-")
+        opts, flags = parse_generic_options(options, pose_options, sep="-")
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()])
         flags = " -" + " -".join(flags) if flags else ""
 
@@ -438,7 +441,7 @@ class Rosetta(Runner):
             raise KeyError(f"options and pose_options must not contain any of {forbidden_options}")
 
         # parse options
-        opts, flags = protflow.runners.parse_generic_options(options, pose_options)
+        opts, flags = parse_generic_options(options, pose_options)
         opts = " ".join([f"-{key}={value}" for key, value in opts.items()]) if opts else ""
         flags = " -" + " -".join(flags) if flags else ""
         overwrite = " -overwrite" if overwrite else ""

@@ -284,11 +284,6 @@ class Poses:
         KeyError
             If the provided storage format is not supported.
 
-        Attributes
-        ----------
-        storage_format : str
-            The format for storing protein data.
-
         Notes
         -----
         This method configures the storage format for protein data. It ensures that the format is one of the supported formats and raises an error if the format is invalid.
@@ -321,16 +316,6 @@ class Poses:
         set_scorefile : bool, optional
             If True, also sets the path for the scorefile in the specified working directory (default is True).
 
-        Attributes
-        ----------
-        work_dir : str
-            The working directory for storing data and results.
-        scores_dir : str
-            Directory for storing score files.
-        filter_dir : str
-            Directory for storing filtered results.
-        plots_dir : str
-            Directory for storing plot files.
 
         Further Details
         ---------------
@@ -432,10 +417,6 @@ class Poses:
         jobstarter : JobStarter
             An instance of the JobStarter class used to manage job submissions.
 
-        Attributes
-        ----------
-        default_jobstarter : JobStarter
-            The default job starter for managing jobs.
 
         Further Details
         ---------------
@@ -703,6 +684,7 @@ class Poses:
         KeyError
             If the prefix is already used in the poses DataFrame.
 
+
         Further Details
         ---------------
         This method verifies whether the specified prefix is already in use within the poses DataFrame. It is useful for ensuring that new prefixes do not conflict with existing ones, maintaining data integrity.
@@ -748,6 +730,7 @@ class Poses:
         ------
         KeyError
             If the DataFrame does not contain the mandatory columns 'input_poses', 'poses', and 'poses_description'.
+
 
         Further Details
         ---------------
@@ -825,8 +808,8 @@ class Poses:
 
         """
         logging.warning(f"Multiline Fasta detected as input to poses. Splitting up the multiline fasta into multiple poses. Split fastas are stored at work_dir/input_fastas/")
-        if not hasattr(self, "work_dir"):
-            raise AttributeError(f"Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
+        if not self.work_dir:
+            raise AttributeError("Set up a work_dir attribute (Poses.set_work_dir()) for your poses class.")
 
         # read multilie-fasta file and split into individual poses
         fasta_dict = parse_fasta_to_dict(path, encoding=encoding)
@@ -836,14 +819,14 @@ class Poses:
         fasta_dict = {re.sub(symbols_to_replace, "_", description): seq for description, seq in fasta_dict.items()}
 
         # setup fasta directory self.work_dir/input_fastas_split/
-        output_dir = os.path.abspath(f"{self.work_dir}/input_fastas_split/")
+        output_dir = os.path.abspath(os.path.join(self.work_dir, "input_fastas_split"))
         if not os.path.isdir(output_dir):
             os.makedirs(output_dir, exist_ok=True)
 
         # write individual poses in fasta directory:
         out_poses = []
         for description, seq in fasta_dict.items():
-            fp = f"{output_dir}/{description}.fa"
+            fp = os.path.join(output_dir, f"{description}.fa")
             try:
                 # check if files are already there. If contents do not match, write the new fasta-file
                 subfasta_dict = parse_fasta_to_dict(path, encoding=encoding)
@@ -1092,7 +1075,7 @@ class Poses:
         return self.df["poses"].to_list()
 
     ########################################## Operations ###############################################
-    def get_pose(self, pose_description: str) -> Bio.PDB.Structure.Structure:
+    def get_pose(self, pose_description: str, all_models: bool = False) -> Bio.PDB.Model.Model | Bio.PDB.Structure.Structure:
         """
         Retrieves a pose structure based on its description.
 
@@ -1100,16 +1083,19 @@ class Poses:
         ----------
         pose_description : str
             The description of the pose to be retrieved.
+        all_models : bool, optional
+            If all models in the input PDB should be returned (all_models = True) or just the first (all_models = False). If False, a Bio.PDB Model is returned, if True, a Bio.PDB Structure is returned.
 
         Returns
         -------
-        Bio.PDB.Structure.Structure
-            The Bio.PDB Structure object corresponding to the specified pose description.
+        Bio.PDB.Model.Model or Bio.PDB.Structure.Structure
+            The Bio.PDB Model or Structure object corresponding to the specified pose description.
 
         Raises
         ------
         KeyError
             If the pose description is not found in the poses DataFrame.
+
 
         Further Details
         ---------------
@@ -1133,11 +1119,11 @@ class Poses:
         - Ensures that the returned pose is loaded as a Bio.PDB Structure object for further processing.
 
         """
-        if pose_description not in self.df["poses_description"]:
+        if pose_description not in self.df["poses_description"].to_list():
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
-        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0])
+        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0], all_models=all_models)
     
-    def reindex_poses(self, prefix:str, remove_layers:int=1, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
+    def reindex_poses(self, prefix:str, group_col:str=None, remove_layers:int=None, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
         """
         Removes index layers from poses. Saves reindexed poses to an output directory.
 
@@ -1145,6 +1131,8 @@ class Poses:
         ----------
         prefix : str
             The directory where the duplicated poses will be saved and the prefix for the DataFrame columns containing the original paths and descriptions.
+        group_col : str, optional
+            The poses dataframe column on which to group to create new descriptions. Must be a column in 'poses_description' or 'poses' format (e.g. from a previous state, before runners appended index layers)
         remove_layers : int, optional
             The number of index layers to remove. 
         force_reindex : bool, optional
@@ -1154,16 +1142,19 @@ class Poses:
             
         Further Details
         ---------------
-        This method removes index layers from poses (_0001, 0002, etc). Subtracts the set number of layers from the description column and groups the poses accordingly.
+        This method removes index layers from poses (_0001, _0002, etc). If a group column is provided, the poses are assigned names according to the group. If remove_layers is above 0, subtracts the set number of layers from the description column and groups the poses accordingly.
         If force_reindex is True, adds one index layer to all poses. 
 
         Notes
         -----
         - The method creates the output directory if it does not exist.
+        - Raises a KeyError if both group_col and remove_layers are set..
         - Raises a RuntimeError if multiple poses with identical description after index layer removal are found and force_reindex is False..
 
         """
-
+        if group_col and remove_layers:
+            raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
+        
         out_dir = os.path.join(self.work_dir, prefix)
         os.makedirs(out_dir, exist_ok=True)
         self.df[f"{prefix}_pre_reindexing_poses_description"] = self.df['poses_description']
@@ -1174,6 +1165,9 @@ class Poses:
         if remove_layers:
             if not isinstance(remove_layers, int): raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
             self.df["tmp_layer_column"] = self.df['poses_description'].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
+        elif group_col:
+            col_in_df(self.df, group_col)
+            self.df["tmp_layer_column"] = [description_from_path(path) for path in self.df[group_col]]
         else: self.df["tmp_layer_column"] = self.df['poses_description']
 
         self.df.sort_values(["tmp_layer_column", "poses_description"], inplace=True) # sort to make sure that all poses are in the same order after grouping
@@ -1344,6 +1338,7 @@ class Poses:
         TypeError
             If the objects in the specified motif column are not of type ResidueSelection.
 
+
         Further Details
         ---------------
         This method sets a column in the poses DataFrame to be used as motifs for further analysis. The motifs must be instances of the ResidueSelection class.
@@ -1393,6 +1388,7 @@ class Poses:
         RuntimeError
             If the poses are not of type PDB.
 
+
         Further Details
         ---------------
         This method converts PDB pose files to FASTA format and stores them in a directory named with the given prefix. It can also update the poses DataFrame to use the new FASTA files if specified.
@@ -1434,7 +1430,7 @@ class Poses:
             self.df['poses'] = fasta_paths
 
     ########################################## Filtering ###############################################
-    def filter_poses_by_rank(self, n: float, score_col: str, remove_layers = None, layer_col = "poses_description", sep = "_", ascending = True, prefix: str = None, plot: bool = False, plot_cols: list[str] = None, overwrite: bool = True, storage_format: str = None) -> "Poses":
+    def filter_poses_by_rank(self, n: float, score_col: str, group_col: str = None, remove_layers: int = None, layer_col: str = "poses_description", sep = "_", ascending: bool = True, prefix: str = None, plot: bool = False, plot_cols: list[str] = None, overwrite: bool = True, storage_format: str = None) -> "Poses":
         """
         Filters poses based on their rank in a specified score column, with options to handle layers and generate plots.
 
@@ -1444,6 +1440,8 @@ class Poses:
             The number of top-ranked poses to keep. If n < 1, it represents a fraction of the total poses.
         score_col : str
             The column in the DataFrame containing the scores used for ranking.
+        group_col : str, optional
+            Group dataframe by this column and filter individual groups.
         remove_layers : int, optional
             The number of layers to remove from the pose descriptions before ranking. This helps in grouping similar poses.
         layer_col : str, optional
@@ -1491,10 +1489,14 @@ class Poses:
         - Logs the filtering process, including any errors or warnings related to the ranking criteria.
 
         """
+
+        if group_col and remove_layers:
+            raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
+    
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
             if self.filter_dir is None:
-                raise AttributeError(f"Filter directory was not set! Did you set a working directory? work_dir can be set with Poses.set_work_dir() and sets up a filter_dir automatically.")
+                raise AttributeError("Filter directory was not set! Did you set a working directory? work_dir can be set with Poses.set_work_dir() and sets up a filter_dir automatically.")
             os.makedirs(self.filter_dir, exist_ok=True)
 
             # make sure output format is available
@@ -1513,7 +1515,7 @@ class Poses:
 
         # Filter df down to the number of poses specified with <n>
         orig_len = str(len(self.df))
-        filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
+        filter_df = filter_dataframe_by_rank(df=self.df, col=score_col, n=n, group_col=group_col, remove_layers=remove_layers, layer_col=layer_col, sep=sep, ascending=ascending).reset_index(drop=True)
         logging.info(f"Filtered poses from {orig_len} to {str(len(filter_df))} poses according to {score_col}.")
 
         # save filtered dataframe if prefix is provided
@@ -1583,6 +1585,7 @@ class Poses:
         ------
         ValueError
             If all poses are removed based on the filtering criteria.
+
 
         Further Details
         ---------------
@@ -1692,17 +1695,20 @@ class Poses:
         scale_output : bool, optional
             If True, scales the composite score to a range between 0 and 1 (default is False).
 
+            
         Returns
         -------
         Poses
             The updated Poses instance with the new composite score column.
 
+            
         Raises
         ------
         ValueError
             If the number of scoreterms and weights do not match.
         TypeError
             If any score column contains non-numeric values.
+
 
         Further Details
         ---------------
@@ -1713,6 +1719,7 @@ class Poses:
         2. Normalize the column by subtracting the median and dividing by the standard deviation.
         3. Optionally scale the normalized values to a range between 0 and 1.
 
+        
         Example
         -------
         .. code-block:: python
@@ -1731,6 +1738,7 @@ class Poses:
                 scale_output=True
             )
 
+            
         Notes
         -----
         - The method ensures that the number of scoreterms and weights match.
@@ -2198,14 +2206,9 @@ def scale_series(ser: pd.Series) -> pd.Series:
     ser = ser.copy()
     # check if all values in <score_col> are the same, set all values to 0 if yes as no scaling is possible
     if ser.nunique() == 1:
-        ser[:] = 0
-        return ser
-    # scale series to values between 0 and 1
-    factor = ser.max() - ser.min()
-    ser = ser / factor
-    ser = ser + (1 - ser.max())
-
-    return ser
+        return pd.Series(0, index=ser.index)
+    # scale all values between 0 and 1
+    return (ser - ser.min()) / (ser.max() - ser.min())
 
 def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], weights: list[float], scale: bool = False) -> pd.Series:
     """
@@ -2233,6 +2236,7 @@ def combine_dataframe_score_columns(df: pd.DataFrame, scoreterms: list[str], wei
         If the number of scoreterms and weights do not match.
     TypeError
         If any score column contains non-numeric values.
+
 
     Further Details
     ---------------
@@ -2324,7 +2328,7 @@ def get_format(path: str):
         "feather": pd.read_feather,
         "parquet": pd.read_parquet
     }
-    return loading_function_dict[path.split(".")[-1]]
+    return loading_function_dict[path.split(".")[-1].lower()]
 
 def load_poses(poses_path: str) -> Poses:
     """
@@ -2377,6 +2381,7 @@ def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
     KeyError
         If any of the specified columns are not found in the DataFrame.
 
+
     Further Details
     ---------------
     This function checks whether the specified column or list of columns exist in the given DataFrame. It is useful for ensuring that the DataFrame contains the necessary columns before performing further operations.
@@ -2407,13 +2412,12 @@ def col_in_df(df: pd.DataFrame, column: str|list[str]) -> None:
     """
     if isinstance(column, list):
         for col in column:
-            if not col in df.columns:
-                raise KeyError(f"Could not find {col} in poses dataframe! Are you sure you provided the right column name?")
+            col_in_df(df, col)
     else:
         if not column in df.columns:
             raise KeyError(f"Could not find {column} in poses dataframe! Are you sure you provided the right column name?")
 
-def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_layers: int = None, layer_col: str = "poses_description", sep: str = "_", ascending: bool = True) -> pd.DataFrame:
+def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, group_col: str = None, remove_layers: int = None, layer_col: str = "poses_description", sep: str = "_", ascending: bool = True) -> pd.DataFrame:
     """
     Filters the DataFrame to retain only the top-ranked rows based on a specified column.
 
@@ -2425,6 +2429,8 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_la
         The column in the DataFrame used for ranking.
     n : Union[float, int]
         The number of top-ranked rows to retain. If n < 1, it represents a fraction of the total rows.
+    group_col : str, optional
+        Group dataframe by this column, then filter individual groups.
     remove_layers : int, optional
         The number of layers to remove from the column values before ranking. This helps in grouping similar rows.
     layer_col : str, optional
@@ -2471,18 +2477,40 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_la
         determines if n is a fraction or an integer and sets cutoff for dataframe filtering accordingly.
         '''
         filter_n = float(n)
-        if filter_n < 1:
-            filter_n = round(len(df) * filter_n)
-        elif filter_n <= 0:
+        if filter_n <= 0:
             raise ValueError(f"ERROR: Argument <n> of filter functions cannot be smaller than 0. It has to be positive number. If n < 1, the top n fraction is taken from the DataFrame. if n > 1, the top n rows are taken from the DataFrame")
+        elif filter_n < 1:
+            filter_n = round(len(df) * filter_n)
 
         return int(filter_n)
+    
+    def filter_groups(df: pd.DataFrame, col: str, n: float, group_col: str, ascending: bool) -> pd.DataFrame:
+        '''
+        groups a dataframe, then filters individual groups.
+        '''
+        # check if group col exists in df
+        col_in_df(df, group_col)
+
+        # group by group column, filter top n rows per group
+        filtered = []
+        for _, group_df in df.groupby(group_col, sort=False):
+            filtered.append(group_df.sort_values(by=col, ascending=ascending).head(determine_filter_n(group_df, n)))
+
+        return pd.concat(filtered).reset_index(drop=True)
+
 
     # make sure <col> exists columns in <df>
     col_in_df(df, col)
 
+    if group_col and remove_layers:
+        raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
+
+    # if group_col is set, group dataframe and filter individual groups
+    if group_col:
+        filtered_df = filter_groups(df=df, col=col, n=n, group_col=group_col, ascending=ascending)
+
     # if remove_layers is set, compile list of unique pose descriptions after removing one index layer:
-    if remove_layers:
+    elif remove_layers:
         if not isinstance(remove_layers, int):
             raise TypeError(f"ERROR: only value of type 'int' allowed for remove_layers. You set it to {type(remove_layers)}")
 
@@ -2493,10 +2521,7 @@ def filter_dataframe_by_rank(df: pd.DataFrame, col: str, n: float|int, remove_la
         df["tmp_layer_column"] = df[layer_col].str.split(sep).str[:-1*int(remove_layers)].str.join(sep)
 
         # group by temporary description column, filter top n rows per group
-        filtered = []
-        for _, group_df in df.groupby("tmp_layer_column", sort=False):
-            filtered.append(group_df.sort_values(by=col, ascending=ascending).head(determine_filter_n(group_df, n)))
-        filtered_df = pd.concat(filtered).reset_index(drop=True)
+        filtered_df = filter_groups(df=df, col=col, n=n, group_col="tmp_layer_column", ascending=ascending)
 
         #drop temporary description column
         filtered_df.drop("tmp_layer_column", axis=1, inplace=True)
