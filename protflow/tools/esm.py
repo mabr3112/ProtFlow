@@ -154,7 +154,11 @@ class ESM(Runner):
         opts_str = runners.options_flags_to_string(options=options, flags=[], sep="--")
 
         # compile path to script
-        return [f"{self.pre_cmd}; {self.python} {self.script_path} {opts_str} {model} {input_fa} {output_dir}" for input_fa in prediction_inputs]
+        cmds = [f"{self.python} {self.script_path} {opts_str} {model} {input_fa} {output_dir}" for input_fa in prediction_inputs]
+
+        if self.pre_cmd:
+            cmds = [f"{self.pre_cmd}; " + cmd for cmd in cmds]
+        return cmds
 
     def output_exists(self, scorefilepath: str) -> bool:
         '''Simple check for collected scores of esm runner.'''

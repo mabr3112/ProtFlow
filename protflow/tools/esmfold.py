@@ -186,7 +186,7 @@ class ESMFold(Runner):
         self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
         self.script_path = os.path.join(self.script_dir, "esmfold_inference.py")
         self.python_path = python_path or load_config_path(config, "ESMFOLD_PYTHON_PATH")
-        self.pre_cmd = pre_cmd or load_config_path(config, "ESM_PRE_CMD", is_pre_cmd=True)
+        self.pre_cmd = pre_cmd or load_config_path(config, "ESMFOLD_PRE_CMD", is_pre_cmd=True)
 
         # runner setup
         self.name = "esmfold.py"
