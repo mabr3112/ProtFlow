@@ -7,11 +7,11 @@ We aren't BindCraft. But we can help you build your own binder design pipeline, 
 In this tutorial, we are going to design binders for the protein Epidermal Growth Factor Receptor (EGFR).
 To achieve this goal, we need several protein design tools:
 
-- `RFdiffusion (backbone generation) <https://github.com/RosettaCommons/RFdiffusion>`_
-- `LigandMPNN (threading sequences onto backbones) <https://github.com/dauparas/LigandMPNN>`_
-- `Rosetta (energy-based backbone optimization) <https://github.com/RosettaCommons/rosetta>`_
-- `ESMFold (structure prediction) <https://github.com/facebookresearch/esm>`_
-- `ColabFold (complex prediction) <https://github.com/YoshitakaMo/localcolabfold>`_
+- `RFdiffusion <https://github.com/RosettaCommons/RFdiffusion>`_ (backbone generation) 
+- `LigandMPNN <https://github.com/dauparas/LigandMPNN>`_ (threading sequences onto backbones) 
+- `Rosetta <https://github.com/RosettaCommons/rosetta>`_ (energy-based backbone optimization) 
+- `ESMFold <https://github.com/facebookresearch/esm>`_ (structure prediction) 
+- `ColabFold <https://github.com/YoshitakaMo/localcolabfold>`_ (complex prediction) 
 
 Make sure these are installed on your local machine and configured in the ProtFlow config file!
 
@@ -40,16 +40,19 @@ Hotspot residues
 We identified 5 residues on EGFR that we want to use as hotspot residues: L325, H346, L348, A415, and I438. These residues are located on a hydrophobic patch of
 EGFR in a region where cetuximab, a monoclonal antibody, binds to EGFR. We are defining these residues as ResidueSelections, a special ProtFlow class for selection of protein
 residues. We modified our input PDB slightly, so that the target EGFR is on chain B. In addition, we truncated the EGFR structure to 162 residues to decrease runtime, as RFdiffusion
-inference time depends on the size of the input structures.
-
+inference time depends on the size of the input structures. We assign each pose a ResidueSelection containing the hotspot residues twice: once to preserve the original hotspot residues, 
+and in another column to update the selection post-diffusion as the residue numbers change after structure generation with RFdiffusion.
 
 .. code-block:: python
 
    from protflow.poses import Poses
    from protflow.residues import residue_selection
 
+   receptor_pdb = "path/to/egfr_truncated.pdb"
+   output_dir = "path/to/output_dir"
+
    # import all PDB files in input dir as poses
-   poses = Poses(poses=args.input_dir, glob_suffix="*pdb", work_dir=args.output_dir)
+   poses = Poses(poses=receptor_pdb, work_dir=output_dir)
 
    hotspot_residues = "B18,B39,B41,B108,B131" # residue numbers are different in the truncated EGFR!
    hotspot_residue_selection = residue_selection(hotspot_residues, delim=",")
@@ -60,26 +63,32 @@ inference time depends on the size of the input structures.
    # this residue selection will be updated post-diffusion (to track changing residue numbers)
    poses.df["hotspot_residues_postdiffusion"] = [hotspot_residues for _ in poses.poses_list()]
 
-We assign each pose a ResidueSelection containing the hotspot residues twice: once to preserve the original hotspot residues, and in another column to update the selection
-post-diffusion as the residue numbers change after structure generation with RFdiffusion.
-
 RFdiffusion
 -----------
 
-RFdiffusion comes with a special potential for binder generation with hotspot residues, which we are going to use. For further details, please check out the
-`RFdiffusion documentation <https://github.com/RosettaCommons/RFdiffusion>`_. We are also going to use the "Beta" model to increase topology diversity of diffused structures.
-Our binder should have a length of 150 residues.
+RFdiffusion comes with a special potential for binder generation with hotspot residues, which we are going to use.  We are also going to use the "Beta" model to increase
+topology diversity of diffused structures. Our binder should have a length of 80 residues. Before we start diffusing, we are extracting sequence information of the receptor.
+
+.. note::
+
+   For further details on RFdiffusion options, the hotspot potential and Beta model, please check out the `RFdiffusion documentation <https://github.com/RosettaCommons/RFdiffusion>`_.
 
 .. code-block:: python
 
+   from protflow.utils.biopython_tools import load_structure_from_pdbfile, get_sequence_from_pose
    from protflow.jobstarters import SbatchArrayJobstarter
    from protflow.tools.rfdiffusion import RFdiffusion
 
+   # extract the receptor sequence
+   receptor_structure = load_structure_from_pdbfile(receptor_pdb)  # only one structure of target in poses
+   receptor_sequence = get_sequence_from_pose(receptor_structure)
+
+   # set up jobstarters
    gpu_jobstarter = SbatchArrayJobstarter(max_cores=5, gpus=1)  # set up a jobstarter that can use GPUs
    rfdiffusion = RFdiffusion(jobstarter=gpu_jobstarter)  # set up rfdiffusion
 
-   # define diffusion contig (B1-162 is the receptor EGFR, binder should be 150 residues)
-   contig = "B1-162/0 150-150"
+   # define diffusion contig (B1-162 is the receptor EGFR, binder should be 80 residues)
+   contig = "B1-162/0 80-80"
    # define path to Beta model (comes with RFdiffusion)
    beta_model_path = "/path/to/Complex_beta_ckpt.pt"
 
@@ -90,14 +99,14 @@ Our binder should have a length of 150 residues.
    rfdiffusion.run(
        poses=poses,
        prefix='rfdiff',
-       num_diffusions=200,
+       num_diffusions=100,
        multiplex_poses=5,
        options=diff_opts,
        fail_on_missing_output_poses=False,
        update_motifs=['hotspot_residues_postdiffusion'],
    )
 
-We are multiplexing (or copying) our input pose (consisting of just the single EGFR .pdb file) 5 times and running 200 diffusions, creating 1000 output structures. Multiplexing is used to
+We are multiplexing (or copying) our input pose (consisting of just the single EGFR .pdb file) 5 times and running 100 diffusions, creating 500 output structures. Multiplexing is used to
 parallelize inference, as we defined 5 cores with one GPU each in our jobstarter. We are also updating our hotspot ResidueSelection, as RFdiffusion outputs structures with continuous
 residue numbers over both chains. Depending on your available computing power, it might take a while until diffusion is completed. The poses dataframe will now contain all diffused 
 structures and the respective scores.
@@ -128,7 +137,7 @@ We want to filter out all low-quality diffused structures. Our criteria are:
    rescontacts_calculator = GenericMetric(module="protflow.utils.metrics", function="residue_contacts", jobstarter=small_cpu_jobstarter) # calculates number of atoms/residues that are within a certain distance from a target atom or residue
    dssp = DSSP(jobstarter=small_cpu_jobstarter) # calculates secondary structure content
    
-   # retrieve updated hotspot residues (same for all diffused backbones, as length of diffused backbones is always 150 residues)
+   # retrieve updated hotspot residues (same for all diffused backbones, as length of diffused backbones is always 80 residues)
    hotspot_residues_postdiffusion = poses.df["hotspot_residues_postdiffusion"].iloc[0]
    
    # calculate rog, general contacts and hotspot contacts
@@ -161,13 +170,13 @@ After we calculated all scores, we can visualize the data:
    :align: center
    :figwidth: 700px
 
-   Rfdiffusion pLDDT, total number of hotspot contacts, radius of gyration, and per-hotspot contacts for 1000 diffused backbones.
+   Rfdiffusion pLDDT, total number of hotspot contacts, radius of gyration, and per-hotspot contacts for 500 diffused backbones.
 
 .. figure:: ../../assets/egfr_diffusion_scores_part2.png
    :align: center
    :figwidth: 700px
 
-   Secondary structure content for 1000 diffused backbones. H = helix, B = residue in beta-bridge, E = extended strand, G = 3-helix, I = 5-helix, T = hydrogen-bonded turn, S = bend, L = loop.
+   Secondary structure content for 500 diffused backbones. H = helix, B = residue in beta-bridge, E = extended strand, G = 3-helix, I = 5-helix, T = hydrogen-bonded turn, S = bend, L = loop.
 
 Looking at the plots, we notice that some of our backbones have a high radius of gyration (rfdiff_rog_data) or a low number of hotspot contacts
 (meaning they do not bind at the intended position). While most are predominantely helical (dssp_H_content) or contain beta-sheets (dssp_E_content), 
@@ -175,7 +184,7 @@ some have significant amount of unordered regions (dssp_L_content). We want to r
 
 .. code-block:: python
    
-   poses.filter_poses_by_value(score_col="rfdiff_rog_data", value=20, operator="<=", prefix="rfdiff_rog", plot=True) # remove all poses with ROG higher than 20
+   poses.filter_poses_by_value(score_col="rfdiff_rog_data", value=18, operator="<=", prefix="rfdiff_rog", plot=True) # remove all poses with ROG higher than 20
    poses.filter_poses_by_value(score_col="hotspot_contacts", value=20, operator=">=", prefix="rfdiff_hotspots_contacts", plot=True) # remove all poses with fewer total contacts to hotspot residues than the set cutoff
    poses.filter_poses_by_value(score_col="dssp_L_content", value = 0.25, operator="<", prefix = "L_content", plot = True) # remove all poses with more than 25% unordered (L) regions
 
@@ -183,7 +192,7 @@ some have significant amount of unordered regions (dssp_L_content). We want to r
    :align: left
    :figwidth: 700px
 
-Each filter will reduce the number of poses. To further narrow down our poses, we can calculate a composite score comprised of all scores that interest us, and filter for the 150 best 
+Each filter will reduce the number of poses. To further narrow down our poses, we can calculate a composite score comprised of all scores that interest us, and filter for the 100 best 
 poses according to this score. We assign a different importance (weight) to each scoreterm, and the sign of the weight depends on if higher or lower numbers indicate a good score.
 
 .. code-block:: python
@@ -193,8 +202,8 @@ poses according to this score. We assign a different importance (weight) to each
    diffusion_comp_score_weights = [1, -2, 1]
    poses.calculate_composite_score(name="diffusion_comp_score", scoreterms=diffusion_comp_score_scoreterms, weights=diffusion_comp_score_weights, plot=True)
    
-   # filter for the top 150 poses
-   poses.filter_poses_by_rank(score_col="comp_score_before_opt", n=150, prefix="comp_score", plot=True, plot_cols=diffusion_comp_score_scoreterms)
+   # filter for the top 100 poses
+   poses.filter_poses_by_rank(score_col="comp_score_before_opt", n=100, prefix="comp_score", plot=True, plot_cols=diffusion_comp_score_scoreterms)
 
 .. figure:: ../../assets/egfr_diff_comp_score_filter.png
    :align: center
@@ -228,6 +237,48 @@ binding affinities. The best structures will be passed on for another cycle of L
 LigandMPNN created structures with amino acid sequences out of our backbones. To improve our backbones, we are going to employ Rosetta Relax, a specialized Rosetta protocol that optimizes
 protein structures by minimizing energies via introduction of small movements. 
 
+.. code-block:: xml
+
+   <ROSETTASCRIPTS>
+      <SCOREFXNS>
+         <ScoreFunction name="beta" weights="beta"/>
+         <ScoreFunction name="beta_cst" weights="beta_cst" />
+      </SCOREFXNS>
+      <RESIDUE_SELECTORS>
+         <Chain name="chainA" chains="A" />
+         <Chain name="chainB" chains="B" />
+      </RESIDUE_SELECTORS>
+      <TASKOPERATIONS>
+      </TASKOPERATIONS>
+      <MOVE_MAP_FACTORIES>
+      </MOVE_MAP_FACTORIES>
+      <SIMPLE_METRICS>
+         <SapScoreMetric name="sapscore" />
+         <InteractionEnergyMetric name="interaction_score" custom_type="interaction_score" residue_selector="chainA" residue_selector2="chainB" scorefxn="beta" />
+      </SIMPLE_METRICS>
+      <FILTERS>
+      </FILTERS>
+      <MOVERS>
+         <RunSimpleMetrics name="calc_proteinscores" metrics="sapscore,interaction_score" />
+         <VirtualRoot name="set_virtual_root" />
+         <AddConstraints name="add_bb_ca_cst" >
+                           <CoordinateConstraintGenerator name="set_bb_ca_constraint" ca_only="true" />
+         </AddConstraints>
+         <FastRelax name="fastrelax" scorefxn="beta_cst" />
+      </MOVERS>
+      <PROTOCOLS>
+         <Add mover_name="set_virtual_root" />
+         <Add mover_name="add_bb_ca_cst" />
+         <Add mover_name="fastrelax" />
+         <Add mover_name="calc_proteinscores" />
+      </PROTOCOLS>
+      <OUTPUT scorefxn="beta" />
+   </ROSETTASCRIPTS>
+
+.. note::
+
+   For further information on Rosetta, RosettaScripts and Rosetta-XML-protocols, please check out the `RosettaCommons <https://docs.rosettacommons.org/docs/latest/Home>`_.
+
 .. code-block:: python
    
    from protflow.tools.rosetta import Rosetta
@@ -238,7 +289,7 @@ protein structures by minimizing energies via introduction of small movements.
    rosetta = Rosetta(jobstarter=cpu_jobstarter, fail_on_missing_output_poses=True)
    
    # relax poses
-   relax_protocol = "path/to/relax.xml"
+   relax_protocol = "path/to/fastrelax_interaction.xml"
    fr_options = f"-parser:protocol {relax_protocol} -beta" # define options for rosetta relax runs (beta weights, and path to relax xml)
    rosetta.run(poses=poses, prefix=f"cycle_{cycle}_rlx", nstruct=3, options=fr_options, rosetta_application="rosetta_scripts.default.linuxgccrelease") # 3 relax trajectories per pose
 
@@ -247,21 +298,22 @@ protein structures by minimizing energies via introduction of small movements.
     f"cycle_{cycle}_rlx_sap_score",
     f"cycle_{cycle}_rlx_total_score",
     f"cycle_{cycle}_rlx_intE_interaction_energy",
-    f"cycle_{cycle}_rlx_shape_complementarity"]
-   relax_comp_weights = [1, 2, 2, -1]
+    ]
+   relax_comp_weights = [1, 2, 2]
    poses.calculate_composite_score(name=f"cycle_{cycle}_threading_comp_score", scoreterms=relax_comp_scoreterms, weights=relax_comp_weights, plot=True)
 
    # apply filter to get best structure for each rfdiffusion output using group_col
    poses.filter_poses_by_rank(n=1, score_col=f"cycle_{cycle}_threading_comp_score", group_col="rfdiff_location")
 
    # generate sequences for relaxed poses
-   ligandmpnn.run(poses=poses, prefix=f"cycle_{cycle}_mpnn", nseq=50, model_type="soluble_mpnn", options=mpnn_opts, return_seq_threaded_pdbs_as_pose=True)
+   ligandmpnn.run(poses=poses, prefix=f"cycle_{cycle}_mpnn", nseq=30, model_type="soluble_mpnn", options=mpnn_opts, return_seq_threaded_pdbs_as_pose=True)
 
 For each diffused backbone, we generated 5 sequences with LigandMPNN and relaxed each one 3 times. After relaxing our poses, we filtered for the best structure of each diffused pose 
 according to a combination of Surface Aggregation Propensity, total score, interaction energy between binder and receptor and shape complementarity. Now that we have energy-optimized 
 backbones, we again create sequences using LigandMPNN. This combination of LigandMPNN-Rosetta-LigandMPNN improves the quality of the generated sequences for a given backbone. Next,
-we need to evaluate if our sequences fold into the design models. For this, we are going to use ESMFold. Since ESMFold can only predict monomers, we have to remove the receptor first.
-The custom ProtFlow class ChainRemover is suited for this task. Since we are only interested in predictions with high confidence, we again filter our poses.
+we need to evaluate if our sequences fold into the design models. For this, we are going to use ESMFold because it offers faster inference time compared to ColabFold.
+Since ESMFold can only predict monomers, we have to remove the receptor first. The custom ProtFlow class ChainRemover is suited for this task. Since we are only interested in 
+predictions with high confidence, we again filter our poses. The top 200 poses according to pLDDT that agree with the design model are passed on to the next step.
 
 .. code-block:: python
    
@@ -292,8 +344,167 @@ The custom ProtFlow class ChainRemover is suited for this task. Since we are onl
    # calculate composite score
    poses.calculate_composite_score(name=f"cycle_{cycle}_esm_composite_score", scoreterms=[f"cycle_{cycle}_tm_TM_score_ref", f"cycle_{cycle}_esm_plddt"], weights=[-1,-2], plot=True)
 
-   # filter to cycle input poses (max 15 poses per optimization cycle input pose)
-   poses.filter_poses_by_rank(n=15, score_col=f"cycle_{cycle}_esm_composite_score", group_col="", plot=True, prefix=f"cycle_{cycle}_esm_comp_per_bb")
+   # filter to cycle input poses (max 10 poses per optimization cycle input pose)
+   poses.filter_poses_by_rank(n=10, score_col=f"cycle_{cycle}_esm_composite_score", group_col="rfdiff_location", plot=True, prefix=f"cycle_{cycle}_esm_comp_per_bb")
 
    # filter for maximum number of input poses for colabfold
-   poses.filter_poses_by_rank(n=500, score_col=f"cycle_{cycle}_esm_composite_score", prefix=f"cycle_{cycle}_esm_comp", plot=True)
+   poses.filter_poses_by_rank(n=200, score_col=f"cycle_{cycle}_esm_composite_score", prefix=f"cycle_{cycle}_esm_comp", plot=True)
+
+.. figure:: ../../assets/egfr_af2_input_filter.png
+   :align: center
+   :figwidth: 700px
+
+Next, we want to evaluate if our binder actually binds to the target using Colabfold (an AlphaFold2 implementation). First, we have to add the target sequence to our poses. Our poses need to be in .fasta format.
+
+.. code-block:: python
+
+   from protflow.tools.protein_edits import SequenceAdder
+   from protflow.tools.colabfold import Colabfold, calculate_poses_interaction_pae
+
+   # set up sequence adder and colabfold
+   seq_adder = SequenceAdder(jobstarter=small_cpu_jobstarter) 
+   colabfold = Colabfold(jobstarter=gpu_jobstarter)
+
+   # convert pdb to fasta
+   poses.convert_pdb_to_fasta(prefix=f"cycle_{cycle}_complex_fasta", update_poses=True)
+
+   # add target sequence
+   seq_adder.run(prefix=f"cycle_{cycle}_target_seq", sequence=receptor_sequence) # reusing the sequence extracted pre-diffusion and adding a chain separator
+
+   # define colabfold options and run it
+   colabfold_opts = "--num-models 3 --num-recycle 3"
+   colabfold.run(poses=poses, prefix=f"cycle_{cycle}_af2", options=colabfold_opts)
+
+   # filter for high confidence predictions
+   poses.filter_poses_by_value(score_col=f"cycle_{cycle}_af2_plddt", value=af2_plddt_cutoff, operator=">", prefix=f"cycle_{cycle}_af2_plddt", plot=True)
+
+   # filter for high agreement between design model and prediction
+   tm_score_calculator.run(poses=poses, prefix=f"cycle_{cycle}_af2_tm", ref_col=f"cycle_{cycle}_rlx_location")
+   poses.filter_poses_by_value(score_col=f"cycle_{cycle}_af2_tm_TM_score_ref", value=0.9, operator=">", prefix=f"cycle_{cycle}_af2_tm_score", plot=True)
+
+   for res in hotspot_residue_selection.to_list():
+      resnum, chain = get_resnum_chain(res)
+      logging.info(f"{resnum}, {chain}, {type(chain)}")
+      tmp.append([chain, resnum])
+      rescontact_opts={"max_distance": 12, "target_chain": "B", "partner_chain": "A", "target_resnum": int(res[1:]), "target_atom_names": ["CA"], "partner_atom_names": ["CA"]}
+      rescontacts_calculator.run(poses=poses, prefix=f"cycle_{cycle}_hotspot_{chain+str(resnum)}_contacts", options=rescontact_opts)
+
+   # calculate overall hotspot contacts
+   poses.df[f"cycle_{cycle}_hotspot_contacts"] = sum([poses.df[f"cycle_{cycle}_hotspot_{res}_contacts_data"] for res in hotspot_residue_selection.to_list()])
+
+   # filter out all poses where the contact between target and binder is below the cutoff
+   poses.filter_poses_by_value(score_col=f"cycle_{cycle}_hotspot_contacts", value=20, operator=">", prefix=f"cycle_{cycle}_hotspots_contacts", plot=True)
+
+   calculate_poses_interaction_pae(
+      poses=poses,
+      prefix=f"cycle_{cycle}",
+      pae_list_col=f"cycle_{cycle}_af2_pae_list",
+      binder_start=1, # first residue of binder
+      binder_end=80, # last residue of binder
+      target_start=81, # first residue of receptor
+      target_end=242) # last residue of receptor
+
+   colabfold_comp_cols = [
+            f"cycle_{cycle}_hotspot_contacts",
+            f"cycle_{cycle}_af2_tm_TM_score_ref",
+            f"cycle_{cycle}_af2_plddt",
+            f"cycle_{cycle}_af2_iptm",
+            f"cycle_{cycle}_pae_interaction"]
+   colabfold_comp_weigths = [-1, -1, -2, -3, 4]
+   
+   # calculate a composite score of colabfold metrics:
+   poses.calculate_composite_score(
+      name = f"cycle_{cycle}_opt_composite_score",
+      scoreterms = colabfold_comp_cols,
+      weights = colabfold_comp_weigths,
+      plot = True
+   )
+   
+   #filter the poses:
+   poses.filter_poses_by_rank(
+      n = 5, # output poses per unique diffusion backbone
+      score_col = f"cycle_{cycle}_opt_composite_score",
+      prefix = f"cycle_{cycle}_opt_composite_score",
+      plot = True,
+      plot_cols=[
+            f"cycle_{cycle}_hotspot_contacts",
+            f"cycle_{cycle}_af2_tm_TM_score_ref",
+            f"cycle_{cycle}_af2_plddt",
+            f"cycle_{cycle}_af2_iptm",
+            f"cycle_{cycle}_pae_interaction"
+      ],
+      group_col = "rfdiff_location"   
+   )
+
+   # for checking the ouput
+   poses.save_poses(os.path.join(poses.work_dir, f"cycle_{cycle}_output"))
+   poses.save_scores(os.path.join(poses.work_dir, f"cycle_{cycle}_scores.json"))
+
+.. figure:: ../../assets/egfr_cycle1_results.png
+   :align: center
+   :figwidth: 700px
+
+We filtered our poses to the best 5 structures per unique diffusion backbone according to our composite score scoreterms. Looking at the poses, you will notice that their names are quite long.
+This is because each tool added an index layer to the pose name. We can remove these suffixes for a cleaner look.
+
+.. code-block:: python
+
+   poses.reindex_poses(prefix=f"cycle_{cycle}_reindex", force_reindex=True, group_col="rfdiff_location") # reset the number of index layers
+
+This will reset the names to the ones specified in group_col, then add another suffix layer (_0001, _0002, etc) to ensure each pose name is unique. This completes our first iterative optimization cycle.
+We can continue with the next cycle by moving all code inside a loop:
+
+.. code-block:: python
+
+   num_cycles = 3
+   for cycle in range(1, num_cycles+1):
+      # run all steps of the iterative optimization inside this loop
+      ...
+
+# TODO: show how scores improved during cycles
+
+Final analysis
+--------------
+
+After the final cycle is completed, we run Rosetta again to calculate some scores:
+
+.. code-block:: python
+
+   # relax all optimized structures & calculate scores
+   rosetta.run(poses=poses, prefix="final_rlx", nstruct=3, options=fr_options, rosetta_application="rosetta_scripts.default.linuxgccrelease")
+
+   # filter for pose with lowest total score for each pose
+   poses.filter_poses_by_rank(
+      n = 1,
+      score_col = "final_rlx_total_score",
+      prefix = "final_rlx_total_score",
+      plot = True,
+      remove_layers = 1 # subtract one index layer then group, same result as group_col="final_rlx_location"
+   )
+
+   # calculate a final composite score:
+   final_comp_cols = colabfold_comp_cols + ["final_rlx_sap_score",  "final_rlx_total_score", "final_rlx_interaction_score_interaction_energy"]
+   final_comp_weights = colabfold_comp_weigths + [1, 1, 1]
+   poses.calculate_composite_score(name="final_comp_score", scoreterms=final_comp_cols, weights=final_comp_weights, plot=True)
+
+   # filter for the final top 20 poses
+   poses.filter_poses_by_rank(
+      n = 20,
+      score_col = "final_comp_score",
+      prefix = "final_comp_score",
+      plot = True,
+      plot_cols=final_comp_cols,
+   )
+
+   # save poses
+   poses.save_poses(os.path.join(poses.work_dir, "results"))
+
+   # plot final scores
+   violinplot_multiple_cols(dataframe=poses.df, cols=final_comp_cols, y_labels=final_comp_cols, out_path=os.path.join(results, "scores.png"))
+
+
+.. figure:: ../../assets/egfr_binders.png
+   :align: center
+   :figwidth: 700px
+
+   Structures of truncated EGFR (green) in complex with de novo binders (magenta).
