@@ -80,7 +80,7 @@ topology diversity of diffused structures. Our binder should have a length of 80
    from protflow.tools.rfdiffusion import RFdiffusion
 
    # extract the receptor sequence
-   receptor_structure = load_structure_from_pdbfile(receptor_pdb)  # only one structure of target in poses
+   receptor_structure = load_structure_from_pdbfile(receptor_pdb)
    receptor_sequence = get_sequence_from_pose(receptor_structure)
 
    # set up jobstarters
