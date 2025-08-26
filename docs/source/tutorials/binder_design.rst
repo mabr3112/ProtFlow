@@ -401,10 +401,10 @@ Next, we want to evaluate if our binder actually binds to the target using Colab
       poses=poses,
       prefix=f"cycle_{cycle}",
       pae_list_col=f"cycle_{cycle}_af2_pae_list",
-      binder_start=1, # first residue of binder
-      binder_end=80, # last residue of binder
-      target_start=81, # first residue of receptor
-      target_end=242) # last residue of receptor
+      binder_start=0, # first residue of binder (0-indexed)
+      binder_end=79, # last residue of binder
+      target_start=80, # first residue of receptor
+      target_end=241) # last residue of receptor (binder length + receptor length)
 
    # define colabfold composite scoreterms and weights
    colabfold_comp_cols = [
