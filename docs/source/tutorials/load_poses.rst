@@ -4,8 +4,9 @@ Create Poses Tutorial
 ======================
 
 Poses are the central class of the ProtFlow package. They store information like paths to design models and the corresponding scores and are the input for the different design tools.
-This tutorial can also be completed interactively, by working in the Jupyter notebook found at ProtFlow/examples/load_poses.ipynb. Input PDBs can be found in the same directory.
-Before we start, make sure the ProtFlow config file is set up properly. 
+This tutorial can also be completed interactively, by working in the Jupyter notebook found at 
+`ProtFlow/examples/load_poses.ipynb <https://github.com/mabr3112/ProtFlow/blob/master/examples/load_poses.ipynb>`_. It can be opened with programs such as Visual Studio Code.
+Input PDBs can be found in the same directory. Before we start, make sure the ProtFlow config file is set up properly and the ProtFlow environment is active. 
 
 .. note::
 
