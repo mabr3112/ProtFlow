@@ -85,14 +85,14 @@ class ESM(Runner):
         # check if poses are sequences (end with .fa or .fasta)
         if all(pose.endswith(".pdb") for pose in poses.poses_list()):
             poses.convert_pdb_to_fasta(prefix=prefix, update_poses=False, chain_sep=":")
-            fastas = poses.df[f"{prefix}_fasta_location"]
+            fastas = poses.df[f"{prefix}_fasta_location"].to_list()
         elif all(pose.endswith((".fa", ".fasta", ".fas")) for pose in poses.poses_list()):
             fastas = poses.poses_list()
         else:
             raise TypeError("Non-fasta file poses detected. To run ESM, your poses must be fasta files, ending with .fa, .fas, or .fasta. .pdb files are also allowed, but all files must be uniform (only .pdb or only .fa)")
 
         # batch input fastas
-        n_jobs = max(jobstarter.max_cores, len(fastas))
+        n_jobs = min(jobstarter.max_cores, len(fastas))
         prediction_inputs = self.prep_fastas_for_prediction(fastas, input_fasta_dir, max_filenum=n_jobs)
 
         # parse options
@@ -227,8 +227,8 @@ class ESM(Runner):
             return out_path
 
         # determine how to split the poses into <max_gpus> fasta files:
-        splitnum = max(len(fastas), max_filenum)
-        fastas_list = split_list(fastas, splitnum)
+        splitnum = min(len(fastas), max_filenum)
+        fastas_list = split_list(fastas, n_sublists=splitnum)
 
         # Write fasta files according to the fasta_split determined above and then return:
         return [mergefastas(files=fastas, out_path=f"{fasta_dir}/fasta_{str(i+1).zfill(4)}.fa", exchange_char=("/",":")) for i, fastas in enumerate(fastas_list)]
