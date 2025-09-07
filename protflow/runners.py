@@ -690,7 +690,8 @@ def options_flags_to_string(options: dict, flags: list, sep="--", no_quotes: boo
 
     # if flags are present, assemble those too and return
     if flags and len(flags) >= 1:
-        out_str += f" {sep}" + f" {sep}".join(flags)
+        flags = [f" {sep}{flag}" for flag in flags if flag != ""]  # removes any empty strings "" from flags (this causes empty "--" to appear in commands causing crashes)
+        out_str += "".join(flags)
     return out_str
 
 def prepend_cmd(cmds: list[str], pre_cmd: str) -> list[str]:
