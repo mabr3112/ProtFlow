@@ -183,7 +183,7 @@ class GenericMetric(Runner):
         """
         # setup config
         config = require_config()
-        self.set_python_path(python_path or os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python"))
+        self.set_python_path(python_path or load_config_path(config, "PROTFLOW_ENV"))
 
         # setup runner
         self.set_module(module)
