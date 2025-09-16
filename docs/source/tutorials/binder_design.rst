@@ -1,7 +1,7 @@
 .. _binder_design:
 
-Binder Design Tutorial
-======================
+Binder Design
+=============
 
 We aren't BindCraft. But we can help you build your own binder design pipeline, just wait until we tell you how!
 In this tutorial, we are going to design binders for the protein Epidermal Growth Factor Receptor (EGFR).
