@@ -7,4 +7,5 @@ Welcome to the ProtFlow tutorials!
     :maxdepth: 1
 
     load_poses
+    run_applications
     binder_design
