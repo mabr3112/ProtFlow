@@ -470,7 +470,13 @@ We can continue with the next cycle by moving all code inside a loop:
       # run all steps of the iterative optimization inside this loop
       ...
 
- # TODO: show how scores improved during cycles
+.. figure:: ../../assets/binder_tutorial/egfr_cycle_results.png
+   :align: center
+   :figwidth: 700px
+
+   AF2 Metrics for output poses of each cycle.
+
+Iterative refinement improved scores in our binder design pipeline.
 
 Final analysis
 --------------
@@ -517,5 +523,11 @@ After the final cycle is completed, we run Rosetta again to calculate some score
    :figwidth: 700px
 
    Structures of truncated EGFR (green) in complex with de novo binders (magenta).
+
+.. figure:: ../../assets/binder_tutorial/egfr_final_scores.png
+   :align: center
+   :figwidth: 700px
+
+   Metrics for top 20 output poses.
 
 This completes the binder design tutorial. The complete binder design script can be found on `GitHub <https://github.com/TecnomaLaser/ProtFlow-binder-design-tutorial>`_.
