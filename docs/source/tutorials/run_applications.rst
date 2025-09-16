@@ -65,7 +65,7 @@ For each runner, you can define options that apply to all poses. These options s
    # reset poses to original
    my_poses = Poses(poses='data/input_pdbs/', glob_suffix='*pdb', work_dir='runners_example', jobstarter=local_jobstarter)
 
-   ligandmpnn_opts = "--temperature 0.05 --ligand_mpnn_use_side_chain_context 1"
+   ligandmpnn_opts = "--temperature 0.05 --seed 1"
    ligandmpnn.run(poses=my_poses, prefix='ligmpnn_opts', options=ligandmpnn_opts, nseq=2, model_type='protein_mpnn')
    print(my_poses.df)
 
