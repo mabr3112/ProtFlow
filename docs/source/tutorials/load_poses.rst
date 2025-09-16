@@ -95,10 +95,6 @@ how compute jobs are distributed and will be explained in detail in the # TODO: 
 
 As mentioned before, all of these settings can be directly defined when setting up the poses:
 
-
-LigandMPNN created structures with amino acid sequences out of our backbones. To improve our backbones, we are going to employ Rosetta Relax, a specialized Rosetta protocol that optimizes
-protein structures by minimizing energies via introduction of small movements. 
-
 .. code-block:: python
 
    my_poses = Poses(poses='path/to/input_pdbs/', glob_suffix='*pdb', work_dir='load_poses_example', storage_format='csv', jobstarter=my_jobstarter)
