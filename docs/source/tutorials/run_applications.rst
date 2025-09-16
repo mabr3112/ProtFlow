@@ -55,6 +55,40 @@ ligandmpnn, it ran on the local machine, because it defaulted to the jobstarter 
 In your working directory, there should now exist a folder called "ligmpnn_local". This is where all the output from the LigandMPNN run is stored. Typically, there is a json file containing all
 scores in this directory. These are the same scores that are added to the poses DataFrame (with the set prefix for each scorename). 
 
+Options & pose options
+----------------------
+
+For each runner, you can define options that apply to all poses. These options should be provided in the same format as when running the tool on the cmd-line; e.g. LigandMNN accepts string options separated by ``--``.
+
+.. code-block:: python
+   
+   # reset poses to original
+   my_poses = Poses(poses='data/input_pdbs/', glob_suffix='*pdb', work_dir='runners_example', jobstarter=local_jobstarter)
+
+   ligandmpnn_opts = "--temperature 0.05 --ligand_mpnn_use_side_chain_context 1"
+   ligandmpnn.run(poses=my_poses, prefix='ligmpnn_opts', options=ligandmpnn_opts, nseq=2, model_type='protein_mpnn')
+   print(my_poses.df)
+
+You can also define options that should only apply to specific poses. These are called pose_options and are typically stored in a poses dataframe column. Let's say we want to keep the identitities of residues 34 and 173 fixed
+for our first pose, residues 36 and 134 for our second pose and keep all positions designable for our last pose. We then provide the dataframe column name containing these options to the runner via pose_options. You can also
+define options that apply to all poses at the same time.
+
+.. code-block:: python
+   
+   # reset poses to original
+   my_poses = Poses(poses='data/input_pdbs/', glob_suffix='*pdb', work_dir='runners_example', jobstarter=local_jobstarter)
+
+   # 3 poses in my_poses
+   ligandmpnn_pose_opts = ["--fixed_residues 'A34 A173'", "--fixed_residues 'A36 A134'", None]
+   my_poses.df["ligandmpnn_pose_opts"] = ligandmpnn_pose_opts
+
+   ligandmpnn.run(poses=my_poses, prefix='ligmpnn_pose_opts', options=ligandmpnn_opts, pose_options="ligandmpnn_pose_opts", nseq=2, model_type='protein_mpnn')
+   print(my_poses.df)
+
+
+Chaining tools
+--------------
+
 To run multiple design tools in succession, just run the next tool on the same poses instance:
 
 .. code-block:: python
