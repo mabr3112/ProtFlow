@@ -167,10 +167,21 @@ class DSSP(Runner):
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
         return output
 
-    def add_HEADER(self, pose_path: str, output_dir: str) -> None:
+    def add_HEADER(self, pose_path: str, output_dir: str) -> str:
         """
-        Ensure the PDB file starts with a valid HEADER and CRYST1 line.
-        If missing, prepend dummy HEADER and/or CRYST1 records.
+        Adds a HEADER line to any PDB files missing it.
+
+        Parameters
+        ----------
+        pose_path : str
+            Path to input pose.
+        output_dir : str
+            Directory for writing output
+
+        Returns
+        -------
+        str
+            Path to output pose.
         """
         if pose_path.endswith("cif"):
             return pose_path
