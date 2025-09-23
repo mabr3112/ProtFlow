@@ -12,7 +12,7 @@ from unittest.mock import patch, MagicMock
 
 # custom
 from protflow.poses import Poses
-from protflow.poses import description_from_path, filter_dataframe_by_value, filter_dataframe_by_rank, col_in_df, load_poses, get_format, combine_dataframe_score_columns, scale_series, normalize_series
+from protflow.poses import description_from_path, filter_dataframe_by_value, filter_dataframe_by_rank, col_in_df, load_poses, get_format, combine_dataframe_score_columns, scale_series, normalize_series, class_in_df
 
 ####################### variables ##############################
 @pytest.fixture
@@ -26,6 +26,10 @@ def sample_df():
         'poses': ['pose1_0001_0001.pdb', 'pose1_0001_0002.pdb', 'pose2_0001_0001.pdb', 'pose2_0001_0003.pdb', 'pose3_0001_0001.pdb', 'pose4_0001_0001.pdb']
     })
 
+class DummyRS:
+    def __init__(self, value, from_scorefile: bool = False):
+        self.value = value
+        self.from_scorefile = from_scorefile
 
 ####################### tests ##################################
 @pytest.mark.parametrize("path, expect", [
@@ -317,6 +321,88 @@ def test_normalize_series_with_nan(sample_df):
     # NaNs remain NaNs
     assert normalized.isna().sum() == 1
 
+### CLASS_IN_DF ###
+
+def test_class_in_df_empty_df_returns_unchanged():
+    df = pd.DataFrame(columns=["a", "b"])
+    out = class_in_df(df, dict, "hit_cols")
+    # same shape & no new column
+    assert list(out.columns) == ["a", "b"]
+    assert out.empty
+    # original not mutated
+    assert list(df.columns) == ["a", "b"]
+
+def test_class_in_df_no_matches_returns_unchanged():
+    df = pd.DataFrame({"a": [1, 2], "b": ["x", "y"]})
+    out = class_in_df(df, dict, "hit_cols")
+    assert list(out.columns) == ["a", "b"]
+    pd.testing.assert_frame_equal(out, df)  # identical copy (no new column)
+
+def test_class_in_df_dict_matches_adds_out_col_with_per_row_lists():
+    df = pd.DataFrame({
+        "a": [1, {"x": 1}, 3],
+        "b": [{"y": 2}, 5, [1, 2]],
+        "c": ["hi", "there", "world"],
+    })
+    out = class_in_df(df, dict, "hit_cols")
+
+    # Column added
+    assert "hit_cols" in out.columns
+
+    # Expected lists (order must follow column order: a, b, c)
+    # row 0: b is dict
+    # row 1: a is dict
+    # row 2: none are dict → empty list
+    expected = [
+        ["b"],
+        ["a"],
+        [],
+    ]
+    assert out["hit_cols"].tolist() == expected
+
+    # other columns preserved
+    pd.testing.assert_series_equal(out["a"], df["a"])
+
+def test_class_in_df_tuple_of_classes_matches_union():
+    df = pd.DataFrame({
+        "a": [1, {"x": 1}, 3],
+        "b": [{"y": 2}, 5, [1, 2]],
+        "c": ["hi", "there", "world"],
+    })
+    out = class_in_df(df, (dict, list), "hit_cols")
+
+    expected = [
+        ["b"],       # dict in b
+        ["a"],       # dict in a
+        ["b"],       # list in b
+    ]
+    assert out["hit_cols"].tolist() == expected
+
+def test_class_in_df_does_not_mutate_input():
+    df = pd.DataFrame({
+        "a": [1, {"x": 1}],
+        "b": ["z", {"y": 2}],
+    })
+    df_copy = df.copy(deep=True)
+
+    out = class_in_df(df, dict, "hit_cols")
+
+    # out has the new column, original doesn't
+    assert "hit_cols" in out.columns
+    assert "hit_cols" not in df.columns
+    # original data unchanged
+    pd.testing.assert_frame_equal(df, df_copy)
+
+def test_class_in_df_rows_with_no_matches_get_empty_list_when_any_match_exists():
+    df = pd.DataFrame({
+        "a": [1, {"x": 1}, 3],      # middle row has a dict
+        "b": ["u", "v", "w"],
+    })
+    out = class_in_df(df, dict, "hit_cols")
+    # row-wise: [[], ['a'], []]
+    assert out["hit_cols"].tolist() == [[], ["a"], []]
+
+
 #### POSES TESTS ####
 
 def test_set_storage_format_valid_and_invalid(tmp_path):
@@ -550,6 +636,139 @@ def test_reindex_poses_force_and_conflict(tmp_path, sample_df):
     # descriptions should have single layer with new index
     assert set(p.df["poses_description"]) == {"x_0001", "x_0002"} or all("_" in d for d in p.df["poses_description"])
 
+def test_set_poses_df_triggers_resselection_conversion_str_and_dict(monkeypatch):
+    # Patch the class used inside convert_resselection_cols
+    from protflow import poses as poses_mod
+    monkeypatch.setattr(poses_mod, "ResidueSelection", DummyRS)
+
+    df = pd.DataFrame({
+        "input_poses": ["a.pdb"],
+        "poses": ["a.pdb"],
+        "poses_description": ["a"],
+        "import_resselection_cols": [["fixed_residues", "motif_residues"]],
+        "fixed_residues": ["A12,A34"],  # str -> DummyRS(str)
+        "motif_residues": [{"residues": [["A", 164], ["A", 165]]}],  # dict -> DummyRS(dict, from_scorefile=True)
+    })
+
+    p = Poses()
+    p.set_poses(df)  # must call convert_resselection_cols under the hood
+
+    assert isinstance(p.df.at[0, "fixed_residues"], DummyRS)
+    assert p.df.at[0, "fixed_residues"].value == "A12,A34"
+    assert p.df.at[0, "fixed_residues"].from_scorefile is False
+
+    assert isinstance(p.df.at[0, "motif_residues"], DummyRS)
+    assert p.df.at[0, "motif_residues"].value == {"residues": [["A", 164], ["A", 165]]}
+    assert p.df.at[0, "motif_residues"].from_scorefile is True
+
+def test_set_poses_df_stringified_selector_is_parsed(monkeypatch):
+    from protflow import poses as poses_mod
+    monkeypatch.setattr(poses_mod, "ResidueSelection", DummyRS)
+
+    df = pd.DataFrame({
+        "input_poses": ["a.pdb"],
+        "poses": ["a.pdb"],
+        "poses_description": ["a"],
+        # like CSV import: stringified list
+        "import_resselection_cols": ["['motif_residues']"],
+        "motif_residues": ["B5-B9"],  # str -> DummyRS(str)
+    })
+
+    p = Poses()
+    p.set_poses(df)
+
+    assert isinstance(p.df.at[0, "motif_residues"], DummyRS)
+    assert p.df.at[0, "motif_residues"].value == "B5-B9"
+
+def test_convert_resselection_cols_missing_target_column_warns_and_skips(monkeypatch, caplog):
+    from protflow import poses as poses_mod
+    monkeypatch.setattr(poses_mod, "ResidueSelection", DummyRS)
+
+    df = pd.DataFrame({
+        "input_poses": ["a.pdb"],
+        "poses": ["a.pdb"],
+        "poses_description": ["a"],
+        "import_resselection_cols": [["nope", "fixed_residues"]],
+        "fixed_residues": ["A1"],
+    })
+
+    p = Poses()
+    p.set_poses(df)  # runs convert_resselection_cols()
+
+    # existing col converted
+    assert isinstance(p.df.at[0, "fixed_residues"], DummyRS)
+    # and we should have seen a warning about the missing one
+    assert any("Could not find column nope" in rec.message for rec in caplog.records)
+
+def test_convert_resselection_cols_selector_wrong_type_raises(monkeypatch):
+    from protflow import poses as poses_mod
+    monkeypatch.setattr(poses_mod, "ResidueSelection", DummyRS)
+
+    df = pd.DataFrame({
+        "input_poses": ["a.pdb"],
+        "poses": ["a.pdb"],
+        "poses_description": ["a"],
+        "import_resselection_cols": [123],  # not list/tuple/parsable string
+        "fixed_residues": ["A1"],
+    })
+
+    p = Poses()
+    with pytest.raises(KeyError):
+        p.set_poses(df)
+
+def test_convert_resselection_cols_malformed_stringified_selector_raises(monkeypatch):
+    from protflow import poses as poses_mod
+    monkeypatch.setattr(poses_mod, "ResidueSelection", DummyRS)
+
+    df = pd.DataFrame({
+        "input_poses": ["a.pdb"],
+        "poses": ["a.pdb"],
+        "poses_description": ["a"],
+        "import_resselection_cols": ["[motif_residues"],  # malformed, literal_eval should fail
+        "motif_residues": ["A1"],
+    })
+
+    p = Poses()
+    with pytest.raises((ValueError, SyntaxError, KeyError)):
+        p.set_poses(df)
+    
+def test_convert_resselection_cols_skips_falsy_and_keeps_existing_instances(monkeypatch):
+    from protflow import poses as poses_mod
+    monkeypatch.setattr(poses_mod, "ResidueSelection", DummyRS)
+
+    already = DummyRS("A2")  # will be left as-is
+
+    df = pd.DataFrame({
+        "input_poses": ["a.pdb", "b.pdb"],
+        "poses": ["a.pdb", "b.pdb"],
+        "poses_description": ["a", "b"],
+        "import_resselection_cols": [["fixed_residues"], ["fixed_residues"]],
+        "fixed_residues": [already, None],   # row0 already RS, row1 falsy -> skip
+    })
+
+    p = Poses()
+    p.set_poses(df)
+
+    # Row 0 remains same object (no re-wrap)
+    assert p.df.at[0, "fixed_residues"] is already
+    # Row 1 unchanged (None stays None)
+    assert p.df.at[1, "fixed_residues"] is None
+
+def test_convert_resselection_cols_absent_selector_col_is_noop(monkeypatch):
+    from protflow import poses as poses_mod
+    monkeypatch.setattr(poses_mod, "ResidueSelection", DummyRS)
+
+    df = pd.DataFrame({
+        "input_poses": ["a.pdb"],
+        "poses": ["a.pdb"],
+        "poses_description": ["a"],
+        # no "import_resselection_cols" column
+        "fixed_residues": ["A1"],
+    })
+
+    p = Poses()
+    p.set_poses(df)  # should not attempt conversion, no error
+    assert p.df.at[0, "fixed_residues"] == "A1"
 
 
 ###############################################################################
@@ -563,3 +782,4 @@ def create_temp_poses(path, df):
     for file, name in zip(df["poses"], df["poses_description"]):
         file.write_text(f"#{name}") # create tmp files containing description as input
     return df
+
