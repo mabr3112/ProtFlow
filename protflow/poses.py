@@ -809,13 +809,13 @@ class Poses:
         ``resselection_col`` and attempts to convert the corresponding cells:
 
         - If a target column listed for a row does not exist in ``self.df``,
-        a warning is logged and that column is skipped for the row.
+          a warning is logged and that column is skipped for the row.
         - If the target cell is already a ``ResidueSelection`` instance,
-        it is left unchanged.
+          it is left unchanged.
         - If the target cell is a ``str``, it is converted via
-        ``ResidueSelection(value)`` (useful for CSV imports).
+          ``ResidueSelection(value)`` (useful for CSV imports).
         - If the target cell is a ``dict``, it is converted via
-        ``ResidueSelection(value, from_scorefile=True)`` (useful for JSON imports).
+          ``ResidueSelection(value, from_scorefile=True)`` (useful for JSON imports).
         - Empty selector lists are allowed and simply result in no action for that row.
         - Cells that are falsy (e.g., ``None``, empty string, empty dict) are skipped.
 
@@ -858,7 +858,7 @@ class Poses:
         -----
         - Missing target columns are not fatal; a warning is logged and processing continues.
         - When importing from CSV, stringified lists in ``resselection_col`` are parsed
-        with ``ast.literal_eval``; malformed strings will raise ``ValueError`` or ``SyntaxError``.
+          with ``ast.literal_eval``; malformed strings will raise ``ValueError`` or ``SyntaxError``.
         - ``ResidueSelection`` construction is delegated; any errors it raises will propagate.
         """
 
