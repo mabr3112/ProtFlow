@@ -780,15 +780,17 @@ class Poses:
         ----------
         resselection_col : str, optional
             Name of the column that, for each row, contains a list/tuple of target
-            column names to convert (default is ``"import_resselection_cols"``).
-            When reading from CSV, this field may be a stringified list (e.g., ``"['a','b']"``),
+            column names to convert (default is ``import_resselection_cols``).
+            When reading from CSV, this field may be a stringified list (e.g., ``['a','b']``),
             which will be parsed automatically.
+
 
         Returns
         -------
         None
-            This method modifies ``self.df`` in place and returns ``None``.
-            If ``resselection_col`` is not present in ``self.df``, the method exits early.
+            This method modifies self.df in place and returns None.
+            If resselection_col is not present in self.df, the method exits early.
+
 
         Raises
         ------
@@ -802,6 +804,7 @@ class Poses:
             If parsing a malformed stringified list triggers a syntax error.
         TypeError
             If constructing a ``ResidueSelection`` from a cell value raises a type error.
+
 
         Further Details
         ---------------
@@ -818,6 +821,7 @@ class Poses:
           ``ResidueSelection(value, from_scorefile=True)`` (useful for JSON imports).
         - Empty selector lists are allowed and simply result in no action for that row.
         - Cells that are falsy (e.g., ``None``, empty string, empty dict) are skipped.
+
 
         Example
         -------
@@ -854,6 +858,7 @@ class Poses:
             # - df.loc[1, "motif_residues"] is a ResidueSelection instance
             # - Row 2 remains unchanged due to empty selector and falsy cells
 
+
         Notes
         -----
         - Missing target columns are not fatal; a warning is logged and processing continues.
@@ -861,6 +866,7 @@ class Poses:
           with ``ast.literal_eval``; malformed strings will raise ``ValueError`` or ``SyntaxError``.
         - ``ResidueSelection`` construction is delegated; any errors it raises will propagate.
         """
+
 
         if not resselection_col in self.df.columns:
             return None 
