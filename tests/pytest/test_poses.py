@@ -193,9 +193,8 @@ def test_load_poses_calls_poses_load_poses():
 @pytest.mark.parametrize("filename,expected_function", [
     ("file.json", pd.read_json),
     ("file.csv", pd.read_csv),
+    ("file.pkl", pd.read_pickle),
     ("file.pickle", pd.read_pickle),
-    ("file.feather", pd.read_feather),
-    ("file.parquet", pd.read_parquet),
     ("file.JSON", pd.read_json),
 ])
 def test_get_format_supported(filename, expected_function):

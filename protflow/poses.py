@@ -91,9 +91,8 @@ from .utils import plotting as plots
 FORMAT_STORAGE_DICT = {
     "json": "to_json",
     "csv": "to_csv",
-    "pickle": "to_pickle",
-    "feather": "to_feather",
-    "parquet": "to_parquet"
+    "pkl": "to_pickle",
+    "pickle": "to_pickle"
 }
 
 class Poses:
@@ -2453,9 +2452,8 @@ def get_format(path: str):
     loading_function_dict = {
         "json": pd.read_json,
         "csv": pd.read_csv,
-        "pickle": pd.read_pickle,
-        "feather": pd.read_feather,
-        "parquet": pd.read_parquet
+        "pkl": pd.read_pickle,
+        "pickle": pd.read_pickle
     }
     return loading_function_dict[path.split(".")[-1].lower()]
 
