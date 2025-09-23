@@ -74,6 +74,7 @@ import re
 from typing import Union
 import shutil
 import logging
+import ast
 
 # dependencies
 import pandas as pd
@@ -647,6 +648,7 @@ class Poses:
         # if DataFrame is passed, load directly.
         if isinstance(poses, pd.DataFrame):
             self.df = self.check_poses_df_integrity(poses)
+            self.convert_resselection_cols(resselection_col="import_resselection_cols")
             return None
 
         if isinstance(poses, str) and any([poses.endswith(ext) for ext in ['csv', 'json', 'parquet', 'pickle', 'feather']]):
@@ -654,6 +656,7 @@ class Poses:
             # importing .csv files results in the index column being read in as Unnamed: 0, it can be dropped
             if 'Unnamed: 0' in self.df.columns: self.df.drop('Unnamed: 0', axis=1, inplace=True)
             self.df = self.check_poses_df_integrity(self.df)
+            self.convert_resselection_cols(resselection_col="import_resselection_cols")
             return None
 
         # if Poses are initialized freshly (with input poses as strings:)
@@ -767,6 +770,130 @@ class Poses:
             if col not in df.columns:
                 raise KeyError(f"Corrupted Format: DataFrame does not contain mandatory Poses column {col}")
         return df
+
+    def convert_resselection_cols(self, resselection_col:str="import_resselection_cols"):
+        """
+        Converts per-row residue selection descriptors into ``ResidueSelection`` objects
+        for the columns listed in a list-like selector column, mutating the DataFrame
+        in place.
+
+        Parameters
+        ----------
+        resselection_col : str, optional
+            Name of the column that, for each row, contains a list/tuple of target
+            column names to convert (default is ``"import_resselection_cols"``).
+            When reading from CSV, this field may be a stringified list (e.g., ``"['a','b']"``),
+            which will be parsed automatically.
+
+        Returns
+        -------
+        None
+            This method modifies ``self.df`` in place and returns ``None``.
+            If ``resselection_col`` is not present in ``self.df``, the method exits early.
+
+        Raises
+        ------
+        KeyError
+            If a row's value in ``resselection_col`` exists but is not a list or tuple
+            (after optional string-to-list parsing).
+        ValueError
+            If parsing a stringified list with ``ast.literal_eval`` fails due to an
+            invalid literal.
+        SyntaxError
+            If parsing a malformed stringified list triggers a syntax error.
+        TypeError
+            If constructing a ``ResidueSelection`` from a cell value raises a type error.
+
+        Further Details
+        ---------------
+        For each row, the method reads the list of target column names from
+        ``resselection_col`` and attempts to convert the corresponding cells:
+
+        - If a target column listed for a row does not exist in ``self.df``,
+        a warning is logged and that column is skipped for the row.
+        - If the target cell is already a ``ResidueSelection`` instance,
+        it is left unchanged.
+        - If the target cell is a ``str``, it is converted via
+        ``ResidueSelection(value)`` (useful for CSV imports).
+        - If the target cell is a ``dict``, it is converted via
+        ``ResidueSelection(value, from_scorefile=True)`` (useful for JSON imports).
+        - Empty selector lists are allowed and simply result in no action for that row.
+        - Cells that are falsy (e.g., ``None``, empty string, empty dict) are skipped.
+
+        Example
+        -------
+        .. code-block:: python
+
+            import pandas as pd
+            from protflow.poses import poses
+
+            # Sample DataFrame where each row specifies which columns to convert
+            df = pd.DataFrame({
+                "import_resselection_cols": [
+                    ["fixed_residues", "motif_residues"],  # row 0: convert two columns
+                    "['motif_residues']",                  # row 1: stringified list (from CSV)
+                    []                                     # row 2: nothing to convert
+                ],
+                "fixed_residues": [
+                    "A12,A34,A56",        # str -> ResidueSelection(str)
+                    None,                 # skipped
+                    "A1"
+                ],
+                "motif_residues": [
+                    {"residues":[["A",164],["A",165],["A",166],["A",167]]},  # dict -> ResidueSelection(dict, from_scorefile=True)
+                    "B5-B9",                           # str -> ResidueSelection(str)
+                    {}
+                ]
+            })
+
+            poses = Poses(df)
+            poses.convert_resselection_cols()  # mutates poses.df in place
+
+            # After this call:
+            # - df.loc[0, "fixed_residues"] is a ResidueSelection instance
+            # - df.loc[0, "motif_residues"] is a ResidueSelection instance (from dict)
+            # - df.loc[1, "motif_residues"] is a ResidueSelection instance
+            # - Row 2 remains unchanged due to empty selector and falsy cells
+
+        Notes
+        -----
+        - Missing target columns are not fatal; a warning is logged and processing continues.
+        - When importing from CSV, stringified lists in ``resselection_col`` are parsed
+        with ``ast.literal_eval``; malformed strings will raise ``ValueError`` or ``SyntaxError``.
+        - ``ResidueSelection`` construction is delegated; any errors it raises will propagate.
+        """
+
+        if not resselection_col in self.df.columns:
+            return None 
+        
+        for idx, cols in self.df[resselection_col].items():
+            # if input was a csv file, lists are imported as str
+            if isinstance(cols, str) and cols.startswith("[") and cols.endswith("]"):
+                cols = ast.literal_eval(cols)
+
+            # skip if no resselection cols are defined
+            if not cols:
+                continue
+
+            # check for wrong content in col
+            if not isinstance(cols, (list, tuple)):
+                raise KeyError(f"Could not import residue selection columns from {resselection_col}! ")
+
+            for col in cols:
+                if col not in self.df.columns:
+                    logging.warning(f"Could not find column {col} in poses dataframe for conversion to ResidueSelection for pose {self.df.at[idx, 'poses_description']}!")
+                    continue
+
+                if self.df.at[idx, col]:
+                    # skip if already a ResidueSelection (e.g. when importing from pickle)
+                    if isinstance(self.df.at[idx, col], ResidueSelection):
+                        continue
+                    # if importing from csv
+                    if isinstance(self.df.at[idx, col], str):
+                        self.df.at[idx, col] = ResidueSelection(self.df.at[idx, col])
+                    # if importing from json
+                    if isinstance(self.df.at[idx, col], dict):
+                        self.df.at[idx, col] = ResidueSelection(self.df.at[idx, col], from_scorefile=True)
 
     def split_multiline_fasta(self, path: str, encoding: str = "UTF-8") -> list[str]:
         """
@@ -978,17 +1105,19 @@ class Poses:
         - Supports various file formats, including JSON, CSV, Pickle, Feather, and Parquet.
         - The method automatically appends the correct file extension if it is not already present in the out_path.
         - Ensures that the scores are saved in a format suitable for further analysis and processing.
-        """
+        """        
         # setup defaults
         out_path = out_path or self.scorefile
         out_format = out_format or self.storage_format
+
+        temp_df = class_in_df(self.df, ResidueSelection, "import_resselection_cols")
 
         # make sure the filename conforms to format
         if not out_path.endswith(f".{out_format}"):
             out_path += f".{out_format}"
 
         if (save_method_name := FORMAT_STORAGE_DICT.get(out_format.lower())):
-            getattr(self.df, save_method_name)(out_path)
+            getattr(temp_df, save_method_name)(out_path)
 
     def save_poses(self, out_path: str, poses_col: str = "poses", overwrite: bool = True) -> None:
         """
@@ -2597,3 +2726,67 @@ def filter_dataframe_by_value(df: pd.DataFrame, col: str, value: float|int, oper
 def description_from_path(path: str) -> str:
     '''Extracts "description" from a pose path.'''
     return os.path.splitext(os.path.basename(path))[0]
+
+def class_in_df(df: pd.DataFrame, cls, out_col:str) -> pd.DataFrame:
+    """
+    Return a copy of ``df`` with a column listing, for each row, the names of
+    columns whose values are instances of a given class (or classes).
+
+    If **no** cells in the DataFrame match ``cls``, the function returns a copy
+    of ``df`` **without** adding ``out_col``. Empty DataFrames are returned
+    unchanged. Elementwise checks use :meth:`pandas.DataFrame.map` (pandas ≥ 2.2).
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input DataFrame to inspect.
+    cls : type or tuple[type, ...]
+        Class (or tuple of classes) to test against, as in :func:`isinstance`.
+        Examples: ``dict`` or ``(dict, list)``.
+    out_col : str
+        Name of the output column to add. Each entry will be a ``list[str]`` of
+        column names whose values in that row are instances of ``cls``. The column
+        is only created if at least one match exists anywhere in ``df``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy of ``df``. If any matches are found, the copy contains an added
+        column ``out_col`` with per-row lists of matching column names. If no
+        matches are found (or ``df`` is empty), the copy is returned unchanged.
+
+    Notes
+    -----
+    - This function does **not** mutate ``df``; it returns a modified copy.
+    - ``cls`` behaves exactly like the second argument to :func:`isinstance`.
+    - To convert the list results to a delimiter-separated string, you can
+      post-process with: ``out[out_col] = out[out_col].apply('|'.join)``.
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import pandas as pd
+        df = pd.DataFrame({
+            'a': [1, {'x': 1}, 3],
+            'b': [{'y': 2}, 5, [1, 2]],
+            'c': ['hi', 'there', 'world'],
+        })
+
+        check_cols_for_class(df, dict, 'resselector_cols')
+    """
+    check_df = df.copy()
+
+    if check_df.empty: # prevents crash
+        return check_df
+    
+    # check for target class
+    mask = check_df.map(lambda x: isinstance(x, cls))
+    
+    # if no rows with target class are found, return original dataframe
+    if not mask.to_numpy().any():
+        return check_df 
+
+    # write output col with col names containing target class
+    check_df[out_col] = mask.apply(lambda row: row.index[row].tolist(), axis=1)
+    return check_df
