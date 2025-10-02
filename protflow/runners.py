@@ -42,6 +42,8 @@ Version
 import logging
 import os
 import re
+import functools
+from multiprocessing import ProcessError
 
 # dependencies
 import pandas as pd
@@ -402,6 +404,9 @@ class Runner:
         work_dir = os.path.abspath(f"{poses.work_dir}/{prefix}")
         if not os.path.isdir(work_dir) and make_work_dir:
             os.makedirs(work_dir, exist_ok=True)
+
+        self.current_jobstarter = jobstarter # TODO: a bit hacky, might lead to problems if jobstarter is not set to wait until jobs finished and the same runner is called multiple times
+
         return work_dir, jobstarter
 
     def check_for_existing_scorefile(self, scorefile: str, overwrite: bool = False) -> pd.DataFrame:
@@ -461,6 +466,46 @@ class Runner:
             getattr(scores, save_method_name)(scorefile)
         else:
             raise KeyError(f"Could not find method to save scorefile as {storage_method}. Make sure the score file extension is correct!")
+        
+    class CrashError(RuntimeError):
+        """Re-raised error with job stderr context when collect_scores fails."""
+
+    @staticmethod
+    def _came_from_collect_scores(exc: BaseException) -> bool:
+        tb = exc.__traceback__
+        while tb:
+            if tb.tb_frame.f_code.co_name == "collect_scores":
+                return True
+            tb = tb.tb_next
+        return False
+
+    @staticmethod
+    def _wrap_run_with_stderr_context(fn):
+        @functools.wraps(fn)
+        def wrapped(self, *args, **kwargs):
+            try:
+                return fn(self, *args, **kwargs)
+            except Exception as e:
+                # Only enrich if failure originated in collect_scores(...)
+                if Runner._came_from_collect_scores(e) or isinstance(e, ProcessError): # ProcessError for LocalJobstarter
+                    js = getattr(self, "current_jobstarter", None)
+                    tail = getattr(js, "last_error_message", "") if js else ""
+                    msg = f"{self.__class__.__name__}.collect_scores failed: {e!r}"
+                    if tail:
+                        msg += "\n\n=== JOB ERROR OUTPUT ===\n" + tail
+                    err = Runner.CrashError(msg)
+                    err.__cause__ = e
+                    raise err
+                # Otherwise, re-raise the original exception unchanged
+                raise
+        return wrapped
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        # Auto-wrap any subclass that defines/overrides run()
+        run_fn = cls.__dict__.get("run")
+        if callable(run_fn):
+            setattr(cls, "run", Runner._wrap_run_with_stderr_context(run_fn))
 
 def parse_generic_options(options: str, pose_options: str, sep="--") -> tuple[dict,list]:
     """
