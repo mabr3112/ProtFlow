@@ -472,6 +472,7 @@ class Runner:
 
     @staticmethod
     def _came_from_collect_scores(exc: BaseException) -> bool:
+        "checks if an exception came from the function collect_scores"
         tb = exc.__traceback__
         while tb:
             if tb.tb_frame.f_code.co_name == "collect_scores":
@@ -481,6 +482,7 @@ class Runner:
 
     @staticmethod
     def _wrap_run_with_stderr_context(fn):
+        "catches exceptions in runners and returns the stderr output log of the job"
         @functools.wraps(fn)
         def wrapped(self, *args, **kwargs):
             try:
@@ -501,6 +503,7 @@ class Runner:
         return wrapped
 
     def __init_subclass__(cls, **kwargs):
+        "overwrites subclasses to check for exceptions"
         super().__init_subclass__(**kwargs)
         # Auto-wrap any subclass that defines/overrides run()
         run_fn = cls.__dict__.get("run")

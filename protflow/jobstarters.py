@@ -135,6 +135,16 @@ class JobStarter:
         self.max_cores = cores
 
     def set_last_error_message(self, error_path:str, read_bytes:int=8192):
+        """
+        Saves content of an error logfile.
+
+        Parameters
+        ----------
+        error_path : str
+            The path to the error logfile.
+        read_bytes : int, optional
+            Defines how many bytes of the log file should be read (starting from the back). Default is 8192.
+        """
         if os.path.isfile(error_path):
             with open(error_path, 'rb') as f:
                 f.seek(0, 2)                     # go to end
@@ -254,7 +264,10 @@ class SbatchArrayJobstarter(JobStarter):
             f.write("\n".join(cmds))
 
         # write sbatch command and run
-        self.options += f" -vvv -e {output_path}/{jobname}_slurm.err -o {output_path}/{jobname}_slurm.out --open-mode=append"
+        log_file = os.path.join(output_path, f"{jobname}_slurm.out")
+        error_file = os.path.join(output_path, f"{jobname}_slurm.err")
+
+        self.options += f" -vvv -e {error_file} -o {log_file} --open-mode=append"
         sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {self.options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
 
         with open(f"{output_path}/{jobname}_jobstarter.log", "w", encoding="UTF-8") as out_file:
@@ -266,6 +279,8 @@ class SbatchArrayJobstarter(JobStarter):
             self.wait_for_job(jobname)
         if self.remove_cmdfile:
             subprocess.run(f"rm {cmdfile}", shell=True, stdout=True, stderr=True, check=True)
+        
+        self.set_last_error_message(error_file)
         
         return None
 
