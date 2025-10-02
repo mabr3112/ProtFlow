@@ -134,6 +134,30 @@ class JobStarter:
         """
         self.max_cores = cores
 
+    def set_last_error_message(self, error_path:str, read_bytes:int=8192):
+        """
+        Saves content of an error logfile.
+
+        Parameters
+        ----------
+        error_path : str
+            The path to the error logfile.
+        read_bytes : int, optional
+            Defines how many bytes of the log file should be read (starting from the back). Default is 8192.
+        """
+        if os.path.isfile(error_path):
+            with open(error_path, 'rb') as f:
+                f.seek(0, 2)                     # go to end
+                filesize = f.tell()
+                f.seek(max(0, filesize - read_bytes))  # jump back some bytes
+                data = f.read().decode("utf-8", errors="ignore")
+            if filesize > read_bytes:
+                data = f"Error message truncated. See full output at {error_path}.\ndata"
+            self.last_error_message = data
+        else:
+            self.last_error_message = None
+        
+
 class SbatchArrayJobstarter(JobStarter):
     """
     Jobstarter that manages the submission of job arrays to SLURM clusters.
@@ -240,7 +264,10 @@ class SbatchArrayJobstarter(JobStarter):
             f.write("\n".join(cmds))
 
         # write sbatch command and run
-        self.options += f" -vvv -e {output_path}/{jobname}_slurm.err -o {output_path}/{jobname}_slurm.out --open-mode=append"
+        log_file = os.path.join(output_path, f"{jobname}_slurm.out")
+        error_file = os.path.join(output_path, f"{jobname}_slurm.err")
+
+        self.options += f" -vvv -e {error_file} -o {log_file} --open-mode=append"
         sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {self.options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
 
         with open(f"{output_path}/{jobname}_jobstarter.log", "w", encoding="UTF-8") as out_file:
@@ -252,6 +279,9 @@ class SbatchArrayJobstarter(JobStarter):
             self.wait_for_job(jobname)
         if self.remove_cmdfile:
             subprocess.run(f"rm {cmdfile}", shell=True, stdout=True, stderr=True, check=True)
+        
+        self.set_last_error_message(error_file)
+        
         return None
 
     def _use_bash(self, use_bash: bool) -> None:
@@ -381,21 +411,23 @@ class LocalJobStarter(JobStarter):
         ProcessError
             If a subprocess crashes during execution.
         """
-        def start_process(command, output_file):
+        def start_process(command, log_file, error_file):
             # Open the file to capture output and error
-            with open(output_file, 'w', encoding="UTF-8") as file:
+            with open(log_file, 'w', encoding="UTF-8") as out_file, \
+                open(error_file, 'w', encoding="UTF-8") as err_file:
                 # Start the process
-                process = subprocess.Popen(command, env=env, executable="/bin/bash", shell=True, stdout=file, stderr=subprocess.STDOUT)
+                process = subprocess.Popen(command, env=env, executable="/bin/bash", shell=True, stdout=out_file, stderr=err_file)
             process.command = command # type: ignore ### giving process a custom attribute for later error tractability
             return process
 
-        def update_active_processes(active_processes: list) -> list:
+        def update_active_processes(active_processes: list, error_file: str) -> list:
             '''checks how many of the processes are active.
             wait: wait for process to be finished when removing.'''
             for process in active_processes: # [:] if copy is required
                 if process.poll() is not None: # process finished
                     returncode = process.wait()
                     if returncode != 0:
+                        self.set_last_error_message(error_file)
                         raise ProcessError(f"Subprocess Crashed. Check last output log of Subprocess! Command: {process.command}")
                     active_processes.remove(process)
             return active_processes
@@ -416,23 +448,28 @@ class LocalJobStarter(JobStarter):
         i = 0
 
         while len(cmds) >= 1:
+            log_file = os.path.join(output_path, f"process_{str(i)}.out")
+            error_file = os.path.join(output_path, f"process_{str(i)}.err")
+
             # first check if any processes need to be removed
             while len(active_processes) >= self.max_cores:
-                update_active_processes(active_processes)
+                update_active_processes(active_processes, error_file)
                 time.sleep(1) # avoid busy waiting
 
             # setup process:
             cmd = cmds.pop()
             i += 1
-            output_file = f"{output_path}/process_{str(i)}.log"
 
             # start
-            active_processes.append(start_process(cmd, output_file))
+            active_processes.append(start_process(cmd, log_file, error_file))
 
         # wait for completion loop
         while len(active_processes) != 0:
-            update_active_processes(active_processes)
+            update_active_processes(active_processes, error_file)
             time.sleep(1)
+
+        self.set_last_error_message(error_file)
+        
         return None
 
     def wait_for_job(self, jobname:str, interval:float) -> None:
