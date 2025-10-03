@@ -82,6 +82,7 @@ class JobStarter:
             The maximum number of cores that can be used for the jobs. Default is None.
         """
         self.max_cores = max_cores
+        self.last_error_message = None
 
     def start(self, cmds: list, jobname: str, wait: bool, output_path: str) -> None:
         """
@@ -134,7 +135,7 @@ class JobStarter:
         """
         self.max_cores = cores
 
-    def set_last_error_message(self, error_path:str, read_bytes:int=8192):
+    def set_last_error_message(self, error_path:str, read_bytes:int=16384):
         """
         Saves content of an error logfile.
 
@@ -152,7 +153,7 @@ class JobStarter:
                 f.seek(max(0, filesize - read_bytes))  # jump back some bytes
                 data = f.read().decode("utf-8", errors="ignore")
             if filesize > read_bytes:
-                data = f"Error message truncated. See full output at {error_path}.\ndata"
+                data = f"Error message truncated. See full output at {os.path.abspath(error_path)}.\n{data}"
             self.last_error_message = data
         else:
             self.last_error_message = None
