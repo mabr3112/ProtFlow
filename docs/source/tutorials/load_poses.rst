@@ -1,7 +1,7 @@
 .. _load_poses:
 
-Create Poses Tutorial
-======================
+Create Poses
+============
 
 Poses are the central class of the ProtFlow package. They store information like paths to design models and the corresponding scores and are the input for the different design tools.
 This tutorial can also be completed interactively, by working in the Jupyter notebook found at 
@@ -80,24 +80,21 @@ We can modify the default scorefile format using the set_storage_format attribut
    my_poses.save_scores()
 
 Another important thing to consider is setting a default jobstarter. This jobstarter will be used for any runner if no explicit jobstarter is provided. Jobstarters handle 
-how compute jobs are distributed and will be explained in detail in the # TODO: jobstarter tutorial. 
+how compute jobs are distributed.
 
 .. code-block:: python
    
    # import the jobstarter
    from protflow.jobstarters import LocalJobStarter
 
-   # define the jobstarter you want to use. In this case, we use the local jobstarter which runs everything on the current machine and does not use any job management applications like SLURM
+   # define the jobstarter you want to use. In this case, we use the local jobstarter which runs everything 
+   # on the current machine and does not use any job management applications like SLURM
    my_jobstarter = LocalJobStarter()
 
    my_poses.set_jobstarter(jobstarter=my_jobstarter)
    print(my_poses.default_jobstarter)
 
 As mentioned before, all of these settings can be directly defined when setting up the poses:
-
-
-LigandMPNN created structures with amino acid sequences out of our backbones. To improve our backbones, we are going to employ Rosetta Relax, a specialized Rosetta protocol that optimizes
-protein structures by minimizing energies via introduction of small movements. 
 
 .. code-block:: python
 
