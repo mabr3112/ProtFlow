@@ -74,7 +74,7 @@ from Bio.PDB.Model import Model
 from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from Bio.SeqUtils import seq1, seq3
-from Bio.PDB import Polypeptide
+from Bio.PDB import Polypeptide, MMCIFParser
 import Bio.PDB.Model
 import Bio.PDB.Structure
 
@@ -561,7 +561,7 @@ def translate_entity(entity: Bio.PDB.Entity, vector: np.array) -> None:
         atom.set_coord(new_coord)
 
 ######################## Bio.PDB.Structure.Structure functions ##########################################
-def get_sequence_from_pose(pose: Structure, chain_sep:str=":") -> str:
+def get_sequence_from_pose(pose: Structure, chain_sep:str=":", with_chains: bool = False) -> str|dict[str,str]:
     '''
     Extracts the sequence of peptides from a protein structure.
 
@@ -581,11 +581,18 @@ def get_sequence_from_pose(pose: Structure, chain_sep:str=":") -> str:
     >>> print(sequence)
     'MSTHRRRPQEAAGRVNRLPGTPLARAKYFYPKPGERKVEQTPWFAWDVTAGNEYEDTIEFRLEAEGKVGEVVEREDPDNGRGNFARFSLGLYGSKTQYRLPFTVEEVFHDLESVTQKDGFWNCTAFRTVQRLPRTRVAAELNPRAKAAASAVFTFQSQDVDAVANAVEACFAGFYEVVGVFVSNAVDGSVAGAQNFSQFCVGFRGGPRMLRQNRAPATFASAGNHPAKVLAACGLRYAA...
     '''
+    if float(Bio.__version__) <= 1.73:
+        print(f"WARNING: You are using this function with an unsupported (old) version of BioPython <= 1.73. This might cause your sequences to be extracted wrongly. Your BioPython: {Bio.__version__}")
     # setup PPBuilder:
     ppb = Bio.PDB.PPBuilder()
 
     # collect sequence
-    return chain_sep.join([str(x.get_sequence()) for x in ppb.build_peptides(pose)])
+    if with_chains:
+        assert isinstance(pose, Model), "pose has to be of type {Model} for this function to work with parameter :with_chains: set:"
+        pose = remove_non_residue_residues(model=pose)
+        return {chain.id: "".join(str(pept.get_sequence()) for pept in ppb.build_peptides(chain)) for chain in pose.get_chains() if len(list(chain.get_residues())) > 0}
+    else:
+        return chain_sep.join([str(x.get_sequence()) for x in ppb.build_peptides(pose)])
 
 def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_pdb_path: str = None, keep_chain: str = "", overwrite: bool = False) -> str:
     """
@@ -953,3 +960,44 @@ def remove_non_residue_residues(model: Model, remove_hydrogens: bool = False) ->
                     atom.get_parent().detach_child(atom.id)
 
     return model
+
+def biopython_load_protein(protein_path: str, model_id: int = None, handle: str = "structure", file_type: str = None) -> Structure|Model:
+    """TODO: write proper docstring!
+    Loads proteins into biopython Structure/Model objects, irrespective of .pdb or .cif format.
+    :file_type: parameter allows to specify explicity which loader should be used. can be {'cif', 'pdb', None}
+    """
+    # sanitation
+    if file_type is None:
+        file_type = os.path.splitext(protein_path)[-1]
+
+    match file_type.lower():
+        case "pdb" | ".pdb":
+            file_type = "pdb"
+        case "cif" | "mmcif" | ".cif" | ".mmcif":
+            file_type = "cif"
+        case _:
+            raise ValueError(f":file_type: must be either of {{'cif', 'pdb'}}. Your :file_type: {file_type}")            
+
+    if not os.path.isfile(protein_path):
+        raise FileNotFoundError(protein_path)
+
+    # handle .pdb files
+    if (protein_path.endswith(".pdb") or file_type.lower() == "pdb") and not file_type.lower() == "cif":
+        protein = load_structure_from_pdbfile(
+            path_to_pdb=protein_path,
+            all_models=model_id is None,
+            model=model_id,
+            handle=handle
+        )
+        return protein
+
+    # handle .cif files
+    if protein_path.endswith(".cif") or file_type.lower() == "cif":
+        # load mmcif
+        parser = MMCIFParser()
+        protein = parser.get_structure(handle, protein_path)
+
+        # extract model if specified
+        if model_id:
+            protein = protein[model_id]
+        return protein
