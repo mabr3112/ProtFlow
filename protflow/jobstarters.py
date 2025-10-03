@@ -82,6 +82,7 @@ class JobStarter:
             The maximum number of cores that can be used for the jobs. Default is None.
         """
         self.max_cores = max_cores
+        self.last_error_message = None
 
     def start(self, cmds: list, jobname: str, wait: bool, output_path: str) -> None:
         """
