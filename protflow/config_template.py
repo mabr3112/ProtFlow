@@ -68,3 +68,7 @@ ESM_PRE_CMD = ""
 # protein generator
 PROTEIN_GENERATOR_PYTHON_PATH = ""
 PROTEIN_GENERATOR_SCRIPT_PATH = ""
+
+# frame2seq
+FRAME2SEQ_PYTHON_PATH = "" # "/path/to/mambaforge/envs/frame2seq/bin/python3
+FRAME2SEQ_PRE_CMD = ""
