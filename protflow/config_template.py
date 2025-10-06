@@ -49,8 +49,8 @@ FPOCKET_PATH = "" # "/path/to/anaconda3/envs/protslurm/bin/fpocket"
 DSSP_PATH = "" # "/path/to/mambaforge/envs/dssp/bin/mkdssp"
 
 # boltz
-BOLTZ_PATH = "" #/path/to/CONDA/envs/boltz_env/bin/boltz
-BOLTZ_PYTHON_PATH = "" # "/path/to/anaconda3/envs/boltz/bin/python3"
+BOLTZ_PATH = "" # /path/to/CONDA/envs/boltz_env/bin/boltz
+BOLTZ_PYTHON = "" # /path/to/conda/envs/boltz_env/bin/python
 BOLTZ_PRE_CMD = ""
 
 # gromacs

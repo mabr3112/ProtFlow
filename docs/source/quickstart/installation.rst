@@ -19,12 +19,13 @@ First, clone the ProtFlow repository. Use either one of the following commands:
     git clone https://github.com/mabr3112/ProtFlow.git
     git clone https://github.com/mabr3112/ProtFlow.git
 
-ProtFlow requires python >= 3.11. You can either install it into an existing environment, or you can create a new one with like this:
+.. note::
+        ProtFlow requires python >= 3.11. You can either install it into an existing environment, or you can create a new one with like this:
 
-.. code-block:: bash
+        .. code-block:: bash
 
-    conda create -n protflow python=3.11
-    conda activate protflow
+                conda create -n protflow python=3.11
+                conda activate protflow
 
 Now install the package. We recommend installing in development mode, because this allows you to easily update ProtFlow in the future.
 
@@ -39,7 +40,10 @@ After the install, instantiate your config.py file. This can be done with the co
 
     protflow-init-config
 
-Finally, you want to verify that the installation was successful. You can do this by running the following command:
+Verification
+^^^^^^^^^^^^
+
+Briefly verify that the installation was successful:
 
 .. code-block:: bash
 
