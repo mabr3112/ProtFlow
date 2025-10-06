@@ -359,6 +359,8 @@ class Runner:
 
         Checks if the prefix exists in poses.df, sets up a jobstarter, and creates the working directory if necessary.
 
+        Returns absolute path to working directory and the jobstarter that will be used for the runner.
+
         Parameters
         ----------
         poses : Poses
