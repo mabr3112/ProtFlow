@@ -4,6 +4,6 @@ We have two notebooks:
    * RFidffusion
    * LigandMPNN
    * Boltz
-2) Creating an aritficial motif using ProtFlow in combination with the RiffDiff pipeline
+2) Creating an artificial motif using ProtFlow in combination with the RiffDiff pipeline
 
 Both are not real examples due a very limited number of designs or artificial motifs computed, but will give a ready-to use, interactive introduction how to use this tools
