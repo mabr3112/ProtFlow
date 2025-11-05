@@ -610,7 +610,7 @@ def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, over
     # get sequence from poses, this differs depending on which type of pose we have (.fasta or .pdb/.cif).
     if all(pose.endswith((".fa", ".fas", ".fasta")) for pose in poses.poses_list()):
         # load raw sequences
-        sequences = [load_sequence_from_fasta(pose, return_multiple_entries=False) for pose in poses.poses_list()]
+        sequences = [str(load_sequence_from_fasta(pose, return_multiple_entries=False).seq) for pose in poses.poses_list()]
 
         # assign chain IDs for sequences (start with [A -> Z], then [AA -> ZZ]):
         sequence_dict_list = [{idx_to_char(i): chain_seq for i, chain_seq in enumerate(seq.split(_determine_split_char(seq)))} for seq in sequences]
