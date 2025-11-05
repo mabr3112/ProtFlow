@@ -75,6 +75,7 @@ from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from Bio.SeqUtils import seq1, seq3
 from Bio.PDB import Polypeptide, MMCIFParser
+from Bio.SeqRecord import SeqRecord
 import Bio.PDB.Model
 import Bio.PDB.Structure
 
@@ -724,7 +725,7 @@ def renumber_pose_by_residue_mapping(pose: Bio.PDB.Structure.Structure, residue_
     return out_pose
 
 ######################## Bio.Seq functions ##########################################
-def load_sequence_from_fasta(fasta:str, return_multiple_entries:bool=True):
+def load_sequence_from_fasta(fasta: str, return_multiple_entries: bool = True) -> SeqRecord:
     """
     Load a sequence from a FASTA file.
 
