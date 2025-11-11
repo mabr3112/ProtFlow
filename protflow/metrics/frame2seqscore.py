@@ -1,3 +1,65 @@
+"""Frame2Seq Design Runner Module
+=================================
+
+This module provides the Frame2SeqScore runner for evaluation of protein sequences
+using Frame2Seq within the ProtFlow framework. It orchestrates input
+preparation, command construction, job execution, and result collection to
+enable high-throughput sequence design against fixed protein backbone frames.
+
+Overview
+--------
+Frame2Seq is a conditional sequence design model that proposes amino-acid
+sequences compatible with an input backbone (“frame”). This module wraps an
+auxiliary script (typically run_frame2seq.py) and exposes a Pythonic
+interface that integrates with ProtFlow’s :class:~protflow.poses.Poses
+containers and :class:~protflow.jobstarters.JobStarter backends. It supports
+per-pose options, batching across available resources,
+and parsing of per-residue negative pseudo-log-likelihoods.
+
+Key Features
+------------
+ProtFlow integration: Works with :class:~protflow.poses.Poses,
+:class:~protflow.jobstarters.JobStarter, and common runner utilities.
+
+Batching & scheduling: Splits large pose sets into batches and delegates
+execution to local or cluster job starters.
+
+Automated parsing: Collects per-residue negative
+pseudo-log-likelihoods into tidy :class:pandas.DataFrame structures.
+
+Examples
+--------
+.. code-block:: python
+
+    from protflow.poses import Poses
+    from protflow.jobstarters import LocalJobStarter
+    from protflow.runners.frame2seqscore import Frame2SeqScore
+
+    poses = Poses("inputs_with_sequences.json", work_dir="work")
+    scorer = Frame2SeqScore()
+
+    evaluated = scorer.run(
+        poses=poses,
+        prefix="f2s_score_batch_01",
+        jobstarter=LocalJobStarter(cpus=8),
+        chain="A",
+        options={"some_flag": True},
+        preserve_original_output=False,
+        overwrite=False,
+    )
+
+    # Per-sequence scores are available in evaluated.df
+    print(evaluated.df)
+
+Authors
+-------
+Markus Braun, Adrian Tripp
+
+Version
+-------
+0.1.0
+"""
+
 # general imports
 import json
 import os
@@ -16,7 +78,81 @@ from protflow.jobstarters import JobStarter, split_list
 from protflow.runners import Runner, RunnerOutput, prepend_cmd
 
 class Frame2SeqScore(Runner):
+    """
+    Frame2SeqScore Class
+    ====================
+
+    The :class:`Frame2SeqScore` runner evaluates *existing* protein sequences
+    against fixed backbone frames using Frame2Seq’s scoring mode (no sequence
+    generation). It prepares inputs, schedules scoring jobs via a
+    :class:`~protflow.jobstarters.JobStarter`, and parses per-residue negative
+    pseudo-log-likelihoods into a tidy :class:`pandas.DataFrame`.
+
+    Overview
+    --------
+    This runner wraps the Frame2Seq helper script (typically ``run_frame2seq.py``)
+    with ``--method score`` to compute compatibility of provided sequences with
+    a structural frame. It integrates with ProtFlow’s :class:`~protflow.poses.Poses`
+    container and runner utilities for batch execution, job management, and
+    standardized score collection.
+
+    Key Features
+    ------------
+    - **Pure scoring (no design):** Uses Frame2Seq in scoring mode to compute
+      negative pseudo-log-likelihoods (NPLL) for supplied sequences.
+    - **Batching & scheduling:** Splits inputs across available cores/nodes and
+      dispatches through a :class:`~protflow.jobstarters.JobStarter`.
+    - **Clean outputs:** Aggregates mean NPLL per sequence and stores full
+      per-residue NPLL vectors for downstream analysis.
+
+    Examples
+    --------
+    .. code-block:: python
+
+        from protflow.poses import Poses
+        from protflow.jobstarters import LocalJobStarter
+        from protflow.runners.frame2seqscore import Frame2SeqScore
+
+        poses = Poses("inputs_with_sequences.json", work_dir="work")
+        scorer = Frame2SeqScore()
+
+        evaluated = scorer.run(
+            poses=poses,
+            prefix="f2s_score_batch_01",
+            jobstarter=LocalJobStarter(cpus=8),
+            chain="A",
+            options={"some_flag": True},
+            preserve_original_output=False,
+            overwrite=False,
+        )
+
+        # Per-sequence scores are available in evaluated.df
+        print(evaluated.df)
+    """
     def __init__(self, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter = None) -> None:
+        """
+        __init__ Method
+        ===============
+
+        Initialize a :class:`Frame2SeqScore` runner with optional execution settings.
+
+        Parameters
+        ----------
+        python_path : str or None, optional
+            Absolute path to the Python interpreter used to invoke the Frame2Seq
+            helper script. If ``None``, read from ProtFlow config
+            (``FRAME2SEQ_PYTHON_PATH``).
+        pre_cmd : str or None, optional
+            Shell snippet to prepend to the command (e.g., environment activation).
+            If ``None``, read from ProtFlow config (``FRAME2SEQ_PRE_CMD``).
+        jobstarter : :class:`~protflow.jobstarters.JobStarter`, optional
+            Default job starter used when none is provided to :meth:`run`.
+
+        Notes
+        -----
+        The helper script path is resolved from
+        ``AUXILIARY_RUNNER_SCRIPTS_DIR/run_frame2seq.py`` in the ProtFlow config.
+        """
         # setup config
         config = require_config()
         self.python_path = python_path or load_config_path(config, "FRAME2SEQ_PYTHON_PATH")
@@ -32,7 +168,81 @@ class Frame2SeqScore(Runner):
         return "frame2seqscore.py"
 
     def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, chain: str = "A", options: dict = None, pose_options: list|str = None, preserve_original_output: bool = False, overwrite: bool = False) -> Poses:
+        """
+        run Method
+        ==========
 
+        Evaluate existing sequences against backbone frames using Frame2Seq scoring.
+
+        This method prepares batch input JSON files from ``poses``, merges global
+        and per-pose options, executes Frame2Seq with ``--method score`` via the
+        provided :class:`~protflow.jobstarters.JobStarter`, and aggregates results
+        (mean and per-residue negative pseudo-log-likelihoods) into the returned
+        :class:`~protflow.poses.Poses` object.
+
+        Parameters
+        ----------
+        poses : :class:`~protflow.poses.Poses`
+            Input poses referencing frames and associated sequences to score.
+        prefix : str
+            Prefix for the run directory created under ``poses.work_dir``.
+        jobstarter : :class:`~protflow.jobstarters.JobStarter`, optional
+            Job starter to schedule scoring jobs. If ``None``, falls back to an
+            instance-level default or the one attached to ``poses``.
+        chain : str, default ``"A"``
+            Chain identifier to score (stored as ``chain_id`` in per-pose options).
+        options : dict or None, optional
+            Global Frame2Seq scoring options applied to all poses (may be empty).
+        pose_options : list of dict or None, optional
+            Per-pose overrides aligned with ``poses``; each dict can override
+            keys from ``options`` for the corresponding pose.
+        preserve_original_output : bool, default ``False``
+            If ``True``, keep raw Frame2Seq output directories; otherwise, clean
+            intermediate files after parsing.
+        overwrite : bool, default ``False``
+            If ``True``, ignore any existing scorefile and re-run scoring; if
+            ``False``, reuse a valid existing scorefile when present.
+
+        Returns
+        -------
+        :class:`~protflow.poses.Poses`
+            The same ``poses`` object with its dataframe augmented by scoring
+            results (one row per input pose).
+
+        Raises
+        ------
+        TypeError
+            If ``pose_options`` is not ``None`` or a list of dictionaries.
+        KeyError
+            If required options are missing for a pose (see Notes).
+        RuntimeError
+            If the number of parsed outputs is smaller than the number of inputs,
+            suggesting failed runs.
+
+        Notes
+        -----
+        **Required per-pose option**
+            ``chain_id`` (str). This is derived from the ``chain`` argument if not
+            given explicitly in options.
+
+        **Reserved/managed options**
+            The runner removes keys such as ``save_indiv_neg_pll`` and
+            ``save_indiv_seqs`` as they are used internally by the helper script.
+
+        Examples
+        --------
+        .. code-block:: python
+
+            evaluated = scorer.run(
+                poses=poses,
+                prefix="f2s_score",
+                jobstarter=LocalJobStarter(cpus=8),
+                chain="A",
+                options={"some_flag": True},
+                preserve_original_output=False,
+                overwrite=False,
+            )
+        """
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
@@ -119,7 +329,34 @@ class Frame2SeqScore(Runner):
     
     
     def merge_opts_and_pose_opts(self, poses:Poses, options:dict, pose_options:list, chain: str):
+        """
+        merge_opts_and_pose_opts Method
+        ===============================
 
+        Merge global options with per-pose overrides and inject default ``chain_id``.
+
+        Parameters
+        ----------
+        poses : :class:`~protflow.poses.Poses`
+            Input poses providing per-pose context.
+        options : dict or None
+            Global options applied to all poses (may be empty or ``None``).
+        pose_options : list of dict or None
+            Per-pose overrides aligned with ``poses``; may include ``None`` entries.
+        chain : str
+            Default chain identifier; stored as ``chain_id`` if not present.
+
+        Returns
+        -------
+        list of dict
+            A list of merged per-pose option dictionaries ready for JSON input.
+
+        Notes
+        -----
+        - If a per-pose entry is ``None``, it is promoted to an empty dict before
+          merging.
+        - ``chain`` is assigned to ``chain_id`` unless already defined per pose.
+        """
         if not options:
             options = {}
         if chain:
@@ -135,11 +372,80 @@ class Frame2SeqScore(Runner):
         return pose_options
 
     def write_cmd(self, input_json: str, work_dir: str):
-        # write command and return.
+        """
+        write_cmd Method
+        ================
+
+        Compose the shell command to invoke Frame2Seq scoring.
+
+        Parameters
+        ----------
+        input_json : str
+            Path to the batch input JSON file.
+        work_dir : str
+            Output directory for Frame2Seq results.
+
+        Returns
+        -------
+        str
+            Fully assembled shell command invoking the helper script with
+            ``--method score``.
+        """
         return f"{self.python_path} {self.script_path} --input_json {input_json} --output_dir {work_dir} --method score"
 
 def collect_scores(work_dir: str, preserve_original_output: bool = False) -> pd.DataFrame:
+    """
+    collect_scores Function
+    =======================
 
+    Parse Frame2Seq scoring outputs and aggregate per-sequence metrics.
+
+    This function reads per-pose CSV files from ``frame2seq_outputs/scores``,
+    computes the mean negative pseudo-log-likelihood (NPLL) per sequence, and
+    gathers the full per-residue NPLL vector. It returns a
+    :class:`pandas.DataFrame` with standardized columns for downstream analysis.
+
+    Parameters
+    ----------
+    work_dir : str
+        Working directory containing ``frame2seq_outputs`` created by the runner.
+    preserve_original_output : bool, default ``False``
+        If ``True``, keep the raw output tree. If ``False``, remove the
+        ``frame2seq_outputs`` directory after parsing to save disk space.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Dataframe with one row per input pose containing at least:
+        - ``location`` : str — Absolute path to the scored input file (pose).
+        - ``description`` : str — Description derived from the pose path.
+        - ``score`` : float — Mean negative pseudo-log-likelihood across residues.
+        - ``per_res_neg_log_likelihood`` : list[float] — Per-residue NPLL vector.
+
+    Raises
+    ------
+    RuntimeError
+        If the expected ``frame2seq_outputs`` directory is missing.
+    FileNotFoundError
+        If required CSV files are not found for an input pose.
+    ValueError
+        If CSVs are malformed or missing the
+        ``Negative pseudo-log-likelihood`` column.
+
+    Notes
+    -----
+    - CSV files are expected to be named like
+      ``<pose_name>_<chain>_seq0.csv`` and to contain a
+      ``Negative pseudo-log-likelihood`` column.
+    - The returned ``score`` is the arithmetic mean of that column for each pose.
+
+    Examples
+    --------
+    .. code-block:: python
+
+        df = collect_scores(work_dir="work/f2s_score_batch_01", preserve_original_output=False)
+        print(df.head())
+    """
     results_dir = os.path.join(work_dir, "frame2seq_outputs")
     if not os.path.isdir(results_dir):
         raise RuntimeError(f"Could not find frame2seq_outputs directory at {results_dir}")
