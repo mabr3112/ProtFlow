@@ -69,11 +69,10 @@ from collections import OrderedDict, defaultdict
 
 class ResidueSelection:
     """
-    ResidueSelection
-    ================
+    Represent a selection of residues in a protein structure.
 
-    A class to represent selections of residues in protein structures. A selection of residues is represented 
-    as a tuple with the hierarchy ((chain, residue_idx), ...).
+    A selection of residues is represented as a tuple with the hierarchy
+    ((chain, residue_idx), ...).
 
     Parameters
     ----------
