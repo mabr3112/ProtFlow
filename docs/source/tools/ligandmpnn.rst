@@ -57,7 +57,7 @@ Replace the file paths with your own.
         poses="path/to/input_pdbs/",
         glob_suffix="*.pdb",
         work_dir="ligandmpnn_example",
-        storage_format="csv",
+        storage_format="json",
         jobstarter=local_jobstarter,
     )
 
@@ -158,7 +158,7 @@ LigandMPNN writes its output into the run directory inside your ``work_dir``:
 - ``backbones/``: input backbones
 - ``seqs/``: designed sequences (FASTA)
 - ``packed/``: optionally packed structures when using sidechain packing
-- ``ligandmpnn_scores.<format>``: collected scores
+- ``ligandmpnn_scores.json``: collected scores (default ProtFlow format)
 
 The :py:class:`~protflow.poses.Poses` dataframe is updated with new columns
 prefixed by the run name (e.g., ``ligmpnn_sequence``, ``ligmpnn_overall_confidence``,
