@@ -23,6 +23,8 @@ import json
 import logging
 import os
 from glob import glob
+import gzip
+import shutil
 
 import pandas as pd
 
@@ -37,7 +39,7 @@ from protflow.runners import (
     prepend_cmd,
 )
 
-class ExampleRunner(Runner):
+class RFDiffusion3(Runner):
     """Template class for implementing a new ProtFlow runner.
 
     Developer instructions
@@ -72,14 +74,15 @@ class ExampleRunner(Runner):
 
         config = require_config()
 
-        # TODO: replace config variable names with your tool's entries.
-        self.application_path = application_path or load_config_path(config, "YOUR_TOOL_PATH")
-        self.python_path = python_path or load_config_path(config, "YOUR_TOOL_PYTHON_PATH")
-        self.pre_cmd = pre_cmd or load_config_path(config, "YOUR_TOOL_PRE_CMD", is_pre_cmd=True)
+        self.application_path = application_path or load_config_path(config, "RFDIFFUSION3_SCRIPT_PATH")
+        self.python_path = python_path or load_config_path(config, "RFDIFFUSION3_PYTHON_PATH")
+        self.pre_cmd = pre_cmd or load_config_path(config, "RFDIFFUSION3_PRE_CMD", is_pre_cmd=True)
+
+
 
         self.jobstarter = jobstarter
-        self.name = "example_runner"
-        self.index_layers = 0
+        self.name = "rfdiffusion3"
+        self.index_layers = 0   # RFD3 output format: <name>_<settings_group>_<batch_number>_model_n.<suffix>. TODO: check if index_layer = 0 fits with the input 
 
     def __str__(self) -> str:
         """Return a short runner name used in logs."""
@@ -90,6 +93,37 @@ class ExampleRunner(Runner):
         poses: Poses,
         prefix: str,
         jobstarter: JobStarter | None = None,
+        # --- Option 1: provide a pre-made JSON directly ---
+        input_json: str | None = None,
+        # --- Option 2: provide parameters to build a JSON automatically ---
+        settings_group_name: str | None = None,
+        input: str | None = None,
+        contig: str | None = None,
+        unindex: str | None = None,
+        length: str | None = None,
+        ligand: str | None = None,
+        select_fixed_atoms: dict | str | bool | None = None,
+        select_unfixed_sequence: dict | str | bool | None = None,
+        select_hotspots: dict | str | bool | None = None,
+        select_buried: dict | str | bool | None = None,
+        select_partially_buried: dict | str | bool | None = None,
+        select_exposed: dict | str | bool | None = None,
+        select_hbond_donor: dict | None = None,
+        select_hbond_acceptor: dict | None = None,
+        redesign_motif_sidechains: bool | None = None,
+        partial_t: float | None = None,
+        plddt_enhanced: bool | None = None,
+        is_non_loopy: bool | None = None,
+        symmetry: dict | None = None,
+        ori_token: list | None = None,
+        infer_ori_strategy: str | None = None,
+        cif_parser_args: dict | None = None,
+        dialect: int | None = None,
+        extra: dict | None = None,
+        # --- RFD3 CLI arguments worth exposing explicitly ---
+        n_batches: int = 1,
+        diffusion_batch_size: int = 8,
+        # --- general ProtFlow parameters ---
         options: str | None = None,
         pose_options: list[str] | str | None = None,
         include_scores: list[str] | None = None,
@@ -114,6 +148,40 @@ class ExampleRunner(Runner):
         Use it to opt into heavy optional score fields (e.g., per-residue vectors
         or 2D matrices) that should not be loaded by default.
         """
+        
+        # 0) Test that *either* input_json or input specification fields were provided
+        if input_json is not None and any([
+            settings_group_name,
+            input,
+            contig,
+            unindex,
+            length,
+            ligand,
+            select_fixed_atoms,
+            select_unfixed_sequence,
+            select_hotspots,
+            select_buried,
+            select_partially_buried,
+            select_exposed,
+            select_hbond_donor,
+            select_hbond_acceptor,
+            redesign_motif_sidechains,
+            partial_t,
+            plddt_enhanced,
+            is_non_loopy,
+            symmetry,
+            ori_token,
+            infer_ori_strategy,
+            cif_parser_args,
+            dialect,
+            extra,
+        ]):
+            raise ValueError(
+                "Cannot provide both input_json and individual JSON parameters. "
+                "Use one approach or the other."
+            )
+        
+        
         # 1) Generic setup shared by all runners.
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
@@ -121,6 +189,12 @@ class ExampleRunner(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter],
         )
         logging.info("Running %s in %s on %d poses", self, work_dir, len(poses))
+        # log total number of designs
+        total_designs = n_batches * diffusion_batch_size
+        logging.info(
+            f"Total designs per input pose: {total_designs} "
+            f"({n_batches} batches x {diffusion_batch_size} per batch)"
+        )
 
         # 2) Scorefile reuse shortcut.
         scorefile = os.path.join(work_dir, f"{self.name}_scores.{poses.storage_format}")
@@ -146,6 +220,33 @@ class ExampleRunner(Runner):
             work_dir=work_dir,
             options=options,
             pose_options=pose_options_list,
+            input_json=input_json,
+            settings_group_name=settings_group_name,
+            input=input,
+            contig=contig,
+            unindex=unindex,
+            length=length,
+            ligand=ligand,
+            select_fixed_atoms=select_fixed_atoms,
+            select_unfixed_sequence=select_unfixed_sequence,
+            select_hotspots=select_hotspots,
+            select_buried=select_buried,
+            select_partially_buried=select_partially_buried,
+            select_exposed=select_exposed,
+            select_hbond_donor=select_hbond_donor,
+            select_hbond_acceptor=select_hbond_acceptor,
+            redesign_motif_sidechains=redesign_motif_sidechains,
+            partial_t=partial_t,
+            plddt_enhanced=plddt_enhanced,
+            is_non_loopy=is_non_loopy,
+            symmetry=symmetry,
+            ori_token=ori_token,
+            infer_ori_strategy=infer_ori_strategy,
+            cif_parser_args=cif_parser_args,
+            dialect=dialect,
+            extra=extra,
+            n_batches=n_batches,
+            diffusion_batch_size=diffusion_batch_size,
         )
 
         if self.pre_cmd:
@@ -180,54 +281,305 @@ class ExampleRunner(Runner):
         work_dir: str,
         options: str | None,
         pose_options: list[str | None],
+        input_json: str | None = None,
+        settings_group_name: str | None = None,
+        input: str | None = None,
+        contig: str | None = None,
+        unindex: str | None = None,
+        length: str | None = None,
+        ligand: str | None = None,
+        select_fixed_atoms: dict | str | bool | None = None,
+        select_unfixed_sequence: dict | str | bool | None = None,
+        select_hotspots: dict | str | bool | None = None,
+        select_buried: dict | str | bool | None = None,
+        select_partially_buried: dict | str | bool | None = None,
+        select_exposed: dict | str | bool | None = None,
+        select_hbond_donor: dict | None = None,
+        select_hbond_acceptor: dict | None = None,
+        redesign_motif_sidechains: bool | None = None,
+        partial_t: float | None = None,
+        plddt_enhanced: bool | None = None,
+        is_non_loopy: bool | None = None,
+        symmetry: dict | None = None,
+        ori_token: list | None = None,
+        infer_ori_strategy: str | None = None,
+        cif_parser_args: dict | None = None,
+        dialect: int | None = None,
+        extra: dict | None = None,
+        n_batches: int = 1,
+        diffusion_batch_size: int = 8,
     ) -> list[str]:
         """Create one shell command per pose.
 
-        Developer instructions
-        ----------------------
-        - Convert a global options string + per-pose options into final CLI options.
-        - Keep all command assembly in one place to simplify debugging.
-        - Return a list with deterministic order matching ``poses`` rows.
-        """
+        Parameters
+        ----------
+        poses : Poses
+            The current poses object.
+        work_dir : str
+            Working directory for this run.
+        options : str | None
+            Global options string passed by the user.
+        pose_options : list[str | None]
+            Per-pose options list, one entry per pose.
+        All other parameters are passed through to write_cmd.
 
+        Returns
+        -------
+        list[str]
+            List of shell commands, one per pose.
+        """
         out_dir = os.path.join(work_dir, "outputs")
         os.makedirs(out_dir, exist_ok=True)
 
         cmds: list[str] = []
         for pose_path, pose_opt in zip(poses.poses_list(), pose_options):
-            # Merge global and pose-specific options; pose options override global values.
+            # merge global and pose-specific options
             merged_opts, merged_flags = parse_generic_options(options, pose_opt, sep="--")
             cli_args = options_flags_to_string(merged_opts, list(merged_flags), sep="--")
-            cmds.append(self.write_cmd(pose_path=pose_path, out_dir=out_dir, cli_args=cli_args))
+
+            cmds.append(self.write_cmd(
+                pose_path=pose_path,
+                out_dir=out_dir,
+                cli_args=cli_args,
+                input_json=input_json,
+                settings_group_name=settings_group_name,
+                input=input,
+                contig=contig,
+                unindex=unindex,
+                length=length,
+                ligand=ligand,
+                select_fixed_atoms=select_fixed_atoms,
+                select_unfixed_sequence=select_unfixed_sequence,
+                select_hotspots=select_hotspots,
+                select_buried=select_buried,
+                select_partially_buried=select_partially_buried,
+                select_exposed=select_exposed,
+                select_hbond_donor=select_hbond_donor,
+                select_hbond_acceptor=select_hbond_acceptor,
+                redesign_motif_sidechains=redesign_motif_sidechains,
+                partial_t=partial_t,
+                plddt_enhanced=plddt_enhanced,
+                is_non_loopy=is_non_loopy,
+                symmetry=symmetry,
+                ori_token=ori_token,
+                infer_ori_strategy=infer_ori_strategy,
+                cif_parser_args=cif_parser_args,
+                dialect=dialect,
+                extra=extra,
+                n_batches=n_batches,
+                diffusion_batch_size=diffusion_batch_size,
+            ))
         return cmds
 
-    def write_cmd(self, pose_path: str, out_dir: str, cli_args: str) -> str:
-        """Return the exact shell command for one pose.
+    def _write_input_json(
+        self,
+        pose_path: str,
+        out_dir: str,
+        settings_group_name: str | None = None,
+        input: str | None = None,
+        contig: str | None = None,
+        unindex: str | None = None,
+        length: str | None = None,
+        ligand: str | None = None,
+        select_fixed_atoms: dict | str | bool | None = None,
+        select_unfixed_sequence: dict | str | bool | None = None,
+        select_hotspots: dict | str | bool | None = None,
+        select_buried: dict | str | bool | None = None,
+        select_partially_buried: dict | str | bool | None = None,
+        select_exposed: dict | str | bool | None = None,
+        select_hbond_donor: dict | None = None,
+        select_hbond_acceptor: dict | None = None,
+        redesign_motif_sidechains: bool | None = None,
+        partial_t: float | None = None,
+        plddt_enhanced: bool | None = None,
+        is_non_loopy: bool | None = None,
+        symmetry: dict | None = None,
+        ori_token: list | None = None,
+        infer_ori_strategy: str | None = None,
+        cif_parser_args: dict | None = None,
+        dialect: int | None = None,
+        extra: dict | None = None,
+    ) -> str:
+        """Generate a RFDiffusion3 input JSON file for a single pose.
 
-        Developer instructions
-        ----------------------
-        - Build an executable command string only; do not execute here.
-        - Ensure output filename preserves or predictably derives from pose description.
-        - Keep quoting robust for paths with spaces.
+        Parameters
+        ----------
+        pose_path : str
+            Path to the input pose file. Used to derive the settings group
+            name if none is provided, and set as 'input' in the JSON if
+            no explicit input is given.
+        out_dir : str
+            Directory where the generated JSON file will be saved.
+        settings_group_name : str | None
+            Name of the settings group in the JSON. If None, the pose
+            description (filename without extension) is used. Note that
+            this name appears in output filenames, so avoid underscores
+            if you want predictable index_layers.
+        All other parameters map directly to RFDiffusion3 InputSpecification
+        fields. Only non-None values are written to the JSON.
+
+        Returns
+        -------
+        str
+            Absolute path to the generated JSON file.
         """
+        # derive description from pose path
+        desc = os.path.splitext(os.path.basename(pose_path))[0]
+        group_name = settings_group_name or desc
 
-        description = os.path.splitext(os.path.basename(pose_path))[0]
-        out_pose = os.path.join(out_dir, f"{description}.pdb") # TODO: change this to the expected output directions of your tool
+        # build the settings dict, only including non-None values
+        spec = {}
 
-        # TODO: replace with your tool's real command structure.
+        # input defaults to the pose_path if not explicitly provided
+        spec["input"] = input or pose_path
+
+        # add all other fields only if provided
+        optional_fields = {
+            "contig": contig,
+            "unindex": unindex,
+            "length": length,
+            "ligand": ligand,
+            "select_fixed_atoms": select_fixed_atoms,
+            "select_unfixed_sequence": select_unfixed_sequence,
+            "select_hotspots": select_hotspots,
+            "select_buried": select_buried,
+            "select_partially_buried": select_partially_buried,
+            "select_exposed": select_exposed,
+            "select_hbond_donor": select_hbond_donor,
+            "select_hbond_acceptor": select_hbond_acceptor,
+            "redesign_motif_sidechains": redesign_motif_sidechains,
+            "partial_t": partial_t,
+            "plddt_enhanced": plddt_enhanced,
+            "is_non_loopy": is_non_loopy,
+            "symmetry": symmetry,
+            "ori_token": ori_token,
+            "infer_ori_strategy": infer_ori_strategy,
+            "cif_parser_args": cif_parser_args,
+            "dialect": dialect,
+            "extra": extra,
+        }
+
+        for key, value in optional_fields.items():
+            if value is not None:
+                spec[key] = value
+
+        # wrap in the settings group
+        content = {group_name: spec}
+
+        # save to out_dir
+        json_path = os.path.join(out_dir, f"{desc}_input.json")
+        with open(json_path, "w", encoding="utf-8") as handle:
+            json.dump(content, handle, indent=4)
+
+        logging.info(f"Written input JSON for {desc} to {json_path}")
+
+        return os.path.abspath(json_path)
+
+
+    def write_cmd(
+        self,
+        pose_path: str,
+        out_dir: str,
+        cli_args: str,
+        input_json: str | None = None,
+        settings_group_name: str | None = None,
+        input: str | None = None,
+        contig: str | None = None,
+        unindex: str | None = None,
+        length: str | None = None,
+        ligand: str | None = None,
+        select_fixed_atoms: dict | str | bool | None = None,
+        select_unfixed_sequence: dict | str | bool | None = None,
+        select_hotspots: dict | str | bool | None = None,
+        select_buried: dict | str | bool | None = None,
+        select_partially_buried: dict | str | bool | None = None,
+        select_exposed: dict | str | bool | None = None,
+        select_hbond_donor: dict | None = None,
+        select_hbond_acceptor: dict | None = None,
+        redesign_motif_sidechains: bool | None = None,
+        partial_t: float | None = None,
+        plddt_enhanced: bool | None = None,
+        is_non_loopy: bool | None = None,
+        symmetry: dict | None = None,
+        ori_token: list | None = None,
+        infer_ori_strategy: str | None = None,
+        cif_parser_args: dict | None = None,
+        dialect: int | None = None,
+        extra: dict | None = None,
+        n_batches: int = 1,
+        diffusion_batch_size: int = 8,
+    ) -> str:
+        """Construct the shell command to run RFDiffusion3 for one pose.
+
+        Parameters
+        ----------
+        pose_path : str
+            Path to the input pose file.
+        out_dir : str
+            Directory where RFD3 outputs will be saved.
+        cli_args : str
+            Additional CLI arguments assembled by _build_commands.
+        input_json : str | None
+            Path to a pre-made input JSON file. If provided, all other
+            JSON parameters are ignored.
+        All other parameters map to RFDiffusion3 InputSpecification fields
+        and are passed to _write_input_json if no input_json is provided.
+
+        Returns
+        -------
+        str
+            The complete shell command string for one pose.
+        """
+        # determine the json input path
+        if input_json:
+            # Option 1: use provided JSON directly
+            json_path = input_json
+        else:
+            # Option 2: generate JSON from provided parameters
+            json_path = self._write_input_json(
+                pose_path=pose_path,
+                out_dir=out_dir,
+                settings_group_name=settings_group_name,
+                input=input,
+                contig=contig,
+                unindex=unindex,
+                length=length,
+                ligand=ligand,
+                select_fixed_atoms=select_fixed_atoms,
+                select_unfixed_sequence=select_unfixed_sequence,
+                select_hotspots=select_hotspots,
+                select_buried=select_buried,
+                select_partially_buried=select_partially_buried,
+                select_exposed=select_exposed,
+                select_hbond_donor=select_hbond_donor,
+                select_hbond_acceptor=select_hbond_acceptor,
+                redesign_motif_sidechains=redesign_motif_sidechains,
+                partial_t=partial_t,
+                plddt_enhanced=plddt_enhanced,
+                is_non_loopy=is_non_loopy,
+                symmetry=symmetry,
+                ori_token=ori_token,
+                infer_ori_strategy=infer_ori_strategy,
+                cif_parser_args=cif_parser_args,
+                dialect=dialect,
+                extra=extra,
+            )
+
+        # assemble and return the command
         return (
-            f"{self.python_path} {self.application_path} "
-            f"--input '{pose_path}' --output '{out_pose}'{cli_args}"
+            f"{self.python_path} {self.application_path} design "
+            f"inputs='{json_path}' "
+            f"out_dir='{out_dir}' "
+            f"n_batches={n_batches} "
+            f"diffusion_batch_size={diffusion_batch_size} "
+            f"{cli_args}"
         )
 
     def _cleanup_previous_outputs(self, work_dir: str) -> None:
-        """Delete/clear runner-specific output artifacts before rerun.
-
-        Developer instructions
-        ----------------------
-        - Keep cleanup scoped to this runner's own output directories.
-        - Never remove unrelated files outside ``work_dir``.
-        - This method is optional but useful for tools that append stale outputs.
+        """Delete all files in the outputs directory before a rerun.
+        
+        Removes all files including .cif.gz structure files, decompressed
+        .cif files, .json score files, and generated input JSON files.
         """
         output_dir = os.path.join(work_dir, "outputs")
         if not os.path.isdir(output_dir):
@@ -283,6 +635,18 @@ def _extract_score_dict(
 
     return out
 
+
+# decompress .cif.gz to .cif
+def _decompress_cif_gz(path: str) -> str:
+    """Decompress a .cif.gz file and return path to the decompressed .cif file."""
+    out_path = path.replace(".cif.gz", ".cif")
+    if not os.path.isfile(out_path):  # don't decompress if already done
+        with gzip.open(path, "rb") as f_in:
+            with open(out_path, "wb") as f_out:
+                shutil.copyfileobj(f_in, f_out)
+    return out_path
+
+
 def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd.DataFrame:
     """Parse runner outputs and return the canonical scores dataframe.
 
@@ -300,10 +664,11 @@ def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd
     """
     include_set = set(include_scores or [])
     output_dir = os.path.join(work_dir, "outputs")
-    output_paths = sorted(
-        glob(os.path.join(output_dir, "*.pdb")) +
-        glob(os.path.join(output_dir, "*.cif"))
-    )
+    output_paths = sorted(glob(os.path.join(output_dir, "*.cif.gz")))
+
+    # decompress all files first
+    output_paths = [_decompress_cif_gz(path) for path in output_paths]
+
 
     rows: list[dict[str, object]] = []
     for path in output_paths:
@@ -313,12 +678,10 @@ def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd
             "location": os.path.abspath(path),
         }
 
-        # TODO: Adjust sidecar discovery for your tool's naming convention.
-        sidecars = sorted(glob(os.path.join(output_dir, f"{desc}*.json")))
-        for sidecar in sidecars:
+        sidecar = os.path.join(output_dir, f"{desc}.json")
+        if os.path.isfile(sidecar):
             with open(sidecar, "r", encoding="utf-8") as handle:
                 parsed = json.load(handle)
-
             if isinstance(parsed, dict):
                 row.update(_extract_score_dict(parsed, include_set))
 
