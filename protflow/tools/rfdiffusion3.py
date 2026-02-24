@@ -82,10 +82,7 @@ class RFdiffusion3(Runner):
 
         self.jobstarter = jobstarter
         self.name = "rfdiffusion3"
-#        self.index_layers = 0   # RFD3 output format: <name>_<settings_group>_<batch_number>_model_n.<suffix>. TODO: check if index_layer = 0 fits with the input 
-
-
-
+        #self.index_layers = 4 # since index layers is dependent on the <settings_group> name only later defined in run() it cannot be defined here
 
     def __str__(self) -> str:
         """Return a short runner name used in logs."""
@@ -152,6 +149,12 @@ class RFdiffusion3(Runner):
         or 2D matrices) that should not be loaded by default.
         """
         
+        # -1)
+        self.index_layers = _retrive_underscores_from_settings_group(input_json=input_json, settings_group_name=settings_group_name)   
+        # RFD3 output format: <name>_<settings_group>_<batch_number>_model_n.<suffix>. So typically index_layers needed to strip would be 4
+        # but if there are underscores in <settings_group> additional layers need to be stripped, that's why the helper function is included 
+
+
         # 0) Test that *either* input_json or input specification fields were provided
         if input_json is not None and any([
             settings_group_name,
@@ -183,31 +186,7 @@ class RFdiffusion3(Runner):
                 "Cannot provide both input_json and individual JSON parameters. "
                 "Use one approach or the other."
             )
-
-
-
-        # determine index_layers early, before any RunnerOutput calls
-        if input_json is not None:
-            # read from provided JSON file
-            self.index_layers = _get_index_layers_from_json(input_json)
-            logging.info(
-                f"Determined index_layers={self.index_layers} from provided "
-                f"input_json '{input_json}'"
-            )
-        else:
-            #compute from settings_group_name directly
-            # default group name is the pose description if not provided
-            group_name = settings_group_name or os.path.splitext(
-                os.path.basename(poses.poses_list()[0])
-            )[0]
-            self.index_layers = len(group_name.split("_")) + 2
-            logging.info(
-                f"Determined index_layers={self.index_layers} from "
-                f"settings_group_name '{group_name}' "
-                f"({len(group_name.split('_'))} chunks in group name + 2 for "
-                f"batch number and model index)"
-            )
-
+        
         
         # 1) Generic setup shared by all runners.
         work_dir, jobstarter = self.generic_run_setup(
@@ -280,29 +259,18 @@ class RFdiffusion3(Runner):
             cmds = prepend_cmd(cmds=cmds, pre_cmd=self.pre_cmd)
 
         # 5) Execute commands.
-        jobstarter.start(
-            cmds=cmds,
-            jobname=self.name,
-            wait=True,
-            output_path=work_dir,
-        )
+        #jobstarter.start(
+        #    cmds=cmds,
+        #    jobname=self.name,
+        #    wait=True,
+        #    output_path=work_dir,
+        #)
 
         # 6) Collect and validate scores (module function, by convention).
         scores = collect_scores(work_dir=work_dir, include_scores=include_scores)
 
         if len(scores.index) == 0:
             raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output logs and runner output directory ({work_dir})")
-        
-
-        # DEBUG - remove after fixing
-        print("poses_description values:", poses.df["poses_description"].tolist())
-        print("scores description values:", scores["description"].tolist())
-        # this is what select_col will look like after stripping index_layers
-        import re
-        scores["debug_select_col"] = scores["description"].str.split("_").str[:-1*self.index_layers].str.join("_")
-        print("select_col after stripping index_layers:", scores["debug_select_col"].tolist())
-        print("index_layers value:", self.index_layers)
-
 
         # 7) Persist and merge back into poses.
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -627,33 +595,81 @@ class RFdiffusion3(Runner):
             if os.path.isfile(file_path):
                 os.remove(file_path)
 
-def _get_index_layers_from_json(json_path: str) -> int:
-    with open(json_path, "r", encoding="utf-8") as handle:
-        content = json.load(handle)
-    
-    group_names = list(content.keys())
-    
-    if not group_names:
-        raise ValueError(f"Could not find any settings groups in {json_path}")
-    
-    if len(group_names) > 1:
-        logging.warning(
-            f"Multiple settings groups found in {json_path}: {group_names}. "
-            f"Using first group '{group_names[0]}' to determine index_layers. "
-            f"If this is wrong, consider splitting your JSON into separate files."
-        )
-    
-    group_name = group_names[0]
-    group_chunks = len(group_name.split("_"))
-    index_layers = group_chunks + 2
+import logging
+from typing import Optional
 
-    logging.info(
-        f"Read settings group '{group_name}' from {json_path}. "
-        f"Group name contains {group_chunks} '_'-separated chunks. "
-        f"index_layers = {group_chunks} + 2 = {index_layers}"
-    )
-    
-    return index_layers
+
+import logging
+from typing import Optional
+
+
+def _retrive_underscores_from_settings_group(
+    input_json: Optional[str],
+    settings_group_name: Optional[str]
+) -> int:
+    """
+    If input_json is provided:
+        - Log the path
+        - Open the JSON file
+        - Get the first outermost key (corresponds to settings_group_name), count underscores
+        - Return 4 + underscore count
+        - Raise ValueError if JSON is empty
+
+    If settings_group_name is provided:
+        - Count underscores in the string
+        - Return 4 + underscore count
+
+    Raise ValueError if:
+        - Both are None
+        - Both are provided
+    """
+
+    # Validate inputs (exactly one must be provided)
+    if (input_json is None and settings_group_name is None) or \
+       (input_json is not None and settings_group_name is not None):
+        raise ValueError(
+            "Exactly one of 'input_json' or 'settings_group_name' must be provided. Either an input .json file is provided or it is built by parsing the options."
+        )
+
+    # Case 1: input_json exists
+    if input_json is not None:
+        import json
+
+        logging.info(f"Input JSON path: {input_json}")
+
+        with open(input_json, "r") as f:
+            data = json.load(f)
+
+        if not data:
+            raise ValueError("JSON file is empty.")
+        
+        if not isinstance(data, dict) or not data:
+            raise ValueError("JSON must contain a non-empty top-level object.")
+
+        # Get outermost key and it's number of underscores
+        outer_key = next(iter(data))
+        logging.info(
+            f"Outermost key: {outer_key}, Type: {type(data[outer_key]).__name__}"
+        )
+
+
+        outer_keys = list(data.keys())
+
+        if len(outer_keys) > 1:
+            logging.warning(
+                f"Multiple outermost keys found ({len(outer_keys)}). "
+                f"Using only the first one: '{outer_keys[0]}'. Please make sure you are aware of how many underscores are in your settings_group_names! This is relevant for ProtFlow pose logic and could be a reason why your poses cannot be merged."
+            )
+
+        first_key = outer_keys[0]
+        underscore_count = first_key.count("_")
+        logging.info(f"<inpt_json> exists and is {input_json} which contains {underscore_count} underscores in the first setting group name ({first_key}). self.index_layer set to 4+{underscore_count}")
+        return 4 + underscore_count
+
+    # Case 2: settings_group_name exists
+    underscore_count = settings_group_name.count("_")
+    logging.info(f"<settings_group_name> exists and is {settings_group_name} which contains {underscore_count} underscores. self.index_layer set to 4+{underscore_count}")
+    return 4 + underscore_count
 
 
 def _is_heavy_value(value: object) -> bool:
@@ -772,4 +788,3 @@ IMPLEMENTATION_CHECKLIST: tuple[str, ...] = (
     "Build docs warning-free: sphinx-build -b html -W docs/source docs/_build/html",
     "Add/extend unit tests for parsing and option handling.",
 )
-
