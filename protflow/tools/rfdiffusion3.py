@@ -39,7 +39,7 @@ from protflow.runners import (
     prepend_cmd,
 )
 
-class RFDiffusion3(Runner):
+class RFdiffusion3(Runner):
     """Template class for implementing a new ProtFlow runner.
 
     Developer instructions
@@ -82,7 +82,10 @@ class RFDiffusion3(Runner):
 
         self.jobstarter = jobstarter
         self.name = "rfdiffusion3"
-        self.index_layers = 0   # RFD3 output format: <name>_<settings_group>_<batch_number>_model_n.<suffix>. TODO: check if index_layer = 0 fits with the input 
+#        self.index_layers = 0   # RFD3 output format: <name>_<settings_group>_<batch_number>_model_n.<suffix>. TODO: check if index_layer = 0 fits with the input 
+
+
+
 
     def __str__(self) -> str:
         """Return a short runner name used in logs."""
@@ -180,7 +183,31 @@ class RFDiffusion3(Runner):
                 "Cannot provide both input_json and individual JSON parameters. "
                 "Use one approach or the other."
             )
-        
+
+
+
+        # determine index_layers early, before any RunnerOutput calls
+        if input_json is not None:
+            # read from provided JSON file
+            self.index_layers = _get_index_layers_from_json(input_json)
+            logging.info(
+                f"Determined index_layers={self.index_layers} from provided "
+                f"input_json '{input_json}'"
+            )
+        else:
+            #compute from settings_group_name directly
+            # default group name is the pose description if not provided
+            group_name = settings_group_name or os.path.splitext(
+                os.path.basename(poses.poses_list()[0])
+            )[0]
+            self.index_layers = len(group_name.split("_")) + 2
+            logging.info(
+                f"Determined index_layers={self.index_layers} from "
+                f"settings_group_name '{group_name}' "
+                f"({len(group_name.split('_'))} chunks in group name + 2 for "
+                f"batch number and model index)"
+            )
+
         
         # 1) Generic setup shared by all runners.
         work_dir, jobstarter = self.generic_run_setup(
@@ -265,6 +292,17 @@ class RFDiffusion3(Runner):
 
         if len(scores.index) == 0:
             raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output logs and runner output directory ({work_dir})")
+        
+
+        # DEBUG - remove after fixing
+        print("poses_description values:", poses.df["poses_description"].tolist())
+        print("scores description values:", scores["description"].tolist())
+        # this is what select_col will look like after stripping index_layers
+        import re
+        scores["debug_select_col"] = scores["description"].str.split("_").str[:-1*self.index_layers].str.join("_")
+        print("select_col after stripping index_layers:", scores["debug_select_col"].tolist())
+        print("index_layers value:", self.index_layers)
+
 
         # 7) Persist and merge back into poses.
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -467,7 +505,7 @@ class RFDiffusion3(Runner):
         content = {group_name: spec}
 
         # save to out_dir
-        json_path = os.path.join(out_dir, f"{desc}_input.json")
+        json_path = os.path.join(out_dir, f"{desc}.json")
         with open(json_path, "w", encoding="utf-8") as handle:
             json.dump(content, handle, indent=4)
 
@@ -588,6 +626,35 @@ class RFDiffusion3(Runner):
         for file_path in glob(os.path.join(output_dir, "*")):
             if os.path.isfile(file_path):
                 os.remove(file_path)
+
+def _get_index_layers_from_json(json_path: str) -> int:
+    with open(json_path, "r", encoding="utf-8") as handle:
+        content = json.load(handle)
+    
+    group_names = list(content.keys())
+    
+    if not group_names:
+        raise ValueError(f"Could not find any settings groups in {json_path}")
+    
+    if len(group_names) > 1:
+        logging.warning(
+            f"Multiple settings groups found in {json_path}: {group_names}. "
+            f"Using first group '{group_names[0]}' to determine index_layers. "
+            f"If this is wrong, consider splitting your JSON into separate files."
+        )
+    
+    group_name = group_names[0]
+    group_chunks = len(group_name.split("_"))
+    index_layers = group_chunks + 2
+
+    logging.info(
+        f"Read settings group '{group_name}' from {json_path}. "
+        f"Group name contains {group_chunks} '_'-separated chunks. "
+        f"index_layers = {group_chunks} + 2 = {index_layers}"
+    )
+    
+    return index_layers
+
 
 def _is_heavy_value(value: object) -> bool:
     """Heuristic for values that can bloat score tables (2D/per-residue objects)."""
