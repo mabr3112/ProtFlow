@@ -93,10 +93,8 @@ class RFdiffusion3(Runner):
         poses: Poses,
         prefix: str,
         jobstarter: JobStarter | None = None,
-        # --- Option 1: provide a pre-made JSON directly ---
-        input_json: str | None = None,
-        # --- Option 2: provide parameters to build a JSON automatically ---
-        settings_group_name: str | None = None,
+        # --- provide parameters to build a JSON file for RFD3 automatically ---
+        settings_group_name: str = "rfd3",
         input: str | None = None,
         contig: str | None = None,
         unindex: str | None = None,
@@ -150,43 +148,12 @@ class RFdiffusion3(Runner):
         """
         
         # -1)
-        self.index_layers = _retrive_underscores_from_settings_group(input_json=input_json, settings_group_name=settings_group_name)   
+        self.index_layers = _retrieve_underscores_from_settings_group(settings_group_name=settings_group_name)   
         # RFD3 output format: <name>_<settings_group>_<batch_number>_model_n.<suffix>. So typically index_layers needed to strip would be 4
         # but if there are underscores in <settings_group> additional layers need to be stripped, that's why the helper function is included 
 
 
-        # 0) Test that *either* input_json or input specification fields were provided
-        if input_json is not None and any([
-            settings_group_name,
-            input,
-            contig,
-            unindex,
-            length,
-            ligand,
-            select_fixed_atoms,
-            select_unfixed_sequence,
-            select_hotspots,
-            select_buried,
-            select_partially_buried,
-            select_exposed,
-            select_hbond_donor,
-            select_hbond_acceptor,
-            redesign_motif_sidechains,
-            partial_t,
-            plddt_enhanced,
-            is_non_loopy,
-            symmetry,
-            ori_token,
-            infer_ori_strategy,
-            cif_parser_args,
-            dialect,
-            extra,
-        ]):
-            raise ValueError(
-                "Cannot provide both input_json and individual JSON parameters. "
-                "Use one approach or the other."
-            )
-        
+      
         
         # 1) Generic setup shared by all runners.
         work_dir, jobstarter = self.generic_run_setup(
@@ -226,7 +193,6 @@ class RFdiffusion3(Runner):
             work_dir=work_dir,
             options=options,
             pose_options=pose_options_list,
-            input_json=input_json,
             settings_group_name=settings_group_name,
             input=input,
             contig=contig,
@@ -259,12 +225,12 @@ class RFdiffusion3(Runner):
             cmds = prepend_cmd(cmds=cmds, pre_cmd=self.pre_cmd)
 
         # 5) Execute commands.
-        #jobstarter.start(
-        #    cmds=cmds,
-        #    jobname=self.name,
-        #    wait=True,
-        #    output_path=work_dir,
-        #)
+        jobstarter.start(
+            cmds=cmds,
+            jobname=self.name,
+            wait=True,
+            output_path=work_dir,
+        )
 
         # 6) Collect and validate scores (module function, by convention).
         scores = collect_scores(work_dir=work_dir, include_scores=include_scores)
@@ -287,7 +253,6 @@ class RFdiffusion3(Runner):
         work_dir: str,
         options: str | None,
         pose_options: list[str | None],
-        input_json: str | None = None,
         settings_group_name: str | None = None,
         input: str | None = None,
         contig: str | None = None,
@@ -347,7 +312,6 @@ class RFdiffusion3(Runner):
                 pose_path=pose_path,
                 out_dir=out_dir,
                 cli_args=cli_args,
-                input_json=input_json,
                 settings_group_name=settings_group_name,
                 input=input,
                 contig=contig,
@@ -419,8 +383,7 @@ class RFdiffusion3(Runner):
         settings_group_name : str | None
             Name of the settings group in the JSON. If None, the pose
             description (filename without extension) is used. Note that
-            this name appears in output filenames, so avoid underscores
-            if you want predictable index_layers.
+            this name appears in output filenames.
         All other parameters map directly to RFDiffusion3 InputSpecification
         fields. Only non-None values are written to the JSON.
 
@@ -487,7 +450,6 @@ class RFdiffusion3(Runner):
         pose_path: str,
         out_dir: str,
         cli_args: str,
-        input_json: str | None = None,
         settings_group_name: str | None = None,
         input: str | None = None,
         contig: str | None = None,
@@ -525,51 +487,45 @@ class RFdiffusion3(Runner):
             Directory where RFD3 outputs will be saved.
         cli_args : str
             Additional CLI arguments assembled by _build_commands.
-        input_json : str | None
-            Path to a pre-made input JSON file. If provided, all other
-            JSON parameters are ignored.
         All other parameters map to RFDiffusion3 InputSpecification fields
-        and are passed to _write_input_json if no input_json is provided.
+        and are passed to _write_input_json.
 
         Returns
         -------
         str
             The complete shell command string for one pose.
         """
-        # determine the json input path
-        if input_json:
-            # Option 1: use provided JSON directly
-            json_path = input_json
-        else:
-            # Option 2: generate JSON from provided parameters
-            json_path = self._write_input_json(
-                pose_path=pose_path,
-                out_dir=out_dir,
-                settings_group_name=settings_group_name,
-                input=input,
-                contig=contig,
-                unindex=unindex,
-                length=length,
-                ligand=ligand,
-                select_fixed_atoms=select_fixed_atoms,
-                select_unfixed_sequence=select_unfixed_sequence,
-                select_hotspots=select_hotspots,
-                select_buried=select_buried,
-                select_partially_buried=select_partially_buried,
-                select_exposed=select_exposed,
-                select_hbond_donor=select_hbond_donor,
-                select_hbond_acceptor=select_hbond_acceptor,
-                redesign_motif_sidechains=redesign_motif_sidechains,
-                partial_t=partial_t,
-                plddt_enhanced=plddt_enhanced,
-                is_non_loopy=is_non_loopy,
-                symmetry=symmetry,
-                ori_token=ori_token,
-                infer_ori_strategy=infer_ori_strategy,
-                cif_parser_args=cif_parser_args,
-                dialect=dialect,
-                extra=extra,
-            )
+
+
+        # generate JSON from provided parameters
+        json_path = self._write_input_json(
+            pose_path=pose_path,
+            out_dir=out_dir,
+            settings_group_name=settings_group_name,
+            input=input,
+            contig=contig,
+            unindex=unindex,
+            length=length,
+            ligand=ligand,
+            select_fixed_atoms=select_fixed_atoms,
+            select_unfixed_sequence=select_unfixed_sequence,
+            select_hotspots=select_hotspots,
+            select_buried=select_buried,
+            select_partially_buried=select_partially_buried,
+            select_exposed=select_exposed,
+            select_hbond_donor=select_hbond_donor,
+            select_hbond_acceptor=select_hbond_acceptor,
+            redesign_motif_sidechains=redesign_motif_sidechains,
+            partial_t=partial_t,
+            plddt_enhanced=plddt_enhanced,
+            is_non_loopy=is_non_loopy,
+            symmetry=symmetry,
+            ori_token=ori_token,
+            infer_ori_strategy=infer_ori_strategy,
+            cif_parser_args=cif_parser_args,
+            dialect=dialect,
+            extra=extra,
+        )
 
         # assemble and return the command
         return (
@@ -603,73 +559,22 @@ import logging
 from typing import Optional
 
 
-def _retrive_underscores_from_settings_group(
-    input_json: Optional[str],
-    settings_group_name: Optional[str]
-) -> int:
+def _retrieve_underscores_from_settings_group(settings_group_name: str) -> int:
     """
-    If input_json is provided:
-        - Log the path
-        - Open the JSON file
-        - Get the first outermost key (corresponds to settings_group_name), count underscores
-        - Return 4 + underscore count
-        - Raise ValueError if JSON is empty
-
-    If settings_group_name is provided:
-        - Count underscores in the string
-        - Return 4 + underscore count
-
-    Raise ValueError if:
-        - Both are None
-        - Both are provided
+    Count underscores in settings_group_name and return 4 + underscore count.
+    
+    RFD3 output format: <json_name>_<settings_group>_<batch_number>_model_<n>
+    Stripping index_layers from the back recovers the original pose description.
+    Base of 4 accounts for: <settings_group>(1+) + <batch_number>(1) + model(1) + <n>(1).
+    Additional layers are added for each underscore in settings_group_name.
     """
-
-    # Validate inputs (exactly one must be provided)
-    if (input_json is None and settings_group_name is None) or \
-       (input_json is not None and settings_group_name is not None):
-        raise ValueError(
-            "Exactly one of 'input_json' or 'settings_group_name' must be provided. Either an input .json file is provided or it is built by parsing the options."
-        )
-
-    # Case 1: input_json exists
-    if input_json is not None:
-        import json
-
-        logging.info(f"Input JSON path: {input_json}")
-
-        with open(input_json, "r") as f:
-            data = json.load(f)
-
-        if not data:
-            raise ValueError("JSON file is empty.")
-        
-        if not isinstance(data, dict) or not data:
-            raise ValueError("JSON must contain a non-empty top-level object.")
-
-        # Get outermost key and it's number of underscores
-        outer_key = next(iter(data))
-        logging.info(
-            f"Outermost key: {outer_key}, Type: {type(data[outer_key]).__name__}"
-        )
-
-
-        outer_keys = list(data.keys())
-
-        if len(outer_keys) > 1:
-            logging.warning(
-                f"Multiple outermost keys found ({len(outer_keys)}). "
-                f"Using only the first one: '{outer_keys[0]}'. Please make sure you are aware of how many underscores are in your settings_group_names! This is relevant for ProtFlow pose logic and could be a reason why your poses cannot be merged."
-            )
-
-        first_key = outer_keys[0]
-        underscore_count = first_key.count("_")
-        logging.info(f"<inpt_json> exists and is {input_json} which contains {underscore_count} underscores in the first setting group name ({first_key}). self.index_layer set to 4+{underscore_count}")
-        return 4 + underscore_count
-
-    # Case 2: settings_group_name exists
     underscore_count = settings_group_name.count("_")
-    logging.info(f"<settings_group_name> exists and is {settings_group_name} which contains {underscore_count} underscores. self.index_layer set to 4+{underscore_count}")
-    return 4 + underscore_count
+    index_layers = 4 + underscore_count
+    logging.info(
+        f"settings_group_name='{settings_group_name}' contains {underscore_count} "
+        f"underscores -> index_layers={index_layers}"
+    )
+    return index_layers
 
 
 def _is_heavy_value(value: object) -> bool:
