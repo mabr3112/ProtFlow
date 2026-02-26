@@ -125,6 +125,7 @@ class RFdiffusion3(Runner):
         options: str | None = None,
         pose_options: list[str] | str | None = None,
         include_scores: list[str] | None = None,
+        update_motifs: list[str] | None = None,
         overwrite: bool = False,
     ) -> Poses:
         """Execute the full runner lifecycle and merge results into ``poses``.
@@ -240,12 +241,19 @@ class RFdiffusion3(Runner):
 
         # 7) Persist and merge back into poses.
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
-        return RunnerOutput(
-            poses=poses,
-            results=scores,
-            prefix=prefix,
-            index_layers=self.index_layers,
-        ).return_poses()
+        poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+
+        # 8) Optionally remap motifs using diffused_index_map from sidecar JSONs.
+        if update_motifs:
+            logging.info(f"Remapping motifs {update_motifs} after RFD3 run.")
+            self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
+
+        # 9) add here optional multiplex_poses
+
+
+        logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
+        return poses
+
 
     def _build_commands(
         self,
@@ -551,8 +559,103 @@ class RFdiffusion3(Runner):
             if os.path.isfile(file_path):
                 os.remove(file_path)
 
-import logging
-from typing import Optional
+    def remap_motifs(self, poses: Poses, motifs: list, prefix: str) -> None:
+        """
+        Update ResidueSelection motifs in poses.df after an RFD3 run.
+
+        Uses the diffused_index_map columns written by collect_scores to remap
+        input residue positions to their new positions in the diffused output.
+        The motif columns are updated in place — old positions are overwritten.
+
+        Parameters
+        ----------
+        poses : Poses
+            The Poses object after the RFD3 run.
+        motifs : list[str]
+            Column names in poses.df containing ResidueSelection objects to remap.
+        prefix : str
+            The prefix used in the RFD3 run, used to find diffused_index_map columns.
+        """
+        from protflow.residues import ResidueSelection, parse_residue
+
+        logging.info(f"[remap_motifs] Starting motif remapping for prefix='{prefix}'")
+        logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
+        logging.info(f"[remap_motifs] poses.df has {len(poses.df)} rows and the following columns: {poses.df.columns.tolist()}")
+
+        # find all diffused_index_map columns for this prefix
+        map_prefix = f"{prefix}_diffused_index_map_"
+        map_cols = [c for c in poses.df.columns if c.startswith(map_prefix)]
+
+        logging.info(f"[remap_motifs] Found {len(map_cols)} diffused_index_map columns: {map_cols}")
+
+        if not map_cols:
+            raise ValueError(
+                f"No diffused_index_map columns found for prefix '{prefix}'. "
+                f"Make sure collect_scores ran successfully and the sidecar JSONs exist."
+            )
+
+        for motif_col in motifs:
+            logging.info(f"[remap_motifs] Processing motif column '{motif_col}'")
+
+            if motif_col not in poses.df.columns:
+                raise ValueError(f"[remap_motifs] Motif column '{motif_col}' not found in poses.df!")
+
+            updated_motifs = []
+            for idx, row in poses.df.iterrows():
+                logging.info(f"[remap_motifs] Row {idx}: description='{row.get('poses_description', 'N/A')}'")
+
+                # reconstruct mapping dict from columns: {("A", 77): ("A", 96), ...}
+                mapping = {}
+                for col in map_cols:
+                    input_res_str = col.replace(map_prefix, "")  # e.g. "A77"
+                    output_res_str = row[col]                     # e.g. "A96"
+                    if pd.notna(output_res_str):
+                        mapping[parse_residue(input_res_str)] = parse_residue(output_res_str)
+                    else:
+                        logging.warning(
+                            f"[remap_motifs] Row {idx}: NaN value for column '{col}', skipping."
+                        )
+
+                logging.info(f"[remap_motifs] Row {idx}: reconstructed mapping: {mapping}")
+
+                # remap the motif
+                motif = row[motif_col]
+                logging.info(f"[remap_motifs] Row {idx}: original motif '{motif_col}': {motif}")
+
+                if not isinstance(motif, ResidueSelection):
+                    raise TypeError(
+                        f"Column '{motif_col}' must contain ResidueSelection objects. "
+                        f"Got {type(motif)} instead."
+                    )
+
+                remapped = tuple(
+                    mapping.get(res, res)  # fall back to original if not in map
+                    for res in motif.residues
+                )
+
+                logging.info(
+                    f"[remap_motifs] Row {idx}: remapped motif '{motif_col}': "
+                    f"{[f'{c}{r}' for c, r in remapped]}"
+                )
+
+                # warn if any residues were not found in the mapping
+                not_remapped = [res for res in motif.residues if res not in mapping]
+                if not_remapped:
+                    logging.warning(
+                        f"[remap_motifs] Row {idx}: {len(not_remapped)} residues in '{motif_col}' "
+                        f"were not found in diffused_index_map and kept at original positions: "
+                        f"{[f'{c}{r}' for c, r in not_remapped]}"
+                    )
+
+                updated_motifs.append(ResidueSelection(remapped, fast=True))
+
+            poses.df["residues_postdiffusion"] = updated_motifs
+            logging.info(
+                f"[remap_motifs] Finished remapping '{motif_col}' for all {len(poses.df)} rows."
+            )
+
+        logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
+
 
 
 import logging
