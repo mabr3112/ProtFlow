@@ -174,12 +174,18 @@ class RFdiffusion3(Runner):
         scorefile = os.path.join(work_dir, f"{self.name}_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info("Reusing existing scorefile: %s", scorefile)
-            return RunnerOutput(
+            poses = RunnerOutput(
                 poses=poses,
                 results=scores,
                 prefix=prefix,
                 index_layers=self.index_layers,
             ).return_poses()
+
+            if update_motifs:
+                logging.info(f"Remapping residue motifs {update_motifs} after RFD3 run.")
+                self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
+
+            return poses
 
         # Optional cleanup when overwrite is requested.
         if overwrite:
@@ -610,6 +616,7 @@ class RFdiffusion3(Runner):
 
                 # exchange 
                 exchanged_motif = [exchange_dict[residue] for residue in motif.residues]
+                logging.info(f"exchanged_motif = {exchanged_motif}")
                 output_motif_l.append(ResidueSelection(exchanged_motif))
 
             # overwrite in place, consistent with RFD1 behavior
