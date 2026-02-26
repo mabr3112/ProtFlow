@@ -245,7 +245,7 @@ class RFdiffusion3(Runner):
 
         # 8) Optionally remap motifs using diffused_index_map from sidecar JSONs.
         if update_motifs:
-            logging.info(f"Remapping motifs {update_motifs} after RFD3 run.")
+            logging.info(f"Remapping residue motifs {update_motifs} after RFD3 run.")
             self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
 
         # 9) add here optional multiplex_poses
@@ -559,28 +559,11 @@ class RFdiffusion3(Runner):
             if os.path.isfile(file_path):
                 os.remove(file_path)
 
-    def remap_motifs(self, poses: Poses, motifs: list, prefix: str) -> None:
+    def remap_motifs(self, poses: Poses, motifs: list[str], prefix: str) -> None:
         """
-        Update ResidueSelection motifs in poses.df after an RFD3 run.
 
-        Uses the diffused_index_map columns written by collect_scores to remap
-        input residue positions to their new positions in the diffused output.
-        The motif columns are updated in place — old positions are overwritten.
-
-        Parameters
-        ----------
-        poses : Poses
-            The Poses object after the RFD3 run.
-        motifs : list[str]
-            Column names in poses.df containing ResidueSelection objects to remap.
-        prefix : str
-            The prefix used in the RFD3 run, used to find diffused_index_map columns.
         """
         from protflow.residues import ResidueSelection, parse_residue
-
-        logging.info(f"[remap_motifs] Starting motif remapping for prefix='{prefix}'")
-        logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
-        logging.info(f"[remap_motifs] poses.df has {len(poses.df)} rows and the following columns: {poses.df.columns.tolist()}")
 
         # find all diffused_index_map columns for this prefix
         map_prefix = f"{prefix}_diffused_index_map_"
@@ -594,66 +577,43 @@ class RFdiffusion3(Runner):
                 f"Make sure collect_scores ran successfully and the sidecar JSONs exist."
             )
 
+        logging.info(f"[remap_motifs] motifs: {motifs}")
+
         for motif_col in motifs:
-            logging.info(f"[remap_motifs] Processing motif column '{motif_col}'")
+            logging.info(f"[remap_motifs] Processing motif column '{motif_col}'") # [remap_motifs] Processing motif column 'residues_original'
 
             if motif_col not in poses.df.columns:
                 raise ValueError(f"[remap_motifs] Motif column '{motif_col}' not found in poses.df!")
 
-            updated_motifs = []
+            output_motif_l = []
             for idx, row in poses.df.iterrows():
                 logging.info(f"[remap_motifs] Row {idx}: description='{row.get('poses_description', 'N/A')}'")
+                # [remap_motifs] Row 0: description='01_F2__TS_fla_test_2_0_model_0'
 
-                # reconstruct mapping dict from columns: {("A", 77): ("A", 96), ...}
-                mapping = {}
+                # reconstruct exchange_dict from columns: {("A", 77): ("A", 96), ...}
+                exchange_dict = {}
                 for col in map_cols:
                     input_res_str = col.replace(map_prefix, "")  # e.g. "A77"
                     output_res_str = row[col]                     # e.g. "A96"
                     if pd.notna(output_res_str):
-                        mapping[parse_residue(input_res_str)] = parse_residue(output_res_str)
+                        exchange_dict[parse_residue(input_res_str)] = parse_residue(output_res_str)
                     else:
                         logging.warning(
                             f"[remap_motifs] Row {idx}: NaN value for column '{col}', skipping."
                         )
 
-                logging.info(f"[remap_motifs] Row {idx}: reconstructed mapping: {mapping}")
+                logging.info(f"[remap_motifs] Row {idx}: reconstructed exchange_dict: {exchange_dict}")
+                # [remap_motifs] Row 1: reconstructed exchange_dict: {('A', 77): ('A', 118), ('A', 78): ('A', 119), ('A', 79): ('A', 120), 
+                # ('A', 80): ('A', 121), ('A', 155): ('A', 15), ('A', 156): ('A', 16), ('A', 157): ('A', 17), ('A', 158): ('A', 18)}
 
-                # remap the motif
                 motif = row[motif_col]
-                logging.info(f"[remap_motifs] Row {idx}: original motif '{motif_col}': {motif}")
 
-                if not isinstance(motif, ResidueSelection):
-                    raise TypeError(
-                        f"Column '{motif_col}' must contain ResidueSelection objects. "
-                        f"Got {type(motif)} instead."
-                    )
+                # exchange 
+                exchanged_motif = [exchange_dict[residue] for residue in motif.residues]
+                output_motif_l.append(ResidueSelection(exchanged_motif))
 
-                remapped = tuple(
-                    mapping.get(res, res)  # fall back to original if not in map
-                    for res in motif.residues
-                )
-
-                logging.info(
-                    f"[remap_motifs] Row {idx}: remapped motif '{motif_col}': "
-                    f"{[f'{c}{r}' for c, r in remapped]}"
-                )
-
-                # warn if any residues were not found in the mapping
-                not_remapped = [res for res in motif.residues if res not in mapping]
-                if not_remapped:
-                    logging.warning(
-                        f"[remap_motifs] Row {idx}: {len(not_remapped)} residues in '{motif_col}' "
-                        f"were not found in diffused_index_map and kept at original positions: "
-                        f"{[f'{c}{r}' for c, r in not_remapped]}"
-                    )
-
-                updated_motifs.append(ResidueSelection(remapped, fast=True))
-
-            poses.df["residues_postdiffusion"] = updated_motifs
-            logging.info(
-                f"[remap_motifs] Finished remapping '{motif_col}' for all {len(poses.df)} rows."
-            )
-
+            # overwrite in place, consistent with RFD1 behavior
+            poses.df[motif_col] = output_motif_l
         logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
 
 
