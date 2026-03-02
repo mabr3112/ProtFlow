@@ -246,12 +246,12 @@ class RFdiffusion3(Runner):
 
         n_input_poses = len(poses.df.index)
         expected_outputs = n_input_poses * n_batches * diffusion_batch_size
+        logging.info(f"expected outputs {expected_outputs} = n_input_poses * n_batches * diffusion_batch_size with len(poses.df.index) {len(poses.df.index)} and n_batches {n_batches} and diffusion_batch_size {diffusion_batch_size} and len(scores.index) {len(scores.index)}.")
         if fail_on_missing_output_poses and len(scores.index) < expected_outputs:
             raise RuntimeError(
                 f"{self}: Expected {expected_outputs} output poses "
                 f"({n_input_poses} input poses x {n_batches} batches x {diffusion_batch_size} per batch) "
-                f"but only collected {len(scores.index)}. "
-                f"Some RFDiffusion3 runs may have crashed. Check logs in {work_dir}."
+                f"but only collected {len(scores.index)}."
             )
 
         # 8) Persist and merge back into poses.
@@ -538,7 +538,7 @@ class RFdiffusion3(Runner):
         map_prefix = f"{prefix}_diffused_index_map_"
         map_cols = [c for c in poses.df.columns if c.startswith(map_prefix)]
 
-        logging.info(f"[remap_motifs] Found {len(map_cols)} diffused_index_map columns: {map_cols}")
+        #logging.info(f"[remap_motifs] Found {len(map_cols)} diffused_index_map columns: {map_cols}")
 
         if not map_cols:
             raise ValueError(
@@ -546,7 +546,7 @@ class RFdiffusion3(Runner):
                 f"Make sure collect_scores ran successfully and the sidecar JSONs exist."
             )
 
-        logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
+        #logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
 
         for motif_col in motifs:
             logging.info(f"[remap_motifs] Processing motif column '{motif_col}'")
@@ -558,9 +558,7 @@ class RFdiffusion3(Runner):
 
             output_motif_l = []
             for idx, row in poses.df.iterrows():
-                logging.info(
-                    f"[remap_motifs] Row {idx}: description='{row.get('poses_description', 'N/A')}'"
-                )
+                #logging.info(f"[remap_motifs] Row {idx}: description='{row.get('poses_description', 'N/A')}'")
 
                 # reconstruct exchange_dict: {("A", 77): ("A", 96), ...}
                 exchange_dict = {}
@@ -574,22 +572,18 @@ class RFdiffusion3(Runner):
                             f"[remap_motifs] Row {idx}: NaN value for column '{col}', skipping."
                         )
 
-                logging.info(
-                    f"[remap_motifs] Row {idx}: reconstructed exchange_dict: {exchange_dict}"
-                )
+                #logging.info(f"[remap_motifs] Row {idx}: reconstructed exchange_dict: {exchange_dict}")
 
                 motif = row[motif_col]
                 exchanged_motif = [exchange_dict[residue] for residue in motif.residues]
-                logging.info(f"[remap_motifs] Row {idx}: exchanged_motif = {exchanged_motif}")
+                #logging.info(f"[remap_motifs] Row {idx}: exchanged_motif = {exchanged_motif}")
                 output_motif_l.append(ResidueSelection(exchanged_motif))
 
             # overwrite in place, consistent with RFD1 behavior
             poses.df[motif_col] = output_motif_l
-            logging.info(
-                f"[remap_motifs] Finished remapping '{motif_col}' for all {len(poses.df)} rows."
-            )
+            #logging.info(f"[remap_motifs] Finished remapping '{motif_col}' for all {len(poses.df)} rows.")
 
-        logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
+        #logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
 
 
 def _retrieve_underscores_from_settings_group(settings_group_name: str) -> int:
@@ -602,10 +596,7 @@ def _retrieve_underscores_from_settings_group(settings_group_name: str) -> int:
     """
     underscore_count = settings_group_name.count("_")
     index_layers = 4 + underscore_count
-    logging.info(
-        f"settings_group_name='{settings_group_name}' contains {underscore_count} "
-        f"underscores -> index_layers={index_layers}"
-    )
+    #logging.info(f"settings_group_name='{settings_group_name}' contains {underscore_count} underscores -> index_layers={index_layers}")
     return index_layers
 
 
