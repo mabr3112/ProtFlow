@@ -2,7 +2,110 @@
 RFdiffusion3 Module
 ===================
 
-ProtFlow runner for RFDiffusion3.
+This module provides the ProtFlow runner implementation for RFDiffusion3.
+It enables structured, automated execution of RFDiffusion3 within the
+ProtFlow framework, including input specification, job execution,
+result collection, and optional motif remapping.
+
+Detailed Description
+--------------------
+The `RFdiffusion3` class extends the generic ProtFlow `Runner` base class
+to support the RFDiffusion3 application. It manages:
+
+- Automatic construction of required input JSON files
+- Command-line interface (CLI) argument assembly
+- Job submission via ProtFlow's JobStarter abstraction
+- Collection and flattening of output scores
+- Optional residue motif remapping based on diffused index maps
+- Safe reuse of cached scorefiles
+- Multiplexing of poses for parallel GPU utilization
+
+This implementation does **not**
+accept a pre-existing JSON specification file. The input JSON file
+is always constructed internally from the parameters provided to
+the `run()` method. Users must supply specification arguments
+(e.g. contig, symmetry, selection options, etc.), and the runner
+generates the JSON file automatically for each pose.
+
+Additionally, the `index_layers` parameter is **not manually configurable**.
+It is dynamically inferred from the `settings_group_name` argument
+via `_retrieve_underscores_from_settings_group()`. This ensures
+correct pose reindexing based on the RFDiffusion3 output naming scheme.
+
+RFDiffusion3 output structures are written as `.cif.gz` files with
+accompanying sidecar `.json` files containing metrics, specification
+data, and diffused index maps. These are parsed and flattened into
+a structured pandas DataFrame for integration into ProtFlow.
+
+Usage
+-----
+To use this module, instantiate the `RFdiffusion3` runner and call
+its `run()` method with appropriate arguments.
+
+The runner will:
+
+1. Infer index layers automatically.
+2. Construct per-pose input JSON files.
+3. Generate shell commands.
+4. Execute jobs via JobStarter.
+5. Parse outputs and merge results back into the Poses object.
+
+Examples
+--------
+Example usage within a ProtFlow workflow:
+
+.. code-block:: python
+
+    from protflow.poses import Poses
+    from protflow.jobstarters import JobStarter
+    from rfdiffusion3 import RFdiffusion3
+
+    poses = Poses()
+    jobstarter = JobStarter()
+
+    runner = RFdiffusion3()
+
+    results = runner.run(
+        poses=poses,
+        prefix="rfd3_experiment",
+        settings_group_name="rfd3",
+        contig="A1-100",
+        n_batches=2,
+        diffusion_batch_size=8,
+        multiplex_poses=4,
+        overwrite=True
+    )
+
+    print(results)
+
+Further Details
+---------------
+- JSON Construction: The input JSON file required by RFDiffusion3
+  is always built internally from the arguments supplied to `run()`.
+  Providing a pre-existing JSON file is not supported.
+- Dynamic Index Handling: The number of index layers used during
+  pose merging is inferred automatically from `settings_group_name`.
+- Score Flattening: Nested metrics in sidecar JSON files are
+  flattened recursively.
+- Heavy Data Filtering: Large per-residue arrays are excluded
+  by default unless explicitly requested via `include_scores`.
+- Multiplexing: Input poses can be duplicated to maximize
+  GPU utilization. Index layers are collapsed after completion.
+- Robustness: Optional failure detection ensures missing
+  outputs are caught early.
+
+Notes
+-----
+This module is part of the ProtFlow package and is designed
+to work in HPC environments with job schedulers.
+
+Authors
+-------
+Sigrid Kaltenbrunner
+
+Version
+-------
+0.1.0
 """
 
 from __future__ import annotations
@@ -28,7 +131,70 @@ from protflow.runners import (
 )
 
 class RFdiffusion3(Runner):
-    """ProtFlow runner for RFDiffusion3."""
+    """
+    RFdiffusion3 Runner Class
+    =========================
+
+    The `RFdiffusion3` class provides a full ProtFlow runner
+    implementation for RFDiffusion3.
+
+    Detailed Description
+    --------------------
+    This class manages the complete lifecycle of an RFDiffusion3 run:
+
+        - Automatic construction of per-pose input JSON files
+        - Command assembly for the RFDiffusion3 CLI
+        - Execution through a JobStarter
+        - Parsing and flattening of output sidecar JSON files
+        - Integration of results into the Poses DataFrame
+        - Optional residue motif remapping
+        - Optional multiplexing of poses for GPU scaling
+
+    Important Implementation Details
+    ---------------------------------
+    1. JSON File Construction
+       The input `.json` file required by RFDiffusion3 is always
+       generated internally using `_write_input_json()`. Users
+       cannot supply an already existing JSON file. All specification
+       parameters must be passed directly to `run()`.
+
+    2. Dynamic index_layers
+       The attribute `self.index_layers` is inferred dynamically
+       inside `run()` based on `settings_group_name`. The number
+       of underscore-separated components in the group name affects
+       how many trailing naming layers must be stripped to recover
+       the original pose description.
+
+    3. Output Format
+       RFDiffusion3 outputs:
+
+           <json_name>_<settings_group>_<batch_number>_model_<n>.cif.gz
+
+       Each structure has a corresponding sidecar `.json` file
+       containing:
+
+           - metrics
+           - specification
+           - diffused_index_map entries
+
+    4. Score Handling
+       Heavy per-residue or multidimensional values are excluded
+       by default to prevent bloated DataFrames. They can be
+       selectively included via `include_scores`.
+
+    5. Multiplexing
+       If `multiplex_poses` is set (>1), poses are duplicated
+       prior to execution and reindexed afterward to collapse
+       duplication layers.
+
+    Raises
+    ------
+    RuntimeError
+        If no outputs are collected or expected outputs are missing.
+    ValueError
+        If motif remapping is requested but required index maps
+        are missing.
+    """
 
     def __init__(
         self,
@@ -93,25 +259,52 @@ class RFdiffusion3(Runner):
         fail_on_missing_output_poses: bool = False,
         overwrite: bool = False,
     ) -> Poses:
-        """Execute the full runner lifecycle and merge results into poses.
+        """
+        Execute the full RFDiffusion3 runner lifecycle and merge results into poses.
+
+        This method performs the complete workflow:
+
+            1. Infer index_layers dynamically from settings_group_name.
+            2. Perform generic runner setup.
+            3. Optionally reuse cached scorefile.
+            4. Optionally duplicate poses for multiplexing.
+            5. Automatically generate per-pose input JSON files.
+            6. Build and execute CLI commands.
+            7. Parse outputs and flatten sidecar JSON scores.
+            8. Merge results into the Poses object.
+            9. Optionally remap residue motifs.
+            10. Optionally collapse multiplex index layers.
+
+        Important Notes
+        ---------------
+        - The input JSON file is ALWAYS constructed internally.
+        It is not possible to provide a pre-existing JSON file.
+        - index_layers is inferred automatically and cannot be
+        manually specified.
 
         Parameters
         ----------
-        multiplex_poses : int | None
-            If set, create this many copies of each input pose before running
-            diffusion. Useful to fully utilize parallel GPUs when you have
-            fewer input poses than GPUs. After the run, poses are reindexed
-            back to remove the duplication layer. Must be > 1 to have any
-            effect.
+        settings_group_name : str
+            Name of the JSON settings group. Determines output naming
+            and affects index_layers inference.
 
-            Example: 1 input pose + multiplex_poses=8 + diffusion_batch_size=8
-            gives 8 parallel jobs each producing 8 outputs = 64 total outputs.
+        multiplex_poses : int | None
+            Duplicate each input pose this many times before execution.
+            Must be >1 to have an effect.
+
         fail_on_missing_output_poses : bool
-            If True, raise a RuntimeError when the number of collected output
-            poses is less than the expected number (n_poses * n_batches *
-            diffusion_batch_size). RFDiffusion3 runs occasionally crash silently,
-            and enabling this flag ensures such failures are caught early rather
-            than propagating through a longer pipeline. Defaults to False.
+            Raise RuntimeError if fewer outputs than expected are collected.
+
+        include_scores : list[str] | None
+            Heavy score field names to include explicitly.
+
+        overwrite : bool
+            If True, delete previous outputs and rerun.
+
+        Returns
+        -------
+        Poses
+            Updated Poses object containing merged RFD3 results.
         """
 
         # -1) Determine index_layers from settings_group_name.
