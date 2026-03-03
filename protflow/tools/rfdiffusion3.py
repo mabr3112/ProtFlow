@@ -2,110 +2,7 @@
 RFdiffusion3 Module
 ===================
 
-This module provides the ProtFlow runner implementation for RFDiffusion3.
-It enables structured, automated execution of RFDiffusion3 within the
-ProtFlow framework, including input specification, job execution,
-result collection, and optional motif remapping.
-
-Detailed Description
---------------------
-The `RFdiffusion3` class extends the generic ProtFlow `Runner` base class
-to support the RFDiffusion3 application. It manages:
-
-- Automatic construction of required input JSON files
-- Command-line interface (CLI) argument assembly
-- Job submission via ProtFlow's JobStarter abstraction
-- Collection and flattening of output scores
-- Optional residue motif remapping based on diffused index maps
-- Safe reuse of cached scorefiles
-- Multiplexing of poses for parallel GPU utilization
-
-This implementation does **not**
-accept a pre-existing JSON specification file. The input JSON file
-is always constructed internally from the parameters provided to
-the `run()` method. Users must supply specification arguments
-(e.g. contig, symmetry, selection options, etc.), and the runner
-generates the JSON file automatically for each pose.
-
-Additionally, the `index_layers` parameter is **not manually configurable**.
-It is dynamically inferred from the `settings_group_name` argument
-via `_retrieve_underscores_from_settings_group()`. This ensures
-correct pose reindexing based on the RFDiffusion3 output naming scheme.
-
-RFDiffusion3 output structures are written as `.cif.gz` files with
-accompanying sidecar `.json` files containing metrics, specification
-data, and diffused index maps. These are parsed and flattened into
-a structured pandas DataFrame for integration into ProtFlow.
-
-Usage
------
-To use this module, instantiate the `RFdiffusion3` runner and call
-its `run()` method with appropriate arguments.
-
-The runner will:
-
-1. Infer index layers automatically.
-2. Construct per-pose input JSON files.
-3. Generate shell commands.
-4. Execute jobs via JobStarter.
-5. Parse outputs and merge results back into the Poses object.
-
-Examples
---------
-Example usage within a ProtFlow workflow:
-
-.. code-block:: python
-
-    from protflow.poses import Poses
-    from protflow.jobstarters import JobStarter
-    from rfdiffusion3 import RFdiffusion3
-
-    poses = Poses()
-    jobstarter = JobStarter()
-
-    runner = RFdiffusion3()
-
-    results = runner.run(
-        poses=poses,
-        prefix="rfd3_experiment",
-        settings_group_name="rfd3",
-        contig="A1-100",
-        n_batches=2,
-        diffusion_batch_size=8,
-        multiplex_poses=4,
-        overwrite=True
-    )
-
-    print(results)
-
-Further Details
----------------
-- JSON Construction: The input JSON file required by RFDiffusion3
-  is always built internally from the arguments supplied to `run()`.
-  Providing a pre-existing JSON file is not supported.
-- Dynamic Index Handling: The number of index layers used during
-  pose merging is inferred automatically from `settings_group_name`.
-- Score Flattening: Nested metrics in sidecar JSON files are
-  flattened recursively.
-- Heavy Data Filtering: Large per-residue arrays are excluded
-  by default unless explicitly requested via `include_scores`.
-- Multiplexing: Input poses can be duplicated to maximize
-  GPU utilization. Index layers are collapsed after completion.
-- Robustness: Optional failure detection ensures missing
-  outputs are caught early.
-
-Notes
------
-This module is part of the ProtFlow package and is designed
-to work in HPC environments with job schedulers.
-
-Authors
--------
-Sigrid Kaltenbrunner
-
-Version
--------
-0.1.0
+ProtFlow runner for RFDiffusion3.
 """
 
 from __future__ import annotations
@@ -131,70 +28,7 @@ from protflow.runners import (
 )
 
 class RFdiffusion3(Runner):
-    """
-    RFdiffusion3 Runner Class
-    =========================
-
-    The `RFdiffusion3` class provides a full ProtFlow runner
-    implementation for RFDiffusion3.
-
-    Detailed Description
-    --------------------
-    This class manages the complete lifecycle of an RFDiffusion3 run:
-
-        - Automatic construction of per-pose input JSON files
-        - Command assembly for the RFDiffusion3 CLI
-        - Execution through a JobStarter
-        - Parsing and flattening of output sidecar JSON files
-        - Integration of results into the Poses DataFrame
-        - Optional residue motif remapping
-        - Optional multiplexing of poses for GPU scaling
-
-    Important Implementation Details
-    ---------------------------------
-    1. JSON File Construction
-       The input `.json` file required by RFDiffusion3 is always
-       generated internally using `_write_input_json()`. Users
-       cannot supply an already existing JSON file. All specification
-       parameters must be passed directly to `run()`.
-
-    2. Dynamic index_layers
-       The attribute `self.index_layers` is inferred dynamically
-       inside `run()` based on `settings_group_name`. The number
-       of underscore-separated components in the group name affects
-       how many trailing naming layers must be stripped to recover
-       the original pose description.
-
-    3. Output Format
-       RFDiffusion3 outputs:
-
-           <json_name>_<settings_group>_<batch_number>_model_<n>.cif.gz
-
-       Each structure has a corresponding sidecar `.json` file
-       containing:
-
-           - metrics
-           - specification
-           - diffused_index_map entries
-
-    4. Score Handling
-       Heavy per-residue or multidimensional values are excluded
-       by default to prevent bloated DataFrames. They can be
-       selectively included via `include_scores`.
-
-    5. Multiplexing
-       If `multiplex_poses` is set (>1), poses are duplicated
-       prior to execution and reindexed afterward to collapse
-       duplication layers.
-
-    Raises
-    ------
-    RuntimeError
-        If no outputs are collected or expected outputs are missing.
-    ValueError
-        If motif remapping is requested but required index maps
-        are missing.
-    """
+    """ProtFlow runner for RFDiffusion3."""
 
     def __init__(
         self,
@@ -223,7 +57,7 @@ class RFdiffusion3(Runner):
         prefix: str,
         jobstarter: JobStarter | None = None,
         # --- parameters to build a JSON file for RFD3 automatically ---
-        settings_group_name: str = "rfd3",
+        settings_group_name: str | None = None,
         input: str | None = None,
         contig: str | None = None,
         unindex: str | None = None,
@@ -259,55 +93,49 @@ class RFdiffusion3(Runner):
         fail_on_missing_output_poses: bool = False,
         overwrite: bool = False,
     ) -> Poses:
-        """
-        Execute the full RFDiffusion3 runner lifecycle and merge results into poses.
-
-        This method performs the complete workflow:
-
-            1. Infer index_layers dynamically from settings_group_name.
-            2. Perform generic runner setup.
-            3. Optionally reuse cached scorefile.
-            4. Optionally duplicate poses for multiplexing.
-            5. Automatically generate per-pose input JSON files.
-            6. Build and execute CLI commands.
-            7. Parse outputs and flatten sidecar JSON scores.
-            8. Merge results into the Poses object.
-            9. Optionally remap residue motifs.
-            10. Optionally collapse multiplex index layers.
-
-        Important Notes
-        ---------------
-        - The input JSON file is ALWAYS constructed internally.
-        It is not possible to provide a pre-existing JSON file.
-        - index_layers is inferred automatically and cannot be
-        manually specified.
+        """Execute the full runner lifecycle and merge results into poses.
 
         Parameters
         ----------
-        settings_group_name : str
-            Name of the JSON settings group. Determines output naming
-            and affects index_layers inference.
-
         multiplex_poses : int | None
-            Duplicate each input pose this many times before execution.
-            Must be >1 to have an effect.
+            If set, create this many copies of each input pose before running
+            diffusion. Useful to fully utilize parallel GPUs when you have
+            fewer input poses than GPUs. After the run, poses are reindexed
+            back to remove the duplication layer. Must be > 1 to have any
+            effect.
 
+            Example: 1 input pose + multiplex_poses=8 + diffusion_batch_size=8
+            gives 8 parallel jobs each producing 8 outputs = 64 total outputs.
         fail_on_missing_output_poses : bool
-            Raise RuntimeError if fewer outputs than expected are collected.
-
-        include_scores : list[str] | None
-            Heavy score field names to include explicitly.
-
-        overwrite : bool
-            If True, delete previous outputs and rerun.
-
-        Returns
-        -------
-        Poses
-            Updated Poses object containing merged RFD3 results.
+            If True, raise a RuntimeError when the number of collected output
+            poses is less than the expected number (n_poses * n_batches *
+            diffusion_batch_size). RFDiffusion3 runs occasionally crash silently,
+            and enabling this flag ensures such failures are caught early rather
+            than propagating through a longer pipeline. Defaults to False.
         """
 
         # -1) Determine index_layers from settings_group_name.
+        #     Also apply a default name for de novo runs where none was provided.
+        is_denovo = len(poses) == 0
+
+        if settings_group_name is None:
+            settings_group_name = "denovo" if is_denovo else "rfd3"
+            logging.info(
+                f"No settings_group_name provided - defaulting to '{settings_group_name}'."
+            )
+
+        if is_denovo and length is None:
+            raise ValueError(
+                "De novo diffusion (empty Poses) requires at least 'length' to be set, "
+                "e.g. length='150-200'. No input structure is provided to infer a length from."
+            )
+
+        if is_denovo:
+            logging.info(
+                f"De novo mode: no input poses. Will generate {n_batches * diffusion_batch_size} "
+                f"structures with length='{length}'."
+            )
+
         self.index_layers = _retrieve_underscores_from_settings_group(
             settings_group_name=settings_group_name
         )
@@ -336,32 +164,37 @@ class RFdiffusion3(Runner):
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info("Reusing existing scorefile: %s", scorefile)
 
-            # If multiplexing, duplicate poses before merge so index layers match.
-            if multiplex_poses:
-                poses.duplicate_poses(
-                    f"{poses.work_dir}/{prefix}_multiplexed_input_pdbs/",
-                    multiplex_poses,
-                )
+            if is_denovo:
+                poses.df = scores.copy()
+                poses.df["input_poses"] = None
+                logging.info("De novo cached reuse: populated poses.df from scorefile.")
+            else:
+                # If multiplexing, duplicate poses before merge so index layers match.
+                if multiplex_poses:
+                    poses.duplicate_poses(
+                        f"{poses.work_dir}/{prefix}_multiplexed_input_pdbs/",
+                        multiplex_poses,
+                    )
 
-            poses = RunnerOutput(
-                poses=poses,
-                results=scores,
-                prefix=prefix,
-                index_layers=self.index_layers,
-            ).return_poses()
+                poses = RunnerOutput(
+                    poses=poses,
+                    results=scores,
+                    prefix=prefix,
+                    index_layers=self.index_layers,
+                ).return_poses()
 
-            if update_motifs:
-                logging.info(f"Remapping residue motifs {update_motifs} from cached scorefile.")
-                self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
+                if update_motifs:
+                    logging.info(f"Remapping residue motifs {update_motifs} from cached scorefile.")
+                    self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
 
-            # remove_layers = 1 (from duplicate_poses) + self.index_layers (from RFD3 output naming)
-            if multiplex_poses:
-                poses.reindex_poses(
-                    prefix=f"{prefix}_post_multiplex_reindexing",
-                    remove_layers=1 + self.index_layers,
-                    force_reindex=True,
-                    overwrite=overwrite,
-                )
+                # remove_layers = 1 (from duplicate_poses) + self.index_layers (from RFD3 output naming)
+                if multiplex_poses:
+                    poses.reindex_poses(
+                        prefix=f"{prefix}_post_multiplex_reindexing",
+                        remove_layers=1 + self.index_layers,
+                        force_reindex=True,
+                        overwrite=overwrite,
+                    )
 
             return poses
 
@@ -380,44 +213,82 @@ class RFdiffusion3(Runner):
                 f"{len(poses)} poses total."
             )
 
-        # 4) Prepare pose-level options.
-        pose_options_list = self.prep_pose_options(poses=poses, pose_options=pose_options)
+        # 4) Prepare pose-level options and build commands.
+        #    De novo: poses is empty, so we generate one synthetic command instead
+        #    of iterating over poses.poses_list() (which would be empty).
+        if is_denovo:
+            pose_options_list = [pose_options] if isinstance(pose_options, str) else (pose_options or [None])
+            merged_opts, merged_flags = parse_generic_options(options, pose_options_list[0], sep="--")
+            cli_args = options_flags_to_string(merged_opts, list(merged_flags), sep="--")
+            out_dir = os.path.join(work_dir, "outputs")
+            os.makedirs(out_dir, exist_ok=True)
+            cmds = [self.write_cmd(
+                pose_path=None,
+                out_dir=out_dir,
+                cli_args=cli_args,
+                settings_group_name=settings_group_name,
+                input=input,
+                contig=contig,
+                unindex=unindex,
+                length=length,
+                ligand=ligand,
+                select_fixed_atoms=select_fixed_atoms,
+                select_unfixed_sequence=select_unfixed_sequence,
+                select_hotspots=select_hotspots,
+                select_buried=select_buried,
+                select_partially_buried=select_partially_buried,
+                select_exposed=select_exposed,
+                select_hbond_donor=select_hbond_donor,
+                select_hbond_acceptor=select_hbond_acceptor,
+                redesign_motif_sidechains=redesign_motif_sidechains,
+                partial_t=partial_t,
+                plddt_enhanced=plddt_enhanced,
+                is_non_loopy=is_non_loopy,
+                symmetry=symmetry,
+                ori_token=ori_token,
+                infer_ori_strategy=infer_ori_strategy,
+                cif_parser_args=cif_parser_args,
+                dialect=dialect,
+                extra=extra,
+                n_batches=n_batches,
+                diffusion_batch_size=diffusion_batch_size,
+            )]
+        else:
+            pose_options_list = self.prep_pose_options(poses=poses, pose_options=pose_options)
+            cmds = self._build_commands(
+                poses=poses,
+                work_dir=work_dir,
+                options=options,
+                pose_options=pose_options_list,
+                settings_group_name=settings_group_name,
+                input=input,
+                contig=contig,
+                unindex=unindex,
+                length=length,
+                ligand=ligand,
+                select_fixed_atoms=select_fixed_atoms,
+                select_unfixed_sequence=select_unfixed_sequence,
+                select_hotspots=select_hotspots,
+                select_buried=select_buried,
+                select_partially_buried=select_partially_buried,
+                select_exposed=select_exposed,
+                select_hbond_donor=select_hbond_donor,
+                select_hbond_acceptor=select_hbond_acceptor,
+                redesign_motif_sidechains=redesign_motif_sidechains,
+                partial_t=partial_t,
+                plddt_enhanced=plddt_enhanced,
+                is_non_loopy=is_non_loopy,
+                symmetry=symmetry,
+                ori_token=ori_token,
+                infer_ori_strategy=infer_ori_strategy,
+                cif_parser_args=cif_parser_args,
+                dialect=dialect,
+                extra=extra,
+                n_batches=n_batches,
+                diffusion_batch_size=diffusion_batch_size,
+            )
 
-        # 5) Build commands.
-        cmds = self._build_commands(
-            poses=poses,
-            work_dir=work_dir,
-            options=options,
-            pose_options=pose_options_list,
-            settings_group_name=settings_group_name,
-            input=input,
-            contig=contig,
-            unindex=unindex,
-            length=length,
-            ligand=ligand,
-            select_fixed_atoms=select_fixed_atoms,
-            select_unfixed_sequence=select_unfixed_sequence,
-            select_hotspots=select_hotspots,
-            select_buried=select_buried,
-            select_partially_buried=select_partially_buried,
-            select_exposed=select_exposed,
-            select_hbond_donor=select_hbond_donor,
-            select_hbond_acceptor=select_hbond_acceptor,
-            redesign_motif_sidechains=redesign_motif_sidechains,
-            partial_t=partial_t,
-            plddt_enhanced=plddt_enhanced,
-            is_non_loopy=is_non_loopy,
-            symmetry=symmetry,
-            ori_token=ori_token,
-            infer_ori_strategy=infer_ori_strategy,
-            cif_parser_args=cif_parser_args,
-            dialect=dialect,
-            extra=extra,
-            n_batches=n_batches,
-            diffusion_batch_size=diffusion_batch_size,
-        )
-
-        if self.pre_cmd:
+        # 5) Prepend pre-cmd if set.
             cmds = prepend_cmd(cmds=cmds, pre_cmd=self.pre_cmd)
 
         # 6) Execute commands.
@@ -438,32 +309,60 @@ class RFdiffusion3(Runner):
             )
 
         n_input_poses = len(poses.df.index)
-        expected_outputs = n_input_poses * n_batches * diffusion_batch_size
-        logging.info(f"expected outputs {expected_outputs} = n_input_poses * n_batches * diffusion_batch_size with len(poses.df.index) {len(poses.df.index)} and n_batches {n_batches} and diffusion_batch_size {diffusion_batch_size} and len(scores.index) {len(scores.index)}.")
+        # for de novo, n_input_poses is 0 so expected count comes from n_batches alone
+        expected_outputs = (n_batches * diffusion_batch_size) if is_denovo else (n_input_poses * n_batches * diffusion_batch_size)
+        logging.info(
+            f"Collected {len(scores.index)} output poses "
+            f"(expected {expected_outputs} = "
+            f"{'1 de novo job' if is_denovo else f'{n_input_poses} input pose(s)'} "
+            f"x {n_batches} batches x {diffusion_batch_size} per batch)."
+        )
         if fail_on_missing_output_poses and len(scores.index) < expected_outputs:
             raise RuntimeError(
                 f"{self}: Expected {expected_outputs} output poses "
-                f"({n_input_poses} input poses x {n_batches} batches x {diffusion_batch_size} per batch) "
-                f"but only collected {len(scores.index)}."
+                f"({'de novo' if is_denovo else f'{n_input_poses} input poses'} "
+                f"x {n_batches} batches x {diffusion_batch_size} per batch) "
+                f"but only collected {len(scores.index)}. "
+                f"Some RFDiffusion3 runs may have crashed. Check logs in {work_dir}."
             )
 
         # 8) Persist and merge back into poses.
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
-        poses = RunnerOutput(
-            poses=poses,
-            results=scores,
-            prefix=prefix,
-            index_layers=self.index_layers,
-        ).return_poses()
+
+        # 8) Merge results back into poses.
+        #    De novo: poses is empty so RunnerOutput has nothing to merge into.
+        #    We populate poses directly from the scores DataFrame instead.
+        if is_denovo:
+            poses.df = scores.copy()
+            poses.df["input_poses"] = None
+            logging.info(
+                f"De novo mode: populated poses.df directly from scores "
+                f"({len(poses.df.index)} rows)."
+            )
+        else:
+            poses = RunnerOutput(
+                poses=poses,
+                results=scores,
+                prefix=prefix,
+                index_layers=self.index_layers,
+            ).return_poses()
 
         # 9) Optionally remap motifs using diffused_index_map from sidecar JSONs.
+        #    Not applicable for de novo (no input residues to remap from).
         if update_motifs:
-            logging.info(f"Remapping residue motifs {update_motifs} after RFD3 run.")
-            self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
+            if is_denovo:
+                logging.warning(
+                    "update_motifs was set but this is a de novo run with no input "
+                    "residues — skipping motif remapping."
+                )
+            else:
+                logging.info(f"Remapping residue motifs {update_motifs} after RFD3 run.")
+                self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
 
         # 10) If multiplexing, reindex poses to collapse duplication layer.
         #     remove_layers = 1 (from duplicate_poses) + self.index_layers (from RFD3 output naming)
-        if multiplex_poses:
+        #     Not applicable for de novo (no duplication was done).
+        if multiplex_poses and not is_denovo:
             poses.reindex_poses(
                 prefix=f"{prefix}_post_multiplex_reindexing",
                 remove_layers=1 + self.index_layers,
@@ -556,7 +455,7 @@ class RFdiffusion3(Runner):
 
     def _write_input_json(
         self,
-        pose_path: str,
+        pose_path: str | None,
         out_dir: str,
         settings_group_name: str | None = None,
         input: str | None = None,
@@ -583,12 +482,26 @@ class RFdiffusion3(Runner):
         dialect: int | None = None,
         extra: dict | None = None,
     ) -> str:
-        """Generate a RFDiffusion3 input JSON file for a single pose."""
-        desc = os.path.splitext(os.path.basename(pose_path))[0]
+        """Generate a RFDiffusion3 input JSON file for a single pose.
+
+        If pose_path is None (de novo mode), no 'input' field is written
+        and the JSON filename is derived from settings_group_name.
+        """
+        # derive description and JSON filename
+        if pose_path is not None:
+            desc = os.path.splitext(os.path.basename(pose_path))[0]
+        else:
+            # de novo: no input file; use settings_group_name as the JSON filename
+            desc = settings_group_name or "denovo"
+
         group_name = settings_group_name or desc
 
-        spec = {}
-        spec["input"] = input or pose_path
+        spec: dict = {}
+
+        # only write 'input' if an explicit value was given or pose_path exists
+        resolved_input = input or pose_path
+        if resolved_input is not None:
+            spec["input"] = resolved_input
 
         optional_fields = {
             "contig": contig,
@@ -631,7 +544,7 @@ class RFdiffusion3(Runner):
 
     def write_cmd(
         self,
-        pose_path: str,
+        pose_path: str | None,
         out_dir: str,
         cli_args: str,
         settings_group_name: str | None = None,
@@ -731,7 +644,7 @@ class RFdiffusion3(Runner):
         map_prefix = f"{prefix}_diffused_index_map_"
         map_cols = [c for c in poses.df.columns if c.startswith(map_prefix)]
 
-        #logging.info(f"[remap_motifs] Found {len(map_cols)} diffused_index_map columns: {map_cols}")
+        logging.info(f"[remap_motifs] Found {len(map_cols)} diffused_index_map columns: {map_cols}")
 
         if not map_cols:
             raise ValueError(
@@ -739,7 +652,7 @@ class RFdiffusion3(Runner):
                 f"Make sure collect_scores ran successfully and the sidecar JSONs exist."
             )
 
-        #logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
+        logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
 
         for motif_col in motifs:
             logging.info(f"[remap_motifs] Processing motif column '{motif_col}'")
@@ -751,7 +664,9 @@ class RFdiffusion3(Runner):
 
             output_motif_l = []
             for idx, row in poses.df.iterrows():
-                #logging.info(f"[remap_motifs] Row {idx}: description='{row.get('poses_description', 'N/A')}'")
+                logging.info(
+                    f"[remap_motifs] Row {idx}: description='{row.get('poses_description', 'N/A')}'"
+                )
 
                 # reconstruct exchange_dict: {("A", 77): ("A", 96), ...}
                 exchange_dict = {}
@@ -765,18 +680,22 @@ class RFdiffusion3(Runner):
                             f"[remap_motifs] Row {idx}: NaN value for column '{col}', skipping."
                         )
 
-                #logging.info(f"[remap_motifs] Row {idx}: reconstructed exchange_dict: {exchange_dict}")
+                logging.info(
+                    f"[remap_motifs] Row {idx}: reconstructed exchange_dict: {exchange_dict}"
+                )
 
                 motif = row[motif_col]
                 exchanged_motif = [exchange_dict[residue] for residue in motif.residues]
-                #logging.info(f"[remap_motifs] Row {idx}: exchanged_motif = {exchanged_motif}")
+                logging.info(f"[remap_motifs] Row {idx}: exchanged_motif = {exchanged_motif}")
                 output_motif_l.append(ResidueSelection(exchanged_motif))
 
             # overwrite in place, consistent with RFD1 behavior
             poses.df[motif_col] = output_motif_l
-            #logging.info(f"[remap_motifs] Finished remapping '{motif_col}' for all {len(poses.df)} rows.")
+            logging.info(
+                f"[remap_motifs] Finished remapping '{motif_col}' for all {len(poses.df)} rows."
+            )
 
-        #logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
+        logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
 
 
 def _retrieve_underscores_from_settings_group(settings_group_name: str) -> int:
@@ -789,7 +708,10 @@ def _retrieve_underscores_from_settings_group(settings_group_name: str) -> int:
     """
     underscore_count = settings_group_name.count("_")
     index_layers = 4 + underscore_count
-    #logging.info(f"settings_group_name='{settings_group_name}' contains {underscore_count} underscores -> index_layers={index_layers}")
+    logging.info(
+        f"settings_group_name='{settings_group_name}' contains {underscore_count} "
+        f"underscores -> index_layers={index_layers}"
+    )
     return index_layers
 
 
