@@ -289,6 +289,7 @@ class RFdiffusion3(Runner):
             )
 
         # 5) Prepend pre-cmd if set.
+        if self.pre_cmd:
             cmds = prepend_cmd(cmds=cmds, pre_cmd=self.pre_cmd)
 
         # 6) Execute commands.
@@ -486,6 +487,15 @@ class RFdiffusion3(Runner):
 
         If pose_path is None (de novo mode), no 'input' field is written
         and the JSON filename is derived from settings_group_name.
+
+        Input PDB handling
+        ------------------
+        RFD3 resolves the 'input' path in the JSON relative to the JSON file's
+        own location. To ensure this works correctly regardless of where the
+        script is called from, this method copies the input PDB into the same
+        directory as the JSON file and writes only the basename (e.g. "5AN7.pdb")
+        as the 'input' value — never an absolute or relative path. If an explicit
+        'input' override is provided it is treated the same way.
         """
         # derive description and JSON filename
         if pose_path is not None:
@@ -498,10 +508,15 @@ class RFdiffusion3(Runner):
 
         spec: dict = {}
 
-        # only write 'input' if an explicit value was given or pose_path exists
+        # copy input PDB next to the JSON and write only its basename as 'input'
         resolved_input = input or pose_path
         if resolved_input is not None:
-            spec["input"] = resolved_input
+            input_basename = os.path.basename(resolved_input)
+            input_dst = os.path.join(out_dir, input_basename)
+            if not os.path.isfile(input_dst):
+                shutil.copy(resolved_input, input_dst)
+                logging.info(f"Copied input PDB '{input_basename}' to {out_dir}")
+            spec["input"] = input_basename
 
         optional_fields = {
             "contig": contig,
@@ -609,8 +624,8 @@ class RFdiffusion3(Runner):
             f"inputs='{json_path}' "
             f"out_dir='{out_dir}' "
             f"n_batches={n_batches} "
-            f"diffusion_batch_size={diffusion_batch_size} "
-            f"{cli_args}"
+            f"diffusion_batch_size={diffusion_batch_size}"
+            + (f" {cli_args.strip()}" if cli_args and cli_args.strip() and cli_args.strip() != ";" else "")
         )
 
     def _cleanup_previous_outputs(self, work_dir: str) -> None:
