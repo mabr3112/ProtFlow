@@ -16,6 +16,9 @@ to support the RFDiffusion3 application. It manages:
 - Optional residue motif remapping based on diffused index maps
 - Safe reuse of cached scorefiles
 - Multiplexing of poses for parallel GPU utilization
+- De novo design by prodividing an empty input pose and output length 
+  as well as motif scaffolding by providing an input .pdb file and
+  unindexed residues according to the RFD3 documentation.
 
 This implementation does **not**
 accept a pre-existing JSON specification file. The input JSON file
@@ -193,6 +196,8 @@ class RFdiffusion3(Runner):
     ValueError
         If motif remapping is requested but required index maps
         are missing.
+        If de novo design is requested (no input .pdb file is provided)
+        but length is not defined.
     """
 
     def __init__(
