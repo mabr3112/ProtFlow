@@ -37,7 +37,6 @@ from protflow.runners import (
     prepend_cmd,
 )
 
-
 class ExampleRunner(Runner):
     """Template class for implementing a new ProtFlow runner.
 
@@ -164,7 +163,7 @@ class ExampleRunner(Runner):
         scores = collect_scores(work_dir=work_dir, include_scores=include_scores)
 
         if len(scores.index) == 0:
-            raise RuntimeError(f"{self}: collect_scores returned no rows.")
+            raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output logs and runner output directory ({work_dir})")
 
         # 7) Persist and merge back into poses.
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -195,7 +194,7 @@ class ExampleRunner(Runner):
         os.makedirs(out_dir, exist_ok=True)
 
         cmds: list[str] = []
-        for pose_path, pose_opt in zip(poses.df["poses"].to_list(), pose_options):
+        for pose_path, pose_opt in zip(poses.poses_list(), pose_options):
             # Merge global and pose-specific options; pose options override global values.
             merged_opts, merged_flags = parse_generic_options(options, pose_opt, sep="--")
             cli_args = options_flags_to_string(merged_opts, list(merged_flags), sep="--")
@@ -213,7 +212,7 @@ class ExampleRunner(Runner):
         """
 
         description = os.path.splitext(os.path.basename(pose_path))[0]
-        out_pose = os.path.join(out_dir, f"{description}.pdb")
+        out_pose = os.path.join(out_dir, f"{description}.pdb") # TODO: change this to the expected output directions of your tool
 
         # TODO: replace with your tool's real command structure.
         return (
@@ -230,7 +229,6 @@ class ExampleRunner(Runner):
         - Never remove unrelated files outside ``work_dir``.
         - This method is optional but useful for tools that append stale outputs.
         """
-
         output_dir = os.path.join(work_dir, "outputs")
         if not os.path.isdir(output_dir):
             return
@@ -238,7 +236,6 @@ class ExampleRunner(Runner):
         for file_path in glob(os.path.join(output_dir, "*")):
             if os.path.isfile(file_path):
                 os.remove(file_path)
-
 
 def _is_heavy_value(value: object) -> bool:
     """Heuristic for values that can bloat score tables (2D/per-residue objects)."""
@@ -286,7 +283,6 @@ def _extract_score_dict(
 
     return out
 
-
 def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd.DataFrame:
     """Parse runner outputs and return the canonical scores dataframe.
 
@@ -302,7 +298,6 @@ def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd
       Use ``include_scores`` to opt-in to specific heavy fields.
     - Keep function callable standalone (for debugging/re-parsing old runs).
     """
-
     include_set = set(include_scores or [])
     output_dir = os.path.join(work_dir, "outputs")
     output_paths = sorted(
