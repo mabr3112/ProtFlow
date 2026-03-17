@@ -7,4 +7,5 @@ This section provides detailed guides on how to use tools implemented as Runners
     :maxdepth: 1
 
     boltz
+    ligandmpnn
  

@@ -23,7 +23,7 @@ Like any other ProtFlow runner, the Boltz runner collects output scores and pred
     - github: https://github.com/jacktday/boltztools/tree/main
 
 Installation
-============
+------------
 
 Follow the installation instructions in the official Boltz repository:
 `https://github.com/jwohlwend/boltz <https://github.com/jwohlwend/boltz>`_.
@@ -49,7 +49,7 @@ You are now ready to use the Boltz runner in your ProtFlow pipelines!
         protflow-check-config
 
 Predicting structures
-=====================
+---------------------
 
 .. note::
 
