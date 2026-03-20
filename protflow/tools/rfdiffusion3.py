@@ -388,14 +388,14 @@ class RFdiffusion3(Runner):
         #    of iterating over poses.poses_list() (which would be empty).
         if is_denovo:
             pose_options_list = [pose_options] if isinstance(pose_options, str) else (pose_options or [None])
-            merged_opts, merged_flags = parse_generic_options(options, pose_options_list[0], sep="--")
-            cli_args = options_flags_to_string(merged_opts, list(merged_flags), sep="--")
+            #merged_opts, merged_flags = parse_generic_options(options, pose_options_list[0], sep="--")
+            #cli_args = options_flags_to_string(merged_opts, list(merged_flags), sep="--")
             out_dir = os.path.join(work_dir, "outputs")
             os.makedirs(out_dir, exist_ok=True)
             cmds = [self.write_cmd(
                 pose_path=None,
                 out_dir=out_dir,
-                cli_args=cli_args,
+                cli_args=options,
                 settings_group_name=settings_group_name,
                 input=input,
                 contig=contig,
@@ -588,13 +588,13 @@ class RFdiffusion3(Runner):
 
         cmds: list[str] = []
         for pose_path, pose_opt in zip(poses.poses_list(), pose_options):
-            merged_opts, merged_flags = parse_generic_options(options, pose_opt, sep="--")
-            cli_args = options_flags_to_string(merged_opts, list(merged_flags), sep="--")
+            #merged_opts, merged_flags = parse_generic_options(options, pose_opt, sep="--")
+            #cli_args = options_flags_to_string(merged_opts, list(merged_flags), sep="--")
 
             cmds.append(self.write_cmd(
                 pose_path=pose_path,
                 out_dir=out_dir,
-                cli_args=cli_args,
+                cli_args=options,
                 settings_group_name=settings_group_name,
                 input=input,
                 contig=contig,
