@@ -65,6 +65,11 @@ PLACER_PRE_CMD = ""
 ESM_PYTHON_PATH = "" # "/path/to/package_manager/envs/your_esm_env/bin/python"
 ESM_PRE_CMD = ""
 
+# minifold
+MINIFOLD_SCRIPT_PATH = "" # "/path/to/minifold/predict.py"
+MINIFOLD_PYTHON_PATH = "" # "/path/to/mambaforge/envs/minifold/bin/python"
+MINIFOLD_PRE_CMD = ""
+
 # protein generator
 PROTEIN_GENERATOR_PYTHON_PATH = ""
 PROTEIN_GENERATOR_SCRIPT_PATH = ""
