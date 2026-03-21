@@ -22,7 +22,7 @@ Here is an example of how to initialize and use the `Minifold` class within a Pr
 
     from protflow.poses import Poses
     from protflow.jobstarters import JobStarter
-    from minifold import Minifold
+    from protflow.tools.minifold import Minifold
 
     # Create instances of necessary classes
     poses = Poses()
@@ -68,14 +68,14 @@ Version
 import os
 import logging
 from glob import glob
-import numpy as npF
+import numpy as np
 
 # dependencies
 import pandas as pd
 
 # custom
 from protflow import require_config, load_config_path, runners
-from protflow.poses import Poses, description_from_pose
+from protflow.poses import Poses, description_from_path
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..jobstarters import JobStarter
 
@@ -145,7 +145,7 @@ class Minifold(Runner):
 
     The Minifold class is intended for researchers and developers who need to perform Minifold simulations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
     """
-    def __init__(self, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter|None = None) -> None:
+    def __init__(self, cache_dir: str = None, python_path: str = None, pre_cmd: str = None, jobstarter: JobStarter = None) -> None:
         """
         Initialize the Minifold class with necessary configurations.
 
@@ -182,7 +182,11 @@ class Minifold(Runner):
         """
         # setup config
         config = require_config()
+
         self.script_path = load_config_path(config, "MINIFOLD_SCRIPT_PATH")
+
+        self.cache_dir = cache_dir or os.path.join(os.path.dirname(self.script_path), "minifold_cache")
+
         self.python_path = python_path or load_config_path(config, "MINIFOLD_PYTHON_PATH")
         self.pre_cmd = pre_cmd or load_config_path(config, "MINIFOLD_PRE_CMD", is_pre_cmd=True)
 
@@ -277,7 +281,7 @@ class Minifold(Runner):
         pose_fastas = self.prep_fastas_for_prediction(poses=poses.df['poses'].to_list(), fasta_dir=fasta_dir, max_filenum=num_batches)
 
         # check if interfering options were set
-        forbidden_options = ['--out_dir']
+        forbidden_options = ['--out_dir', "--cache"]
         if options and any(opt in options for opt in forbidden_options) :
             raise KeyError(f"Options must not contain any of {forbidden_options}\nThese will be set automatically.")
 
@@ -299,10 +303,10 @@ class Minifold(Runner):
 
         # collect scores
         logging.info("Predictions finished, starting to collect scores.")
-        scores = collect_minifold_scores(work_dir=work_dir)
+        scores = collect_scores(work_dir=work_dir)
 
         if len(scores.index) < len(poses.df.index):
-            raise RuntimeError("Number of output poses is smaller than number of input poses. Some runs might have crashed!")
+            raise RuntimeError(f"Number of output poses ({len(scores.index)}) is smaller than number of input poses {len(poses.df.index)}. Some runs might have crashed!")
 
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -419,9 +423,9 @@ class Minifold(Runner):
         # parse options
         opts, flags = runners.parse_generic_options(options, None)
 
-        return f"{self.python_path} {self.script_path} {pose_path} --out_dir {output_dir} {runners.options_flags_to_string(opts, flags, sep='--')}"
+        return f"{self.python_path} {self.script_path} {pose_path} --out_dir {output_dir} --cache {self.cache_dir} {runners.options_flags_to_string(opts, flags, sep='--')}"
 
-def collect_minifold_scores(work_dir:str) -> pd.DataFrame:
+def collect_scores(work_dir:str) -> pd.DataFrame:
     """
     Collect and process the scores from Minifold output.
 
@@ -461,20 +465,24 @@ def collect_minifold_scores(work_dir:str) -> pd.DataFrame:
     """
 
     def extract_plddt_from_pdb(pdb_path:str, ca_only:bool=True) -> list: 
-        df = pd.read_csv(pdb_path, skiprows=1, names=["record", "atom_num", "atom_name", "res_name", "chain", "res_num", "x", "y", "z", "occupancy", "bfactor", "element"], sep='\s+')
+        headers = ["record", "atom_num", "atom_name", "res_name", "chain", "res_num", "x", "y", "z", "occupancy", "bfactor", "element"]
+        df = pd.read_csv(pdb_path, skiprows=1, names=headers, sep=r"\s+")
         df = df[df['record'].isin(['ATOM', 'HETATM'])]
-        if ca_only:
+        if ca_only: # minifold assigns per-residue plddts --> extract plddt once per res 
             df = df[df['atom_name'] == "CA"]
         return df["bfactor"].to_list()
 
     # collect all .pdb files
-    pl = glob(os.path.join(work_dir, "minifold_results_*/*.pdb"))
+    pl = glob(os.path.join(work_dir, "minifold_preds", "minifold_results_*", "*.pdb"))
 
     # extract plddts from pdbs, create score table
     data = []
     for pdb in pl:
         plddt_list = extract_plddt_from_pdb(pdb)
-        data.append(pd.Series({"location": os.path.abspath(pdb), "description": description_from_pose(pdb), "mean_per_res_plddt": sum(plddt_list) / len(plddt_list), "per_res_plddt": plddt_list}))
+        data.append(pd.Series({"location": os.path.abspath(pdb),
+                               "description": description_from_path(pdb),
+                               "mean_per_res_plddt": sum(plddt_list) / len(plddt_list),
+                               "per_res_plddt": plddt_list}))
         
     data = pd.DataFrame(data)
 
