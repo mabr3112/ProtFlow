@@ -34,6 +34,12 @@ RFDIFFUSION_SCRIPT_PATH = "" # "/path/to/RFdiffusion/scripts/run_inference.py"
 RFDIFFUSION_PYTHON_PATH = "" # "/path/to/miniconda3/envs/SE3nv/bin/python"
 RFDIFFUSION_PRE_CMD = ""
 
+# rfdiffusion3.py
+RFDIFFUSION3_SCRIPT_PATH = "" # "/path/to/miniconda3/envs/RFD3/bin/rfd3"
+RFDIFFUSION3_PYTHON_PATH = "" # "/path/to/miniconda3/envs/RFD3/bin/python"
+RFDIFFUSION3_PRE_CMD = ""
+
+
 # esmfold.py
 ESMFOLD_PYTHON_PATH = "" # "/path/to/miniconda3/envs/esm/bin/python"
 ESMFOLD_PRE_CMD = ""
