@@ -889,16 +889,21 @@ class Poses:
                     logging.warning(f"Could not find column {col} in poses dataframe for conversion to ResidueSelection for pose {self.df.at[idx, 'poses_description']}!")
                     continue
 
-                if self.df.at[idx, col]:
+                cell_value = self.df.at[idx, col]
+                if cell_value:
                     # skip if already a ResidueSelection (e.g. when importing from pickle)
-                    if isinstance(self.df.at[idx, col], ResidueSelection):
+                    if isinstance(cell_value, ResidueSelection):
                         continue
+                    # pandas 3 infers string-like columns as StringDtype by default, which
+                    # cannot hold ResidueSelection objects unless we widen the column first.
+                    if not pd.api.types.is_object_dtype(self.df[col].dtype):
+                        self.df[col] = self.df[col].astype(object)
                     # if importing from csv
-                    if isinstance(self.df.at[idx, col], str):
-                        self.df.at[idx, col] = ResidueSelection(self.df.at[idx, col])
+                    if isinstance(cell_value, str):
+                        self.df.at[idx, col] = ResidueSelection(cell_value)
                     # if importing from json
-                    if isinstance(self.df.at[idx, col], dict):
-                        self.df.at[idx, col] = ResidueSelection(self.df.at[idx, col], from_scorefile=True)
+                    if isinstance(cell_value, dict):
+                        self.df.at[idx, col] = ResidueSelection(cell_value, from_scorefile=True)
 
     def split_multiline_fasta(self, path: str, encoding: str = "UTF-8") -> list[str]:
         """
