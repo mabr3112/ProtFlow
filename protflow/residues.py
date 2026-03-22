@@ -69,11 +69,10 @@ from collections import OrderedDict, defaultdict
 
 class ResidueSelection:
     """
-    ResidueSelection
-    ================
+    Represent a selection of residues in a protein structure.
 
-    A class to represent selections of residues in protein structures. A selection of residues is represented 
-    as a tuple with the hierarchy ((chain, residue_idx), ...).
+    A selection of residues is represented as a tuple with the hierarchy
+    ((chain, residue_idx), ...).
 
     Parameters
     ----------
@@ -310,10 +309,13 @@ def fast_parse_selection(input_selection: tuple[tuple[str, int]]) -> tuple[tuple
     return input_selection
 
 def parse_from_scorefile(input_selection: dict) -> tuple[tuple[str, int]]:
+    '''Helper to parse ResidueSelection object from ProtFlow scorefile format.'''
     if isinstance(input_selection, dict) and "residues" in input_selection:
-        return tuple([tuple(sele) for sele in input_selection["residues"]])
-    else:
-        raise TypeError(f"Unsupported Input type for parameter 'input_selection' {type(input_selection)}. This function is meant to parse ResidueSelections that were written to file. Only dict with 'residues' as key allowed.")
+        return tuple(tuple(sele) for sele in input_selection["residues"])
+    if isinstance(input_selection, ResidueSelection):
+        # be lenient to double-parsing. If input_selection is already ResidueSelection, just pass.
+        return input_selection.residues # Note: This is not very clean but implemented for backwards compatibility.
+    raise TypeError(f"Unsupported Input type for parameter 'input_selection' {type(input_selection)}. This function is meant to parse ResidueSelections that were written to file. Only dict with 'residues' as key allowed.")
 
 def parse_selection(input_selection, delim: str = ",", fast: bool = False, from_scorefile: bool = False) -> tuple[tuple[str,int]]:
     """

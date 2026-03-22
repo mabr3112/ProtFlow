@@ -1,7 +1,5 @@
 .. ProtFlow documentation master file, created by
    sphinx-quickstart on Wed Jun  1 2024.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
 
 .. _home:
 
@@ -28,6 +26,12 @@ Key Features
    :caption: Tutorials:
 
    tutorials/index
+
+.. toctree::
+   :maxdepth: 1
+   :caption: ProtFlow Tools:
+
+   tools/index
 
 .. toctree::
    :maxdepth: 2

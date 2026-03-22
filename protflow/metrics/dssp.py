@@ -134,7 +134,8 @@ class DSSP(Runner):
             return output
 
         cmds = []
-        for pose in poses.df['poses'].to_list():
+        for pose in poses.poses_list():
+            pose = self.add_HEADER(pose_path=pose, output_dir=work_dir)
             cmds.append(self.write_cmd(pose_path=pose, output_dir=work_dir))
 
         num_cmds = jobstarter.max_cores
@@ -166,6 +167,44 @@ class DSSP(Runner):
         output = RunnerOutput(poses=poses, results=scores, prefix=prefix).return_poses()
         return output
 
+    def add_HEADER(self, pose_path: str, output_dir: str) -> str:
+        """
+        Adds a HEADER line to any PDB files missing it.
+
+        Parameters
+        ----------
+        pose_path : str
+            Path to input pose.
+        output_dir : str
+            Directory for writing output
+
+        Returns
+        -------
+        str
+            Path to output pose.
+        """
+        if pose_path.endswith("cif"):
+            return pose_path
+        elif not pose_path.endswith(".pdb"):
+            raise RuntimeError(f"Input must be pdb or cif file, but is {os.path.splitext(pose_path)[1]}!")
+
+        with open(pose_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        # Flags
+        if lines[0].startswith("HEADER"):
+            return pose_path
+        
+        # A minimal HEADER: class/keywords/date/idcode are optional placeholders
+        header = ["HEADER    DUMMY STRUCTURE                            01-JAN-00   DUM000\n"]
+
+        os.makedirs(input_dir := os.path.join(output_dir, "input_pdbs"), exist_ok=True)
+
+        with open(pose_path := os.path.join(input_dir, os.path.basename(pose_path)), "w", encoding="utf-8") as f:
+            f.writelines(header + lines)
+        
+        return pose_path
+
     def write_cmd(self, pose_path: str, output_dir: str) -> str:
         """
         Generate the command line string to run DSSP on a specific pose.
@@ -190,7 +229,7 @@ class DSSP(Runner):
         scorefile = os.path.join(output_dir, f"{os.path.splitext(os.path.basename(pose_path))[0]}.dsspout")
 
         # compile command
-        run_string = f"{self.application} {pose_path} > {scorefile}"
+        run_string = f"{self.application} {pose_path} --output-format dssp > {scorefile}"
 
         return run_string
 
@@ -245,6 +284,7 @@ def collect_scores(output_dir: str) -> pd.DataFrame:
             "I": 0,
             "T": 0,
             "S": 0,
+            "P": 0,
             "L": 0
         }
 

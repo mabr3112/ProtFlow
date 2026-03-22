@@ -4,6 +4,14 @@ protflow.tools package
 Submodules
 ----------
 
+protflow.tools.boltz module
+---------------------------
+
+.. automodule:: protflow.tools.boltz
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 protflow.tools.attnpacker module
 --------------------------------
 

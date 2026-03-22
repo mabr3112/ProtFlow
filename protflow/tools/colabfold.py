@@ -481,10 +481,12 @@ def collect_scores(work_dir: str, num_return_poses: int = 1) -> pd.DataFrame:
     """
 
     def get_json_files_of_description(description: str, input_dir: str) -> str:
-        return sorted([filepath for filepath in glob(f"{input_dir}/{description}*rank*.json") if re.search(f"{description}_scores_rank_..._.*_model_._seed_...\.json", filepath)]) # pylint: disable=W1401
+        pattern = rf"{re.escape(description)}_scores_rank_..._.*_model_._seed_...\.json"
+        return sorted([filepath for filepath in glob(f"{input_dir}/{description}*rank*.json") if re.search(pattern, filepath)])
 
     def get_pdb_files_of_description(description: str, input_dir: str) -> str:
-        return sorted([filepath for filepath in glob(f"{input_dir}/{description}*rank*.pdb") if re.search(f"{description}_.?.?relaxed_rank_..._.*_model_._seed_...\.pdb", filepath)]) # pylint: disable=W1401
+        pattern = rf"{re.escape(description)}_.?.?relaxed_rank_..._.*_model_._seed_...\.pdb"
+        return sorted([filepath for filepath in glob(f"{input_dir}/{description}*rank*.pdb") if re.search(pattern, filepath)])
 
     def get_json_pdb_tuples_from_description(description: str, input_dir: str) -> list[tuple[str,str]]:
         '''Collects af2-output scores.json and .pdb file for a given 'description' as corresponding tuples (by sorting).'''
