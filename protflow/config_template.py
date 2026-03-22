@@ -34,6 +34,12 @@ RFDIFFUSION_SCRIPT_PATH = "" # "/path/to/RFdiffusion/scripts/run_inference.py"
 RFDIFFUSION_PYTHON_PATH = "" # "/path/to/miniconda3/envs/SE3nv/bin/python"
 RFDIFFUSION_PRE_CMD = ""
 
+# rfdiffusion3.py
+RFDIFFUSION3_SCRIPT_PATH = "" # "/path/to/miniconda3/envs/RFD3/bin/rfd3"
+RFDIFFUSION3_PYTHON_PATH = "" # "/path/to/miniconda3/envs/RFD3/bin/python"
+RFDIFFUSION3_PRE_CMD = ""
+
+
 # esmfold.py
 ESMFOLD_PYTHON_PATH = "" # "/path/to/miniconda3/envs/esm/bin/python"
 ESMFOLD_PRE_CMD = ""
@@ -64,6 +70,11 @@ PLACER_PRE_CMD = ""
 # ESM
 ESM_PYTHON_PATH = "" # "/path/to/package_manager/envs/your_esm_env/bin/python"
 ESM_PRE_CMD = ""
+
+# minifold
+MINIFOLD_SCRIPT_PATH = "" # "/path/to/minifold/predict.py"
+MINIFOLD_PYTHON_PATH = "" # "/path/to/mambaforge/envs/minifold/bin/python"
+MINIFOLD_PRE_CMD = ""
 
 # protein generator
 PROTEIN_GENERATOR_PYTHON_PATH = ""

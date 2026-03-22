@@ -22,6 +22,7 @@ from protflow.tools.rfdiffusion import RFdiffusion
 from protflow.tools.attnpacker import AttnPacker
 from protflow.tools.esmfold import ESMFold
 from protflow.tools.colabfold import Colabfold
+from protflow.tools.minifold import Minifold
 
 # import metrics
 from protflow.metrics.protparam import ProtParam
@@ -74,7 +75,8 @@ def main(args):
 
     js_dict = {
         "slurm_gpu_jobstarter": SbatchArrayJobstarter(max_cores=10, gpus=1),
-        "local_jobstarter": LocalJobStarter()
+        "local_jobstarter": LocalJobStarter(),
+        "slurm_cpu_jobstarter": SbatchArrayJobstarter(max_cores=10)
     }
 
     # set jobstarter
@@ -158,9 +160,14 @@ def main(args):
                 "jobstarter": jobstarter
             },
             "config": None
+        },
+        "Minifold": {
+            "runner": Minifold() if config.MINIFOLD_PYTHON_PATH else None,
+            "poses_options": {"poses": "input_files/esmfold/", "glob_suffix": "*.fasta"},
+            "runner_options": {"jobstarter": jobstarter or js_dict['slurm_gpu_jobstarter']},
+            "config": [config.MINIFOLD_PYTHON_PATH]
         }
     }
-    test = LigandMPNN()
 
     if not config.AUXILIARY_RUNNER_SCRIPTS_DIR or not os.path.isdir(config.AUXILIARY_RUNNER_SCRIPTS_DIR):
         logging.warning(f"AUXILIARY_RUNNER_SCRIPTS_DIR was not properly set in config.py!")

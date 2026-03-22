@@ -126,7 +126,7 @@ class ProtParam(Runner):
         The `__init__` method ensures that the ProtParam class is ready to perform protein sequence parameter calculations within the ProtFlow framework, setting up the environment and configurations necessary for successful execution.
         """
         self.jobstarter = jobstarter
-        self.python = python or os.path.join(load_config_path(require_config(), "PROFLOW_ENV"), "python")
+        self.python = python or os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "python")
 
     def __str__(self):
         return "protparam.py"
