@@ -67,12 +67,11 @@ Version
 0.1.0
 """
 # general imports
-import json
 import os
 import logging
-from glob import glob
 import shutil
 import re
+from glob import glob
 
 # dependencies
 import pandas as pd
@@ -147,7 +146,7 @@ class CalibySequenceDesign(Runner):
     -------
     0.1.0
     """
-    def __init__(self, caliby_dir: str|None = None, python_path: str|None = None, pre_cmd: str|None = None, jobstarter: JobStarter = None) -> None:
+    def __init__(self, caliby_dir: str = None, python_path: str = None, pre_cmd: str = None, jobstarter: JobStarter = None) -> None:
         """
         Initializes the LigandMPNN class.
 
@@ -166,8 +165,12 @@ class CalibySequenceDesign(Runner):
         # setup config
         config = require_config()
         self.caliby_dir = caliby_dir or load_config_path(config, "CALIBY_DIR_PATH")
+        self.script_path = os.path.join(self.caliby_dir, "caliby/eval/sampling/seq_des.py")
         self.python_path = python_path or load_config_path(config, "CALIBY_PYTHON_PATH")
         self.pre_cmd = pre_cmd or load_config_path(config, "CALIBY_PRE_CMD", is_pre_cmd=True)
+
+        # TODO: find a better way, but otherwise caliby will look in wrong directory because of relative paths
+        self.sampling_cfg = os.path.join(self.caliby_dir, "caliby/configs/seq_des/atom_mpnn_inference.yaml")
 
         # setup runner
         self.name = "caliby.py"
@@ -177,7 +180,7 @@ class CalibySequenceDesign(Runner):
     def __str__(self):
         return "caliby.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = 1, model: str = "caliby", omit_aas: str|list = None, fixed_pos_seq_col: str = None, fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None, pos_constraint_csv: str = None, return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, overwrite: bool = False, num_batches: int = None) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = 1, model: str = "caliby", omit_aas: str|list = None, fixed_pos_seq_col: str = None, fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None, pos_constraint_csv: str = None, return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, convert_cif_to_pdb: bool = True, overwrite: bool = False, num_batches: int = None) -> Poses:
         """
         Execute the LigandMPNN process with given poses and jobstarter configuration.
 
@@ -273,28 +276,29 @@ class CalibySequenceDesign(Runner):
 
         opt_dict = self.parse_caliby_opts(options)
         opt_dict["sampling_cfg_overrides.num_seqs_per_pdb"] = nseq
-        opt_dict["ckpt_name_or_path"] = model
-        opt_dict["out_dir"] = work_dir
+        opt_dict["ckpt_name_or_path"] = model if os.path.isfile(model) else model_path
+        opt_dict["seq_des_cfg.atom_mpnn.sampling_cfg"] = self.sampling_cfg # TODO: this is a hack so caliby does not crash when running outside of installation dir, there might be better ways to solve this
+
         if omit_aas:
             opt_dict["omit_aas"] = omit_aas
         if pos_constraint_csv:
             opt_dict["pos_constraint_csv"] = os.path.abspath(pos_constraint_csv)
         else:
-            if "pos_constraint_csv" in options and any([fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col]):
+            if "pos_constraint_csv" in opt_dict and any([fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col]):
                 raise ValueError("Pose-specific constraints cannot be set if a pregenerated pos_constraints_csv is provided!")
 
             opt_dict["pos_constraint_csv"] = self.create_constraint_csv(poses, work_dir, fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col)
         
         # define number of batches
         if num_batches:
-            num_batches = min([len(poses.poses_list(), num_batches)])
+            num_batches = min([len(poses.poses_list()), num_batches])
         else:
-            num_batches = min([len(poses.poses_list(), jobstarter.max_cores)])
+            num_batches = min([len(poses.poses_list()), jobstarter.max_cores])
 
         # setup for batch mode
-        batch_opts = self.setup_batch_mode(poses.poses_list(), opt_dict, work_dir, num_batches)
+        batch_opts = self.setup_batch_mode(pose_paths=poses.poses_list(), options=opt_dict, num_batches=num_batches, work_dir=work_dir)
 
-        # write ligandmpnn cmds:
+        # write caliby cmds:
         cmds = [self.write_cmd(options=opt_dict) for opt_dict in batch_opts]
 
         # prepend pre-cmd if defined:
@@ -346,7 +350,7 @@ class CalibySequenceDesign(Runner):
 
         cst_csv = cst_csv.fillna('')
 
-        cst_csv.to_csv(out := os.path.join(work_dir, "pos_constraints.csv"))
+        cst_csv.to_csv(out := os.path.join(work_dir, "pos_constraints.csv"), index=False)
         return os.path.abspath(out)
 
     def setup_batch_mode(self, pose_paths: list[str], options: dict, num_batches: int, work_dir: str) -> list:
@@ -359,7 +363,7 @@ class CalibySequenceDesign(Runner):
             return directories
 
         def write_input_list(pose_paths: list, filename: str):
-            with open(filename) as f:
+            with open(filename, "w+") as f:
                 f.write("\n".join([os.path.basename(pose) for pose in pose_paths]))
             return
 
@@ -376,7 +380,7 @@ class CalibySequenceDesign(Runner):
             options["input_cfg.pdb_dir"] = input_dir
         else:
             updated_paths = pose_paths
-            options["input_cfg.pdb_dir"] = input_dir = in_folders[0]
+            options["input_cfg.pdb_dir"] = list(in_folders)[0]
 
         # split poses into batches
         pose_batches = split_list(updated_paths, n_sublists=num_batches)
@@ -389,6 +393,8 @@ class CalibySequenceDesign(Runner):
             write_input_list(batch, list_path)
             batch_opts = options.copy()
             batch_opts["input_cfg.pdb_name_list"] = list_path
+            batch_opts["out_dir"] = os.path.join(work_dir, f"batch_{i}")
+
             batch_opt_list.append(batch_opts)
 
         return batch_opt_list
@@ -463,11 +469,11 @@ class CalibySequenceDesign(Runner):
         """
         # convert to string
         options = options_flags_to_string(options, None, sep="")
-    
+
         return f"{self.python_path} {self.script_path} {options}"
 
 
-def collect_scores(work_dir: str, return_seq_threaded_pdbs_as_pose: bool) -> pd.DataFrame:
+def collect_scores(work_dir: str, return_seq_threaded_pdbs_as_pose: bool = False) -> pd.DataFrame:
     """
     Collects scores from the LigandMPNN output.
 
@@ -509,21 +515,23 @@ def collect_scores(work_dir: str, return_seq_threaded_pdbs_as_pose: bool) -> pd.
     def write_fasta(seq, name, path):
         with open(path, "w+") as f:
             f.write(f">{name}\n{seq}")
-    # read .pdb files
-
-    data = pd.read_csv(os.path.join(work_dir, "seq_des_outputs.csv"))
+    # read .csv files
+    csvs = glob(os.path.join(work_dir, "batch_*/seq_des_outputs.csv"))
+    data = pd.concat([pd.read_csv(csv) for csv in csvs])
+    data.reset_index(drop=True, inplace=True)
 
     if not return_seq_threaded_pdbs_as_pose:
-        os.makedirs(fasta_dir := os.path.join(work_dir, "fasta"))
+        os.makedirs(fasta_dir := os.path.join(work_dir, "fasta"), exist_ok=True)
         fasta_paths = []
         for pose, seq in zip(data["out_pdb"].to_list(), data["seq"]):
             name = description_from_path(pose)
             fasta_path = os.path.join(fasta_dir, f"{name}.fasta")
             write_fasta(seq, name, fasta_path)
             fasta_paths.append(fasta_path)
-        data["location"] = os.path.abspath(fasta_paths)
+        data["location"] = [os.path.abspath(fasta_path) for fasta_path in fasta_paths]
     else:
         data["location"] = [os.path.abspath(path) for path in data["out_pdb"].to_list()]
+        data.drop(["out_pdb"], axis=1, inplace=True)
     
     data["description"] = [description_from_path(path) for path in data["location"].to_list()]
 
