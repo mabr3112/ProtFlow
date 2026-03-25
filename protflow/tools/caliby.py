@@ -148,21 +148,7 @@ class CalibySequenceDesign(Runner):
     0.1.0
     """
     def __init__(self, caliby_dir: str = None, python_path: str = None, pre_cmd: str = None, jobstarter: JobStarter = None) -> None:
-        """
-        Initializes the LigandMPNN class.
 
-        Parameters:
-            script_path (str, optional): The path to the LigandMPNN script. Defaults to the configured script path in ProtFlow.
-            python_path (str, optional): The path to the Python executable to run the LigandMPNN script. Defaults to the configured Python path in ProtFlow.
-            jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job submissions. If not provided, it will use the default job starter configuration.
-
-        Detailed Description
-        --------------------
-        The `__init__` method sets up the necessary paths and configurations for running LigandMPNN. It searches for the provided script and Python
-        paths to ensure they are correct and sets them as instance attributes. Additionally, it initializes the job starter, which manages the execution
-        of jobs in high-performance computing (HPC) environments. This method ensures that all configurations are correctly set up before running any
-        LigandMPNN tasks.
-        """
         # setup config
         config = require_config()
         self.caliby_dir = caliby_dir or load_config_path(config, "CALIBY_DIR_PATH")
@@ -181,72 +167,7 @@ class CalibySequenceDesign(Runner):
     def __str__(self):
         return "caliby.py"
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = 1, model: str = "caliby", omit_aas: str|list = None, fixed_pos_seq_col: str = None, fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None, pos_constraint_csv: str = None, return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, convert_cif_to_pdb: bool = True, overwrite: bool = False, num_batches: int = None) -> Poses:
-        """
-        Execute the LigandMPNN process with given poses and jobstarter configuration.
-
-        This method sets up and runs the LigandMPNN process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.
-
-        Parameters:
-            poses (Poses): The Poses object containing the protein structures.
-            prefix (str): A prefix used to name and organize the output files.
-            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            nseq (int, optional): The number of sequences to generate for each input pose. Defaults to 1.
-            model_type (str, optional): The type of model to use. Defaults to 'caliby'.
-            options (str, optional): Additional options for the LigandMPNN script. Defaults to None.
-            pose_options (object, optional): Pose-specific options for the LigandMPNN script. Defaults to None.
-            fixed_res_col (str, optional): Column name in the poses DataFrame specifying fixed residues. Defaults to None.
-            design_res_col (str, optional): Column name in the poses DataFrame specifying residues to be redesigned. Defaults to None.
-            pose_opt_cols (dict, optional): Dictionary of pose-specific options for the LigandMPNN script. Defaults to None.
-            return_seq_threaded_pdbs_as_pose (bool, optional): If True, return sequence-threaded PDBs as poses. Defaults to False.
-            preserve_original_output (bool, optional): If True, preserve the original output files. Defaults to True.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-
-        Returns:
-            Poses: The updated Poses object containing the results of the LigandMPNN process.
-
-        Raises:
-            FileNotFoundError: If required files or directories are not found during the execution process.
-            ValueError: If invalid arguments are provided to the method.
-
-        Examples:
-            Here is an example of how to use the `run` method:
-
-            .. code-block:: python
-
-                from protflow.poses import Poses
-                from protflow.jobstarters import JobStarter
-                from ligandmpnn import LigandMPNN
-
-                # Create instances of necessary classes
-                poses = Poses()
-                jobstarter = JobStarter()
-
-                # Initialize the LigandMPNN class
-                ligandmpnn = LigandMPNN()
-
-                # Run the diffusion process
-                results = ligandmpnn.run(
-                    poses=poses,
-                    prefix="experiment_1",
-                    jobstarter=jobstarter,
-                    nseq=10,
-                    model_type="ligand_mpnn",
-                    options="some_option=some_value",
-                    pose_options=["pose_option=pose_value"],
-                    overwrite=True
-                )
-
-                # Access and process the results
-                print(results)
-
-        Further Details:
-            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed.
-            - **Output Management:** The method handles the collection and processing of output data, ensuring that results are organized and accessible for further analysis.
-            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the process to their specific needs.
-
-        This method is designed to streamline the execution of LigandMPNN processes within the ProtFlow framework, making it easier for researchers and developers to perform and analyze protein design simulations.
-        """
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, nseq: int = 1, model: str = "caliby", omit_aas: str|list = None, fixed_pos_seq_col: str = None, fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None, pos_constraint_csv: str = None, return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, cif_to_pdb: bool = True, overwrite: bool = False, num_batches: int = None) -> Poses:
 
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
@@ -268,9 +189,11 @@ class CalibySequenceDesign(Runner):
         if pos_constraint_csv and not os.path.isfile(pos_constraint_csv):
             raise ValueError(f"<pos_constraint_csv> must specify the path to a single csv file. Could not find a file at {pos_constraint_csv}.")
 
-        # convert omit_aas string to list
+        # convert omit_aas string to list, then to str that looks like a list
         if omit_aas and isinstance(omit_aas, str):
             omit_aas = [aa for aa in omit_aas]
+        if omit_aas and isinstance(omit_aas, list):
+            omit_aas = str(omit_aas)
 
         if not os.path.isfile(model) and not os.path.isfile(model_path := os.path.join(self.caliby_dir, "model_params", "caliby", f"{model}.ckpt")):
             raise FileNotFoundError(f"Could not detect a model at {model} or at {model_path}.")
@@ -282,13 +205,16 @@ class CalibySequenceDesign(Runner):
 
         if omit_aas:
             opt_dict["omit_aas"] = omit_aas
+
         if pos_constraint_csv:
             opt_dict["pos_constraint_csv"] = os.path.abspath(pos_constraint_csv)
-        else:
-            if "pos_constraint_csv" in opt_dict and any([fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col]):
-                raise ValueError("Pose-specific constraints cannot be set if a pregenerated pos_constraints_csv is provided!")
-
-            opt_dict["pos_constraint_csv"] = self.create_constraint_csv(poses, work_dir, fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col)
+        
+        # check for conflicting options (pos_constraint_csv might have been defined via options!)
+        if "pos_constraint_csv" in opt_dict and any([fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col]):
+            raise ValueError("Pose-specific constraints cannot be set if a pregenerated pos_constraints_csv is provided!")
+        
+        # create new pos_constraint_csv from inputs, do not overwrite existing one
+        opt_dict.setdefault("pos_constraint_csv", self.create_constraint_csv(poses, work_dir, fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col))
         
         # define number of batches
         if num_batches:
@@ -318,6 +244,7 @@ class CalibySequenceDesign(Runner):
         scores = collect_scores(
             work_dir=work_dir,
             return_seq_threaded_pdbs_as_pose=return_seq_threaded_pdbs_as_pose,
+            cif_to_pdb=cif_to_pdb
         )
 
         if len(scores.index) < len(poses.df.index) * nseq:
@@ -424,95 +351,14 @@ class CalibySequenceDesign(Runner):
         return parsed_config
 
     def write_cmd(self, options: dict) -> str:
-        """
-        Writes the command to run ligandmpnn.py.
-
-        This method constructs the command necessary to run the LigandMPNN script, incorporating various options and parameters. It ensures that the command is correctly formatted and includes all required arguments.
-
-        Parameters:
-            pose_path (str): The path to the input PDB file for the pose.
-            output_dir (str): The directory where the output files will be saved.
-            model (str): The type of model to use (e.g., "ligand_mpnn").
-            nseq (int): The number of sequences to generate for each input pose. Defaults to 1.
-            options (str): Additional options for the LigandMPNN script.
-            pose_options (str): Pose-specific options for the LigandMPNN script.
-
-        Returns:
-            str: The constructed command string to run LigandMPNN.
-
-        Raises:
-            ValueError: If the specified model is not one of the available models.
-
-        Examples:
-            Here is an example of how to use the `write_cmd` method:
-
-            .. code-block:: python
-
-                # Initialize the LigandMPNN class
-                ligandmpnn = LigandMPNN()
-
-                # Write the command
-                cmd = ligandmpnn.write_cmd(
-                    pose_path="path/to/input.pdb",
-                    output_dir="path/to/output",
-                    model="ligand_mpnn",
-                    nseq=10,
-                    options="some_option=some_value",
-                    pose_options="pose_option=pose_value"
-                )
-
-                print(cmd)  # Outputs the constructed command string
-
-        Further Details:
-            - **Model Validation:** The method checks if the specified model is among the available models and raises an error if it is not.
-            - **Option Parsing:** The method parses generic options and pose-specific options, ensuring that necessary safety checks and defaults are applied.
-            - **Command Construction:** The method assembles the final command string, including paths, model checkpoints, options, and other necessary parameters.
-        """
         # convert to string
+        print(options)
         options = options_flags_to_string(options, None, sep="")
 
         return f"{self.python_path} {self.script_path} {options}"
 
 
 def collect_scores(work_dir: str, return_seq_threaded_pdbs_as_pose: bool = False, cif_to_pdb: bool = True) -> pd.DataFrame:
-    """
-    Collects scores from the LigandMPNN output.
-
-    This method processes the output files generated by LigandMPNN, including multi-sequence FASTA files and PDB files. It reads, renames, and organizes these files into a structured DataFrame.
-
-    Parameters:
-        work_dir (str): The directory where LigandMPNN output files are located.
-        return_seq_threaded_pdbs_as_pose (bool): If True, replaces FASTA files with sequence-threaded PDB files as poses.
-        preserve_original_output (bool, optional): If True, preserves the original output files. Defaults to True.
-
-    Returns:
-        pd.DataFrame: A DataFrame containing the collected scores and relevant data from the LigandMPNN output.
-
-    Raises:
-        FileNotFoundError: If required output files are not found in the specified directory.
-
-    Examples:
-        Here is an example of how to use the `collect_scores` method:
-
-        .. code-block:: python
-
-            # Initialize the LigandMPNN class
-            ligandmpnn = LigandMPNN()
-
-            # Collect scores from the output directory
-            scores = ligandmpnn.collect_scores(
-                work_dir="/path/to/output",
-                return_seq_threaded_pdbs_as_pose=True,
-                preserve_original_output=False
-            )
-
-            print(scores)  # Outputs the collected scores DataFrame
-
-    Further Details:
-        - **Output Processing:** The method reads and parses multi-sequence FASTA files, converts sequences into a structured dictionary, and writes new FASTA files if necessary.
-        - **File Management:** Original output files are copied to dedicated directories, and new files are generated and organized for easy access. Optionally, original files can be preserved or deleted based on the `preserve_original_output` parameter.
-        - **Error Handling:** The method includes checks to ensure that required output files are present, raising errors if files are missing or paths are incorrect.
-    """
     def write_fasta(seq, name, path):
         with open(path, "w+") as f:
             f.write(f">{name}\n{seq}")
