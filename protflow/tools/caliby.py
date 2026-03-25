@@ -78,10 +78,11 @@ import pandas as pd
 
 # custom
 from protflow import require_config, load_config_path
-from protflow.residues import ResidueSelection
-from protflow.poses import Poses, description_from_path
-from protflow.jobstarters import JobStarter, split_list
-from protflow.runners import Runner, RunnerOutput, col_in_df, options_flags_to_string, prepend_cmd
+from ..residues import ResidueSelection
+from ..poses import Poses, description_from_path
+from ..jobstarters import JobStarter, split_list
+from ..runners import Runner, RunnerOutput, col_in_df, options_flags_to_string, prepend_cmd
+from ..utils.openbabel_tools import openbabel_fileconverter
 
 class CalibySequenceDesign(Runner):
     """
@@ -274,7 +275,7 @@ class CalibySequenceDesign(Runner):
         if not os.path.isfile(model) and not os.path.isfile(model_path := os.path.join(self.caliby_dir, "model_params", "caliby", f"{model}.ckpt")):
             raise FileNotFoundError(f"Could not detect a model at {model} or at {model_path}.")
 
-        opt_dict = self.parse_caliby_opts(options)
+        opt_dict = self._parse_caliby_opts(options)
         opt_dict["sampling_cfg_overrides.num_seqs_per_pdb"] = nseq
         opt_dict["ckpt_name_or_path"] = model if os.path.isfile(model) else model_path
         opt_dict["seq_des_cfg.atom_mpnn.sampling_cfg"] = self.sampling_cfg # TODO: this is a hack so caliby does not crash when running outside of installation dir, there might be better ways to solve this
@@ -296,7 +297,7 @@ class CalibySequenceDesign(Runner):
             num_batches = min([len(poses.poses_list()), jobstarter.max_cores])
 
         # setup for batch mode
-        batch_opts = self.setup_batch_mode(pose_paths=poses.poses_list(), options=opt_dict, num_batches=num_batches, work_dir=work_dir)
+        batch_opts = self._setup_batch_mode(pose_paths=poses.poses_list(), options=opt_dict, num_batches=num_batches, work_dir=work_dir)
 
         # write caliby cmds:
         cmds = [self.write_cmd(options=opt_dict) for opt_dict in batch_opts]
@@ -353,7 +354,7 @@ class CalibySequenceDesign(Runner):
         cst_csv.to_csv(out := os.path.join(work_dir, "pos_constraints.csv"), index=False)
         return os.path.abspath(out)
 
-    def setup_batch_mode(self, pose_paths: list[str], options: dict, num_batches: int, work_dir: str) -> list:
+    def _setup_batch_mode(self, pose_paths: list[str], options: dict, num_batches: int, work_dir: str) -> list:
 
         def same_folder_check(file_paths):
             # Extract the absolute directory path for each file and put them in a set
@@ -400,7 +401,7 @@ class CalibySequenceDesign(Runner):
         return batch_opt_list
 
 
-    def parse_caliby_opts(self, options: str = None) -> dict:
+    def _parse_caliby_opts(self, options: str = None) -> dict:
 
         def re_split(command: str) -> list:
             # Return empty list if the string is empty
@@ -473,7 +474,7 @@ class CalibySequenceDesign(Runner):
         return f"{self.python_path} {self.script_path} {options}"
 
 
-def collect_scores(work_dir: str, return_seq_threaded_pdbs_as_pose: bool = False) -> pd.DataFrame:
+def collect_scores(work_dir: str, return_seq_threaded_pdbs_as_pose: bool = False, cif_to_pdb: bool = True) -> pd.DataFrame:
     """
     Collects scores from the LigandMPNN output.
 
@@ -515,20 +516,26 @@ def collect_scores(work_dir: str, return_seq_threaded_pdbs_as_pose: bool = False
     def write_fasta(seq, name, path):
         with open(path, "w+") as f:
             f.write(f">{name}\n{seq}")
+        return path
+
+    def convert_cif_to_pdb(input_cif: str, output_format: str, output:str):
+        openbabel_fileconverter(input_file=input_cif, output_format=output_format, output_file=output)
+        return output
+    
     # read .csv files
     csvs = glob(os.path.join(work_dir, "batch_*/seq_des_outputs.csv"))
     data = pd.concat([pd.read_csv(csv) for csv in csvs])
     data.reset_index(drop=True, inplace=True)
 
+
     if not return_seq_threaded_pdbs_as_pose:
         os.makedirs(fasta_dir := os.path.join(work_dir, "fasta"), exist_ok=True)
-        fasta_paths = []
-        for pose, seq in zip(data["out_pdb"].to_list(), data["seq"]):
-            name = description_from_path(pose)
-            fasta_path = os.path.join(fasta_dir, f"{name}.fasta")
-            write_fasta(seq, name, fasta_path)
-            fasta_paths.append(fasta_path)
-        data["location"] = [os.path.abspath(fasta_path) for fasta_path in fasta_paths]
+        data["location"] = data.apply(lambda row: write_fasta(seq=row["seq"], name=description_from_path(row["out_pdb"]), path=os.path.join(fasta_dir, f"{description_from_path(row['out_pdb'])}.fasta")), axis=1)
+    
+    elif cif_to_pdb:
+        os.makedirs(pdb_dir := os.path.join(work_dir, "converted"), exist_ok=True)
+        data["location"] = data.apply(lambda row: convert_cif_to_pdb(input_cif=row["out_pdb"], output_format="pdb", output=os.path.join(pdb_dir, f"{description_from_path(row['out_pdb'])}.pdb")), axis=1)
+    
     else:
         data["location"] = [os.path.abspath(path) for path in data["out_pdb"].to_list()]
         data.drop(["out_pdb"], axis=1, inplace=True)
