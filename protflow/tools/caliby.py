@@ -196,10 +196,6 @@ class _CalibyRunner(Runner):
         * The ``pdb_key`` column always contains only the *stem* of the
           pose filename (no directory prefix, no extension), matching the
           convention used by Caliby's input reader.
-        * When ``fixed_pos_scn_col`` is provided, the implementation
-          currently reads from ``fixed_pos_seq_col`` for the
-          ``fixed_pos_scn`` column as well (see source comment for the
-          pending TODO).
  
         Examples
         --------
@@ -224,7 +220,7 @@ class _CalibyRunner(Runner):
         if fixed_pos_scn_col:
             # TODO: add fixed_pos_scn to fixed_pos_seq if missing, but tricky if fixed_pos_seq used description like 'A5-15' and not explicit list
             col_in_df(poses.df, fixed_pos_scn_col)
-            cst_csv["fixed_pos_scn"] = [sele.to_string() if isinstance(sele, ResidueSelection) else sele for sele in poses.df[fixed_pos_seq_col].to_list()]
+            cst_csv["fixed_pos_scn"] = [sele.to_string() if isinstance(sele, ResidueSelection) else sele for sele in poses.df[fixed_pos_scn_col].to_list()]
         if fixed_pos_override_seq_col:
             col_in_df(poses.df, fixed_pos_override_seq_col)
             cst_csv["fixed_pos_override_seq"] = poses.df[fixed_pos_override_seq_col]
@@ -242,7 +238,7 @@ class _CalibyRunner(Runner):
         cst_csv.to_csv(out := os.path.join(work_dir, "pos_constraints.csv"), index=False)
         return os.path.abspath(out)
 
-    def setup_batch_mode(self, pose_paths: list[str], options: dict, num_batches: int, work_dir: str, mode="single") -> list:
+    def setup_batch_mode(self, poses: Poses, options: dict, num_batches: int, work_dir: str, mode="single", conformer_col: str = None) -> list:
         """
         setup_batch_mode Method
         =======================
@@ -277,10 +273,13 @@ class _CalibyRunner(Runner):
  
             * ``"single"`` — sets ``input_cfg.pdb_dir`` to the common
               input directory.
-            * ``"ensemble"`` — omits ``input_cfg.pdb_dir`` (the caller
-              is expected to set ``input_cfg.conformer_dir`` instead).
+            * ``"ensemble"`` — sets ``input_cfg.conformer_dir`` for 
+              for each input pose.
  
             Default is ``"single"``.
+        conformer_col : str, optional
+            Poses dataframe column containing conformer folders or lists
+            of conformer paths. Ignored when *mode* is ``single``.
  
         Returns
         -------
@@ -321,32 +320,46 @@ class _CalibyRunner(Runner):
             # batch_opts[0]["out_dir"] == "/scratch/my_run/batch_0"
         """
 
-        def same_folder_check(file_paths):
-            # Extract the absolute directory path for each file and put them in a set
-            directories = {os.path.dirname(os.path.abspath(p)) for p in file_paths}
-
-            # If all files are in the same folder, the set will only have 1 unique item
-            return directories
-
         def write_input_list(pose_paths: list, filename: str):
             with open(filename, "w+", encoding="UTF-8") as f:
                 f.write("\n".join([os.path.basename(pose) for pose in pose_paths]))
 
-        in_folders = same_folder_check(pose_paths)
-
-        # check if input files are all in same folder, otherwise copy to new folder
-        if len(in_folders) > 1:
+        if mode == "single":
+            # check if input files are all in same folder, otherwise copy to new folder
             os.makedirs(input_dir := os.path.join(work_dir, "input"), exist_ok=True)
             updated_paths = []
-            for pose in pose_paths:
+            for pose in poses.poses_list():
                 shutil.copy(pose, new_path := os.path.join(input_dir, os.path.basename(pose)))
                 updated_paths.append(new_path)
-            if mode == "single":
-                options["input_cfg.pdb_dir"] = input_dir
+            options["input_cfg.pdb_dir"] = input_dir
+
+        elif mode == "ensemble":
+            # create conformer input folder
+            os.makedirs(ens_dir := os.path.join(work_dir, "conformers"), exist_ok=True)
+
+            updated_paths = []
+            for _, row in poses.df.iterrows():
+                # copy conformers into separate folder for each pose
+                os.makedirs(conf_dir := os.path.join(ens_dir, row["poses_description"]), exist_ok=True)
+
+                confs = row[conformer_col]
+                if isinstance(confs, str) and os.path.isdir(confs):
+                    files = Path(confs).glob("*.pdb")
+                elif isinstance(confs, list):
+                    files = confs
+                else:
+                    raise ValueError(f"<conformer_col> must be a path to a directory containing conformers or a list of conformer paths, not {confs}")
+                
+                # copy conformer files (including primary) to new dir
+                for conf in files + [row["poses"]]:
+                    shutil.copy(conf, conf_dir)
+                
+                updated_paths.append(os.path.join(conf_dir, os.path.basename(row["poses"])))
+
+            options["input_cfg.conformer_dir"] = ens_dir
+        
         else:
-            updated_paths = pose_paths
-            if mode == "single":
-                options["input_cfg.pdb_dir"] = list(in_folders)[0]
+            raise ValueError(f"<mode> must be 'single' or 'ensemble', not {mode}!")
 
         # split poses into batches
         pose_batches = split_list(updated_paths, n_sublists=num_batches)
@@ -793,7 +806,7 @@ class CalibySequenceDesign(_CalibyRunner):
             num_batches = min([len(poses.poses_list()), jobstarter.max_cores])
 
         # setup for batch mode
-        batch_opts = self.setup_batch_mode(pose_paths=poses.poses_list(), options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="single")
+        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="single")
 
         # write caliby cmds:
         cmds = [self.write_cmd(options=opt_dict) for opt_dict in batch_opts]
@@ -1014,7 +1027,7 @@ class CalibyEnsembleGenerator(_CalibyRunner):
             num_batches = min([len(poses.poses_list()), jobstarter.max_cores])
 
         # setup for batch mode
-        batch_opts = self.setup_batch_mode(pose_paths=poses.poses_list(), options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="single")
+        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="single")
 
         # write caliby cmds:
         cmds = [self.write_cmd(options=opt_dict) for opt_dict in batch_opts]
@@ -1342,21 +1355,6 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
 
         col_in_df(poses.df, conformer_col)
 
-        os.makedirs(ens_dir := os.path.join(work_dir, "conformers"), exist_ok=True)
-        for _, row in poses.df.iterrows():
-            os.makedirs(conf_dir := os.path.join(ens_dir, row["poses_description"]), exist_ok=True)
-            confs = row[conformer_col]
-            if isinstance(confs, str) and os.path.isdir(confs):
-                files = Path(confs).glob("*.pdb")
-            elif isinstance(confs, list):
-                files = confs
-            else:
-                raise ValueError(f"<conformer_col> must be a path to a directory containing conformers or a list of conformer paths, not {confs}")
-            
-            # copy conformer files to new dir
-            for conf in files:
-                shutil.copy(conf, conf_dir)
-
         # check for pos_constraint_csv file
         if pos_constraint_csv and not os.path.isfile(pos_constraint_csv):
             raise ValueError(f"<pos_constraint_csv> must specify the path to a single csv file. Could not find a file at {pos_constraint_csv}.")
@@ -1368,7 +1366,6 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
         opt_dict["sampling_cfg_overrides.num_seqs_per_pdb"] = nseq
         opt_dict["ckpt_name_or_path"] = model if os.path.isfile(model) else model_path
         opt_dict["seq_des_cfg.atom_mpnn.sampling_cfg"] = self.sampling_cfg # TODO: this is a hack so caliby does not crash when running outside of installation dir, there might be better ways to solve this
-        opt_dict["input_cfg.conformer_dir"] = ens_dir
 
         # convert omit_aas string to list, then to str that looks like a list
         if omit_aas and isinstance(omit_aas, str):
@@ -1394,7 +1391,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
             num_batches = min([len(poses.poses_list()), jobstarter.max_cores])
 
         # setup for batch mode
-        batch_opts = self.setup_batch_mode(pose_paths=poses.poses_list(), options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="ensemble")
+        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="ensemble", conformer_col=conformer_col)
 
         # write caliby cmds:
         cmds = [self.write_cmd(options=opt_dict) for opt_dict in batch_opts]
@@ -1427,7 +1424,10 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
 
         # delete conformer dir
         if run_clean:
-            shutil.rmtree(ens_dir)
+            if os.path.isdir(ens_dir := os.path.join(work_dir, "conformers")):
+                shutil.rmtree(ens_dir)
+            if os.path.isdir(input_list_dir := os.path.join(work_dir, "input_lists")):
+                shutil.rmtree(input_list_dir)
 
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
@@ -1714,4 +1714,3 @@ def collect_scores(work_dir: str, mode: str = "seq_des", return_seq_threaded_pdb
         data = pd.DataFrame(records)
 
     return data
-
