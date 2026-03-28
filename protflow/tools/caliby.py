@@ -351,10 +351,11 @@ class _CalibyRunner(Runner):
                     raise ValueError(f"<conformer_col> must be a path to a directory containing conformers or a list of conformer paths, not {confs}")
                 
                 # copy conformer files (including primary) to new dir
-                for conf in files + [row["poses"]]:
+                for conf in files:
                     shutil.copy(conf, conf_dir)
                 
-                updated_paths.append(os.path.join(conf_dir, os.path.basename(row["poses"])))
+                shutil.copy(row["poses"], new_path := os.path.join(conf_dir, os.path.basename(row["poses"])))
+                updated_paths.append(new_path)
 
             options["input_cfg.conformer_dir"] = ens_dir
         
@@ -604,7 +605,7 @@ class CalibySequenceDesign(_CalibyRunner):
         self.index_layers = 1
 
 
-    def run(self, poses: Poses, prefix: str, nseq: int = 1, model: str = "caliby", omit_aas: str|list = None, fixed_pos_seq_col: str = None, fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None, pos_constraint_csv: str = None, return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, cif_to_pdb: bool = True, jobstarter: JobStarter = None, overwrite: bool = False, num_batches: int = None) -> Poses:
+    def run(self, poses: Poses, prefix: str, nseq: int = 1, model: str = "caliby", omit_aas: str|list = None, fixed_pos_seq_col: str = None, fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None, pos_constraint_csv: str = None, return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, cif_to_pdb: bool = True, jobstarter: JobStarter = None, overwrite: bool = False, num_batches: int = None, run_clean: bool = True) -> Poses:
         """
         run Method
         ==========
@@ -682,6 +683,9 @@ class CalibySequenceDesign(_CalibyRunner):
             Override the number of parallel batches.  Defaults to
             ``min(len(poses), jobstarter.max_cores)``. Not identical with
             caliby batch setting!
+        run_clean : bool, optional
+            If ``True`` (default), the input directory (``<work_dir>/input/``) 
+            is deleted after sequence design completes to free disk space.
  
         Returns
         -------
@@ -836,6 +840,11 @@ class CalibySequenceDesign(_CalibyRunner):
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
+        if run_clean:
+            logging.info("Deleting temporary files.")
+            if os.path.isdir(input_dir := os.path.join(work_dir, "input")):
+                shutil.rmtree(input_dir)
+
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
@@ -909,7 +918,7 @@ class CalibyEnsembleGenerator(_CalibyRunner):
         # setup runner
         self.index_layers = 1
 
-    def run(self, poses: Poses, prefix: str, nstruct: int = 1, options: str = None, cif_to_pdb: bool = True, model_dir: str = None, jobstarter: JobStarter = None, overwrite: bool = False, num_batches: int = None) -> Poses:
+    def run(self, poses: Poses, prefix: str, nstruct: int = 1, options: str = None, cif_to_pdb: bool = True, model_dir: str = None, jobstarter: JobStarter = None, overwrite: bool = False, num_batches: int = None, run_clean: bool = True) -> Poses:
         """
         run Method
         ==========
@@ -947,6 +956,10 @@ class CalibyEnsembleGenerator(_CalibyRunner):
         num_batches : int, optional
             Number of parallel batches.  Defaults to
             ``min(len(poses), jobstarter.max_cores)``.
+        run_clean : bool, optional
+            If ``True`` (default), the input directory
+            (``<work_dir>/input/``) is deleted after ensemble generation
+            completes to free disk space.
  
         Returns
         -------
@@ -1057,6 +1070,11 @@ class CalibyEnsembleGenerator(_CalibyRunner):
 
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
+
+        if run_clean:
+            logging.info("Deleting temporary files.")
+            if os.path.isdir(input_dir := os.path.join(work_dir, "input")):
+                shutil.rmtree(input_dir)
 
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
@@ -1345,7 +1363,8 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
                 nstruct=gen_num_ensembles, 
                 options=gen_ens_options, 
                 num_batches=num_batches, 
-                jobstarter=jobstarter or self.jobstarter
+                jobstarter=jobstarter or self.jobstarter,
+                run_clean=run_clean
             )
             
             conformer_col = f"{ens_gen_prefix}_conformer_dir"
@@ -1424,6 +1443,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
 
         # delete conformer dir
         if run_clean:
+            logging.info("Deleting temporary files.")
             if os.path.isdir(ens_dir := os.path.join(work_dir, "conformers")):
                 shutil.rmtree(ens_dir)
             if os.path.isdir(input_list_dir := os.path.join(work_dir, "input_lists")):
@@ -1432,7 +1452,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
     
-    def run_protpardelle_ensemble_generation(self, poses: Poses, prefix: str , nstruct: int, options: str, num_batches: int, jobstarter: JobStarter):
+    def run_protpardelle_ensemble_generation(self, poses: Poses, prefix: str , nstruct: int, options: str, num_batches: int, jobstarter: JobStarter, run_clean: bool = True):
         """
         run_protpardelle_ensemble_generation Method
         ===========================================
@@ -1468,6 +1488,10 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
             Number of parallel batches.
         jobstarter : JobStarter
             Job submission backend for the ensemble-generation step.
+        run_clean : bool, optional
+            If ``True`` (default), the input directory
+            (``<work_dir>/input/``) is deleted after ensemble generation
+            completes to free disk space.
  
         Returns
         -------
@@ -1515,7 +1539,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
             jobstarter=jobstarter)
         
         # run ensemble generation
-        ensgenerator.run(poses=poses, prefix=prefix, nstruct=nstruct, options=options, num_batches=num_batches)
+        ensgenerator.run(poses=poses, prefix=prefix, nstruct=nstruct, options=options, num_batches=num_batches, run_clean=run_clean)
 
         # restore input poses as primary conformers
         poses.df = poses.df[[col for col in poses.df.columns if col.startswith(prefix)]]
