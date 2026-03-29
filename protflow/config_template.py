@@ -80,6 +80,15 @@ MINIFOLD_PRE_CMD = ""
 PROTEIN_GENERATOR_PYTHON_PATH = ""
 PROTEIN_GENERATOR_SCRIPT_PATH = ""
 
+# protenix
+PROTENIX_BIN_PATH = "" # "/path/to/mambaforge/envs/protenix/bin/protenix"
+PROTENIX_PRE_CMD = ""
+
+# caliby
+CALIBY_DIR_PATH = "" # "/path/to/caliby/"
+CALIBY_PYTHON_PATH = "" # "/path/to/caliby/envs/caliby/bin/python"
+CALIBY_PRE_CMD = "" # "source /path/to/caliby/env_setup.sh"
+
 # frame2seq
 FRAME2SEQ_PYTHON_PATH = "" # "/path/to/mambaforge/envs/frame2seq/bin/python3
 FRAME2SEQ_PRE_CMD = ""
