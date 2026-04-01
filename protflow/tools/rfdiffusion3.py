@@ -110,10 +110,16 @@ from ..jobstarters import JobStarter, split_list
 from ..poses import Poses, col_in_df, description_from_path
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..utils.openbabel_tools import openbabel_fileconverter
-from ..residues import ResidueSelection, parse_residue
+from ..residues import ResidueSelection
 
 class RFD3InputSpecification(UserDict):
-    def __init__(self, poses: Poses, spec_from_json: str = None, spec_from_dict : dict | RFD3InputSpecification = None):
+    """
+    Helper class to specify input for RFD3.
+    See https://github.com/RosettaCommons/foundry/blob/production/models/rfd3/docs/input.md#inputspecification-fields
+    for more information on input specification format. <input> fields are created automatically from poses.
+    """
+    def __init__(self, poses: Poses, spec_from_json: str = None, spec_from_dict : dict | RFD3InputSpecification = None, update_input: bool = True):
+        super().__init__()
         self.poses = poses
 
         if spec_from_json and spec_from_dict:
@@ -157,22 +163,35 @@ class RFD3InputSpecification(UserDict):
             partial_t: float = None,
             **kwargs
             )  -> RFD3InputSpecification:
-                
-        # 1. Capture all local variables (including arguments and kwargs)
+        
+        """
+        set input specifications for all poses. Setting <input> field manually not recommended, it is deduced automatically from poses.
+        """
+        
+        # check for existing spec_dict:
+        if not self.data:
+            self.data = {"denovo": {}}
+
+        # Capture all local variables (including arguments and kwargs)
         params = locals().copy()
         
         exclude = {'self', 'kwargs'}
         
-        # 3. Build the dictionary: exclude the blacklist and filter out None
+        # Build the dictionary: exclude the blacklist and filter out None
         spec_dict = {
             k: v for k, v in params.items() 
             if k not in exclude and v is not None
         }
 
+        # update with generic inputs
         if kwargs:
             spec_dict.update(kwargs)
 
-        for pose in self.input_specs:
+        if "input" in spec_dict:
+            logging.warning("Defining <input> manually not recommended, it is deduced automatically from poses. Make sure to use absolute paths!")
+
+        # update input_specs for each pose
+        for pose in self.data:
             self.data[pose].update(spec_dict)
         
         return self
@@ -202,6 +221,9 @@ class RFD3InputSpecification(UserDict):
             partial_t: str | list = None,
             **kwargs
             ) -> RFD3InputSpecification:
+        """
+        Set pose-specific input specifications from poses.df columns or from lists containing an input spec value per pose
+        """
         
         if not self.poses:
             raise ValueError("Per-pose input specifications cannot be set on empty poses!")
@@ -222,6 +244,8 @@ class RFD3InputSpecification(UserDict):
 
         # extract specs from poses df
         for key, val in spec_dict.items():
+            if key == "input":
+                logging.warning("Defining <input> manually not recommended, it is deduced automatically from poses. Make sure to use absolute paths!")
             if isinstance(val, str):
                 col_in_df(self.poses.df, val)
                 pose_specs = self.poses.df[val]
@@ -239,11 +263,17 @@ class RFD3InputSpecification(UserDict):
         return self    
     
     def spec_from_dict(self, spec_dict: dict | RFD3InputSpecification) -> RFD3InputSpecification:
+        """
+        set input specifications from an existing dict
+        """
         self._check_specs(spec_dict)
         self.data = spec_dict
         return self
     
     def spec_from_json(self, json_path: str) -> RFD3InputSpecification:
+        """
+        set input specifications from an existing json file
+        """
         if not os.path.isfile(json_path):
             raise ValueError(f"Could not detect json file at {json_path}!")
         spec = read_json(json_path)
@@ -252,33 +282,57 @@ class RFD3InputSpecification(UserDict):
         return self
         
     def reset_pose_specs(self, poses: Poses) -> RFD3InputSpecification:
+        """
+        delete existing input specifications, create new blank input
+        """
         self.poses = poses
         self.data = self._create_pose_dict(self.poses)
         return self
 
     def add_specs(self, additional_specs: RFD3InputSpecification | dict) -> RFD3InputSpecification:
+        """
+        function to add new specs, only if no input poses are set --> to create multiple unconditional diffusions with different settings
+        """
         if self.poses:
             raise ValueError("Additional pose-specific input specifications can ony be added if no poses are present (unconditional diffusion)!")
+        self._check_specs(additional_specs)
         self.data.update(additional_specs)
         return self
 
     def modify_specs(self, new_specs: RFD3InputSpecification | dict) -> RFD3InputSpecification:
-        # does not check for poses in case of multi-specs for unconditional diffusion
+        """
+        function to modify EXISTING input specifications, will update them with values from new_specs
+        """
         if not all(pose in self.data for pose in new_specs) or not len(self.data) == len(new_specs):
             raise KeyError("Poses in <new_specs> do not match existing poses!")
+        
+        # update each pose
         for pose in new_specs:
             self.data[pose].update(new_specs[pose])
         return self
     
     def _check_specs(self, specs: RFD3InputSpecification | dict):
-        if self.poses and not all(pose in self.data for pose in specs) or not len(self.data) == len(specs):
+        """
+        check if input_specs format is correct
+        """
+        # check if dict is nested, raise error otherwise
+        if not all(isinstance(v, dict) for v in specs.values()):
+            dict_example = {"pose_1": {"spec_1": 1, "spec_2": 2}, "pose_2": {"spec_3": 3}}
+            raise ValueError(f"Input specifications must be supplied in the format {dict_example}")
+        
+        # check if new specs fit to existing poses
+        if self.poses and not all(pose in specs for pose in self.poses["poses_description"]) or not len(self.poses) == len(specs):
             raise ValueError("Specs do not fit existing poses!")
 
+
     def _create_pose_dict(self, poses: Poses) -> dict:
+        """
+        create a new input specification dict for each pose, return an empty dict for empty poses
+        """
         if poses:
-            return {name: {"input": path} for name, path in zip(self.poses.df["poses_description"], self.poses.df["poses"])}
+            return {name: {"input": os.path.abspath(path)} for name, path in zip(self.poses.df["poses_description"], self.poses.df["poses"])}
         else:
-            return {"denovo": {}}
+            return {}
 
     
 class RFdiffusion3(Runner):
@@ -373,19 +427,18 @@ class RFdiffusion3(Runner):
         prefix: str,
         poses: Poses,
         input_specification: RFD3InputSpecification,
-        # parameters that go into input json files, see https://github.com/RosettaCommons/foundry/blob/production/models/rfd3/docs/input.md#inputspecification-fields
-        # can be either a path to a json file, a dictionary, or a str indicating a dataframe column containing json paths or dicts
         # --- RFD3 CLI arguments ---
         n_batches: int = 1,
         diffusion_batch_size: int = 8,
         dump_trajectories: bool = False,
         # --- general ProtFlow parameters ---
         options: str = None,
-        update_motifs: list[str] = None,
+        update_motifs: list[str] = None, 
         multiplex_poses: int = None,
         jobstarter: JobStarter = None,
         convert_cif_to_pdb: bool = True,
-        run_clean: bool = True,
+        strict_remap: bool = True, # if true, fail if residues in motifs are not preserved post-diffusion
+        run_clean: bool = True, # delete additional outputs like pre-conversion files
         fail_on_missing_output_poses: bool = False,
         overwrite: bool = False,
     ) -> Poses:
@@ -399,17 +452,14 @@ class RFdiffusion3(Runner):
             fewer input poses than GPUs. After the run, poses are reindexed
             back to remove the duplication layer. Must be > 1 to have any
             effect.
-
-            Example: 1 input pose + multiplex_poses=8 + diffusion_batch_size=8
-            gives 8 parallel jobs each producing 8 outputs = 64 total outputs.
         fail_on_missing_output_poses : bool
             If True, raise a RuntimeError when the number of collected output
             poses is less than the expected number (n_poses * n_batches *
-            diffusion_batch_size). RFDiffusion3 runs occasionally crash silently,
+            diffusion_batch_size * multiplex_poses). RFDiffusion3 runs occasionally crash silently,
             and enabling this flag ensures such failures are caught early rather
             than propagating through a longer pipeline. Defaults to False.
         """
-
+        # check if input_specification fits to input poses
         if poses and not all(name in input_specification for name in poses.df["poses_description"]) or not len(poses) == len(input_specification):
             raise ValueError("Input <poses> do not match <input_specification>")
         
@@ -420,23 +470,24 @@ class RFdiffusion3(Runner):
         if not multiplex_poses:
             multiplex_poses = 1
 
+        # update index layers as RFD3 adds 3 layers (later removed via reindexing)
         index_layers = self.index_layers + 2
 
-        # 1) Generic setup shared by all runners.
+        # Generic setup shared by all runners
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter],
         )
 
+        # calculate total number of diffusions
         total_designs = n_batches * diffusion_batch_size * multiplex_poses
-        logging.info(
-            f"Total designs per input pose: {total_designs}\n({n_batches} batches x {diffusion_batch_size} per batch)"
-        )
+        logging.info(f"Total designs per input pose: {total_designs}\n({n_batches} batches x {diffusion_batch_size} per batch)")
+
         if multiplex_poses > 1:
             logging.info(f"and multiplexing input poses {multiplex_poses} times.")
             index_layers += 1
-            suffixes = [f"_{str(i).zfill(4)}" for i in range(1, multiplex_poses +1)]
+            suffixes = [f"_{str(i).zfill(4)}" for i in range(1, multiplex_poses + 1)]
 
             # multiplex and add an index layer to each input so that filenames are unique
             pose_specs = [
@@ -451,10 +502,10 @@ class RFdiffusion3(Runner):
         expected_outputs = n_batches * diffusion_batch_size * len(pose_specs)
         logging.info(f"Expected number of output poses: {expected_outputs}")
 
-        # 2) Scorefile reuse shortcut.
+        # scorefile reuse shortcut
         scorefile = os.path.join(work_dir, f"{self.name}_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
-            logging.info("Reusing existing scorefile: %s", scorefile)
+            logging.info(f"Reusing existing scorefile: {scorefile}")
 
             if not poses:
                 poses.df = scores.copy()
@@ -464,13 +515,10 @@ class RFdiffusion3(Runner):
                 poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=index_layers).return_poses()
 
                 if update_motifs:
-                    logging.info(f"Remapping residue motifs {update_motifs} from cached scorefile.")
-                    self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
-
-                if update_motifs:
                     logging.info(f"Remapping residue motifs {update_motifs} after RFD3 run.")
-                    self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
+                    remap_rfd3_motifs(poses=poses, motifs=update_motifs, prefix=prefix, strict=strict_remap)
 
+            # forced to reindex by layers because of possible empty input poses
             poses.reindex_poses(f"{prefix}_rfd3_reindex", remove_layers=index_layers, force_reindex=True, overwrite=overwrite)
             return poses
 
@@ -536,7 +584,7 @@ class RFdiffusion3(Runner):
 
             if update_motifs:
                 logging.info(f"Remapping residue motifs {update_motifs} after RFD3 run.")
-                self.remap_motifs(poses=poses, motifs=update_motifs, prefix=prefix)
+                remap_rfd3_motifs(poses=poses, motifs=update_motifs, prefix=prefix, strict=strict_remap)
         
         poses.reindex_poses(f"{prefix}_rfd3_reindex", remove_layers=index_layers, force_reindex=True, overwrite=overwrite)
 
@@ -580,92 +628,73 @@ class RFdiffusion3(Runner):
 
         if not options:
             options = ""
-            
+
+        # check for forbidden options        
+        forbidden_options = ["inputs", "out_dir", "n_batches", "diffusion_batch_size", "dump_trajectories"]
+        if any(f" {f_opt}=" in options for f_opt in forbidden_options):
+            raise ValueError(f"<options> must not contain any of {forbidden_options}, set them via .run arguments instead!")
+        
+        # return cmd string
         return f"{self.python_path} {self.application_path} design inputs={in_json} out_dir={out_dir} " \
             f"n_batches={n_batches} diffusion_batch_size={diffusion_batch_size} dump_trajectories={dump_trajectories} {options}"
 
     def _cleanup_previous_outputs(self, work_dir: str) -> None:
         """Delete all files in the outputs directory before a rerun."""
         output_dir = os.path.join(work_dir, "outputs")
-        if not os.path.isdir(output_dir):
-            return
-        for file_path in glob(os.path.join(output_dir, "*")):
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+        input_dir = os.path.join(work_dir, "inputs")
+        if os.path.isdir(output_dir):
+            shutil.rmtree(output_dir)
+        if os.path.isdir(input_dir):
+            shutil.rmtree(input_dir)
 
-    def remap_motifs(self, poses: Poses, motifs: list[str], prefix: str) -> None:
-        """Remap ResidueSelection motifs in poses.df using diffused_index_map columns.
+def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool = True) -> None:
+    """Remap ResidueSelection motifs in poses.df using diffused_index_map columns.
 
-        Uses the {prefix}_diffused_index_map_* columns added by collect_scores
-        to translate input residue positions to their new positions in the
-        diffused output structures. Overwrites motif columns in place,
-        consistent with RFD1 behavior.
+    Uses the {prefix}_diffused_index_map_* column added by collect_scores
+    to translate input residue positions to their new positions in the
+    diffused output structures. Overwrites motif columns in place,
+    consistent with RFD1 behavior.
 
-        Parameters
-        ----------
-        poses : Poses
-            The Poses object after the RFD3 run (must have index_map columns).
-        motifs : list[str]
-            Column names in poses.df containing ResidueSelection objects to remap.
-        prefix : str
-            The prefix used in the RFD3 run, used to find diffused_index_map columns.
-        """
+    Parameters
+    ----------
+    poses : Poses
+        The Poses object after the RFD3 run (must have index_map columns).
+    motifs : list[str]
+        Column names in poses.df containing ResidueSelection objects to remap.
+    prefix : str
+        The prefix used in the RFD3 run, used to find diffused_index_map column.
+    """
+    diff_index_map_name = f"{prefix}_diffused_index_map"
+    col_in_df(poses.df, diff_index_map_name)
+    diffused_index_maps = poses.df[diff_index_map_name].to_list()
 
-        map_prefix = f"{prefix}_diffused_index_map_"
-        map_cols = [c for c in poses.df.columns if c.startswith(map_prefix)]
+    logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
 
-        logging.info(f"[remap_motifs] Found {len(map_cols)} diffused_index_map columns: {map_cols}")
+    for motif_col in motifs:
 
-        if not map_cols:
-            raise ValueError(
-                f"No diffused_index_map columns found for prefix '{prefix}'. "
-                f"Make sure collect_scores ran successfully and the sidecar JSONs exist."
-            )
-
-        logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
-
-        for motif_col in motifs:
-            logging.info(f"[remap_motifs] Processing motif column '{motif_col}'")
-
-            if motif_col not in poses.df.columns:
-                raise ValueError(
-                    f"[remap_motifs] Motif column '{motif_col}' not found in poses.df!"
-                )
-
-            output_motif_l = []
-            for idx, row in poses.df.iterrows():
-                logging.info(
-                    f"[remap_motifs] Row {idx}: description='{row.get('poses_description', 'N/A')}'"
-                )
-
-                # reconstruct exchange_dict: {("A", 77): ("A", 96), ...}
-                exchange_dict = {}
-                for col in map_cols:
-                    input_res_str = col.replace(map_prefix, "")  # e.g. "A77"
-                    output_res_str = row[col]                     # e.g. "A96"
-                    if pd.notna(output_res_str):
-                        exchange_dict[parse_residue(input_res_str)] = parse_residue(output_res_str)
-                    else:
-                        logging.warning(
-                            f"[remap_motifs] Row {idx}: NaN value for column '{col}', skipping."
-                        )
-
-                logging.info(
-                    f"[remap_motifs] Row {idx}: reconstructed exchange_dict: {exchange_dict}"
-                )
-
-                motif = row[motif_col]
-                exchanged_motif = [exchange_dict[residue] for residue in motif.residues]
-                logging.info(f"[remap_motifs] Row {idx}: exchanged_motif = {exchanged_motif}")
-                output_motif_l.append(ResidueSelection(exchanged_motif))
-
-            # overwrite in place, consistent with RFD1 behavior
-            poses.df[motif_col] = output_motif_l
-            logging.info(
-                f"[remap_motifs] Finished remapping '{motif_col}' for all {len(poses.df)} rows."
-            )
-
-        logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
+        logging.info(f"[remap_motifs] Processing motif column '{motif_col}'")
+        col_in_df(poses.df, motif_col)
+        ref_motifs = poses.df[motif_col].to_list()
+        
+        # check if all motifs are ResidueSelections
+        if not all(isinstance(motif, ResidueSelection) for motif in ref_motifs):
+            raise ValueError(f"Not all motifs in column {motif_col} are of type ResidueSelection!")
+        
+        # create a list out of each ResidueSelection
+        ref_motifs = [motif.to_list() for motif in ref_motifs] 
+        updated_motifs = []
+        for diff_idx_map, ref_motif in zip(diffused_index_maps, ref_motifs):
+            # check if every residue is present in the diffused index map if strict matching is required
+            if strict and not all(res in diff_idx_map for res in ref_motif): 
+                raise ValueError(f"Could not find all original residues in diffused index map for selection {motif_col}. Are you sure they were preserved?")
+            # check if diff_idx_map is present for all poses
+            if strict and not diff_idx_map:
+                raise ValueError("Not all poses feature diffused_index_map property. Are you sure preserved motifs exist for all input poses?")
+            updated_motifs.append([diff_idx_map[res] for res in ref_motif if res in diff_idx_map]) # skip residues not in diff_idx_map
+        # update motif col with new residue selections
+        poses.df[motif_col] = [ResidueSelection(updated_motif) for updated_motif in updated_motifs]
+        
+    logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
 
 
 def collect_scores(work_dir: str, cif_to_pdb: bool = True, run_clean: bool=True) -> pd.DataFrame:
