@@ -629,52 +629,41 @@ def get_SLURM_stats(job_name, start_time=None):
     Returns
     -------
     dict
-        On success, a dictionary with the following keys:
+        A dictionary containing aggregated statistics.
 
-        ``job_name`` : str
+        **On success**, keys include:
+
+        job_name : str
             The *job_name* argument echoed back.
-        ``total_cpu_sec`` : int
-            Sum of ``CPUTimeRaw`` (``ElapsedRaw × AllocCPUS``) across all
-            tasks.  Represents the total CPU-core-seconds reserved and
-            consumed by the job array.
-        ``avg_task_runtime_sec`` : float
-            Mean wall-clock elapsed time per task in seconds, rounded to
-            2 decimal places.  Returns ``0`` when no tasks were found.
-        ``max_task_runtime_sec`` : int
-            Wall-clock elapsed time of the longest-running task (seconds).
-            Returns ``0`` when no tasks were found.
-        ``min_task_runtime_sec`` : int
-            Wall-clock elapsed time of the shortest-running task (seconds).
-            Returns ``0`` when no tasks were found.
-        ``num_tasks`` : int
-            Total number of individual task records returned by ``sacct``.
-        ``total_cpus_reserved`` : int
-            Sum of ``AllocCPUS`` across all tasks; the total number of CPU
-            cores that were allocated to the job array.
-        ``state`` : str
-            Aggregated job-array state.  ``"COMPLETED"`` when every task
-            finished successfully; otherwise ``"MIXED (<states>)"`` listing
-            all unique states encountered (e.g.
-            ``"MIXED (COMPLETED, FAILED)"``).
-        ``queried_after`` : str or None
-            The *start_time* argument echoed back (``None`` if not
-            provided).
+        total_cpu_sec : int
+            Sum of ``CPUTimeRaw`` across all tasks.
+        avg_task_runtime_sec : float
+            Mean wall-clock elapsed time per task in seconds (2 decimal places).
+        max_task_runtime_sec : int
+            Wall-clock elapsed time of the longest-running task.
+        min_task_runtime_sec : int
+            Wall-clock elapsed time of the shortest-running task.
+        num_tasks : int
+            Total number of task records returned.
+        total_cpus_reserved : int
+            Sum of ``AllocCPUS`` across all tasks.
+        state : str
+            ``"COMPLETED"`` or ``"MIXED (<states>)"``.
+        queried_after : str or None
+            The *start_time* argument echoed back.
 
-        On failure (no records found, ``sacct`` error, or any unexpected
-        exception), a minimal error dictionary is returned instead:
+        **On failure**, keys include:
 
-        ``job_name`` : str
+        job_name : str
             The *job_name* argument echoed back.
-        ``error`` : str
-            Human-readable description of the failure (e.g.
-            ``"No records found since 2025-06-01T12:00:00"``,
-            ``"SLURM Error: <stderr>"``, or the exception message).
+        error : str
+            Human-readable description of the failure.
 
     Raises
     ------
-    This function does **not** propagate exceptions.  All
-    :class:`subprocess.CalledProcessError` and general :class:`Exception`
-    instances are caught and returned as error dictionaries (see above).
+    None
+        This function does **not** propagate exceptions. All errors are 
+        caught and returned as a dictionary with an ``error`` key.
 
     Notes
     -----
