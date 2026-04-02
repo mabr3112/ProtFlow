@@ -591,21 +591,22 @@ def split_list(input_list: list, element_length: int = None, n_sublists: int = N
     return result
 
 def get_SLURM_stats(job_name, start_time=None):
-    """Query ``sacct`` and return aggregated resource statistics for a SLURM job array.
- 
+    """
+    Query ``sacct`` and return aggregated resource statistics for a SLURM job array.
+
     Shells out to the SLURM ``sacct`` command to retrieve per-task timing
     and CPU accounting data for all tasks in the array job identified by
     *job_name*.  The raw per-task records are aggregated into a single
     summary dictionary, which is returned to the caller.
- 
+
     .. warning::
- 
+
        This function must be called from the **cluster login node** or
        another host that has the ``sacct`` binary in its ``PATH`` and access
        to SLURM's accounting database.  Calling it from within a compute-node
        job step (e.g. inside a running SLURM batch script) will fail because
        ``sacct`` is not available on compute nodes.
- 
+
     Parameters
     ----------
     job_name : str
@@ -624,57 +625,46 @@ def get_SLURM_stats(job_name, start_time=None):
         recommended to pass the :attr:`~SbatchArrayRunnerTimer.session_start`
         attribute of the enclosing :class:`SbatchArrayRunnerTimer` to avoid
         this.
- 
+
     Returns
     -------
     dict
-        On success, a dictionary with the following keys:
- 
-        ``job_name`` : str
+        A dictionary containing aggregated statistics.
+
+        **On success**, keys include:
+
+        job_name : str
             The *job_name* argument echoed back.
-        ``total_cpu_sec`` : int
-            Sum of ``CPUTimeRaw`` (``ElapsedRaw × AllocCPUS``) across all
-            tasks.  Represents the total CPU-core-seconds reserved and
-            consumed by the job array.
-        ``avg_task_runtime_sec`` : float
-            Mean wall-clock elapsed time per task in seconds, rounded to
-            2 decimal places.  Returns ``0`` when no tasks were found.
-        ``max_task_runtime_sec`` : int
-            Wall-clock elapsed time of the longest-running task (seconds).
-            Returns ``0`` when no tasks were found.
-        ``min_task_runtime_sec`` : int
-            Wall-clock elapsed time of the shortest-running task (seconds).
-            Returns ``0`` when no tasks were found.
-        ``num_tasks`` : int
-            Total number of individual task records returned by ``sacct``.
-        ``total_cpus_reserved`` : int
-            Sum of ``AllocCPUS`` across all tasks; the total number of CPU
-            cores that were allocated to the job array.
-        ``state`` : str
-            Aggregated job-array state.  ``"COMPLETED"`` when every task
-            finished successfully; otherwise ``"MIXED (<states>)"`` listing
-            all unique states encountered (e.g.
-            ``"MIXED (COMPLETED, FAILED)"``).
-        ``queried_after`` : str or None
-            The *start_time* argument echoed back (``None`` if not
-            provided).
- 
-        On failure (no records found, ``sacct`` error, or any unexpected
-        exception), a minimal error dictionary is returned instead:
- 
-        ``job_name`` : str
+        total_cpu_sec : int
+            Sum of ``CPUTimeRaw`` across all tasks.
+        avg_task_runtime_sec : float
+            Mean wall-clock elapsed time per task in seconds (2 decimal places).
+        max_task_runtime_sec : int
+            Wall-clock elapsed time of the longest-running task.
+        min_task_runtime_sec : int
+            Wall-clock elapsed time of the shortest-running task.
+        num_tasks : int
+            Total number of task records returned.
+        total_cpus_reserved : int
+            Sum of ``AllocCPUS`` across all tasks.
+        state : str
+            ``"COMPLETED"`` or ``"MIXED (<states>)"``.
+        queried_after : str or None
+            The *start_time* argument echoed back.
+
+        **On failure**, keys include:
+
+        job_name : str
             The *job_name* argument echoed back.
-        ``error`` : str
-            Human-readable description of the failure (e.g.
-            ``"No records found since 2025-06-01T12:00:00"``,
-            ``"SLURM Error: <stderr>"``, or the exception message).
- 
+        error : str
+            Human-readable description of the failure.
+
     Raises
     ------
-    This function does **not** propagate exceptions.  All
-    :class:`subprocess.CalledProcessError` and general :class:`Exception`
-    instances are caught and returned as error dictionaries (see above).
- 
+    None
+        This function does **not** propagate exceptions. All errors are 
+        caught and returned as a dictionary with an ``error`` key.
+
     Notes
     -----
     * The ``sacct`` command is invoked with ``-X`` (suppress sub-step
@@ -693,40 +683,17 @@ def get_SLURM_stats(job_name, start_time=None):
       returned when **every** task's state is exactly ``"COMPLETED"``
       (set equality).  A single failed or cancelled task will produce a
       ``"MIXED"`` state.
- 
+
     Examples
     --------
     Query statistics for a recently submitted job::
- 
+
         from protflow.jobstarters import get_SLURM_stats
- 
+
         stats = get_SLURM_stats("caliby_seqdes", start_time="2025-06-01T12:00:00")
         print(stats)
-        # {
-        #     "job_name": "caliby_seqdes",
-        #     "total_cpu_sec": 18400,
-        #     "avg_task_runtime_sec": 230.50,
-        #     "max_task_runtime_sec": 312,
-        #     "min_task_runtime_sec": 198,
-        #     "num_tasks": 50,
-        #     "total_cpus_reserved": 200,
-        #     "state": "COMPLETED",
-        #     "queried_after": "2025-06-01T12:00:00",
-        # }
- 
-    Handling a partial failure::
- 
-        stats = get_SLURM_stats("caliby_seqdes", start_time="2025-06-01T12:00:00")
-        if "error" in stats:
-            print(f"Could not retrieve stats: {stats['error']}")
-        elif stats["state"] != "COMPLETED":
-            print(f"Warning: some tasks did not complete cleanly: {stats['state']}")
- 
-    Query without a start-time filter (not recommended for production)::
- 
-        stats = get_SLURM_stats("caliby_seqdes")
-        # May return records from previous sessions with the same job name.
     """
+
     # Base command
     cmd = [
         "sacct", 
