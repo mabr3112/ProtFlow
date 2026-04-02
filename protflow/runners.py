@@ -40,9 +40,12 @@ Version
 '''
 # builtins
 import logging
+import time
 import os
 import re
 import functools
+import subprocess
+from datetime import datetime, timedelta
 from multiprocessing import ProcessError
 
 # dependencies
@@ -50,7 +53,7 @@ import pandas as pd
 
 # custom
 from .poses import Poses, get_format, FORMAT_STORAGE_DICT
-from .jobstarters import JobStarter
+from .jobstarters import JobStarter, SbatchArrayJobstarter, get_SLURM_stats
 
 class RunnerOutput:
     """
@@ -769,3 +772,70 @@ def prepend_cmd(cmds: list[str], pre_cmd: str) -> list[str]:
     """
     cmds = ["; ".join([pre_cmd, cmd]) for cmd in cmds]
     return cmds
+
+class SbatchArrayRunnerTimer(Runner):
+    def __init__(self, runner: Runner):
+        super().__init__()
+        self.runner = runner
+        self.history = []
+        self.job_ids = []
+        # session_start for sacct filtering
+        self.session_start = (datetime.now() - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    def __getattr__(self, name):
+        return getattr(self.runner, name)
+
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, **kwargs) -> Poses:
+        # --- PHASE 1: START SETUP ---
+        t_start_wrapper = time.perf_counter()
+
+        # Execute the wrapped runner
+        # Note: The 'setup' happens inside .run() before the job is submitted.
+        # The 'wait' happens inside .run() after submission.
+        poses = self.runner.run(poses=poses, prefix=prefix, jobstarter=jobstarter, **kwargs)
+
+        # --- PHASE 2: END POST-PROCESSING ---
+        t_end_wrapper = time.perf_counter()
+        
+        # Calculate Total Wall Time (Python's perspective)
+        total_wall_runtime = t_end_wrapper - t_start_wrapper
+
+        # --- PHASE 3: QUERY CLUSTER STATS ---
+        used_starter = jobstarter or getattr(self.runner, "jobstarter", None) or getattr(poses, "default_jobstarter", None)
+
+        # Safety Check: Only proceed with timing if it's the correct SLURM starter
+        if not isinstance(used_starter, SbatchArrayJobstarter):
+            logging.warning(f"Stats skipped: {type(used_starter)} does not support SLURM accounting.")
+            return poses
+        
+        target_job_name = getattr(used_starter, "last_job_name", None)
+        self.job_ids.append(target_job_name)
+
+        if target_job_name:
+            # Wait for SLURM DB sync
+            time.sleep(5)
+            stats = get_SLURM_stats(target_job_name, self.session_start)
+            
+            # Decompose the time
+            # Note: total_wall_runtime includes (Setup + Queue Wait + Cluster Run + Post-processing)
+            # real_runtime_sec is just (Cluster Run)
+            
+            stats.update({
+                "runner_class": self.runner.__class__.__name__,
+                "prefix": prefix,
+                "total_python_wall_sec": round(total_wall_runtime, 2),
+                "overhead_plus_queue_sec": round(total_wall_runtime - stats.get("runtime_sec", 0), 2)
+            })
+            self.history.append(stats)
+            self.report(prefix=prefix)
+        
+        return poses
+
+    def report(self, prefix:str=None):
+        jobs = self.job_ids
+        df = pd.DataFrame(self.history)
+        if prefix:
+            with open(f"{prefix}_job_ids.txt", "w", encoding="UTF-8") as f:
+                f.write("\n".join(jobs))
+            df.to_csv(f"{prefix}_stats.csv")
+        return df

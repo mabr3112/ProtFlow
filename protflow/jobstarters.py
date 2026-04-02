@@ -219,6 +219,7 @@ class SbatchArrayJobstarter(JobStarter):
         self.batch_cmds = batch_cmds
         self.set_options(options, gpus=gpus)
         self.bash = False
+        self.last_job_name = None
 
         # static attribute, can be changed depending on slurm settings:
         self.slurm_max_arrayjobs = 1000
@@ -270,6 +271,9 @@ class SbatchArrayJobstarter(JobStarter):
 
         self.options += f" -vvv -e {error_file} -o {log_file} --open-mode=append"
         sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {self.options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
+
+        # save last job name, e.g. for timer wrapper
+        self.last_job_name = jobname
 
         with open(f"{output_path}/{jobname}_jobstarter.log", "w", encoding="UTF-8") as out_file:
             # Run the sbatch command and direct both stdout and stderr to the log file
@@ -585,3 +589,72 @@ def split_list(input_list: list, element_length: int = None, n_sublists: int = N
             break
         result.append(sublist)
     return result
+
+def get_SLURM_stats(job_name, start_time=None):
+    """
+    Queries sacct for all tasks in a job array and aggregates the results.
+    """
+    
+    # Base command
+    cmd = [
+        "sacct", 
+        "--name", job_name, 
+        "-X", 
+        "--format", "JobName,ElapsedRaw,CPUTimeRaw,AllocCPUS,State", 
+        "-n", "-P"
+    ]
+
+    # Add starttime if provided
+    if start_time:
+        cmd += ["--starttime", start_time]
+
+    cmd = " ".join(cmd)
+    
+    try:
+        # run sacct command on the shell
+        res = subprocess.run(cmd, capture_output=True, text=True, check=True, shell=True)
+        lines = [l for l in res.stdout.strip().split('\n') if l]
+        
+        if not lines:
+            return {"job_name": job_name, "error": f"No records found since {start_time or 'beginning'}"}
+
+        # Initialize aggregators
+        total_cpu_sec = 0
+        task_runtimes = []
+        states = set()
+        total_cpus_allocated = 0
+
+        for line in lines:
+            p = line.split('|')
+            # p[1] = Elapsed (Wall-clock for this specific task)
+            # p[2] = CPUTime (Elapsed * AllocCPUS for this task)
+            # p[3] = AllocCPUS
+            elapsed = int(p[1]) if p[1] else 0
+            cpu_raw = int(p[2]) if p[2] else 0
+            cpus    = int(p[3]) if p[3] else 1
+            
+            total_cpu_sec += cpu_raw
+            total_cpus_allocated += cpus
+            task_runtimes.append(elapsed)
+            states.add(p[4])
+
+        # Logic for final state: If everything is COMPLETED, return COMPLETED. 
+        # Otherwise, list the unique states (e.g., "COMPLETED, FAILED")
+        final_state = "COMPLETED" if states == {"COMPLETED"} else f"MIXED ({', '.join(states)})"
+
+        return {
+            "job_name": job_name,
+            "total_cpu_sec": total_cpu_sec,
+            "avg_task_runtime_sec": round(sum(task_runtimes) / len(task_runtimes), 2) if task_runtimes else 0,
+            "max_task_runtime_sec": max(task_runtimes) if task_runtimes else 0,
+            "min_task_runtime_sec": min(task_runtimes) if task_runtimes else 0,
+            "num_tasks": len(task_runtimes),
+            "total_cpus_reserved": total_cpus_allocated,
+            "state": final_state,
+            "queried_after": start_time
+        }
+        
+    except subprocess.CalledProcessError as e:
+        return {"job_name": job_name, "error": f"SLURM Error: {e.stderr}"}
+    except Exception as e:
+        return {"job_name": job_name, "error": str(e)}
