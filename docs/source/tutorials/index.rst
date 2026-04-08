@@ -8,4 +8,5 @@ Welcome to the ProtFlow tutorials!
 
     load_poses
     run_applications
+    generic_metric
     binder_design
