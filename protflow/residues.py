@@ -11,6 +11,8 @@ Classes
 
 - `ResidueSelection`
     Represents a selection of residues with functionality for parsing, converting, and manipulating selections.
+- `AtomSelection`
+    Represents an ordered selection of atoms for atom-level operations.
 
 Functions
 ---------
@@ -66,6 +68,157 @@ This module simplifies the process of handling residue selections in bioinformat
 """
 # imports
 from collections import OrderedDict, defaultdict
+from typing import Any, TypeAlias
+
+AtomID: TypeAlias = tuple[Any, ...]
+
+
+def _validate_residue_atom_id(residue_id: Any) -> None:
+    """Validate compact or BioPython residue ID formats used inside atom IDs."""
+    if isinstance(residue_id, int):
+        return
+    if isinstance(residue_id, str):
+        try:
+            int(residue_id)
+            return
+        except ValueError as exc:
+            raise ValueError(f"Residue ID strings must be integer-like. Got: {residue_id}") from exc
+    if isinstance(residue_id, (list, tuple)) and len(residue_id) == 3:
+        try:
+            int(residue_id[1])
+            return
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"BioPython residue IDs must contain an integer-like residue number. Got: {residue_id}") from exc
+    raise ValueError(
+        "Residue IDs in atom specifications must be integer-like or BioPython residue IDs "
+        f"(hetero_flag, residue_number, insertion_code). Got: {residue_id}"
+    )
+
+
+def _validate_atom_name(atom_name: Any) -> None:
+    """Validate compact atom names and BioPython atom IDs."""
+    if isinstance(atom_name, str) and atom_name:
+        return
+    if isinstance(atom_name, (list, tuple)) and len(atom_name) == 2 and isinstance(atom_name[0], str) and atom_name[0]:
+        return
+    raise ValueError(f"Atom names must be non-empty strings or BioPython atom IDs like (atom_name, altloc). Got: {atom_name}")
+
+
+def _validate_atom_id(atom_id: Any) -> None:
+    """Validate compact or BioPython full atom IDs."""
+    if not isinstance(atom_id, (list, tuple)):
+        raise TypeError(f"Atom IDs must be tuple/list-like. Got {type(atom_id)}: {atom_id}")
+
+    atom_id = list(atom_id)
+    if len(atom_id) == 3:
+        chain_id, residue_id, atom_name = atom_id
+    elif len(atom_id) == 4:
+        _, chain_id, residue_id, atom_name = atom_id
+    elif len(atom_id) == 5:
+        _, _, chain_id, residue_id, atom_name = atom_id
+    elif len(atom_id) == 6:
+        _, _, chain_id, residue_id, atom_name, _ = atom_id
+    else:
+        raise ValueError(
+            "Atom IDs must have 3 compact elements (chain_id, res_id, atom_name), "
+            "4 elements (model_id, chain_id, res_id, atom_name), "
+            "5 BioPython full-id elements, or 6 full-id-plus-altloc elements. "
+            f"Got {len(atom_id)} elements: {atom_id}"
+        )
+
+    if not isinstance(chain_id, str) or not chain_id:
+        raise ValueError(f"Atom ID chain identifiers must be non-empty strings. Got: {chain_id}")
+    _validate_residue_atom_id(residue_id)
+    _validate_atom_name(atom_name)
+
+
+def _looks_like_single_atom_id(selection: Any) -> bool:
+    """Return True if selection itself is one atom ID rather than a sequence of atom IDs."""
+    try:
+        _validate_atom_id(selection)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def _as_tuple_recursive(value: Any) -> Any:
+    """Convert nested JSON-style lists to tuples while preserving scalar values."""
+    if isinstance(value, (list, tuple)):
+        return tuple(_as_tuple_recursive(item) for item in value)
+    return value
+
+
+def _as_list_recursive(value: Any) -> Any:
+    """Convert nested tuples to JSON-friendly lists while preserving scalar values."""
+    if isinstance(value, (list, tuple)):
+        return [_as_list_recursive(item) for item in value]
+    return value
+
+
+def _normalize_atom_selection_value(selection: Any, parameter_name: str) -> tuple[AtomID, ...]:
+    """Validate and normalize one ordered atom selection."""
+    if selection.__class__.__name__ == "AtomSelection" and callable(getattr(selection, "to_list", None)):
+        selection = selection.to_list()
+    if isinstance(selection, dict) and "atoms" in selection:
+        selection = selection["atoms"]
+
+    if not isinstance(selection, (list, tuple)):
+        raise TypeError(
+            f"{parameter_name} must be an AtomSelection object or an ordered tuple/list of atom IDs. "
+            f"Got {type(selection)}: {selection}"
+        )
+
+    atom_ids = (selection,) if _looks_like_single_atom_id(selection) else selection
+    if not atom_ids:
+        raise ValueError(f"{parameter_name} must contain at least one atom ID.")
+
+    normalized = []
+    for atom_id in atom_ids:
+        try:
+            _validate_atom_id(atom_id)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid atom ID in {parameter_name}: {atom_id}") from exc
+        normalized.append(_as_tuple_recursive(atom_id))
+    return tuple(normalized)
+
+
+class AtomSelection:
+    """
+    Represent an ordered selection of atoms in a protein structure.
+
+    Atom IDs can be compact IDs ``(chain_id, res_id, atom_name)`` using model 0
+    implicitly, or full BioPython-style IDs with model and structure IDs. Atom
+    ordering is preserved because RMSD calculation pairs atoms by position.
+    """
+
+    def __init__(self, atoms: Any) -> None:
+        self.atoms = _normalize_atom_selection_value(atoms, parameter_name="AtomSelection")
+
+    def __iter__(self):
+        return iter(self.atoms)
+
+    def __len__(self) -> int:
+        return len(self.atoms)
+
+    def __str__(self) -> str:
+        return str(self.to_tuple())
+
+    ####################################### OUTPUT #############################################
+    def to_tuple(self) -> tuple[AtomID, ...]:
+        """Return the ordered atom selection as tuples."""
+        return self.atoms
+
+    def to_list(self) -> list[Any]:
+        """Return the ordered atom selection in JSON-friendly list format."""
+        return _as_list_recursive(self.atoms)
+
+    def to_dict(self) -> dict[str, list[Any]]:
+        """Return a scorefile-friendly dictionary representation."""
+        return {"atoms": self.to_list()}
+
+
+AtomSelectionInput: TypeAlias = str | tuple[Any, ...] | list[Any] | dict[str, Any] | AtomSelection | None
+
 
 class ResidueSelection:
     """

@@ -866,11 +866,9 @@ class Poses:
           with ``ast.literal_eval``; malformed strings will raise ``ValueError`` or ``SyntaxError``.
         - ``ResidueSelection`` construction is delegated; any errors it raises will propagate.
         """
-
-
         if not resselection_col in self.df.columns:
-            return None 
-        
+            return None
+
         for idx, cols in self.df[resselection_col].items():
             # if input was a csv file, lists are imported as str
             if isinstance(cols, str) and cols.startswith("[") and cols.endswith("]"):
