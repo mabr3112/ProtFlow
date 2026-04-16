@@ -678,7 +678,7 @@ class RFD3Params(UserDict):
             raise ValueError(f"Input specifications must be supplied in the format {dict_example}")
         
         # check if new specs fit to existing poses
-        if self.poses and not all(pose in specs for pose in self.poses["poses_description"]) or not len(self.poses) == len(specs):
+        if self.poses and not all(pose in specs for pose in self.poses.df["poses_description"]) or not len(self.poses) == len(specs):
             raise ValueError("Specs do not fit existing poses!")
 
 
