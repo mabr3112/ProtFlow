@@ -25,10 +25,7 @@ import os
 from glob import glob
 
 import pandas as pd
-from rdkit import Chem
-from rdkit.Geometry import Point3D
-import torch
-from pathlib import Path
+
 
 from protflow import load_config_path, require_config
 from protflow.jobstarters import JobStarter
@@ -124,7 +121,7 @@ class SigmaDock(Runner):
 
         # 3b) Build runner defaults from explicit run() parameters.
         runner_defaults = (
-            f"ckpt={self.ckpt_path}"
+            f"ckpt={self.ckpt_path} "
             f"hardware.devices=1 "
             f"graph.sample_conformer={str(sample_conformer).lower()} "
             f"graph.fragmentation_strategy={fragmentation_strategy}"
@@ -162,7 +159,7 @@ class SigmaDock(Runner):
         )
 
         # 6) Collect and validate scores (module function, by convention).
-        scores = collect_scores(work_dir=work_dir, include_scores=include_scores)
+        scores = collect_scores(work_dir=work_dir, python_path=self.python_path, include_scores=include_scores)
 
         if len(scores.index) == 0:
             raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output logs and runner output directory ({work_dir})")
@@ -296,31 +293,8 @@ def _extract_score_dict(
 
     return out
 
-def _mol_with_coords(mol_ref, coords):
 
-    if hasattr(coords, "float"):
-        coords = coords.float().cpu().tolist()
-    mol = Chem.RWMol(mol_ref)
-    mol.RemoveAllConformers()
-    conf = Chem.Conformer(mol.GetNumAtoms())
-    for i, (x, y, z) in enumerate(coords):
-        conf.SetAtomPosition(i, Point3D(float(x), float(y), float(z)))
-    mol.AddConformer(conf)
-    return mol
-
-
-def _write_complex_pdb(prot_path: str, mol, out_path) -> None:
-    
-    lig_lines = [ln for ln in Chem.MolToPDBBlock(mol, flavor=4).splitlines() if ln.startswith(("HETATM", "CONECT"))]
-    with open(prot_path) as f:
-        prot_lines = [ln.rstrip() for ln in f if not ln.startswith(("END", "CONECT"))]
-    with open(out_path, "w") as f:
-        f.write("\n".join(prot_lines) + "\n")
-        f.write("\n".join(lig_lines) + "\n")
-        f.write("END\n")
-
-
-def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd.DataFrame:
+def collect_scores(work_dir: str, python_path: str, include_scores: list[str] | None = None) -> pd.DataFrame:
     """Parse runner outputs and return the canonical scores dataframe.
 
     Developer instructions
@@ -335,74 +309,18 @@ def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd
       Use ``include_scores`` to opt-in to specific heavy fields.
     - Keep function callable standalone (for debugging/re-parsing old runs).
     """
+    import subprocess
 
+    script = os.path.join(os.path.dirname(__file__), "runners_auxiliary_scripts", "sigmadock_collect_scores.py")
+    cmd = [python_path, script, work_dir]
+    if include_scores:
+        cmd += ["--include-scores", ",".join(include_scores)]
+    subprocess.run(cmd, check=True)
 
-    output_root = Path(work_dir) / "outputs"
-    rows: list[dict[str, object]] = []
-
-    for pose_dir in sorted(output_root.iterdir()):
-        if not pose_dir.is_dir():
-            continue
-        pose_stem = pose_dir.name
-
-        pred_files = sorted(pose_dir.rglob("predictions.pt"))
-        if not pred_files:
-            logging.warning("No predictions.pt found under %s", pose_dir)
-            continue
-        seed_dir = pred_files[0].parent
-
-        pred    = torch.load(seed_dir / "predictions.pt", weights_only=False)
-        rescore = torch.load(seed_dir / "rescoring.pt",   weights_only=False) if (seed_dir / "rescoring.pt").exists()   else None
-        pb      = torch.load(seed_dir / "posebusters.pt", weights_only=False) if (seed_dir / "posebusters.pt").exists() else None
-
-        complex_dir = pose_dir / "complexes"
-        complex_dir.mkdir(exist_ok=True)
-
-        for code, samples in pred["results"].items():
-            if not samples:
-                continue
-            s        = samples[0]
-            mol_ref  = s.get("lig_ref")
-            coords   = s.get("x0_hat")
-            pdb_path = s.get("pdb_path")
-
-            if mol_ref is None or coords is None:
-                logging.warning("Missing lig_ref or x0_hat for %s — skipping", pose_stem)
-                continue
-
-            out_complex = complex_dir / f"{pose_stem}_complex.pdb"
-            mol = _mol_with_coords(mol_ref, coords)
-            if pdb_path and Path(pdb_path).exists():
-                _write_complex_pdb(pdb_path, mol, out_complex)
-            else:
-                Chem.MolToPDBFile(mol, str(out_complex))
-
-            row: dict[str, object] = {
-                "description": pose_stem,
-                "location":    str(out_complex.resolve()),
-            }
-
-            if rescore is not None:
-                pose_scores = rescore["scores"].get(code)
-                if pose_scores:
-                    sc = pose_scores[0]
-                    row["affinity"]              = sc.get("Affinity")
-                    row["intramolecular_energy"] = sc.get("Intramolecular energy")
-                    row["cnn_score"]             = sc.get("CNNscore")
-                    row["cnn_affinity"]          = sc.get("CNNaffinity")
-                    row["cnn_variance"]          = sc.get("CNNvariance")
-
-            if pb is not None:
-                row["rmsd"]         = pb["rmsds"].get(code)
-                row["pb_pass_rate"] = pb["pb_checks"].get(code)
-                pb_dict = pb["pb_dicts"].get(code)
-                if pb_dict:
-                    for k, v in pb_dict.items():
-                        row[f"pb_{k}"] = v
-
-            rows.append(row)
-
-    return pd.DataFrame(rows)
+    scores_file = os.path.join(work_dir, "sigmadock_scores.json")
+    scores = pd.read_json(scores_file, orient="records")
+    os.remove(scores_file)
+    return scores
 
 
 # Optional: lightweight checklist for developers implementing a new runner.
