@@ -22,10 +22,10 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 from glob import glob
 
 import pandas as pd
-
 
 from protflow import load_config_path, require_config
 from protflow.jobstarters import JobStarter
@@ -37,7 +37,7 @@ from protflow.runners import (
     options_flags_to_string,
     prepend_cmd,
 )
-from ..utils.openbabel_tools import split_complex
+from ..utils.biopython_tools import split_complex
 
 class SigmaDock(Runner):
     """Template class for implementing a new ProtFlow runner.
@@ -85,8 +85,10 @@ class SigmaDock(Runner):
         poses: Poses,
         prefix: str,
         jobstarter: JobStarter | None = None,
+        ligand_name: str = "LIG",
         sample_conformer: bool = True,
         fragmentation_strategy: str = "canonical",
+        query_ligands: list[str] | None = None,
         options: str | None = None,
         pose_options: list[str] | str | None = None,
         include_scores: list[str] | None = None,
@@ -117,7 +119,7 @@ class SigmaDock(Runner):
             self._cleanup_previous_outputs(work_dir=work_dir)
 
         # 3a) Split complexes into receptor PDB + ligand SDF; paths stored in poses.df.
-        self._prepare_sigmadock_inputs(poses=poses, work_dir=work_dir, overwrite=overwrite)
+        self._prepare_sigmadock_inputs(poses=poses, work_dir=work_dir, ligand_name=ligand_name, query_ligands=query_ligands, overwrite=overwrite)
 
         # 3b) Build runner defaults from explicit run() parameters.
         runner_defaults = (
@@ -129,7 +131,7 @@ class SigmaDock(Runner):
 
         # 3c) Merge: defaults < user options < per-pose options < receptor/ligand paths.
         base_opts = options_flags_to_string(*parse_generic_options(runner_defaults, options, sep=" "), sep=" ", no_quotes=True)
-        sigmadock_opts = poses.df["sigmadock_inputs"].tolist()
+        sigmadock_opts = self._build_sigmadock_cli_opts(poses=poses, work_dir=work_dir)
         user_opts = self.prep_pose_options(poses=poses, pose_options=pose_options)
         pose_options_list = [
             options_flags_to_string(*parse_generic_options(base_opts, usr_opt, sep=" "), sep=" ", no_quotes=True)
@@ -201,51 +203,62 @@ class SigmaDock(Runner):
         description = os.path.splitext(os.path.basename(pose_path))[0]
         out_pose = os.path.join(out_dir, description)
 
-        # TODO: adapt cli_args already contains inference.protein_pdb and inference.ligand_sdf from _prepare_sigmadock_inputs
         return (
             f"{self.python_path} {self.application_path} "
-            f"output_dir={out_pose}"
+            f"output_dir={out_pose} "
             f"{cli_args}"
         )
 
-    def _prepare_sigmadock_inputs(self, poses: Poses, work_dir: str, overwrite: bool = False) -> None:
-        """Split each pose complex into a receptor PDB and ligand SDF for docking.
+    def _prepare_sigmadock_inputs(self, poses: Poses, work_dir: str, ligand_name: str, query_ligands: list[str] | None = None, overwrite: bool = False) -> None:
+        """Split each pose complex into a receptor PDB and ligand SDF.
 
-        Writes per-pose CLI strings into poses.df["sigmadock_inputs"] so they flow
-        through the standard pose_options mechanism into _build_commands.
+        Sets two columns on poses.df:
+          - ``sigmadock_pdb``: path to the receptor PDB
+          - ``sigmadock_ligands``: single SDF path (redocking) or list of SDF paths (crossdocking)
         """
         inputs_dir = os.path.join(work_dir, "inputs")
         os.makedirs(inputs_dir, exist_ok=True)
 
-        input_opts = []
+        pdb_paths, ligand_paths = [], []
         for pose_path in poses.poses_list():
             stem = os.path.splitext(os.path.basename(pose_path))[0]
-            out_pdb = os.path.join(inputs_dir, f"{stem}.pdb") # these are for naming the files and to kn ow where to save them
+            out_pdb = os.path.join(inputs_dir, f"{stem}.pdb")
             out_sdf = os.path.join(inputs_dir, f"{stem}_ligand.sdf")
-            if overwrite or not os.path.isfile(out_pdb): #if the file is already there, this is False, skips spliting again, but only if overwrite is also true
-                split_complex(pose_path, work_dir=inputs_dir)
-            input_opts.append(
-                f"inference.protein_pdb={out_pdb} inference.ligand_sdf={out_sdf}"
-            )
+            if overwrite or not os.path.isfile(out_pdb):
+                split_complex(pose_path, work_dir=inputs_dir, ligand_name=ligand_name)
+            pdb_paths.append(out_pdb)
+            ligand_paths.append(query_ligands if query_ligands else out_sdf)
 
-        poses.df["sigmadock_inputs"] = input_opts # do not think this is a ncie way to handle the inputs, need to check in pose object. 
+        poses.df["sigmadock_pdb"] = pdb_paths
+        poses.df["sigmadock_ligands"] = ligand_paths
+
+    def _build_sigmadock_cli_opts(self, poses: Poses, work_dir: str) -> list[str]:
+        """Convert sigmadock_pdb / sigmadock_ligands columns into per-pose CLI strings.
+
+        Redocking (sigmadock_ligands is a str): inline inference.protein_pdb + inference.ligand_sdf.
+        Crossdocking (sigmadock_ligands is a list): write a per-pose inference_datafront CSV.
+        """
+        inputs_dir = os.path.join(work_dir, "inputs")
+        cli_opts = []
+        for _, row in poses.df.iterrows():
+            pdb = row["sigmadock_pdb"]
+            ligands = row["sigmadock_ligands"]
+            if isinstance(ligands, list):
+                stem = os.path.splitext(os.path.basename(pdb))[0]
+                ref_sdf = os.path.join(inputs_dir, f"{stem}_ligand.sdf")
+                csv_path = os.path.join(inputs_dir, f"{stem}_inference.csv")
+                rows = [{"PDB": pdb, "SDF": q, "REF_SDF": ref_sdf} for q in ligands]
+                pd.DataFrame(rows).to_csv(csv_path, index=False)
+                cli_opts.append(f"inference.inference_datafront={csv_path}")
+            else:
+                cli_opts.append(f"inference.protein_pdb={pdb} inference.ligand_sdf={ligands}")
+        return cli_opts
 
     def _cleanup_previous_outputs(self, work_dir: str) -> None:
-        """Delete/clear runner-specific output artifacts before rerun.
-
-        Developer instructions
-        ----------------------
-        - Keep cleanup scoped to this runner's own output directories.
-        - Never remove unrelated files outside ``work_dir``.
-        - This method is optional but useful for tools that append stale outputs.
-        """
-        output_dir = os.path.join(work_dir, "outputs")
-        if not os.path.isdir(output_dir):
-            return
-
-        for file_path in glob(os.path.join(output_dir, "*")):
-            if os.path.isfile(file_path):
-                os.remove(file_path)
+        if os.path.isdir(inputs_dir := os.path.join(work_dir, "inputs")):
+            shutil.rmtree(inputs_dir)
+        if os.path.isdir(outputs_dir := os.path.join(work_dir, "outputs")):
+            shutil.rmtree(outputs_dir)
 
 def _is_heavy_value(value: object) -> bool:
     """Heuristic for values that can bloat score tables (2D/per-residue objects)."""

@@ -27,6 +27,21 @@ def _is_heavy(value: object) -> bool:
     return False
 
 
+def _set_residue_name(mol, name: str):
+    """Set PDB residue name on every atom (controls HETATM resName in the complex PDB)."""
+    padded = name[:3].ljust(3)
+    for atom in mol.GetAtoms():
+        info = atom.GetMonomerInfo()
+        if info is not None:
+            info.SetResidueName(padded)
+        else:
+            new_info = Chem.AtomPDBResidueInfo()
+            new_info.SetResidueName(padded)
+            new_info.SetIsHeteroAtom(True)  # ensures HETATM not ATOM in MolToPDBBlock
+            atom.SetMonomerInfo(new_info)
+    return mol
+
+
 def _mol_with_coords(mol_ref, coords):
     if hasattr(coords, "float"):
         coords = coords.float().cpu().tolist()
@@ -79,6 +94,8 @@ def collect(work_dir: str, include_scores: set[str] | None = None) -> list[dict]
             mol_ref  = s.get("lig_ref")
             coords   = s.get("x0_hat")
             pdb_path = s.get("pdb_path")
+            ligand_path = s.get("ligand_path")
+            
 
             if mol_ref is None or coords is None:
                 print(f"[WARN] Missing lig_ref or x0_hat for {pose_stem} — skipping", file=sys.stderr)
@@ -86,6 +103,9 @@ def collect(work_dir: str, include_scores: set[str] | None = None) -> list[dict]
 
             out_complex = complex_dir / f"{pose_stem}.pdb"
             mol = _mol_with_coords(mol_ref, coords)
+            if ligand_path and Path(ligand_path).exists():
+                lig_name = Path(ligand_path).read_text().splitlines()[0].strip() or "LIG"
+                mol = _set_residue_name(mol, lig_name)
             if pdb_path and Path(pdb_path).exists():
                 _write_complex_pdb(pdb_path, mol, out_complex)
             else:
@@ -99,13 +119,17 @@ def collect(work_dir: str, include_scores: set[str] | None = None) -> list[dict]
             if rescore is not None:
                 pose_scores = rescore["scores"].get(code)
                 if pose_scores:
-                    for k, v in pose_scores[0].items():
+                    seed_idx = s.get("seed", 0)
+                    sc = pose_scores[seed_idx] if len(pose_scores) > seed_idx else pose_scores[0]
+                    for k, v in sc.items():
                         flat_key = k.lower().replace(" ", "_")
                         if _is_heavy(v):
                             if flat_key in include_scores:
                                 row[flat_key] = json.dumps(v)
                         else:
                             row[flat_key] = v
+            else:
+                print(f"[DEBUG] No rescoring.pt found for {pose_stem}", file=sys.stderr)
 
             if pb is not None:
                 rmsd = pb["rmsds"].get(code)
@@ -114,15 +138,6 @@ def collect(work_dir: str, include_scores: set[str] | None = None) -> list[dict]
                     row["rmsd"] = rmsd
                 if pb_pass is not None:
                     row["pb_pass_rate"] = pb_pass
-                pb_dict = pb["pb_dicts"].get(code)
-                if pb_dict:
-                    for k, v in pb_dict.items():
-                        flat_key = f"pb_{k}"
-                        if _is_heavy(v):
-                            if flat_key in include_scores:
-                                row[flat_key] = json.dumps(v)
-                        else:
-                            row[flat_key] = v
 
             rows.append(row)
 
