@@ -678,7 +678,7 @@ class RFD3Params(UserDict):
             raise ValueError(f"Input specifications must be supplied in the format {dict_example}")
         
         # check if new specs fit to existing poses
-        if self.poses and not all(pose in specs for pose in self.poses["poses_description"]) or not len(self.poses) == len(specs):
+        if self.poses and not all(pose in specs for pose in self.poses.df["poses_description"]) or not len(self.poses) == len(specs):
             raise ValueError("Specs do not fit existing poses!")
 
 
@@ -1032,7 +1032,7 @@ class RFdiffusion3(Runner):
 
 
         # check if input_specification fits to input poses
-        if poses and not all(name in params for name in poses.df["poses_description"]) or not len(poses) == len(params):
+        if poses and (not all(name in params for name in poses.df["poses_description"]) or not len(poses) == len(params)):
             raise ValueError("Input <poses> do not match <input_specification>")
         
         ckpt_path = identify_checkpoint(ckpt_path)
@@ -1084,6 +1084,8 @@ class RFdiffusion3(Runner):
             if not poses:
                 poses.df = scores.copy()
                 poses.df["input_poses"] = None
+                poses.df["poses"] = poses.df["location"].apply(os.path.abspath)
+                poses.df["poses_description"] = poses.df["description"]
                 logging.info("Populated poses.df from scorefile.")
             else:
                 poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=index_layers).return_poses()
@@ -1148,6 +1150,8 @@ class RFdiffusion3(Runner):
         if not poses:
             poses.df = scores.copy()
             poses.df["input_poses"] = None
+            poses.df["poses"] = poses.df["location"].apply(os.path.abspath)
+            poses.df["poses_description"] = poses.df["description"]
             logging.info(
                 f"Populated poses.df directly from scores {len(poses.df.index)} rows).")
         else:
