@@ -53,6 +53,13 @@ Here are some examples of how to use the functions provided in this module:
         from biopython_tools import determine_protparams
         parameters = determine_protparams(sequence_record.seq)
 
+7. Extracting a ligand from a co-crystal structure:
+
+    .. code-block:: python
+
+        from openbabel_tools import split_complex
+        sdf_path = split_complex("complex.pdb", "ligand.sdf", "out.pdb", name="COC")
+
 These examples illustrate the primary capabilities of the module, showcasing how it can be utilized to streamline the process of working with protein structures and sequences in BioPython.
 
 Authors
@@ -61,9 +68,9 @@ Markus Braun, Adrian Tripp
 """
 # Imports
 import os
-
 # dependencies
-from openbabel import openbabel
+
+from openbabel import openbabel, pybel
 
 # customs
 def openbabel_fileconverter(input_file: str, output_format:str, output_file:str=None, input_format:str=None) -> str:
@@ -87,3 +94,50 @@ def openbabel_fileconverter(input_file: str, output_format:str, output_file:str=
     obConversion.SetOutFormat(output_format)
     obConversion.WriteFile(mol, output_file)
     return output_file
+
+
+def split_complex(path: str, work_dir: str, name: str = "ligand") -> None:
+    """
+    Split a structure file into a HETATM-based SDF and an ATOM-only PDB.
+
+    CIF inputs are converted to PDB first. Both outputs are written to ``work_dir``
+    using the input file stem. The HETATM part gets a ``_ligand`` suffix. HETATOM is unsafe since boltz for example does put ligand on chain B and not mark them as hetatoms, maybe convert to cif and extract there as ligand?
+    Water (HOH) is excluded from the SDF output.
+
+    Parameters
+    ----------
+    path : str
+        Path to the input file (``.pdb`` or ``.cif``).
+    work_dir : str
+        Directory where output files are written.
+    name : str, optional
+        Molecule title written into the SDF record. Defaults to ``"ligand"``.
+        
+    """
+    stem = os.path.splitext(os.path.basename(path))[0]
+    ext = path.rsplit(".", 1)[-1].lower()
+
+    if ext == "cif":
+        path = openbabel_fileconverter(path, output_format="pdb", output_file=os.path.join(work_dir, f"{stem}.pdb"))
+        print(f"Converted CIF to PDB: {path}")
+
+    out_pdb = os.path.join(work_dir, f"{stem}.pdb")
+    out_sdf = os.path.join(work_dir, f"{stem}_ligand.sdf")
+
+    def _is_hetatm(a) -> bool:
+        res = a.OBAtom.GetResidue()
+        return res is not None and res.IsHetAtom(a.OBAtom) and res.GetName().strip() != "HOH"
+
+    mol_lig = next(pybel.readfile("pdb", path))
+    for atom in [a for a in mol_lig.atoms if not _is_hetatm(a)]:
+        mol_lig.OBMol.DeleteAtom(atom.OBAtom)
+
+    mol_prot = next(pybel.readfile("pdb", path))
+    for atom in [a for a in mol_prot.atoms if _is_hetatm(a)]:
+        mol_prot.OBMol.DeleteAtom(atom.OBAtom)
+
+    mol_lig.title = name
+    mol_lig.write("sdf", out_sdf, overwrite=True)
+    mol_prot.write("pdb", out_pdb, overwrite=True)
+
+    return None
