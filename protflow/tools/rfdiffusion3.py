@@ -105,7 +105,7 @@ from ..jobstarters import JobStarter, split_list
 from ..poses import Poses, col_in_df, description_from_path
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..utils.openbabel_tools import openbabel_fileconverter
-from ..residues import ResidueSelection
+from ..residues import AtomSelection, ResidueSelection, parse_residue
 
 class RFD3Params(UserDict):
     """
@@ -1354,15 +1354,238 @@ class RFdiffusion3(Runner):
         if os.path.isdir(input_dir):
             shutil.rmtree(input_dir)
 
+def _ensure_rfd3_index_map(diff_idx_map: dict | None, motif_col: str, strict: bool) -> dict:
+    """
+    Validate one RFD3 ``diffused_index_map`` before motif remapping.
+
+    Parameters
+    ----------
+    diff_idx_map : dict or None
+        Per-pose mapping from original residue identifiers, for example
+        ``"A5"``, to output residue identifiers, for example ``"B12"``.
+    motif_col : str
+        Name of the motif column being remapped. This is used only to make
+        error messages specific to the failing column.
+    strict : bool
+        If ``True``, missing or empty maps are treated as errors. If
+        ``False``, missing maps are converted to an empty dictionary and
+        unmapped residues or atoms are skipped by the caller.
+
+    Returns
+    -------
+    dict
+        Validated index map. The returned dictionary may be empty only when
+        ``strict`` is ``False``.
+
+    Raises
+    ------
+    ValueError
+        If ``strict`` is ``True`` and *diff_idx_map* is missing, empty, or not
+        a dictionary.
+    """
+    if isinstance(diff_idx_map, dict):
+        if strict and not diff_idx_map:
+            raise ValueError("Not all poses feature diffused_index_map property. Are you sure preserved motifs exist for all input poses?")
+        return diff_idx_map
+    if strict:
+        raise ValueError(f"Pose has no usable diffused_index_map while remapping selection {motif_col}. Got: {diff_idx_map}")
+    return {}
+
+
+def _remap_residue_selection(selection: ResidueSelection, diff_idx_map: dict, motif_col: str, strict: bool) -> ResidueSelection:
+    """
+    Remap one ResidueSelection through an RFD3 ``diffused_index_map``.
+
+    Parameters
+    ----------
+    selection : ResidueSelection
+        Residue selection in input-structure numbering.
+    diff_idx_map : dict
+        Mapping from input residue identifiers to output residue identifiers.
+    motif_col : str
+        Name of the column being remapped. Used for error messages.
+    strict : bool
+        If ``True``, every selected residue must be present in
+        *diff_idx_map*. If ``False``, residues absent from the map are skipped.
+
+    Returns
+    -------
+    ResidueSelection
+        New residue selection in output-structure numbering.
+
+    Raises
+    ------
+    ValueError
+        If ``strict`` is ``True`` and any selected residue is absent from the
+        map.
+    """
+    residues = selection.to_list()
+    if strict and not all(residue in diff_idx_map for residue in residues):
+        raise ValueError(f"Could not find all original residues in diffused index map for selection {motif_col}. Are you sure they were preserved?")
+    return ResidueSelection([diff_idx_map[residue] for residue in residues if residue in diff_idx_map])
+
+
+def _atom_residue_number(residue_id) -> int:
+    """
+    Extract the numeric residue component from compact or BioPython atom IDs.
+
+    Parameters
+    ----------
+    residue_id : int, str, list, or tuple
+        Compact residue ID or BioPython residue ID tuple
+        ``(hetero_flag, residue_number, insertion_code)``.
+
+    Returns
+    -------
+    int
+        Numeric residue number used to look up ``diffused_index_map`` entries.
+    """
+    if isinstance(residue_id, (list, tuple)) and len(residue_id) == 3:
+        return int(residue_id[1])
+    return int(residue_id)
+
+
+def _format_remapped_atom_residue_id(original_residue_id, remapped_residue_number: int):
+    """
+    Format a remapped residue ID to match the original atom ID style.
+
+    Parameters
+    ----------
+    original_residue_id : int, str, list, or tuple
+        Residue ID component from the original AtomSelection atom ID.
+    remapped_residue_number : int
+        Residue number parsed from the RFD3 output residue identifier.
+
+    Returns
+    -------
+    int, str, or tuple
+        Residue ID with the same broad representation as
+        *original_residue_id*. BioPython hetero flags are preserved. Insertion
+        codes are reset to blank because RFD3 ``diffused_index_map`` values do
+        not encode insertion codes.
+
+    Raises
+    ------
+    ValueError
+        If *original_residue_id* is not a supported residue ID form.
+    """
+    if isinstance(original_residue_id, int):
+        return remapped_residue_number
+    if isinstance(original_residue_id, str):
+        return str(remapped_residue_number)
+    if isinstance(original_residue_id, (list, tuple)) and len(original_residue_id) == 3:
+        hetero_flag = original_residue_id[0] or " "
+        return (hetero_flag, remapped_residue_number, " ")
+    raise ValueError(f"Cannot remap unsupported atom residue ID: {original_residue_id}")
+
+
+def _remap_atom_id(atom_id, diff_idx_map: dict, motif_col: str, strict: bool):
+    """
+    Remap the chain/residue part of one AtomSelection atom ID.
+
+    Parameters
+    ----------
+    atom_id : tuple or list
+        Atom ID in one of the compact or BioPython-style formats supported by
+        :class:`protflow.residues.AtomSelection`.
+    diff_idx_map : dict
+        Mapping from input residue identifiers to output residue identifiers.
+    motif_col : str
+        Name of the column being remapped. Used for error messages.
+    strict : bool
+        If ``True``, the atom's source residue must be present in
+        *diff_idx_map*. If ``False``, missing residues return ``None`` so the
+        caller can skip that atom.
+
+    Returns
+    -------
+    tuple or None
+        Remapped atom ID with the original atom-ID shape preserved. ``None`` is
+        returned only when ``strict`` is ``False`` and the atom's residue is not
+        present in *diff_idx_map*.
+
+    Raises
+    ------
+    ValueError
+        If *atom_id* has an unsupported shape, or if ``strict`` is ``True`` and
+        the atom's residue is absent from the map.
+    """
+    atom_id = tuple(atom_id)
+    # Decompose each supported atom ID shape into prefix, chain/residue, and
+    # suffix components so the final atom ID can be reconstructed losslessly.
+    if len(atom_id) == 3:
+        chain_id, residue_id, atom_name = atom_id
+        prefix_values = ()
+        suffix_values = (atom_name,)
+    elif len(atom_id) == 4:
+        model_id, chain_id, residue_id, atom_name = atom_id
+        prefix_values = (model_id,)
+        suffix_values = (atom_name,)
+    elif len(atom_id) == 5:
+        structure_id, model_id, chain_id, residue_id, atom_name = atom_id
+        prefix_values = (structure_id, model_id)
+        suffix_values = (atom_name,)
+    elif len(atom_id) == 6:
+        structure_id, model_id, chain_id, residue_id, atom_name, altloc = atom_id
+        prefix_values = (structure_id, model_id)
+        suffix_values = (atom_name, altloc)
+    else:
+        raise ValueError(f"Atom IDs must have 3, 4, 5, or 6 elements while remapping {motif_col}. Got: {atom_id}")
+
+    # RFD3 maps residue identifiers without atom names, so atom-level remapping
+    # first collapses each atom ID to the corresponding residue key.
+    source_residue = f"{chain_id}{_atom_residue_number(residue_id)}"
+    if source_residue not in diff_idx_map:
+        if strict:
+            raise ValueError(f"Could not find original atom residue {source_residue} in diffused index map for selection {motif_col}. Are you sure it was preserved?")
+        return None
+
+    remapped_chain, remapped_residue_number = parse_residue(diff_idx_map[source_residue])
+    remapped_residue_id = _format_remapped_atom_residue_id(residue_id, remapped_residue_number)
+    # Preserve atom names, altlocs, model IDs, and structure IDs exactly; only
+    # the chain and residue index come from RFD3.
+    return (*prefix_values, remapped_chain, remapped_residue_id, *suffix_values)
+
+
+def _remap_atom_selection(selection: AtomSelection, diff_idx_map: dict, motif_col: str, strict: bool) -> AtomSelection:
+    """
+    Remap one AtomSelection through an RFD3 ``diffused_index_map``.
+
+    Parameters
+    ----------
+    selection : AtomSelection
+        Atom selection in input-structure numbering.
+    diff_idx_map : dict
+        Mapping from input residue identifiers to output residue identifiers.
+    motif_col : str
+        Name of the column being remapped. Used for error messages.
+    strict : bool
+        If ``True``, every atom's residue must be present in *diff_idx_map*.
+        If ``False``, atoms whose residues are absent from the map are skipped.
+
+    Returns
+    -------
+    AtomSelection
+        New atom selection in output-structure numbering. Atom order and atom
+        names are preserved.
+    """
+    remapped_atoms = []
+    for atom_id in selection.to_tuple():
+        remapped_atom_id = _remap_atom_id(atom_id, diff_idx_map=diff_idx_map, motif_col=motif_col, strict=strict)
+        if remapped_atom_id is not None:
+            remapped_atoms.append(remapped_atom_id)
+    return AtomSelection(remapped_atoms)
+
+
 def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool = True) -> None:
-    """Remap :class:`~protflow.residues.ResidueSelection` motifs to diffused-output numbering.
+    """Remap ResidueSelection or AtomSelection motifs to diffused-output numbering.
  
     Translates residue positions stored in designated
-    :class:`~protflow.residues.ResidueSelection` columns from their original
+    :class:`~protflow.residues.ResidueSelection` or
+    :class:`~protflow.residues.AtomSelection` columns from their original
     input-structure numbering to the corresponding positions in the diffused
     output structures, using the per-pose ``diffused_index_map`` entries
-    produced by RFDiffusion3 and stored in ``poses.df`` by
-    :func:`collect_scores`.
+    produced by RFDiffusion3 and stored in ``poses.df`` by :func:`collect_scores`.
  
     The motif columns are updated **in place**, matching the convention
     established by the RFDiffusion 1 runner in ProtFlow.
@@ -1370,19 +1593,29 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
     Parameters
     ----------
     poses : Poses
-        The pose collection returned by :meth:`RFdiffusion3.run`.  Must
-        contain a column named ``<prefix>_diffused_index_map``.
+        Pose collection returned by :meth:`RFdiffusion3.run`, or any object
+        exposing a ``df`` attribute compatible with :class:`pandas.DataFrame`.
+        ``poses.df`` must contain a column named
+        ``"<prefix>_diffused_index_map"``. Each value in that column should be
+        a dictionary mapping input residue identifiers, such as ``"A5"``, to
+        output residue identifiers, such as ``"B12"``.
     motifs : list of str
-        Names of columns in ``poses.df`` whose values are
-        :class:`~protflow.residues.ResidueSelection` objects to be remapped.
+        Names of columns in ``poses.df`` to remap in place. Each named column
+        must be homogeneous: all values in one column must be either
+        :class:`~protflow.residues.ResidueSelection` objects or
+        :class:`~protflow.residues.AtomSelection` objects. Different columns
+        may use different selection types.
     prefix : str
         The run prefix used to locate the ``<prefix>_diffused_index_map``
-        column.
+        column. For example, ``prefix="rfd3"`` reads the column
+        ``"rfd3_diffused_index_map"``.
     strict : bool, optional
         When ``True`` (default):
  
         * Raises a :exc:`ValueError` if any residue in a motif selection
-          is absent from the ``diffused_index_map`` for its pose.
+          is absent from the ``diffused_index_map`` for its pose. For
+          AtomSelections this check is performed at the residue level for each
+          atom ID.
         * Raises a :exc:`ValueError` if the ``diffused_index_map`` is
           empty (``None`` / ``{}``) for any pose, indicating that no
           motif was preserved during diffusion.
@@ -1394,7 +1627,9 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
     Returns
     -------
     None
-        This function modifies ``poses.df`` in place and returns nothing.
+        This function modifies ``poses.df`` in place. Remapped
+        ResidueSelection columns remain ResidueSelection columns, and remapped
+        AtomSelection columns remain AtomSelection columns.
  
     Raises
     ------
@@ -1403,21 +1638,27 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
         is absent from ``poses.df`` (raised by
         :func:`~protflow.poses.col_in_df`).
     ValueError
-        If any value in a motif column is not a
-        :class:`~protflow.residues.ResidueSelection` instance.
+        If a motif column is empty or contains mixed/unsupported object types.
+        Supported types are :class:`~protflow.residues.ResidueSelection` and
+        :class:`~protflow.residues.AtomSelection`.
     ValueError
-        If *strict* is ``True`` and a residue from a motif selection is
-        absent from the corresponding ``diffused_index_map``.
+        If *strict* is ``True`` and a residue from a ResidueSelection, or an
+        atom's residue from an AtomSelection, is absent from the corresponding
+        ``diffused_index_map``.
     ValueError
         If *strict* is ``True`` and the ``diffused_index_map`` is empty
         for any pose (motifs were not preserved for all inputs).
  
     Notes
     -----
-    * Each :class:`~protflow.residues.ResidueSelection` is first converted
-      to a list via :meth:`~protflow.residues.ResidueSelection.to_list`
-      before remapping, then converted back to a
-      :class:`~protflow.residues.ResidueSelection` after remapping.
+    * ResidueSelection values are remapped residue-wise using their
+      :meth:`~protflow.residues.ResidueSelection.to_list` representation.
+    * AtomSelection values keep atom order, atom names, model IDs, structure
+      IDs, altlocs, and BioPython hetero flags unchanged. Only the chain and
+      numeric residue index are replaced according to ``diffused_index_map``.
+    * BioPython insertion codes in AtomSelection residue IDs are reset to blank
+      after remapping, because RFD3 ``diffused_index_map`` values do not carry
+      insertion-code information.
     * This function is called automatically from :meth:`RFdiffusion3.run`
       when *update_motifs* is provided.  It can also be called manually
       on previously computed poses.
@@ -1429,16 +1670,24 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
     --------
     ::
  
-        from protflow.runners.rfdiffusion3 import remap_rfd3_motifs
+        from protflow.residues import AtomSelection, ResidueSelection
+        from protflow.tools.rfdiffusion3 import remap_rfd3_motifs
  
-        # poses.df contains "rfd3_diffused_index_map" and "binding_site" columns
+        poses.df["rfd3_diffused_index_map"] = [{"A1": "B10", "A2": "B11"}]
+        poses.df["active_site"] = [ResidueSelection(["A1", "A2"])]
+        poses.df["active_site_atoms"] = [AtomSelection([("A", 1, "N"), ("A", 2, "CA")])]
+
         remap_rfd3_motifs(
             poses=poses,
-            motifs=["binding_site", "catalytic_triad"],
+            motifs=["active_site", "active_site_atoms"],
             prefix="rfd3",
             strict=True,
         )
-        # poses.df["binding_site"] now contains remapped ResidueSelections
+
+        poses.df["active_site"].iloc[0].to_list()
+        # ["B10", "B11"]
+        poses.df["active_site_atoms"].iloc[0].to_tuple()
+        # (("B", 10, "N"), ("B", 11, "CA"))
  
     With non-strict remapping (partial motif preservation allowed)::
  
@@ -1461,24 +1710,25 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
         logging.info(f"[remap_motifs] Processing motif column '{motif_col}'")
         col_in_df(poses.df, motif_col)
         ref_motifs = poses.df[motif_col].to_list()
-        
-        # check if all motifs are ResidueSelections
-        if not all(isinstance(motif, ResidueSelection) for motif in ref_motifs):
-            raise ValueError(f"Not all motifs in column {motif_col} are of type ResidueSelection!")
-        
-        # create a list out of each ResidueSelection
-        ref_motifs = [motif.to_list() for motif in ref_motifs] 
+        if not ref_motifs:
+            raise ValueError(f"Motif column {motif_col} is empty and cannot be remapped.")
+
+        # Each DataFrame column must contain one concrete selection type so
+        # the output column remains predictable for downstream runners.
+        if all(isinstance(motif, ResidueSelection) for motif in ref_motifs):
+            remap_selection = _remap_residue_selection
+        elif all(isinstance(motif, AtomSelection) for motif in ref_motifs):
+            remap_selection = _remap_atom_selection
+        else:
+            raise ValueError(f"All motifs in column {motif_col} must be either ResidueSelections or AtomSelections!")
+
         updated_motifs = []
         for diff_idx_map, ref_motif in zip(diffused_index_maps, ref_motifs):
-            # check if every residue is present in the diffused index map if strict matching is required
-            if strict and not all(res in diff_idx_map for res in ref_motif): 
-                raise ValueError(f"Could not find all original residues in diffused index map for selection {motif_col}. Are you sure they were preserved?")
-            # check if diff_idx_map is present for all poses
-            if strict and not diff_idx_map:
-                raise ValueError("Not all poses feature diffused_index_map property. Are you sure preserved motifs exist for all input poses?")
-            updated_motifs.append([diff_idx_map[res] for res in ref_motif if res in diff_idx_map]) # skip residues not in diff_idx_map
-        # update motif col with new residue selections
-        poses.df[motif_col] = [ResidueSelection(updated_motif) for updated_motif in updated_motifs]
+            # Validate the per-pose map once, then dispatch to the selection
+            # type-specific remapper selected above.
+            diff_idx_map = _ensure_rfd3_index_map(diff_idx_map, motif_col=motif_col, strict=strict)
+            updated_motifs.append(remap_selection(ref_motif, diff_idx_map=diff_idx_map, motif_col=motif_col, strict=strict))
+        poses.df[motif_col] = updated_motifs
         
     logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
 
