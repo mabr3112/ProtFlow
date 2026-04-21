@@ -1,8 +1,58 @@
-"""Auxiliary script — runs in the sigmadock Python environment.
+"""Auxiliary script for parsing SigmaDock inference outputs.
 
-Loads .pt outputs, exports complex PDBs, writes scores to JSON.
+This script runs inside the SigmaDock Python environment (requires PyTorch and
+RDKit) and is invoked as a subprocess by :func:`protflow.tools.sigmadock.collect_scores`.
+It should never be imported directly from within the ProtFlow environment.
 
-Usage:
+For each pose directory under ``<work_dir>/outputs/``, the script:
+
+1. Loads ``predictions.pt``, ``rescoring.pt`` (if present), and
+   ``posebusters.pt`` (if present) from the first ``predictions.pt``
+   seed directory found via recursive glob.
+2. Reconstructs the docked ligand molecule by placing the predicted
+   ``x0_hat`` coordinates onto the reference RDKit mol (``lig_ref``).
+3. Writes a protein–ligand complex PDB to
+   ``<work_dir>/outputs/<pose_stem>/complexes/<pose_stem>.pdb`` by
+   concatenating the receptor ATOM lines with HETATM lines from the
+   reconstructed ligand.
+4. Collects scalar scores from ``rescoring.pt`` (e.g. ``affinity``,
+   ``intramolecular_energy``) and from ``posebusters.pt`` (``rmsd``,
+   ``pb_pass_rate``).  Heavy tensor/list values are skipped unless their
+   key appears in ``include_scores``.
+5. Writes all rows as a JSON array to
+   ``<work_dir>/sigmadock_scores.json`` and exits.  The calling
+   :func:`~protflow.tools.sigmadock.collect_scores` reads this file and
+   deletes it immediately after parsing.
+
+Parameters
+----------
+work_dir : str
+    Root directory of a single SigmaDock runner invocation (the directory
+    that contains the ``outputs/`` sub-tree).
+--include-scores : str, optional
+    Comma-separated list of score keys whose values are heavy (tensors or
+    long lists) but should be serialised as JSON strings and included in
+    the output anyway.  Example: ``--include-scores torsion_angles,feat``.
+
+Output columns (always present when the corresponding file exists)
+------------------------------------------------------------------
+description : str
+    Stem of the pose directory name (matches ``poses.df["description"]``).
+location : str
+    Absolute path to the written complex PDB.
+affinity : float
+    Predicted binding affinity from ``rescoring.pt`` (lower is better).
+intramolecular_energy : float
+    Intramolecular strain energy from ``rescoring.pt``.
+rmsd : float
+    Ligand RMSD to the reference pose from ``posebusters.pt``.  Only
+    present when a reference SDF was supplied (redocking) or when
+    PoseBusters computed it.
+pb_pass_rate : float
+    Fraction of PoseBusters checks that passed for this pose.
+
+Usage
+-----
     python sigmadock_collect_scores.py <work_dir> [--include-scores key1,key2]
 """
 
@@ -132,12 +182,16 @@ def collect(work_dir: str, include_scores: set[str] | None = None) -> list[dict]
                 print(f"[DEBUG] No rescoring.pt found for {pose_stem}", file=sys.stderr)
 
             if pb is not None:
-                rmsd = pb["rmsds"].get(code)
+                rmsd = pb["rmsds"].get(code) # use these hardcode calls since pb gives a lot of unrelevant boolen scores
                 pb_pass = pb["pb_checks"].get(code)
                 if rmsd is not None:
                     row["rmsd"] = rmsd
+                else:
+                    print(f"[WARN] No RMSD found for {pose_stem} / {code} in posebusters.pt", file=sys.stderr)
                 if pb_pass is not None:
                     row["pb_pass_rate"] = pb_pass
+                else:
+                    print(f"[WARN] No pb_pass_rate found for {pose_stem} / {code} in posebusters.pt", file=sys.stderr)
 
             rows.append(row)
 
@@ -156,4 +210,3 @@ if __name__ == "__main__":
     out_path = Path(args.work_dir) / "sigmadock_scores.json"
     with open(out_path, "w") as f:
         json.dump(rows, f)
-    print(f"Wrote {len(rows)} rows to {out_path}")
