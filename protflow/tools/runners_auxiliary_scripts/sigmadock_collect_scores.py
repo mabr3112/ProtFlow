@@ -44,12 +44,6 @@ affinity : float
     Predicted binding affinity from ``rescoring.pt`` (lower is better).
 intramolecular_energy : float
     Intramolecular strain energy from ``rescoring.pt``.
-rmsd : float
-    Ligand RMSD to the reference pose from ``posebusters.pt``.  Only
-    present when a reference SDF was supplied (redocking) or when
-    PoseBusters computed it.
-pb_pass_rate : float
-    Fraction of PoseBusters checks that passed for this pose.
 
 Usage
 -----
@@ -131,8 +125,7 @@ def collect(work_dir: str, include_scores: set[str] | None = None) -> list[dict]
         seed_dir = pred_files[0].parent
 
         pred    = torch.load(seed_dir / "predictions.pt", weights_only=False)
-        rescore = torch.load(seed_dir / "rescoring.pt",   weights_only=False) if (seed_dir / "rescoring.pt").exists()   else None
-        pb      = torch.load(seed_dir / "posebusters.pt", weights_only=False) if (seed_dir / "posebusters.pt").exists() else None
+        rescore = torch.load(seed_dir / "rescoring.pt",   weights_only=False) if (seed_dir / "rescoring.pt").exists() else None
 
         complex_dir = pose_dir / "complexes"
         complex_dir.mkdir(exist_ok=True)
@@ -140,60 +133,55 @@ def collect(work_dir: str, include_scores: set[str] | None = None) -> list[dict]
         for code, samples in pred["results"].items():
             if not samples:
                 continue
-            s        = samples[0]
-            mol_ref  = s.get("lig_ref")
-            coords   = s.get("x0_hat")
-            pdb_path = s.get("pdb_path")
-            ligand_path = s.get("ligand_path")
-            
 
-            if mol_ref is None or coords is None:
-                print(f"[WARN] Missing lig_ref or x0_hat for {pose_stem} — skipping", file=sys.stderr)
-                continue
-
-            out_complex = complex_dir / f"{pose_stem}.pdb"
-            mol = _mol_with_coords(mol_ref, coords)
+            pdb_path    = samples[0].get("pdb_path")
+            ligand_path = samples[0].get("ligand_path")
+            lig_name    = "LIG"
             if ligand_path and Path(ligand_path).exists():
                 lig_name = Path(ligand_path).read_text().splitlines()[0].strip() or "LIG"
+
+            for sample_idx, s in enumerate(samples):
+                mol_ref = s.get("lig_ref")
+                coords  = s.get("x0_hat")
+
+                if mol_ref is None or coords is None:
+                    print(f"[WARN] Missing lig_ref or x0_hat for {pose_stem} sample {sample_idx} — skipping", file=sys.stderr)
+                    continue
+
+
+                description = f"{pose_stem}_{sample_idx:04d}" # naming of samples matches RunnerOutput's zero-padded sample_idx suffix convention
+                out_complex = complex_dir / f"{description}.pdb"
+
+                mol = _mol_with_coords(mol_ref, coords)
                 mol = _set_residue_name(mol, lig_name)
-            if pdb_path and Path(pdb_path).exists():
-                _write_complex_pdb(pdb_path, mol, out_complex)
-            else:
-                Chem.MolToPDBFile(mol, str(out_complex))
-
-            row = {
-                "description": pose_stem,
-                "location":    str(out_complex.resolve()),
-            }
-
-            if rescore is not None:
-                pose_scores = rescore["scores"].get(code)
-                if pose_scores:
-                    seed_idx = s.get("seed", 0)
-                    sc = pose_scores[seed_idx] if len(pose_scores) > seed_idx else pose_scores[0]
-                    for k, v in sc.items():
-                        flat_key = k.lower().replace(" ", "_")
-                        if _is_heavy(v):
-                            if flat_key in include_scores:
-                                row[flat_key] = json.dumps(v)
-                        else:
-                            row[flat_key] = v
-            else:
-                print(f"[DEBUG] No rescoring.pt found for {pose_stem}", file=sys.stderr)
-
-            if pb is not None:
-                rmsd = pb["rmsds"].get(code) # use these hardcode calls since pb gives a lot of unrelevant boolen scores
-                pb_pass = pb["pb_checks"].get(code)
-                if rmsd is not None:
-                    row["rmsd"] = rmsd
+                if pdb_path and Path(pdb_path).exists():
+                    _write_complex_pdb(pdb_path, mol, out_complex)
                 else:
-                    print(f"[WARN] No RMSD found for {pose_stem} / {code} in posebusters.pt", file=sys.stderr)
-                if pb_pass is not None:
-                    row["pb_pass_rate"] = pb_pass
-                else:
-                    print(f"[WARN] No pb_pass_rate found for {pose_stem} / {code} in posebusters.pt", file=sys.stderr)
+                    Chem.MolToPDBFile(mol, str(out_complex))
 
-            rows.append(row)
+                row = {
+                    "description": description,
+                    "location":    str(out_complex.resolve()),
+                }
+
+                if rescore is not None:
+                    pose_scores = rescore["scores"].get(code)
+                    if pose_scores:
+                        sc = pose_scores[sample_idx] if len(pose_scores) > sample_idx else pose_scores[-1]
+                        _skip = {"cnnscore", "cnnaffinity", "cnnvariance", "cnn_score", "cnn_affinity", "cnn_variance"}
+                        for k, v in sc.items():
+                            flat_key = k.lower().replace(" ", "_")
+                            if flat_key in _skip:
+                                continue
+                            if _is_heavy(v):
+                                if flat_key in include_scores:
+                                    row[flat_key] = json.dumps(v)
+                            else:
+                                row[flat_key] = v
+                else:
+                    print(f"[DEBUG] No rescoring.pt found for {pose_stem}", file=sys.stderr)
+
+                rows.append(row)
 
     return rows
 

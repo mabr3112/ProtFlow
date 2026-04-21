@@ -147,6 +147,8 @@ class SigmaDock(Runner):
         prefix: str,
         jobstarter: JobStarter | None = None,
         ligand_name: str = "LIG",
+        num_seeds: int = 1,
+        seed: int = 0,
         sample_conformer: bool = True,
         fragmentation_strategy: str = "canonical",
         query_ligands: list[str] | None = None,
@@ -176,6 +178,15 @@ class SigmaDock(Runner):
         ligand_name:
             Residue name of the ligand in the input complex (used by
             split_complex; ignored when ``ligand_col`` is set).
+        num_seeds:
+            Number of independent stochastic draws per pose (``num_seeds``
+            in SigmaDock's Hydra config).  Each seed produces one docked
+            pose, written as ``{description}_{i:04d}.pdb``.
+        seed:
+            Master random seed (``seed`` in SigmaDock's Hydra config).
+            SigmaDock derives ``num_seeds`` per-draw seeds from this value,
+            so the same ``seed`` + ``num_seeds`` combination always reproduces
+            the same set of poses.  Stored as ``{prefix}_master_seed``.
         query_ligands:
             Absolute SDF paths for crossdocking from complex.  One list is
             shared across all poses.
@@ -192,6 +203,10 @@ class SigmaDock(Runner):
             Score keys whose values are heavy tensors but should still be
             serialised and included in the output dataframe.
         """
+        # Each seed adds one index layer; RunnerOutput uses this to strip the
+        # zero-padded suffix when merging multi-sample results back to poses.
+        self.index_layers = 1 if num_seeds > 1 else 0
+
         # 1) Generic setup shared by all runners.
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
@@ -226,6 +241,8 @@ class SigmaDock(Runner):
         runner_defaults = (
             f"ckpt={self.ckpt_path} "
             f"hardware.devices=1 "
+            f"seed={seed} "
+            f"num_seeds={num_seeds} "
             f"graph.sample_conformer={str(sample_conformer).lower()} "
             f"graph.fragmentation_strategy={fragmentation_strategy}"
         )
@@ -266,6 +283,9 @@ class SigmaDock(Runner):
 
         if len(scores.index) == 0:
             raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output logs and runner output directory ({work_dir})")
+        scores["master_seed"] = seed
+        if len(scores.index) < len(poses) * num_seeds:
+            logging.warning("%s: expected %d rows (%d poses × %d seeds), got %d — some runs may have crashed.", self, len(poses) * num_seeds, len(poses), num_seeds, len(scores.index))
 
         # 7) Persist and merge back into poses.
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)

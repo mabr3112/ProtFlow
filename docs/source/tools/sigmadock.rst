@@ -93,6 +93,7 @@ pose-prediction accuracy.
         poses=my_poses,
         prefix="redock",
         ligand_name="LIG",   # residue name of the ligand in the input complex
+        num_seeds=1,        # number of independent samples per pose (see SigmaDock docs for details)
         overwrite=False,
     )
 
