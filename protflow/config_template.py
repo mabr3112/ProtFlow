@@ -88,3 +88,10 @@ PROTEIN_GENERATOR_SCRIPT_PATH = ""
 # frame2seq
 FRAME2SEQ_PYTHON_PATH = "" # "/path/to/mambaforge/envs/frame2seq/bin/python3
 FRAME2SEQ_PRE_CMD = ""
+
+
+# sigmadock
+SIGMADOCK_SCRIPT_PATH = "" # "/path/to/sigmadock/scripts/sample.py"
+SIGMADOCK_PYTHON_PATH = "" # "/path/to/package_manager/envs/sigmadock/bin/python"
+SIGMADOCK_CKPT_PATH = "" # "/path/to/sigmadock/model/sample_checkpoint_0.ckpt"
+SIGMADOCK_PRE_CMD = "" # "export PATH=/path/to/package_manager/envs/sigmadock/bin:$PATH"
