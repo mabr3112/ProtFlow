@@ -53,12 +53,6 @@ Here are some examples of how to use the functions provided in this module:
         from biopython_tools import determine_protparams
         parameters = determine_protparams(sequence_record.seq)
 
-7. Extracting a ligand from a co-crystal structure:
-
-    .. code-block:: python
-
-        from openbabel_tools import split_complex
-        sdf_path = split_complex("complex.pdb", "ligand.sdf", "out.pdb", name="COC")
 
 These examples illustrate the primary capabilities of the module, showcasing how it can be utilized to streamline the process of working with protein structures and sequences in BioPython.
 
