@@ -135,7 +135,7 @@ class SigmaDock(Runner):
 
         self.jobstarter = jobstarter
         self.name = "sigmadock_runner"
-        self.index_layers = 0
+        self.index_layers = 1
 
     def __str__(self) -> str:
         """Return a short runner name used in logs."""
@@ -203,9 +203,6 @@ class SigmaDock(Runner):
             Score keys whose values are heavy tensors but should still be
             serialised and included in the output dataframe.
         """
-        # collect_scores always appends _{sample_idx:04d}, so strip one layer unconditionally.
-        self.index_layers = 1
-
 
         # 1) Generic setup shared by all runners.
         work_dir, jobstarter = self.generic_run_setup(
