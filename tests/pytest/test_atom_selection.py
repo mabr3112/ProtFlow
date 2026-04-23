@@ -1,4 +1,4 @@
-from protflow.residues import AtomSelection
+from protflow.residues import AtomSelection, ResidueSelection
 
 
 def _pdb_line(record, serial, atom_name, resname, chain, resseq, x, y, z, element):
@@ -39,6 +39,24 @@ def test_atom_selection_add_and_subtract_preserve_order():
 
     assert (first + second).to_tuple() == (("A", 1, "N"), ("A", 1, "CA"), ("A", 1, "C"))
     assert (first - second).to_tuple() == (("A", 1, "N"),)
+
+
+def test_residue_selection_from_atomselection_preserves_first_atom_order():
+    atom_selection = AtomSelection.from_list(
+        [
+            ("B", 3, "CB"),
+            ("A", 1, "N"),
+            ("B", 3, "CA"),
+            ("A", 2, "CA"),
+            ("A", 1, "CA"),
+            ("Z", ("H_LIG", 9, " "), "C1"),
+            ("A", 2, "C"),
+        ]
+    )
+
+    selection = ResidueSelection.from_atomselection(atom_selection)
+
+    assert selection.residues == (("B", 3), ("A", 1), ("A", 2), ("Z", 9))
 
 
 def test_from_dict_parses_rfd3_input_selection_without_pose_when_atoms_explicit():

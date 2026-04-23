@@ -482,6 +482,25 @@ def _unique_atom_ids(atom_ids: list[AtomID]) -> tuple[AtomID, ...]:
     return tuple(OrderedDict.fromkeys(_as_tuple_recursive(atom_id) for atom_id in atom_ids))
 
 
+def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
+    """Collapse one normalized atom ID to the `(chain, residue_number)` pair."""
+    _validate_atom_id(atom_id)
+
+    if len(atom_id) == 3:
+        chain_id, residue_id, _ = atom_id
+    elif len(atom_id) == 4:
+        _, chain_id, residue_id, _ = atom_id
+    elif len(atom_id) == 5:
+        _, _, chain_id, residue_id, _ = atom_id
+    else:
+        _, _, chain_id, residue_id, _, _ = atom_id
+
+    if isinstance(residue_id, (list, tuple)):
+        residue_id = residue_id[1]
+
+    return (chain_id, int(residue_id))
+
+
 class AtomSelection:
     """
     Represent an ordered selection of atoms in a protein structure.
@@ -1173,6 +1192,19 @@ class ResidueSelection:
         return NotImplemented
 
     ####################################### INPUT ##############################################
+    @classmethod
+    def from_atomselection(cls, atom_selection: AtomSelection|AtomSelectionInput) -> "ResidueSelection":
+        """
+        Create a ResidueSelection from an AtomSelection-like input.
+
+        Residues are ordered by the first atom index at which they appear in
+        the atom selection. Repeated atoms from the same residue therefore
+        collapse to one residue while preserving encounter order.
+        """
+        atom_selection = AtomSelection(atom_selection)
+        residues = reduce_to_unique(tuple(_residue_from_atom_id(atom_id) for atom_id in atom_selection))
+        return cls(residues, fast=True)
+
     def from_selection(self, selection) -> "ResidueSelection":
         """
         Constructs a ResidueSelection instance from the provided selection.
