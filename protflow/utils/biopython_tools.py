@@ -65,6 +65,7 @@ from typing import Union
 import Bio.PDB.Entity
 import numpy as np
 import pandas as pd
+import io as _io # neccesary for in memory file handling for pybel, could be moved entierly to runner if we want to keep this module strictly biopython related
 
 # dependencies
 import Bio
@@ -78,6 +79,7 @@ from Bio.PDB import Polypeptide, MMCIFParser
 from Bio.SeqRecord import SeqRecord
 import Bio.PDB.Model
 import Bio.PDB.Structure
+from openbabel import pybel # needed for sdf saving, could be moved entierly to runner if we want to keep this module strictly biopython related
 
 # customs
 from ..residues import ResidueSelection
@@ -562,7 +564,48 @@ def translate_entity(entity: Bio.PDB.Entity, vector: np.array) -> None:
         atom.set_coord(new_coord)
 
 ######################## Bio.PDB.Structure.Structure functions ##########################################
-def get_sequence_from_pose(pose: Structure, chain_sep:str=":", with_chains: bool = False) -> str|dict[str,str]:
+def get_sequence_from_pose(pose: Structure, chain_sep:str=":", with_chains:bool=False, sort_residues:bool=True, custom_one_letter:dict=None) -> str|dict[str,str]:
+    '''
+    Extracts the sequence of peptides from a protein structure.
+
+    Parameters:
+    - pose (Bio.PDB.Structure.Structure): A BioPython Protein Data Bank (PDB) structure object containing the protein's atomic coordinates.
+    - chain_sep (str, optional): Separator used to join the sequences of individual peptides. Default is ":".
+    - with_chains (bool, optional): Returns a dictionary with chain ids as keys and sequences as values instead of a single str. Default is False.
+    - sort_residues (bool, optional): Sort residues on each chain according to residue number, not occurrence in input .pdb file. Default is True.
+    - custom_one_letter (dict, optional): Assign a custom one-letter code to a non-standard residue 3-letter code in the form {"B": "BAA"}. Default is None.
+
+    Returns:
+    - str: The concatenated sequence of peptides, separated by the specified separator.
+
+    Description:
+    This function takes a BioPython PDB structure object 'pose' and extracts the sequences of individual peptides within the structure using the PPBuilder from BioPython. It then joins these sequences into a single string, using the 'chain_sep' as a separator. The resulting string represents the concatenated sequence of peptides in the protein structure.
+
+    Example:
+    >>> structure = Bio.PDB.PDBParser().get_structure("example", "example.pdb")
+    >>> sequence = get_sequence_from_pose(structure, "-")
+    >>> print(sequence)
+    'MSTHRRRPQEAAGRVNRLPGTPLARAKYFYPKPGERKVEQTPWFAWDVTAGNEYEDTIEFRLEAEGKVGEVVEREDPDNGRGNFARFSLGLYGSKTQYRLPFTVEEVFHDLESVTQKDGFWNCTAFRTVQRLPRTRVAAELNPRAKAAASAVFTFQSQDVDAVANAVEACFAGFYEVVGVFVSNAVDGSVAGAQNFSQFCVGFRGGPRMLRQNRAPATFASAGNHPAKVLAACGLRYAA...
+    '''
+    if float(Bio.__version__) <= 1.73:
+        print(f"WARNING: You are using this function with an unsupported (old) version of BioPython <= 1.73. This might cause your sequences to be extracted wrongly. Your BioPython: {Bio.__version__}")
+
+    pose = remove_non_residue_residues(model=pose) # removes all hetatm records
+    if sort_residues:
+        pose = sort_residues_on_chain(pose=pose) # sorts residues according to residue number (independent of order of occurrence in .pdb)
+
+    # collect sequence
+    seq_dict = {}
+    for chain in pose.get_chains():
+        assert chain.id not in seq_dict, f"Chain IDs in multimodel poses must be unique, but chain ID {chain.id} appears twice!"
+        if len(list(chain.get_residues())) > 0:
+            seq_dict[chain.id] = "".join([seq1(res.get_resname(), custom_map=custom_one_letter) for res in chain.get_residues()])
+    if with_chains:
+        return seq_dict
+    else:
+        return chain_sep.join([seq for chain, seq in seq_dict.items()])
+
+def _get_sequence_from_pose_deprecated(pose: Structure, chain_sep:str=":", with_chains: bool = False) -> str|dict[str,str]:
     '''
     Extracts the sequence of peptides from a protein structure.
 
@@ -594,6 +637,7 @@ def get_sequence_from_pose(pose: Structure, chain_sep:str=":", with_chains: bool
         return {chain.id: "".join(str(pept.get_sequence()) for pept in ppb.build_peptides(chain)) for chain in pose.get_chains() if len(list(chain.get_residues())) > 0}
     else:
         return chain_sep.join([str(x.get_sequence()) for x in ppb.build_peptides(pose)])
+
 
 def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_pdb_path: str = None, keep_chain: str = "", overwrite: bool = False) -> str:
     """
@@ -939,6 +983,23 @@ def one_to_three_AA_code(seq: Union[str, Bio.SeqRecord.SeqRecord, Bio.Seq.Seq], 
     """
     return seq3(seq, custom_map=custom_map, undef_code=undef_code)
 
+def sort_residues_on_chain(pose: Model | Structure):
+    """
+    Sorts all residues on each chain according to residue number.
+    """
+
+    for chain in pose.get_chains():
+        residues = list(chain.get_residues())
+
+        for res in residues:
+            chain.detach_child(res.id)
+
+        for res in sorted(residues, key=lambda res:res.id[1]):
+            chain.add(res)
+    
+    return pose
+
+
 def remove_non_residue_residues(model: Model, remove_hydrogens: bool = False) -> Model:
     """
     Removes non-residue residues from a BioPython Model object,
@@ -961,6 +1022,8 @@ def remove_non_residue_residues(model: Model, remove_hydrogens: bool = False) ->
                     atom.get_parent().detach_child(atom.id)
 
     return model
+
+
 
 def biopython_load_protein(protein_path: str, model_id: int = None, handle: str = "structure", file_type: str = None) -> Structure|Model:
     """TODO: write proper docstring!
@@ -1002,3 +1065,49 @@ def biopython_load_protein(protein_path: str, model_id: int = None, handle: str 
         if model_id:
             protein = protein[model_id]
         return protein
+
+
+def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
+    """
+    Split a structure file into a ligand SDF and a protein PDB.
+
+    Handles both PDB and CIF inputs. Only the residue matching ``ligand_name``
+    is written to SDF; all ATOM residues are written to PDB.
+
+    Parameters
+    ----------
+    path : str
+        Path to the input file (``.pdb`` or ``.cif``).
+    work_dir : str
+        Directory where output files are written.
+    ligand_name : str
+        Residue name of the ligand to extract (e.g. ``"COC"``).
+    """
+    stem = os.path.splitext(os.path.basename(path))[0]
+    out_pdb = os.path.join(work_dir, f"{stem}.pdb")
+    out_sdf = os.path.join(work_dir, f"{stem}_ligand.sdf")
+
+    structure = biopython_load_protein(path, handle=stem)
+
+    class _ProteinSelect(Bio.PDB.Select): # inherit from Bio.PDB.Select to write only ATOM records
+        def accept_residue(self, residue):
+            return residue.id[0] == " "
+
+    class _LigandSelect(Bio.PDB.Select): # specific ligand resname filter, will not break on multiple ligands
+        def accept_residue(self, residue):
+            return residue.resname == ligand_name
+
+    io = Bio.PDB.PDBIO()
+    io.set_structure(structure)
+    io.save(out_pdb, _ProteinSelect()) # will only keep Atom records, all ligands and hetatms are removed!!! Adapt if neccessary
+
+    
+    buf = _io.StringIO()
+    io.save(buf, _LigandSelect())
+
+    pybel.ob.obErrorLog.SetOutputLevel(pybel.ob.obError) # suppress OpenBabel warnings, Error only logging
+    mol = pybel.readstring("pdb", buf.getvalue())
+
+    mol.title = ligand_name
+    mol.write("sdf", out_sdf, overwrite=True)
+    return None

@@ -645,7 +645,7 @@ def test_set_poses_df_triggers_resselection_conversion_str_and_dict(monkeypatch)
         "poses": ["a.pdb"],
         "poses_description": ["a"],
         "import_resselection_cols": [["fixed_residues", "motif_residues"]],
-        "fixed_residues": ["A12,A34"],  # str -> DummyRS(str)
+        "fixed_residues": pd.Series(["A12,A34"], dtype="string"),  # pandas 3 default-style string dtype
         "motif_residues": [{"residues": [["A", 164], ["A", 165]]}],  # dict -> DummyRS(dict, from_scorefile=True)
     })
 
@@ -670,7 +670,7 @@ def test_set_poses_df_stringified_selector_is_parsed(monkeypatch):
         "poses_description": ["a"],
         # like CSV import: stringified list
         "import_resselection_cols": ["['motif_residues']"],
-        "motif_residues": ["B5-B9"],  # str -> DummyRS(str)
+        "motif_residues": pd.Series(["B5-B9"], dtype="string"),  # pandas 3 default-style string dtype
     })
 
     p = Poses()
@@ -688,7 +688,7 @@ def test_convert_resselection_cols_missing_target_column_warns_and_skips(monkeyp
         "poses": ["a.pdb"],
         "poses_description": ["a"],
         "import_resselection_cols": [["nope", "fixed_residues"]],
-        "fixed_residues": ["A1"],
+        "fixed_residues": pd.Series(["A1"], dtype="string"),
     })
 
     p = Poses()
@@ -781,4 +781,3 @@ def create_temp_poses(path, df):
     for file, name in zip(df["poses"], df["poses_description"]):
         file.write_text(f"#{name}") # create tmp files containing description as input
     return df
-

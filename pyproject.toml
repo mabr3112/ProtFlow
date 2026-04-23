@@ -55,3 +55,8 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 protflow = ["config_template.py"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["protflow*"]
+

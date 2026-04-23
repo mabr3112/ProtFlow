@@ -67,6 +67,7 @@ Version
 """
 # general imports
 import os
+import re
 import time
 import logging
 from glob import glob
@@ -80,6 +81,72 @@ from ..poses import Poses
 from ..jobstarters import JobStarter
 from ..runners import Runner, RunnerOutput, prepend_cmd, parse_generic_options
 from .. import require_config, load_config_path
+
+
+ROSETTA_RAW_DESCRIPTION_PATTERN = re.compile(
+    r"^r(?P<pose_index>\d+)_(?P<pose_description>.+)_(?P<decoy_index>\d+)$"
+)
+
+
+def _rename_rosetta_raw_description(raw_description: str) -> str:
+    """
+    Convert a Rosetta raw decoy name into the ProtFlow description format.
+
+    Rosetta outputs handled by this runner are emitted with an ``-out:prefix``
+    of the form ``r0001_`` and a final Rosetta decoy index, for example
+    ``r0001_pose_name_0001``. ProtFlow stores these outputs as
+    ``pose_name_0001`` where the Rosetta input index is moved to the end.
+
+    Parameters
+    ----------
+    raw_description : str
+        Raw Rosetta decoy name read from the score JSON.
+
+    Returns
+    -------
+    str
+        ProtFlow-normalized pose description.
+
+    Raises
+    ------
+    ValueError
+        If *raw_description* does not match the Rosetta naming convention
+        emitted by :meth:`Rosetta.write_cmd`.
+    """
+    match = ROSETTA_RAW_DESCRIPTION_PATTERN.fullmatch(raw_description)
+    if not match:
+        raise ValueError(
+            f"Could not parse Rosetta raw description '{raw_description}'. "
+            "Expected the form 'r0001_pose_description_0001'."
+        )
+    return f"{match.group('pose_description')}_{match.group('pose_index')}"
+
+
+def _wait_for_expected_rosetta_pdbs(expected_pdbs: dict[str, str], max_wait_seconds: float = 30.0, poll_interval: float = 1.0) -> list[str]:
+    """
+    Wait briefly for Rosetta PDB outputs that are referenced by score JSONs.
+
+    Rosetta occasionally writes the score JSON before the corresponding PDB
+    appears on disk. This helper waits for late-arriving files but returns the
+    still-missing raw descriptions after a bounded timeout so the caller can
+    continue leniently with the completed outputs.
+    """
+    missing_raw_descriptions = [
+        raw_description
+        for raw_description, pdb_path in expected_pdbs.items()
+        if not os.path.isfile(pdb_path)
+    ]
+    deadline = time.time() + max_wait_seconds
+
+    while missing_raw_descriptions and time.time() < deadline:
+        time.sleep(poll_interval)
+        missing_raw_descriptions = [
+            raw_description
+            for raw_description, pdb_path in expected_pdbs.items()
+            if not os.path.isfile(pdb_path)
+        ]
+
+    return missing_raw_descriptions
 
 class Rosetta(Runner):
     """
@@ -493,31 +560,59 @@ def collect_scores(work_dir: str) -> pd.DataFrame:
     for scorefile in scorefiles:
         scores_l.append(pd.read_json(scorefile, typ='series'))
     scores_df = pd.DataFrame(scores_l).reset_index(drop=True).rename(columns={"decoy": "raw_description"})
-    scores_df.loc[:, "description"] = scores_df["raw_description"].str.split("_").str[1:-1].str.join("_") + "_" + scores_df["raw_description"].str.split("_").str[0].str.replace("r", "")
+    # Parse only the Rosetta runner's own output convention
+    # ``r0001_pose_description_0001`` so pose names that merely start with "r"
+    # are not rewritten a second time.
+    scores_df.loc[:, "description"] = scores_df["raw_description"].apply(_rename_rosetta_raw_description)
+    description_map = dict(zip(scores_df["raw_description"], scores_df["description"]))
 
-    # wait for all Rosetta output files to appear in the output directory (for some reason, they are sometimes not there after the runs completed.)
-    while len(glob(f"{work_dir}/r*.pdb")) < len(scores_df):
-        time.sleep(1)
+    # Wait for the exact PDBs referenced by the score JSONs. Using the raw
+    # decoy names from the scorefile is stricter than globbing ``r*.pdb`` and
+    # avoids touching unrelated files whose names also start with ``r``.
+    expected_pdbs = {
+        raw_description: os.path.join(work_dir, f"{raw_description}.pdb")
+        for raw_description in description_map
+    }
+    if missing_raw_descriptions := _wait_for_expected_rosetta_pdbs(expected_pdbs):
+        logging.warning(
+            "Missing %d Rosetta output PDB file(s) after waiting in %s. "
+            "Keeping only completed outputs. Missing raw descriptions: %s",
+            len(missing_raw_descriptions),
+            work_dir,
+            ", ".join(sorted(missing_raw_descriptions)),
+        )
+        scores_df = scores_df.loc[~scores_df["raw_description"].isin(missing_raw_descriptions)].reset_index(drop=True)
+        description_map = dict(zip(scores_df["raw_description"], scores_df["description"]))
 
     # rename .pdb files in work_dir to the reindexed names.
-    names_dict = scores_df[["raw_description", "description"]].to_dict()
     logging.info(f"Renaming and reindexing {len(scores_df)} Rosetta output .pdb files")
-    for oldname, newname in zip(names_dict["raw_description"].values(), names_dict["description"].values()):
-        shutil.move(f"{work_dir}/{oldname}.pdb", (nf := f"{work_dir}/{newname}.pdb"))
+    for oldname, newname in description_map.items():
+        old_path = f"{work_dir}/{oldname}.pdb"
+        new_path = f"{work_dir}/{newname}.pdb"
+        if not os.path.isfile(old_path):
+            logging.warning(
+                "Rosetta score entry %s has no matching PDB output at %s. Skipping rename for this entry.",
+                oldname,
+                old_path,
+            )
+            continue
+        shutil.move(old_path, (nf := new_path))
         if not os.path.isfile(nf):
             logging.warning(f"WARNING: Could not rename file {oldname} to {nf}\n Retrying renaming.")
-            shutil.move(f"{work_dir}/{oldname}.pdb", (nf := f"{work_dir}/{newname}.pdb"))
+            if os.path.isfile(old_path):
+                shutil.move(old_path, (nf := new_path))
 
     # Collect information of path to .pdb files into dataframe under "location" column
     scores_df.loc[:, "location"] = work_dir + "/" + scores_df["description"] + ".pdb"
 
-    # safetycheck rename all remaining files with r*.pdb into proper filename:
-    if (remaining_r_pdbfiles := glob(f"{work_dir}/r*.pdb")):
-        for pdb_path in remaining_r_pdbfiles:
-            pdb_path = pdb_path.split("/")[-1]
-            idx = pdb_path.split("_")[0].replace("r", "")
-            new_name = "_".join(pdb_path.split("_")[1:-1]).replace(".pdb", "") + "_" + idx + ".pdb"
-            shutil.move(f"{work_dir}/{pdb_path}", f"{work_dir}/{new_name}")
+    # Safety-check only the Rosetta-produced files referenced by the score JSON.
+    # This avoids renaming already-normalized outputs whose pose descriptions
+    # happen to start with ``r``.
+    for oldname, newname in description_map.items():
+        old_path = f"{work_dir}/{oldname}.pdb"
+        new_path = f"{work_dir}/{newname}.pdb"
+        if os.path.isfile(old_path):
+            shutil.move(old_path, new_path)
 
     # reset index and write scores to file
     scores_df.reset_index(drop="True", inplace=True)

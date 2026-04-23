@@ -53,6 +53,7 @@ Here are some examples of how to use the functions provided in this module:
         from biopython_tools import determine_protparams
         parameters = determine_protparams(sequence_record.seq)
 
+
 These examples illustrate the primary capabilities of the module, showcasing how it can be utilized to streamline the process of working with protein structures and sequences in BioPython.
 
 Authors
@@ -61,9 +62,9 @@ Markus Braun, Adrian Tripp
 """
 # Imports
 import os
-
 # dependencies
-from openbabel import openbabel
+
+from openbabel import openbabel, pybel
 
 # customs
 def openbabel_fileconverter(input_file: str, output_format:str, output_file:str=None, input_format:str=None) -> str:

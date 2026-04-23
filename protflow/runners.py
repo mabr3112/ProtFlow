@@ -40,9 +40,12 @@ Version
 '''
 # builtins
 import logging
+import time
 import os
 import re
 import functools
+import subprocess
+from datetime import datetime, timedelta
 from multiprocessing import ProcessError
 
 # dependencies
@@ -50,7 +53,7 @@ import pandas as pd
 
 # custom
 from .poses import Poses, get_format, FORMAT_STORAGE_DICT
-from .jobstarters import JobStarter
+from .jobstarters import JobStarter, SbatchArrayJobstarter, get_SLURM_stats
 
 class RunnerOutput:
     """
@@ -769,3 +772,403 @@ def prepend_cmd(cmds: list[str], pre_cmd: str) -> list[str]:
     """
     cmds = ["; ".join([pre_cmd, cmd]) for cmd in cmds]
     return cmds
+
+class SbatchArrayRunnerTimer(Runner):
+    """
+    SbatchArrayRunnerTimer Class
+    ============================
+    
+    Instrumentation wrapper that profiles any ProtFlow Runner on SLURM.
+ 
+    :class:`SbatchArrayRunnerTimer` wraps an arbitrary
+    :class:`~protflow.runners.Runner` instance and, after each call to
+    :meth:`run`, queries SLURM's accounting database via
+    :func:`get_SLURM_stats` to collect per-job resource statistics.  All
+    timing and statistics records are accumulated in :attr:`history` and can
+    be exported at any time via :meth:`report`.
+ 
+    The class inherits from :class:`~protflow.runners.Runner` and uses
+    :meth:`__getattr__` to transparently proxy every attribute lookup to the
+    wrapped runner, so it can serve as a drop-in replacement in any ProtFlow
+    pipeline without modifying the surrounding code.
+ 
+    .. warning::
+ 
+       Profiling relies on :func:`get_SLURM_stats`, which calls ``sacct``
+       and therefore requires the process to be running on the **cluster
+       login node**.  See :func:`get_SLURM_stats` for details.
+ 
+    Parameters
+    ----------
+    runner : Runner
+        Any instantiated ProtFlow :class:`~protflow.runners.Runner`
+        (e.g. :class:`~protflow.runners.caliby.CalibySequenceDesign`,
+        :class:`~protflow.runners.ligandmpnn.LigandMPNN`, etc.) whose
+        :meth:`run` calls should be timed and profiled.
+ 
+    Attributes
+    ----------
+    runner : Runner
+        The wrapped runner instance.
+    history : list of dict
+        Accumulated statistics records.  Each entry corresponds to one
+        successfully profiled :meth:`run` call and contains all keys
+        returned by :func:`get_SLURM_stats` plus the four keys added by
+        :meth:`run` (``runner_class``, ``prefix``,
+        ``total_python_wall_sec``, ``overhead_plus_queue_sec``).  Empty
+        until the first successful profiled run completes.
+    job_ids : list of str or None
+        SLURM job names recorded for each :meth:`run` call, in call order.
+        An entry of ``None`` indicates that
+        :attr:`~protflow.jobstarters.SbatchArrayJobstarter.last_job_name`
+        could not be retrieved (e.g. because a non-SLURM jobstarter was
+        used and the guard did not fire before the append).
+    session_start : str
+        ISO-8601 timestamp (``YYYY-MM-DDTHH:MM:SS``) set at construction
+        time to one minute before instantiation.  Passed as *start_time*
+        to every :func:`get_SLURM_stats` call so that only jobs from the
+        current session are returned by ``sacct``, preventing false matches
+        against stale jobs with the same name from earlier sessions.
+ 
+    Notes
+    -----
+    * ``__init__`` calls ``super().__init__()`` to satisfy the
+      :class:`~protflow.runners.Runner` base-class contract, making all
+      base-class utilities (e.g. scorefile helpers) available on ``self``
+      in addition to the wrapped ``self.runner``.
+    * :attr:`session_start` is backdated by one minute to guard against
+      off-by-one errors on clusters with coarse ``sacct`` timestamp
+      resolution.
+    * :attr:`history` grows unboundedly across :meth:`run` calls within
+      the same Python session.  For very long pipelines, consider calling
+      :meth:`report` periodically and resetting ``self.history = []`` if
+      memory usage is a concern.
+ 
+    Examples
+    --------
+    Wrap a LigandMPNN runner and time three sequential design rounds::
+ 
+        from protflow.runners.ligandmpnn import LigandMPNN
+        from protflow.runners.sbatch_array_runner_timer import SbatchArrayRunnerTimer
+ 
+        timed_runner = SbatchArrayRunnerTimer(LigandMPNN())
+ 
+        for prefix in ["round1", "round2", "round3"]:
+            poses = timed_runner.run(poses, prefix=prefix, nseq=20)
+ 
+        summary = timed_runner.report(prefix="full_pipeline")
+        print(summary[["prefix", "total_python_wall_sec", "avg_task_runtime_sec"]])
+    """
+
+
+    def __init__(self, runner: Runner):
+        super().__init__()
+        self.runner = runner
+        self.history = []
+        self.job_ids = []
+        # session_start for sacct filtering
+        self.session_start = (datetime.now() - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    def __getattr__(self, name):
+        return getattr(self.runner, name)
+
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, **kwargs) -> Poses:
+        """
+        Execute the wrapped runner and collect timing and SLURM statistics.
+ 
+        Delegates the actual computation to :attr:`runner` via
+        ``self.runner.run(poses, prefix, jobstarter, **kwargs)`` and then,
+        if a :class:`~protflow.jobstarters.SbatchArrayJobstarter` was used,
+        queries SLURM's accounting database for per-job resource statistics
+        using :func:`get_SLURM_stats`.  The combined timing and cluster stats
+        record is appended to :attr:`history` and :meth:`report` is called
+        automatically to persist an up-to-date CSV and job-ID file.
+ 
+        The method measures time across three consecutive phases:
+ 
+        1. **Phase 1 — wrapper start**: ``time.perf_counter()`` is captured
+           immediately before delegating to the wrapped runner.
+        2. **Phase 2 — runner execution**: the full body of
+           ``self.runner.run()``, which internally performs ProtFlow setup,
+           submits the SLURM array job, blocks until all tasks complete
+           (``wait=True``), and post-processes the results.
+        3. **Phase 3 — wrapper end**: ``time.perf_counter()`` is captured
+           immediately after the wrapped runner returns.
+ 
+        Parameters
+        ----------
+        poses : Poses
+            Input pose collection, forwarded verbatim to
+            ``self.runner.run``.
+        prefix : str
+            Column prefix and working-directory identifier forwarded to
+            ``self.runner.run`` and used to name the output CSV and job-ID
+            files written by :meth:`report`.
+        jobstarter : JobStarter, optional
+            Job submission backend.  When provided, this value is passed to
+            the wrapped runner and is also used to determine whether SLURM
+            accounting can be queried.  When omitted, the jobstarter is
+            resolved from ``self.runner.jobstarter`` and then from
+            ``poses.default_jobstarter`` for the purpose of stat collection.
+        **kwargs
+            All additional keyword arguments are forwarded unchanged to
+            ``self.runner.run``, making the timer fully compatible with any
+            runner regardless of its specific signature.
+ 
+        Returns
+        -------
+        Poses
+            The :class:`~protflow.poses.Poses` object returned by the
+            wrapped runner, unchanged.  Timing and statistics are stored in
+            :attr:`history` and written to disk by :meth:`report`; they do
+            not alter the returned poses.
+ 
+        Side Effects
+        ------------
+        When profiling succeeds (SLURM jobstarter detected and
+        ``last_job_name`` is set), the following side effects occur:
+ 
+        * **5-second sleep** inserted via ``time.sleep(5)`` to allow the
+          SLURM accounting database to synchronise before ``sacct`` is
+          queried.
+        * A statistics dictionary is **appended to** :attr:`history`.  The
+          dictionary contains all keys from :func:`get_SLURM_stats` (see its
+          return-value documentation) plus the following four keys added by
+          this method:
+ 
+          ``runner_class`` : str
+              ``__class__.__name__`` of the wrapped runner
+              (e.g. ``"CalibySequenceDesign"``).
+          ``prefix`` : str
+              The *prefix* argument passed to this call.
+          ``total_python_wall_sec`` : float
+              Total elapsed wall-clock time in seconds from Python's
+              perspective (Phase 1 → Phase 3), rounded to 2 decimal places.
+              Encompasses ProtFlow setup, SLURM queue wait, cluster
+              execution, and result post-processing.
+          ``overhead_plus_queue_sec`` : float
+              ``total_python_wall_sec`` minus ``runtime_sec`` from SLURM,
+              rounded to 2 decimal places.  Approximates the combined cost
+              of ProtFlow overhead and scheduler queue wait.  May be
+              negative in rare cases due to clock skew between the login
+              node and compute nodes, or rounding in ``sacct``.
+ 
+        * The SLURM job name is **appended to** :attr:`job_ids`.
+        * ``<prefix>_stats.csv`` and ``<prefix>_job_ids.txt`` are written
+          (or overwritten) in the current working directory via
+          :meth:`report`.
+ 
+        Warns
+        -----
+        logging.WARNING
+            Emitted when the resolved jobstarter is not an instance of
+            :class:`~protflow.jobstarters.SbatchArrayJobstarter`.
+            Message format: ``"Stats skipped: <type> does not support SLURM
+            accounting."``.  Profiling is skipped entirely and the
+            unmodified poses are returned immediately.
+ 
+        Notes
+        -----
+        * The jobstarter resolution priority is:
+          *argument* → ``self.runner.jobstarter`` → ``poses.default_jobstarter``.
+          This mirrors the fallback chain used by most ProtFlow runners and
+          ensures that the correct jobstarter is identified for stat
+          collection even when it was set on the runner at construction time.
+        * ``total_python_wall_sec`` includes SLURM queue wait time because
+          the wrapped runner calls
+          :meth:`~protflow.jobstarters.SbatchArrayJobstarter.start` with
+          ``wait=True``, blocking until all array tasks complete before
+          returning.
+        * If ``last_job_name`` is ``None`` (e.g. the jobstarter was never
+          used to submit a job), the stats-collection block is skipped
+          entirely and :attr:`history` is not updated, even though the
+          jobstarter type check passes.
+ 
+        Examples
+        --------
+        Basic timed run::
+ 
+            timed = SbatchArrayRunnerTimer(CalibySequenceDesign())
+            poses = timed.run(
+                poses,
+                prefix="sd_round1",
+                nseq=10,
+                jobstarter=SbatchArrayJobstarter(max_cores=50),
+            )
+            print(timed.history[-1]["total_python_wall_sec"])    # e.g. 312.45
+            print(timed.history[-1]["overhead_plus_queue_sec"])  # e.g.  18.72
+            print(timed.history[-1]["runner_class"])             # "CalibySequenceDesign"
+            print(timed.history[-1]["state"])                    # "COMPLETED"
+ 
+        Passing runner-specific kwargs transparently::
+ 
+            timed = SbatchArrayRunnerTimer(LigandMPNN())
+            poses = timed.run(
+                poses,
+                prefix="mpnn",
+                nseq=20,
+                model_type="ligand_mpnn",
+                fixed_residues_col="binding_site",
+            )
+ 
+        Non-SLURM jobstarter (profiling skipped, poses still returned)::
+ 
+            from protflow.jobstarters import LocalJobStarter
+            poses = timed.run(poses, prefix="local_test", jobstarter=LocalJobStarter())
+            # Logs: WARNING - Stats skipped: <class 'LocalJobStarter'>
+            #                 does not support SLURM accounting.
+            # timed.history is unchanged.
+        """
+
+        # --- PHASE 1: START SETUP ---
+        t_start_wrapper = time.perf_counter()
+
+        # Execute the wrapped runner
+        # Note: The 'setup' happens inside .run() before the job is submitted.
+        # The 'wait' happens inside .run() after submission.
+        poses = self.runner.run(poses=poses, prefix=prefix, jobstarter=jobstarter, **kwargs)
+
+        # --- PHASE 2: END POST-PROCESSING ---
+        t_end_wrapper = time.perf_counter()
+        
+        # Calculate Total Wall Time (Python's perspective)
+        total_wall_runtime = t_end_wrapper - t_start_wrapper
+
+        # --- PHASE 3: QUERY CLUSTER STATS ---
+        used_starter = jobstarter or getattr(self.runner, "jobstarter", None) or getattr(poses, "default_jobstarter", None)
+
+        # Safety Check: Only proceed with timing if it's the correct SLURM starter
+        if not isinstance(used_starter, SbatchArrayJobstarter):
+            logging.warning(f"Stats skipped: {type(used_starter)} does not support SLURM accounting.")
+            return poses
+        
+        target_job_name = getattr(used_starter, "last_job_name", None)
+        self.job_ids.append(target_job_name)
+
+        if target_job_name:
+            # Wait for SLURM DB sync
+            time.sleep(5)
+            stats = get_SLURM_stats(target_job_name, self.session_start)
+            
+            # Decompose the time
+            # Note: total_wall_runtime includes (Setup + Queue Wait + Cluster Run + Post-processing)
+            # real_runtime_sec is just (Cluster Run)
+            
+            stats.update({
+                "runner_class": self.runner.__class__.__name__,
+                "prefix": prefix,
+                "total_python_wall_sec": round(total_wall_runtime, 2),
+                "overhead_plus_queue_sec": round(total_wall_runtime - stats.get("runtime_sec", 0), 2)
+            })
+            self.history.append(stats)
+            self.report(prefix=prefix)
+        
+        return poses
+
+    def report(self, prefix:str=None):
+        """Export accumulated timing and SLURM statistics to disk and return as a DataFrame.
+ 
+        Converts :attr:`history` to a :class:`~pandas.DataFrame` and, when
+        *prefix* is provided, writes two files to the current working
+        directory:
+ 
+        * ``<prefix>_stats.csv`` — the full statistics table, one row per
+          profiled :meth:`run` call, written with
+          :meth:`~pandas.DataFrame.to_csv` (index column included).
+        * ``<prefix>_job_ids.txt`` — a newline-delimited list of all SLURM
+          job names from :attr:`job_ids`, in the order the runs were
+          performed.
+ 
+        Parameters
+        ----------
+        prefix : str, optional
+            Filename stem for the output files.  When ``None``, no files are
+            written and only the in-memory DataFrame is returned.  When
+            provided, both output files are created or overwritten in the
+            current working directory.
+ 
+        Returns
+        -------
+        pandas.DataFrame
+            DataFrame built from :attr:`history`, with one row per profiled
+            :meth:`run` call.  Columns are the union of all keys present in
+            :attr:`history` entries.  Guaranteed columns (when at least one
+            profiled run has completed) include:
+ 
+            ``runner_class`` : str
+                Class name of the wrapped runner for that run.
+            ``prefix`` : str
+                The *prefix* used in that :meth:`run` call.
+            ``total_python_wall_sec`` : float
+                Total Python wall-clock time for that run (seconds).
+            ``overhead_plus_queue_sec`` : float
+                Estimated overhead + queue-wait time (seconds).
+            ``job_name`` : str
+                SLURM job name queried by :func:`get_SLURM_stats`.
+            ``total_cpu_sec`` : int
+                Total CPU-core-seconds reserved across all tasks.
+            ``avg_task_runtime_sec`` : float
+                Mean per-task wall-clock elapsed time (seconds).
+            ``max_task_runtime_sec`` : int
+                Longest per-task wall-clock elapsed time (seconds).
+            ``min_task_runtime_sec`` : int
+                Shortest per-task wall-clock elapsed time (seconds).
+            ``num_tasks`` : int
+                Number of SLURM array tasks.
+            ``total_cpus_reserved`` : int
+                Total CPU cores allocated across all tasks.
+            ``state`` : str
+                Aggregated job-array completion state.
+            ``queried_after`` : str or None
+                The ``sacct`` start-time filter used for that query.
+ 
+            Returns an **empty** :class:`~pandas.DataFrame` when
+            :attr:`history` is empty (i.e. before any profiled run has
+            completed, or when all runs used a non-SLURM jobstarter).
+ 
+        Notes
+        -----
+        * :meth:`report` is called automatically at the end of every
+          successful profiled :meth:`run` call using that run's *prefix*,
+          so the CSV and job-ID files are always up to date after each run.
+          Manual calls to :meth:`report` are useful for retrieving an in-
+          memory summary or writing a consolidated report under a different
+          prefix after multiple runs.
+        * The job-ID file is written from :attr:`job_ids` (not from the
+          ``job_name`` column of :attr:`history`), which means it includes
+          entries from runs where ``last_job_name`` was ``None`` or where
+          the non-SLURM guard fired before the append.  ``None`` values will
+          appear as the literal string ``"None"`` in the file.
+        * Output files are written with UTF-8 encoding and will overwrite
+          existing files of the same name without prompting.
+ 
+        Examples
+        --------
+        Inspect stats after two runs and write a combined report::
+ 
+            timed = SbatchArrayRunnerTimer(CalibySequenceDesign())
+            poses = timed.run(poses, prefix="round1", nseq=5)
+            poses = timed.run(poses, prefix="round2", nseq=10)
+ 
+            df = timed.report(prefix="pipeline_summary")
+            # Writes:
+            #   pipeline_summary_stats.csv
+            #   pipeline_summary_job_ids.txt
+            print(df[["prefix", "total_python_wall_sec", "avg_task_runtime_sec"]])
+            #      prefix  total_python_wall_sec  avg_task_runtime_sec
+            # 0    round1                 245.12                228.40
+            # 1    round2                 510.87                491.33
+ 
+        In-memory summary without writing files::
+ 
+            df = timed.report()   # prefix=None — no files written
+            print(df[["state", "num_tasks", "total_cpu_sec"]].to_string())
+        """
+
+        jobs = self.job_ids
+        df = pd.DataFrame(self.history)
+        if prefix:
+            with open(f"{prefix}_job_ids.txt", "w", encoding="UTF-8") as f:
+                f.write("\n".join(jobs))
+            df.to_csv(f"{prefix}_stats.csv")
+        return df
