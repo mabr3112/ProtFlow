@@ -75,17 +75,20 @@ from typing import Union
 import shutil
 import logging
 import ast
+import json
 
 # dependencies
 import pandas as pd
 import Bio.PDB
 
 # customs
-from . import jobstarters
-from .jobstarters import JobStarter
+import protflow.utils.openbabel_tools
+from . import jobstarters, require_config, load_config_path
+from .jobstarters import JobStarter, split_list
 from .residues import ResidueSelection
 from .utils.utils import parse_fasta_to_dict
 from .utils.biopython_tools import load_structure_from_pdbfile, get_sequence_from_pose
+from .utils.openbabel_tools import openbabel_fileconverter
 from .utils import plotting as plots
 
 FORMAT_STORAGE_DICT = {
@@ -2248,6 +2251,117 @@ class Poses:
         self.df = self.df.merge(on='poses_description')
         return self
 
+    def convert_poses(self, prefix: str, out_format: str, jobstarter: JobStarter = None, overwrite: bool = False):
+        """
+        Converts input poses to the selected output format using Openbabel.
+
+        Parameters
+        ----------
+        prefix : str
+            Defines output folder and output column prefix.
+        out_format : str
+            The target output format (see Openbabel documentation for possible formats).
+        jobstarter : Jobstarter, optional
+            If set, delegates conversion to a jobstarter instead of running conversions locally (useful if converting many poses in parallel). Default is None.
+        overwrite : bool, optional
+            Whether to overwrite previous outputs. Default is False.
+
+        Returns
+        -------
+        self
+            The instance of the class with updated pose paths.
+
+        Raises
+        ------
+        KeyError
+            If prefix is already present in poses DataFrame.
+        RuntimeError
+            If conversion for one or more poses fails.
+        """
+
+        def replace_extension(path: str, ext: str):
+            """replaces file extensions"""
+            return f"{os.path.splitext(path)[0]}.{ext}"
+
+        def convert(path: str, out_format: str, out_dir: str, overwrite: bool = False):
+            """converts poses to output format"""
+            out_path = os.path.join(out_dir, replace_extension(os.path.basename(path), out_format))
+            if not os.path.isfile(out_path) or overwrite is True:
+                openbabel_fileconverter(path, out_format, out_path)
+            return out_path
+        
+
+        def write_obabel_batch_json(poses: list[str], out_path: str, out_format: str, out_dir: str, overwrite: bool = False):
+            """creates input jsons for batch conversion with a jobstarter"""
+            in_dict = {"input_poses": poses, "out_dir": out_dir, "out_format": out_format, "overwrite": overwrite}
+
+            with open(out_path, 'w', encoding="UTF-8") as j:
+                json.dump(in_dict, j, indent=2)
+
+            return out_path
+        
+        def write_conversion_cmd(json_path:str, env_path:str):
+            """creates cmds for batch conversion with a jobstarter"""
+            return f"{os.path.join(env_path, 'python')} {os.path.abspath(protflow.utils.openbabel_tools.__file__)} --input_json {json_path}"
+
+        if f"{prefix}_location" in self.df.columns or f"{prefix}_description" in self.df.columns:
+            raise KeyError(f"Column {prefix} found in Poses DataFrame! Pick different Prefix!")
+
+        if out_format == "cif":
+            logging.warning("cif file set as target format. Be aware that 'mmcif' is the correct format for macromolecules!")
+
+        out_dir = os.path.join(self.work_dir, prefix)
+
+        # delete previous outputs
+        if overwrite and os.path.isdir(out_dir):
+            shutil.rmtree(out_dir)
+
+        # create dir for converted poses
+        os.makedirs(out_dir := os.path.join(self.work_dir, prefix), exist_ok=True)
+
+        if not jobstarter:
+            # convert poses directly
+            self.df["poses"] = self.df.apply(lambda row: convert(row["poses"], out_format, out_dir, overwrite), axis=1)
+            self.df[f"{prefix}_location"] = self.df["poses"]
+            self.df[f"{prefix}_description"] = self.df["poses_description"]
+
+        else:
+            # load config
+            config = require_config()
+            env = load_config_path(config, "PROTFLOW_ENV")
+
+            # define number of batches
+            n_batches = min([len(self.df.index), jobstarter.max_cores])
+
+            # split poses into n_batches sublists
+            poses_sublists = split_list(self.poses_list(), n_sublists=n_batches)
+
+            # write input jsons
+            jsons = [write_obabel_batch_json(poses_sublist, os.path.join(out_dir, f"in_{i}.json"), out_format, out_dir, overwrite) for i, poses_sublist in enumerate(poses_sublists)]
+
+            # write cmds
+            cmds = [write_conversion_cmd(json_path, env) for json_path in jsons]
+
+            # start conversion
+            jobstarter.start(cmds, "convert_poses", wait=True, output_path=out_dir)
+
+            # gather output
+            poses = glob(os.path.join(out_dir, f"*.{out_format}"))
+
+            # check for missing poses
+            if not len(poses) == len(self.df.index):
+                raise RuntimeError(f"Not all input poses could be converted! Check logs at {out_dir}!")
+            
+            # create dataframe
+            converted_df = pd.DataFrame({f"{prefix}_location": poses, f"{prefix}_description": [description_from_path(pose) for pose in poses]})
+
+            # merge with input poses
+            self.df = self.df.merge(converted_df, left_on="poses_description", right_on=f"{prefix}_description")
+
+            # update pose locations
+            self.df["poses"] = self.df[f"{prefix}_location"]
+        
+        return self
 
 def normalize_series(ser: pd.Series, scale: bool = False) -> pd.Series:
     """
