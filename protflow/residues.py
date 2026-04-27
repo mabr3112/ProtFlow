@@ -1133,6 +1133,24 @@ class AtomSelection:
         """Return a scorefile-friendly dictionary representation."""
         return {"atoms": self.to_list()}
 
+    def to_rfd3_dict(self) -> dict[str, str]:
+        """Return a dict formatted like an RFdiffusion3 input contig (e.g. {"A5": "CA,N,O"})."""
+
+        # initialize a defaultdict with list as the default factory
+        rfd3_dict = defaultdict(list)
+
+        for chain, num, atm in self.atoms:
+            # create the key by concatenating the string and the integer
+            key = f"{chain}{num}"
+            rfd3_dict[key].append(atm)
+
+        # convert list to comma-separated str
+        for res, atms in rfd3_dict.items():
+            rfd3_dict[res] = ",".join(atms)
+
+        # Convert back to a regular dict and return
+        return dict(rfd3_dict)
+
 
 AtomSelectionInput: TypeAlias = str | tuple[Any, ...] | list[Any] | dict[str, Any] | AtomSelection | None
 
