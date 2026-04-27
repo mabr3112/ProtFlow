@@ -131,3 +131,74 @@ def test_from_rfd3_input_spec_parses_selection_fields_and_ligand(tmp_path):
         ("Z", ("H_LIG", 9, " "), "C1"),
         ("Z", ("H_LIG", 9, " "), "O1"),
     )
+
+
+def test_from_rfd3_input_spec_derives_fixed_motif_atoms_from_unindex_sequence_and_fixed_overrides(tmp_path):
+    pdb_path = _write_test_pdb(tmp_path)
+    input_spec = {
+        "input": str(pdb_path),
+        "unindex": "A1-2",
+        "select_fixed_atoms": {"A1": "BKBN"},
+        "select_unfixed_sequence": "A2",
+    }
+
+    selections = AtomSelection.from_rfd3_input_spec(input_spec)
+
+    expected = (
+        ("A", 1, "N"),
+        ("A", 1, "CA"),
+        ("A", 1, "C"),
+        ("A", 1, "O"),
+        ("A", 2, "N"),
+        ("A", 2, "CA"),
+        ("A", 2, "C"),
+        ("A", 2, "O"),
+    )
+    assert selections["fixed_motif_atoms"].to_tuple() == expected
+    assert selections["fixed_motif_atoms_with_ligand"].to_tuple() == expected
+
+
+def test_from_rfd3_input_spec_derives_fixed_motif_atoms_with_ligand_fixed_overrides(tmp_path):
+    pdb_path = _write_test_pdb(tmp_path)
+    input_spec = {
+        "input": str(pdb_path),
+        "unindex": "A2",
+        "select_fixed_atoms": {"LIG": "C1"},
+        "ligand": "LIG",
+    }
+
+    selections = AtomSelection.from_rfd3_input_spec(input_spec)
+
+    fixed_motif_atoms = (
+        ("A", 2, "N"),
+        ("A", 2, "CA"),
+        ("A", 2, "C"),
+        ("A", 2, "O"),
+        ("A", 2, "CB"),
+        ("A", 2, "CG"),
+        ("A", 2, "OD1"),
+        ("A", 2, "ND2"),
+    )
+    assert selections["fixed_motif_atoms"].to_tuple() == fixed_motif_atoms
+    assert selections["fixed_motif_atoms_with_ligand"].to_tuple() == fixed_motif_atoms + (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+    )
+    assert selections["ligand"].to_tuple() == (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+        ("Z", ("H_LIG", 9, " "), "O1"),
+    )
+
+
+def test_from_rfd3_input_spec_derived_fixed_motif_atoms_respect_select_fixed_atoms_false(tmp_path):
+    pdb_path = _write_test_pdb(tmp_path)
+    input_spec = {
+        "input": str(pdb_path),
+        "unindex": "A1",
+        "select_fixed_atoms": False,
+        "ligand": "LIG",
+    }
+
+    selections = AtomSelection.from_rfd3_input_spec(input_spec)
+
+    assert selections["fixed_motif_atoms"].to_tuple() == ()
+    assert selections["fixed_motif_atoms_with_ligand"].to_tuple() == ()

@@ -79,12 +79,19 @@ RFD3_INPUT_SELECTION_FIELDS = (
     "unindex",
     "select_fixed_atoms",
     "select_unfixed_sequence",
+    "fixed_motif_atoms",
+    "fixed_motif_atoms_with_ligand",
     "select_buried",
     "select_partially_buried",
     "select_exposed",
     "select_hbond_donor",
     "select_hbond_acceptor",
     "select_hotspots",
+)
+
+_RFD3_DERIVED_INPUT_SELECTION_FIELDS = (
+    "fixed_motif_atoms",
+    "fixed_motif_atoms_with_ligand",
 )
 
 _RFD3_BACKBONE_ATOMS = ("N", "CA", "C", "O")
@@ -499,6 +506,207 @@ def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
         residue_id = residue_id[1]
 
     return (chain_id, int(residue_id))
+
+
+def _atom_name_from_atom_id(atom_id: AtomID) -> str:
+    """Return the atom-name component from one normalized atom ID."""
+    _validate_atom_id(atom_id)
+
+    if len(atom_id) == 3:
+        atom_name = atom_id[2]
+    elif len(atom_id) == 4:
+        atom_name = atom_id[3]
+    elif len(atom_id) == 5:
+        atom_name = atom_id[4]
+    else:
+        atom_name = atom_id[4]
+
+    if isinstance(atom_name, (list, tuple)):
+        atom_name = atom_name[0]
+    return str(atom_name).strip()
+
+
+def _sidechain_atom_selection(atom_selection: "AtomSelection") -> "AtomSelection":
+    """Return non-backbone atoms from an AtomSelection."""
+    return AtomSelection(
+        tuple(
+            atom
+            for atom in atom_selection
+            if _atom_name_from_atom_id(atom) not in _RFD3_BACKBONE_ATOMS
+        )
+    )
+
+
+def _atom_selection_residues(atom_selection: "AtomSelection") -> set[tuple[str, int]]:
+    """Return residue identifiers covered by an AtomSelection."""
+    return {_residue_from_atom_id(atom) for atom in atom_selection}
+
+
+def _rfd3_selection_components(input_selection: Any) -> list[str]:
+    """Return component strings referenced by an RFD3 InputSelection-like value."""
+    if isinstance(input_selection, str):
+        return _rfd3_components_from_string(input_selection)
+    if isinstance(input_selection, dict) and "atoms" not in input_selection:
+        components = []
+        for component_spec in input_selection:
+            components.extend(_rfd3_components_from_string(str(component_spec)))
+        return components
+    return []
+
+
+def _residues_from_rfd3_component(component: str, entity: Any, model_id: Any = 0) -> set[tuple[str, int]]:
+    """Resolve one RFD3 component to residue identifiers."""
+    residue_components = _parse_rfd3_residue_component(component)
+    if residue_components is not None:
+        return {(chain, int(resi)) for chain, resi in residue_components}
+    if entity is None:
+        raise ValueError(
+            f"RFD3 component '{component}' requires a pose because it is not an indexed residue component."
+        )
+    return {
+        (_residue_chain_id(residue), int(residue.id[1]))
+        for residue in _matching_residues_for_rfd3_component(
+            component,
+            entity=entity,
+            model_id=model_id,
+        )
+    }
+
+
+def _covered_residues_from_rfd3_selection(
+    input_selection: Any,
+    pose: Any = None,
+    model_id: Any = 0,
+) -> set[tuple[str, int]]:
+    """
+    Return residues explicitly covered by an RFD3 InputSelection-like value.
+
+    This preserves the distinction between "selected atoms" and "covered
+    residues" needed for RFD3 override fields such as select_fixed_atoms, where
+    selecting a subset of atoms in one residue unselects the remaining atoms in
+    that same residue but does not affect unrelated residues.
+    """
+    if input_selection is None:
+        return set()
+    if (
+        isinstance(input_selection, AtomSelection)
+        or (isinstance(input_selection, dict) and "atoms" in input_selection)
+        or isinstance(input_selection, (list, tuple))
+    ):
+        return _atom_selection_residues(AtomSelection(input_selection))
+
+    entity = _normalize_biopython_entity(pose, model_id=model_id)
+    if isinstance(input_selection, bool):
+        if entity is None:
+            raise ValueError(f"RFD3 boolean InputSelection={input_selection} requires a pose.")
+        return {
+            (_residue_chain_id(residue), int(residue.id[1]))
+            for residue in _iter_biopython_residues(entity, model_id=model_id)
+        }
+
+    residues = set()
+    for component in _rfd3_selection_components(input_selection):
+        residues.update(
+            _residues_from_rfd3_component(component, entity=entity, model_id=model_id)
+        )
+    return residues
+
+
+def _apply_rfd3_fixed_atom_overrides(
+    atom_selection: "AtomSelection",
+    select_fixed_atoms: Any,
+    pose: Any = None,
+    model_id: Any = 0,
+    residue_id_format: str = "auto",
+) -> "AtomSelection":
+    """Apply RFD3 select_fixed_atoms coordinate-fixing semantics to a selection."""
+    if select_fixed_atoms is None:
+        return atom_selection
+    if isinstance(select_fixed_atoms, bool):
+        return atom_selection if select_fixed_atoms else AtomSelection(())
+
+    fixed_atoms = AtomSelection.from_rfd3_input_selection(
+        select_fixed_atoms,
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+    fixed_atom_set = set(fixed_atoms.atoms)
+    covered_residues = _covered_residues_from_rfd3_selection(
+        select_fixed_atoms,
+        pose=pose,
+        model_id=model_id,
+    )
+    return AtomSelection(
+        tuple(
+            atom
+            for atom in atom_selection
+            if _residue_from_atom_id(atom) not in covered_residues or atom in fixed_atom_set
+        )
+    )
+
+
+def _fixed_motif_atoms_from_rfd3_input_spec(
+    input_spec: dict[str, Any],
+    pose: Any = None,
+    model_id: Any = 0,
+    residue_id_format: str = "auto",
+) -> "AtomSelection":
+    """Derive coordinate-fixed unindexed motif atoms from an RFD3 input spec."""
+    if input_spec.get("unindex") is None:
+        return AtomSelection(())
+
+    fixed_motif_atoms = AtomSelection.from_rfd3_input_selection(
+        input_spec["unindex"],
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+    fixed_motif_atoms = _apply_rfd3_fixed_atom_overrides(
+        fixed_motif_atoms,
+        input_spec.get("select_fixed_atoms"),
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+
+    if input_spec.get("select_unfixed_sequence") is not None:
+        unfixed_sequence_atoms = AtomSelection.from_rfd3_input_selection(
+            input_spec["select_unfixed_sequence"],
+            pose=pose,
+            model_id=model_id,
+            residue_id_format=residue_id_format,
+        )
+        fixed_motif_atoms = fixed_motif_atoms - _sidechain_atom_selection(
+            unfixed_sequence_atoms
+        )
+
+    return fixed_motif_atoms
+
+
+def _fixed_ligand_atoms_from_rfd3_input_spec(
+    input_spec: dict[str, Any],
+    pose: Any = None,
+    model_id: Any = 0,
+    residue_id_format: str = "auto",
+) -> "AtomSelection":
+    """Derive coordinate-fixed ligand atoms from an RFD3 input spec."""
+    if input_spec.get("ligand") is None:
+        return AtomSelection(())
+
+    ligand_atoms = AtomSelection.from_rfd3_ligand(
+        input_spec["ligand"],
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+    return _apply_rfd3_fixed_atom_overrides(
+        ligand_atoms,
+        input_spec.get("select_fixed_atoms"),
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
 
 
 class AtomSelection:
@@ -1050,9 +1258,13 @@ class AtomSelection:
             InputSelection field names to parse. Defaults to all RFD3
             InputSelection fields known to ProtFlow: ``contig``, ``unindex``,
             ``select_fixed_atoms``, ``select_unfixed_sequence``,
+            ``fixed_motif_atoms``, ``fixed_motif_atoms_with_ligand``,
             ``select_buried``, ``select_partially_buried``,
             ``select_exposed``, ``select_hbond_donor``,
-            ``select_hbond_acceptor``, and ``select_hotspots``.
+            ``select_hbond_acceptor``, and ``select_hotspots``. The
+            ``fixed_motif_atoms`` fields are derived from the RFD3 motif,
+            sequence, and coordinate-fixing fields rather than read directly
+            from *input_spec*.
         include_ligand : bool, optional
             If ``True`` (default), parse the RFD3 ``ligand`` field into an
             AtomSelection under the key ``"ligand"``.
@@ -1098,6 +1310,8 @@ class AtomSelection:
 
         selections = {}
         for field in fields:
+            if field in _RFD3_DERIVED_INPUT_SELECTION_FIELDS:
+                continue
             if field in input_spec and input_spec[field] is not None:
                 # Parse each requested InputSelection independently so callers
                 # can inspect the semantic source field after conversion.
@@ -1107,6 +1321,38 @@ class AtomSelection:
                     model_id=model_id,
                     residue_id_format=residue_id_format,
                 )
+
+        if "fixed_motif_atoms" in fields and input_spec.get("unindex") is not None:
+            selections["fixed_motif_atoms"] = _fixed_motif_atoms_from_rfd3_input_spec(
+                input_spec,
+                pose=pose,
+                model_id=model_id,
+                residue_id_format=residue_id_format,
+            )
+
+        if "fixed_motif_atoms_with_ligand" in fields and (
+            input_spec.get("unindex") is not None
+            or (include_ligand and input_spec.get("ligand") is not None)
+        ):
+            fixed_motif_atoms = selections.get("fixed_motif_atoms")
+            if fixed_motif_atoms is None:
+                fixed_motif_atoms = _fixed_motif_atoms_from_rfd3_input_spec(
+                    input_spec,
+                    pose=pose,
+                    model_id=model_id,
+                    residue_id_format=residue_id_format,
+                )
+            fixed_ligand_atoms = (
+                _fixed_ligand_atoms_from_rfd3_input_spec(
+                    input_spec,
+                    pose=pose,
+                    model_id=model_id,
+                    residue_id_format=residue_id_format,
+                )
+                if include_ligand
+                else AtomSelection(())
+            )
+            selections["fixed_motif_atoms_with_ligand"] = fixed_motif_atoms + fixed_ligand_atoms
 
         if include_ligand and input_spec.get("ligand") is not None:
             # Ligand is not typed as InputSelection in RFD3, but it resolves to
