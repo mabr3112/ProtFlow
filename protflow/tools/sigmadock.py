@@ -374,8 +374,8 @@ class SigmaDock(Runner):
         pdb_paths, ligand_paths, ref_paths = [], [], []
         for pose_path in poses.poses_list():
             stem = os.path.splitext(os.path.basename(pose_path))[0]
-            out_pdb = os.path.join(inputs_dir, f"{stem}.pdb")
-            out_sdf = os.path.join(inputs_dir, f"{stem}_ligand.sdf")
+            out_pdb = os.path.join(inputs_dir, f"{stem}_{ligand_name}.pdb")
+            out_sdf = os.path.join(inputs_dir, f"{stem}_{ligand_name}.sdf")
             if overwrite or not os.path.isfile(out_pdb):
                 split_complex(pose_path, work_dir=inputs_dir, ligand_name=ligand_name)
             pdb_paths.append(out_pdb)

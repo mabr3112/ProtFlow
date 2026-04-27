@@ -198,7 +198,7 @@ def test_prepare_sets_sigmadock_pdb_column(runner, tmp_path):
             poses=poses, work_dir=str(tmp_path), ligand_name="LIG"
         )
 
-    expected_pdb = os.path.join(str(tmp_path), "inputs", "complex_A.pdb")
+    expected_pdb = os.path.join(str(tmp_path), "inputs", "complex_A_LIG.pdb")
     assert poses.df["sigmadock_pdb"].iloc[0] == expected_pdb
 
 
@@ -235,7 +235,7 @@ def test_prepare_skips_split_if_pdb_exists_and_no_overwrite(runner, tmp_path):
     # split_complex must not be called when overwrite=False and the receptor PDB exists.
     inputs_dir = tmp_path / "inputs"
     inputs_dir.mkdir()
-    (inputs_dir / "complex_A.pdb").write_text("existing")
+    (inputs_dir / "complex_A_LIG.pdb").write_text("existing")
 
     poses = MagicMock()
     poses.df = pd.DataFrame({"poses": ["/input/complex_A.pdb"]})
@@ -252,7 +252,7 @@ def test_prepare_calls_split_when_overwrite_true(runner, tmp_path):
     # split_complex must be called even if the PDB exists when overwrite=True.
     inputs_dir = tmp_path / "inputs"
     inputs_dir.mkdir()
-    (inputs_dir / "complex_A.pdb").write_text("existing")
+    (inputs_dir / "complex_A_LIG.pdb").write_text("existing")
 
     poses = MagicMock()
     poses.df = pd.DataFrame({"poses": ["/input/complex_A.pdb"]})
