@@ -62,6 +62,7 @@ Markus Braun, Adrian Tripp
 """
 # Imports
 import os
+import json
 # dependencies
 
 from openbabel import openbabel, pybel
@@ -88,3 +89,36 @@ def openbabel_fileconverter(input_file: str, output_format:str, output_file:str=
     obConversion.SetOutFormat(output_format)
     obConversion.WriteFile(mol, output_file)
     return output_file
+
+
+def main(args) -> None:
+    '''Batch convert files.'''
+
+    def replace_extension(path: str, ext: str):
+        return f"{os.path.splitext(path)[0]}.{ext}"
+
+    with open(args.input_json, 'r', encoding="UTF-8") as j:
+        in_dict = json.load(j)
+
+    in_poses = in_dict["input_poses"]
+    overwrite = in_dict["overwrite"]
+    out_dir =in_dict["out_dir"]
+    out_format = in_dict["out_format"]
+
+    for pose in in_poses:
+        out_path = os.path.join(out_dir, replace_extension(os.path.basename(pose), out_format))
+        if not os.path.isfile(out_path) or overwrite is True:
+            openbabel_fileconverter(pose, out_format, out_path)
+
+if __name__ == "__main__":
+    import argparse
+
+    # setup args
+    argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # input options
+    argparser.add_argument("--input_json", type=str, help=".json formatted file that contains a dictionary pointing to target and reference pdbs in the following way: {'target': 'reference'}")
+
+    arguments = argparser.parse_args()
+
+    main(arguments)
