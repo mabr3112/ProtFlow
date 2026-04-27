@@ -446,7 +446,7 @@ class RFD3Params(UserDict):
         self._check_specs(spec_dict)
         self.data = spec_dict
         self._update_input()
-        self._selections_to_contigs()
+        self.selections_to_contigs()
         return self
     
     def spec_from_json(self, json_path: str) -> RFD3Params:
@@ -488,7 +488,7 @@ class RFD3Params(UserDict):
         self._check_specs(spec)
         self.data = spec
         self._update_input()
-        self._selections_to_contigs()
+        self.selections_to_contigs()
         return self
         
     def reset_pose_specs(self, poses: Poses) -> RFD3Params:
@@ -626,9 +626,17 @@ class RFD3Params(UserDict):
         for pose in new_specs:
             self.data[pose].update(new_specs[pose])
         self._update_input()
-        self._selections_to_contigs()
+        self.selections_to_contigs()
         return self
-
+    
+    def selections_to_contigs(self):
+        """Convert all Residue- or AtomSelections to RFD3 contigs/dicts"""
+        for spec in self.data.values():
+            for key, val in spec.items():
+                spec[key] = convert_selection_to_contig(val)
+        
+        return self
+    
     def _update_input(self):
         """
         Refresh the ``"input"`` field for every pose from the current pose paths.
@@ -708,12 +716,6 @@ class RFD3Params(UserDict):
             return {name: {"input": os.path.abspath(path)} for name, path in zip(self.poses.df["poses_description"], self.poses.df["poses"])}
         else:
             return {}
-    
-    def _selections_to_contigs(self):
-        """Convert all Residue- or AtomSelections to RFD3 contigs/dicts"""
-        for spec in self.data.values():
-            for key, val in spec.items():
-                spec[key] = convert_selection_to_contig(val)
     
 class RFdiffusion3(Runner):
     """
@@ -1065,6 +1067,9 @@ class RFdiffusion3(Runner):
         # calculate total number of diffusions
         total_designs = n_batches * diffusion_batch_size * multiplex_poses
         logging.info(f"Total designs per input pose: {total_designs}\n({n_batches} batches x {diffusion_batch_size} per batch)")
+
+        # convert params from selections to strings again in case params were manually manipulated
+        params.selections_to_contigs()
 
         if multiplex_poses > 1:
             logging.info(f"and multiplexing input poses {multiplex_poses} times.")
