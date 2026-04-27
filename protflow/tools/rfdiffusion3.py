@@ -197,8 +197,8 @@ class RFD3Params(UserDict):
             self.spec_from_json(spec_from_json)
 
         elif spec_from_dict:
-            self._check_specs(spec_from_dict)
-            self.data = spec_from_dict
+            self.spec_from_dict(spec_from_dict)
+
         else:
             self.data = self._create_pose_dict(poses)
 
@@ -290,7 +290,7 @@ class RFD3Params(UserDict):
         
         # Build the dictionary: exclude the blacklist and filter out None
         spec_dict = {
-            k: v for k, v in params.items() 
+            k: convert_selection_to_contig(v) for k, v in params.items() 
             if k not in exclude and v is not None
         }
 
@@ -403,7 +403,7 @@ class RFD3Params(UserDict):
 
             for pose, spec in zip(self.poses.df["poses_description"], pose_specs):
                 if pd.notna(spec): # only update if spec is specified for this pose
-                    self.data[pose].update({key: spec})
+                    self.data[pose].update({key: convert_selection_to_contig(spec)})
 
         return self    
     
@@ -446,6 +446,7 @@ class RFD3Params(UserDict):
         self._check_specs(spec_dict)
         self.data = spec_dict
         self._update_input()
+        self.selections_to_contigs()
         return self
     
     def spec_from_json(self, json_path: str) -> RFD3Params:
@@ -487,6 +488,7 @@ class RFD3Params(UserDict):
         self._check_specs(spec)
         self.data = spec
         self._update_input()
+        self.selections_to_contigs()
         return self
         
     def reset_pose_specs(self, poses: Poses) -> RFD3Params:
@@ -624,8 +626,17 @@ class RFD3Params(UserDict):
         for pose in new_specs:
             self.data[pose].update(new_specs[pose])
         self._update_input()
+        self.selections_to_contigs()
         return self
-
+    
+    def selections_to_contigs(self):
+        """Convert all Residue- or AtomSelections to RFD3 contigs/dicts"""
+        for spec in self.data.values():
+            for key, val in spec.items():
+                spec[key] = convert_selection_to_contig(val)
+        
+        return self
+    
     def _update_input(self):
         """
         Refresh the ``"input"`` field for every pose from the current pose paths.
@@ -705,7 +716,6 @@ class RFD3Params(UserDict):
             return {name: {"input": os.path.abspath(path)} for name, path in zip(self.poses.df["poses_description"], self.poses.df["poses"])}
         else:
             return {}
-
     
 class RFdiffusion3(Runner):
     """
@@ -1058,6 +1068,9 @@ class RFdiffusion3(Runner):
         total_designs = n_batches * diffusion_batch_size * multiplex_poses
         logging.info(f"Total designs per input pose: {total_designs}\n({n_batches} batches x {diffusion_batch_size} per batch)")
 
+        # convert params from selections to strings again in case params were manually manipulated
+        params.selections_to_contigs()
+
         if multiplex_poses > 1:
             logging.info(f"and multiplexing input poses {multiplex_poses} times.")
             index_layers += 1
@@ -1357,6 +1370,14 @@ class RFdiffusion3(Runner):
             shutil.rmtree(output_dir)
         if os.path.isdir(input_dir):
             shutil.rmtree(input_dir)
+
+def convert_selection_to_contig(selection):
+    """Converts input selections to rfd3 contig strings. Returns original if not a Residue- or AtomSelection."""
+    if isinstance(selection, ResidueSelection):
+        return selection.to_rfdiffusion_contig()
+    if isinstance(selection, AtomSelection):
+        return selection.to_rfd3_dict()
+    return selection
 
 def _ensure_rfd3_index_map(diff_idx_map: dict | None, motif_col: str, strict: bool) -> dict:
     """
