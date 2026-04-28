@@ -1084,8 +1084,8 @@ def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
         Residue name of the ligand to extract (e.g. ``"COC"``).
     """
     stem = os.path.splitext(os.path.basename(path))[0]
-    out_pdb = os.path.join(work_dir, f"{stem}.pdb")
-    out_sdf = os.path.join(work_dir, f"{stem}_ligand.sdf")
+    out_pdb = os.path.join(work_dir, f"{stem}_{ligand_name}.pdb")
+    out_sdf = os.path.join(work_dir, f"{stem}_{ligand_name}.sdf")
 
     structure = biopython_load_protein(path, handle=stem)
 

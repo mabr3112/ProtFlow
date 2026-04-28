@@ -110,14 +110,14 @@ def cif_file(tmp_path):
 def test_pdb_creates_output_files(pdb_file, tmp_path):
     # Basic smoke test: both expected output files must exist after a PDB run.
     split_complex(pdb_file, work_dir=str(tmp_path), ligand_name="LIG")
-    assert os.path.isfile(tmp_path / "complex.pdb")
-    assert os.path.isfile(tmp_path / "complex_ligand.sdf")
+    assert os.path.isfile(tmp_path / "complex_LIG.pdb")
+    assert os.path.isfile(tmp_path / "complex_LIG.sdf")
 
 
 def test_receptor_contains_only_atom_records(pdb_file, tmp_path):
     # The receptor PDB must contain ATOM lines and no HETATM — ligand must be fully stripped.
     split_complex(pdb_file, work_dir=str(tmp_path), ligand_name="LIG")
-    pdb_text = (tmp_path / "complex.pdb").read_text()
+    pdb_text = (tmp_path / "complex_LIG.pdb").read_text()
     assert "ATOM" in pdb_text
     assert "HETATM" not in pdb_text
 
@@ -125,33 +125,33 @@ def test_receptor_contains_only_atom_records(pdb_file, tmp_path):
 def test_sdf_contains_ligand_atoms(pdb_file, tmp_path):
     # The SDF must contain exactly the 2 heavy atoms of LIG (C1 + C2), parsed from the V2000 counts line.
     split_complex(pdb_file, work_dir=str(tmp_path), ligand_name="LIG")
-    assert _sdf_atom_count(tmp_path / "complex_ligand.sdf") == 2
+    assert _sdf_atom_count(tmp_path / "complex_LIG.sdf") == 2
 
 
 def test_sdf_title_matches_ligand_name(pdb_file, tmp_path):
     # SDF line 1 is the molecule title; must match ligand_name so downstream tools can identify it.
     split_complex(pdb_file, work_dir=str(tmp_path), ligand_name="LIG")
-    sdf_text = (tmp_path / "complex_ligand.sdf").read_text()
+    sdf_text = (tmp_path / "complex_LIG.sdf").read_text()
     assert sdf_text.splitlines()[0].strip() == "LIG"
 
 
 def test_cif_input_produces_outputs(cif_file, tmp_path):
     # CIF inputs must go through the MMCIFParser branch and produce the same two output files as PDB.
     split_complex(cif_file, work_dir=str(tmp_path), ligand_name="LIG")
-    assert os.path.isfile(tmp_path / "complex.pdb")
-    assert os.path.isfile(tmp_path / "complex_ligand.sdf")
+    assert os.path.isfile(tmp_path / "complex_LIG.pdb")
+    assert os.path.isfile(tmp_path / "complex_LIG.sdf")
 
 
 def test_only_target_ligand_extracted(two_ligands_pdb, tmp_path):
     # When two HETATM residues are present only the requested one (LIG, not HOH) must appear in the SDF.
     split_complex(two_ligands_pdb, work_dir=str(tmp_path), ligand_name="LIG")
-    assert _sdf_atom_count(tmp_path / "two_lig_ligand.sdf") == 1
+    assert _sdf_atom_count(tmp_path / "two_lig_LIG.sdf") == 1
 
 
 def test_receptor_excludes_non_target_ligand(two_ligands_pdb, tmp_path):
     # Neither the target ligand nor any other HETATM residue (HOH) should leak into the receptor PDB.
     split_complex(two_ligands_pdb, work_dir=str(tmp_path), ligand_name="LIG")
-    pdb_text = (tmp_path / "two_lig.pdb").read_text()
+    pdb_text = (tmp_path / "two_lig_LIG.pdb").read_text()
     assert "LIG" not in pdb_text
     assert "HOH" not in pdb_text
 
@@ -159,8 +159,8 @@ def test_receptor_excludes_non_target_ligand(two_ligands_pdb, tmp_path):
 def test_output_stem_matches_input_filename(pdb_file, tmp_path):
     # Output filenames must be derived from the input stem so the runner can predict them without globbing.
     split_complex(pdb_file, work_dir=str(tmp_path), ligand_name="LIG")
-    assert os.path.isfile(tmp_path / "complex.pdb")
-    assert os.path.isfile(tmp_path / "complex_ligand.sdf")
+    assert os.path.isfile(tmp_path / "complex_LIG.pdb")
+    assert os.path.isfile(tmp_path / "complex_LIG.sdf")
 
 
 # ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ def test_output_stem_matches_input_filename(pdb_file, tmp_path):
 def test_ligand_name_not_present_produces_empty_or_invalid_sdf(no_ligand_pdb, tmp_path):
     # Missing ligand: function must not crash, but SDF should contain 0 atoms (silent failure, no exception).
     split_complex(no_ligand_pdb, work_dir=str(tmp_path), ligand_name="LIG")
-    sdf_path = tmp_path / "no_lig_ligand.sdf"
+    sdf_path = tmp_path / "no_lig_LIG.sdf"
     assert sdf_path.exists()
     assert _sdf_atom_count(sdf_path) == 0
 
@@ -198,7 +198,7 @@ def test_wrong_extension_raises(tmp_path):
 def test_empty_ligand_name_produces_no_atoms(pdb_file, tmp_path):
     # Empty ligand_name matches no residue — must not crash, SDF should contain 0 atoms.
     split_complex(pdb_file, work_dir=str(tmp_path), ligand_name="")
-    sdf_path = tmp_path / "complex_ligand.sdf"
+    sdf_path = tmp_path / "complex_.sdf"
     assert sdf_path.exists()
     assert _sdf_atom_count(sdf_path) == 0
 
@@ -215,5 +215,5 @@ def test_idempotent_overwrite(pdb_file, tmp_path):
     split_complex(pdb_file, work_dir=str(out1), ligand_name="LIG")
     split_complex(pdb_file, work_dir=str(out2), ligand_name="LIG")
 
-    assert (out1 / "complex.pdb").read_text() == (out2 / "complex.pdb").read_text()
-    assert (out1 / "complex_ligand.sdf").read_text() == (out2 / "complex_ligand.sdf").read_text()
+    assert (out1 / "complex_LIG.pdb").read_text() == (out2 / "complex_LIG.pdb").read_text()
+    assert (out1 / "complex_LIG.sdf").read_text() == (out2 / "complex_LIG.sdf").read_text()
