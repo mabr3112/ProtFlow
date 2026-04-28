@@ -832,6 +832,7 @@ class RFdiffusion3(Runner):
         multiplex_poses: int = None,
         jobstarter: JobStarter = None,
         convert_cif_to_pdb: bool = True,
+        renumber_input: bool = False,
         strict_remap: bool = True, # if true, fail if residues in motifs are not preserved post-diffusion
         run_clean: bool = True, # delete additional outputs like pre-conversion files
         fail_on_missing_output_poses: bool = False,
@@ -911,6 +912,15 @@ class RFdiffusion3(Runner):
             converted to ``.pdb`` format via OpenBabel.  When ``False``,
             the ``location`` column in the returned poses points to
             ``.cif`` files.
+        renumber_input : bool, optional
+            When ``True``, write one renumbered copy of the RFDiffusion3
+            input PDB per output structure under
+            ``<work_dir>/renumbered_inputs``.  Residues present in the
+            sidecar ``diffused_index_map`` are renumbered to their diffused
+            chain/residue identifiers, while all other PDB records are copied
+            unchanged.  The scorefile gains a ``renumbered_inputs`` column
+            containing the corresponding output path for each design.  Default
+            is ``False``.
         strict_remap : bool, optional
             When ``True`` (default), :func:`remap_rfd3_motifs` raises a
             :exc:`ValueError` if any residue in a motif column is absent
@@ -949,6 +959,10 @@ class RFdiffusion3(Runner):
                 Mapping from input residue identifiers to their new
                 positions in the diffused structure (required for
                 :func:`remap_rfd3_motifs`).
+            ``<prefix>_renumbered_inputs``
+                Present when *renumber_input* is ``True``.  Absolute path to
+                the input PDB copy renumbered according to the output's
+                ``diffused_index_map``.
             All numeric metrics from the sidecar ``metrics`` block,
             flattened into individual columns (e.g.
             ``<prefix>_plddt``, ``<prefix>_ptm``, etc.).
@@ -1093,6 +1107,9 @@ class RFdiffusion3(Runner):
         scorefile = os.path.join(work_dir, f"{self.name}_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Reusing existing scorefile: {scorefile}")
+            if renumber_input:
+                scores = add_renumbered_inputs_to_scores(scores=scores, work_dir=work_dir)
+                self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
             if not poses:
                 poses.df = scores.copy()
@@ -1147,7 +1164,12 @@ class RFdiffusion3(Runner):
         )
 
         # collect and validate scores
-        scores = collect_scores(work_dir=work_dir, cif_to_pdb=convert_cif_to_pdb, run_clean=run_clean)
+        scores = collect_scores(
+            work_dir=work_dir,
+            cif_to_pdb=convert_cif_to_pdb,
+            run_clean=run_clean,
+            renumber_input=renumber_input,
+        )
 
         n_out_poses = len(scores.index)
         if n_out_poses == 0:
@@ -1343,13 +1365,13 @@ class RFdiffusion3(Runner):
 
     def _cleanup_previous_outputs(self, work_dir: str) -> None:
         """
-        Delete the ``outputs/`` and ``inputs/`` sub-directories before a rerun.
+        Delete generated sub-directories before a rerun.
  
         Called internally by :meth:`run` when *overwrite* is ``True``.
-        Removes ``<work_dir>/outputs/`` and ``<work_dir>/inputs/``
-        recursively using :func:`shutil.rmtree` if they exist, ensuring
-        that stale files from a previous run do not interfere with
-        output collection.
+        Removes ``<work_dir>/outputs/``, ``<work_dir>/inputs/``, and
+        ``<work_dir>/renumbered_inputs/`` recursively using
+        :func:`shutil.rmtree` if they exist, ensuring that stale files from a
+        previous run do not interfere with output collection.
  
         Parameters
         ----------
@@ -1359,17 +1381,15 @@ class RFdiffusion3(Runner):
  
         Notes
         -----
-        Only the ``outputs/`` and ``inputs/`` sub-directories are removed.
+        Only the generated output/input sub-directories are removed.
         The scorefile (``rfdiffusion3_scores.<format>``) is handled
         separately by the base-class :meth:`~protflow.runners.Runner.check_for_existing_scorefile`
         logic.
         """
-        output_dir = os.path.join(work_dir, "outputs")
-        input_dir = os.path.join(work_dir, "inputs")
-        if os.path.isdir(output_dir):
-            shutil.rmtree(output_dir)
-        if os.path.isdir(input_dir):
-            shutil.rmtree(input_dir)
+        for subdir in ["outputs", "inputs", "renumbered_inputs"]:
+            path = os.path.join(work_dir, subdir)
+            if os.path.isdir(path):
+                shutil.rmtree(path)
 
 def convert_selection_to_contig(selection):
     """Converts input selections to rfd3 contig strings. Returns original if not a Residue- or AtomSelection."""
@@ -1787,7 +1807,207 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
     logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")
 
 
-def collect_scores(work_dir: str, cif_to_pdb: bool = True, run_clean: bool=True) -> pd.DataFrame:
+def _normalize_rfd3_output_names(output_dir: str) -> None:
+    """
+    Strip RFDiffusion3 batch prefixes from output file names in place.
+    """
+    directory = Path(output_dir)
+    pattern = r"batch.*?_"
+    for file_path in directory.iterdir():
+        if file_path.is_file():
+            new_name = re.sub(pattern, "", file_path.name)
+            new_path = file_path.with_name(new_name)
+            if new_path != file_path:
+                file_path.rename(new_path)
+
+
+def _rfd3_output_jsons(work_dir: str) -> list[str]:
+    """
+    Return normalized RFDiffusion3 output JSON sidecars for *work_dir*.
+    """
+    output_dir = os.path.join(work_dir, "outputs")
+    if not os.path.isdir(output_dir):
+        return []
+    _normalize_rfd3_output_names(output_dir)
+    return sorted(glob(os.path.join(output_dir, "*.json")))
+
+
+def _resolve_rfd3_spec_input_path(input_pdb: str, sidecar_json: str) -> str:
+    """
+    Resolve an input PDB path recorded in an RFDiffusion3 output sidecar.
+    """
+    if os.path.isabs(input_pdb):
+        return input_pdb
+
+    candidate_bases = [
+        os.getcwd(),
+        os.path.dirname(sidecar_json),
+        os.path.dirname(os.path.dirname(sidecar_json)),
+    ]
+    candidates = [os.path.abspath(os.path.join(base, input_pdb)) for base in candidate_bases]
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return candidates[0]
+
+
+def _input_pdb_from_rfd3_sidecar(sidecar_data: dict, sidecar_json: str) -> str:
+    """
+    Extract the input PDB path from an RFDiffusion3 sidecar ``specification``.
+    """
+    specification = sidecar_data.get("specification")
+    if not isinstance(specification, dict):
+        raise ValueError(f"RFDiffusion3 sidecar {sidecar_json} does not contain a specification dictionary.")
+
+    input_pdb = specification.get("input")
+    if not input_pdb:
+        raise ValueError(f"RFDiffusion3 sidecar {sidecar_json} does not contain specification.input.")
+    return _resolve_rfd3_spec_input_path(str(input_pdb), sidecar_json=sidecar_json)
+
+
+def _rfd3_index_map_to_residue_mapping(diffused_index_map: dict) -> dict[tuple[str, int], tuple[str, int]]:
+    """
+    Convert an RFD3 ``diffused_index_map`` into tuple-key residue mapping.
+    """
+    if not isinstance(diffused_index_map, dict):
+        raise ValueError(f"Expected diffused_index_map to be a dictionary, got {type(diffused_index_map)}.")
+
+    residue_mapping = {}
+    for source, target in diffused_index_map.items():
+        source_chain, source_residue = parse_residue(str(source).strip())
+        target_chain, target_residue = parse_residue(str(target).strip())
+        residue_mapping[(source_chain, source_residue)] = (target_chain, target_residue)
+    return residue_mapping
+
+
+def _pdb_line_residue_key(line: str) -> tuple[str, int] | None:
+    """
+    Return ``(chain, resseq)`` for PDB records with residue fields.
+    """
+    if line[:6] not in {"ATOM  ", "HETATM", "ANISOU", "TER   "}:
+        return None
+    if len(line) < 26:
+        return None
+
+    residue_number = line[22:26].strip()
+    if not residue_number:
+        return None
+    try:
+        return line[21], int(residue_number)
+    except ValueError:
+        return None
+
+
+def _split_line_ending(line: str) -> tuple[str, str]:
+    """
+    Split a text line into content and original line ending.
+    """
+    if line.endswith("\r\n"):
+        return line[:-2], "\r\n"
+    if line.endswith("\n"):
+        return line[:-1], "\n"
+    return line, ""
+
+
+def _format_pdb_residue_line(line: str, chain_id: str, residue_number: int) -> str:
+    """
+    Replace chain, residue number, and insertion code fields in one PDB line.
+    """
+    if len(chain_id) != 1:
+        raise ValueError(f"PDB chain IDs must be a single character, got {chain_id!r}.")
+    if residue_number < -999 or residue_number > 9999:
+        raise ValueError(f"PDB residue number {residue_number} cannot be represented in a 4-character resSeq field.")
+
+    content, line_ending = _split_line_ending(line)
+    if len(content) < 27:
+        content = content.ljust(27)
+    return f"{content[:21]}{chain_id}{residue_number:>4} {content[27:]}{line_ending}"
+
+
+def renumber_rfd3_input_pdb(
+    input_pdb: str,
+    diffused_index_map: dict,
+    output_pdb: str,
+    overwrite: bool = False,
+) -> str:
+    """
+    Copy an RFDiffusion3 input PDB and renumber residues in ``diffused_index_map``.
+
+    The function preserves every line from *input_pdb*.  For PDB records with
+    residue fields (``ATOM``, ``HETATM``, ``ANISOU``, and ``TER``), only residues
+    present in *diffused_index_map* have their chain/residue fields replaced by
+    the mapped RFDiffusion3 output identifiers.  Unmapped residues, ligands, and
+    non-coordinate records are copied unchanged.
+    """
+    input_pdb = os.path.abspath(input_pdb)
+    output_pdb = os.path.abspath(output_pdb)
+
+    if not os.path.isfile(input_pdb):
+        raise FileNotFoundError(f"Cannot renumber missing RFDiffusion3 input PDB: {input_pdb}")
+    if os.path.isfile(output_pdb) and not overwrite:
+        return output_pdb
+
+    residue_mapping = _rfd3_index_map_to_residue_mapping(diffused_index_map)
+    os.makedirs(os.path.dirname(output_pdb), exist_ok=True)
+
+    with open(input_pdb, "r", encoding="UTF-8") as input_handle, open(output_pdb, "w", encoding="UTF-8") as output_handle:
+        for line in input_handle:
+            residue_key = _pdb_line_residue_key(line)
+            if residue_key in residue_mapping:
+                chain_id, residue_number = residue_mapping[residue_key]
+                line = _format_pdb_residue_line(line, chain_id=chain_id, residue_number=residue_number)
+            output_handle.write(line)
+
+    return output_pdb
+
+
+def _renumbered_inputs_from_output_jsons(work_dir: str, overwrite: bool = False) -> dict[str, str]:
+    """
+    Create renumbered input PDBs for all RFDiffusion3 sidecars in *work_dir*.
+    """
+    output_jsons = _rfd3_output_jsons(work_dir)
+    if not output_jsons:
+        raise RuntimeError(f"Cannot renumber RFDiffusion3 inputs because no output JSON sidecars were found in {os.path.join(work_dir, 'outputs')}.")
+
+    renumbered_input_dir = os.path.join(work_dir, "renumbered_inputs")
+    renumbered_inputs = {}
+    for sidecar_json in output_jsons:
+        sidecar_data = read_json(sidecar_json)
+        description = description_from_path(sidecar_json)
+        input_pdb = _input_pdb_from_rfd3_sidecar(sidecar_data, sidecar_json=sidecar_json)
+        output_pdb = os.path.join(renumbered_input_dir, f"{description}.pdb")
+        renumbered_inputs[description] = renumber_rfd3_input_pdb(
+            input_pdb=input_pdb,
+            diffused_index_map=sidecar_data.get("diffused_index_map"),
+            output_pdb=output_pdb,
+            overwrite=overwrite,
+        )
+    return renumbered_inputs
+
+
+def add_renumbered_inputs_to_scores(scores: pd.DataFrame, work_dir: str, overwrite: bool = False) -> pd.DataFrame:
+    """
+    Ensure an RFDiffusion3 scores DataFrame contains ``renumbered_inputs``.
+    """
+    scores = scores.copy()
+    if "renumbered_inputs" in scores.columns and not overwrite:
+        paths = scores["renumbered_inputs"].dropna().to_list()
+        if len(paths) == len(scores.index) and all(os.path.isfile(path) for path in paths):
+            return scores
+
+    col_in_df(scores, "description")
+    renumbered_inputs = _renumbered_inputs_from_output_jsons(work_dir=work_dir, overwrite=overwrite)
+    missing = [description for description in scores["description"].to_list() if description not in renumbered_inputs]
+    if missing:
+        raise RuntimeError(
+            "Could not create renumbered RFDiffusion3 inputs for all score rows. "
+            f"Missing output sidecars for descriptions: {missing}"
+        )
+    scores["renumbered_inputs"] = scores["description"].map(renumbered_inputs)
+    return scores
+
+
+def collect_scores(work_dir: str, cif_to_pdb: bool = True, run_clean: bool=True, renumber_input: bool = False) -> pd.DataFrame:
     """
     Collect, decompress, convert, and flatten RFDiffusion3 output files.
  
@@ -1820,8 +2040,12 @@ def collect_scores(work_dir: str, cif_to_pdb: bool = True, run_clean: bool=True)
         * Compressed ``.cif.gz`` files are always deleted.
         * Intermediate ``.cif`` files are additionally deleted when
           *cif_to_pdb* is ``True``.
- 
+
         When ``False``, all intermediate files are retained.
+    renumber_input : bool, optional
+        When ``True``, create one renumbered copy of each sidecar's
+        ``specification.input`` PDB under ``<work_dir>/renumbered_inputs`` and
+        add a ``renumbered_inputs`` path column to the returned DataFrame.
  
     Returns
     -------
@@ -1837,6 +2061,9 @@ def collect_scores(work_dir: str, cif_to_pdb: bool = True, run_clean: bool=True)
         ``diffused_index_map`` : dict
             Mapping from input residue identifiers to their new positions
             in the diffused output, as reported by RFDiffusion3.
+        ``renumbered_inputs`` : str
+            Present when *renumber_input* is ``True``.  Absolute path to the
+            corresponding renumbered input PDB.
         All fields from the top-level sidecar JSON (excluding
         ``"specification"`` and ``"metrics"``), plus all fields from the
         ``"metrics"`` sub-dict, flattened to top-level columns.
@@ -1891,19 +2118,7 @@ def collect_scores(work_dir: str, cif_to_pdb: bool = True, run_clean: bool=True)
         openbabel_fileconverter(input_file=input_cif, output_format=output_format, output_file=output)
         return os.path.abspath(output)
     
-    output_dir = os.path.join(work_dir, "outputs")
-
-    directory = Path(output_dir)
-    pattern = r"batch.*?_"
-
-
-    # rename paths and jsons to remove prefix derived from json input
-    for file_path in directory.iterdir():
-        if file_path.is_file():
-            new_name = re.sub(pattern, "", file_path.name)
-            file_path.rename(file_path.with_name(new_name))
-
-    output_jsons = glob(os.path.join(output_dir, "*.json"))
+    output_jsons = _rfd3_output_jsons(work_dir)
 
     data = []
     # iterate over jsons because additional cif files might be there if dump_trajectories is true
@@ -1929,6 +2144,9 @@ def collect_scores(work_dir: str, cif_to_pdb: bool = True, run_clean: bool=True)
         data["location"] = data["cif_location"]
 
     data["description"] = [description_from_path(p) for p in data["location"]]
+
+    if renumber_input:
+        data = add_renumbered_inputs_to_scores(scores=data, work_dir=work_dir, overwrite=True)
 
     # delete obsolete output
     if run_clean:
