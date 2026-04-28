@@ -85,7 +85,7 @@ import Bio.PDB
 import protflow.utils.openbabel_tools
 from . import jobstarters, require_config, load_config_path
 from .jobstarters import JobStarter, split_list
-from .residues import ResidueSelection
+from .residues import ResidueSelection, AtomSelection
 from .utils.utils import parse_fasta_to_dict
 from .utils.biopython_tools import load_structure_from_pdbfile, get_sequence_from_pose
 from .utils.openbabel_tools import openbabel_fileconverter
@@ -651,6 +651,7 @@ class Poses:
         if isinstance(poses, pd.DataFrame):
             self.df = self.check_poses_df_integrity(poses)
             self.convert_resselection_cols(resselection_col="import_resselection_cols")
+            self.convert_atomselection_cols(atomselection_col="import_atomselection_cols")
             return None
 
         if isinstance(poses, str) and any([poses.endswith(ext) for ext in ['csv', 'json', 'parquet', 'pickle', 'feather']]):
@@ -659,6 +660,7 @@ class Poses:
             if 'Unnamed: 0' in self.df.columns: self.df.drop('Unnamed: 0', axis=1, inplace=True)
             self.df = self.check_poses_df_integrity(self.df)
             self.convert_resselection_cols(resselection_col="import_resselection_cols")
+            self.convert_atomselection_cols(atomselection_col="import_atomselection_cols")
             return None
 
         # if Poses are initialized freshly (with input poses as strings:)
@@ -906,6 +908,105 @@ class Poses:
                     if isinstance(cell_value, dict):
                         self.df.at[idx, col] = ResidueSelection(cell_value, from_scorefile=True)
 
+    def convert_atomselection_cols(self, atomselection_col:str="import_atomselection_cols"):
+        """
+        Converts per-row atom selection descriptors into ``AtomSelection`` objects
+        for the columns listed in a list-like selector column, mutating the DataFrame
+        in place.
+
+        Parameters
+        ----------
+        atomselection_col : str, optional
+            Name of the column that, for each row, contains a list/tuple of target
+            column names to convert (default is ``import_atomselection_cols``).
+            When reading from CSV, this field may be a stringified tuple (e.g., ``(('A',1,'CA')``),
+            which will be parsed automatically.
+
+
+        Returns
+        -------
+        None
+            This method modifies self.df in place and returns None.
+            If atomselection_col is not present in self.df, the method exits early.
+
+
+        Raises
+        ------
+        KeyError
+            If a row's value in ``atomselection_col`` exists but is not a list or tuple
+            (after optional string-to-list parsing).
+        ValueError
+            If parsing a stringified list with ``ast.literal_eval`` fails due to an
+            invalid literal.
+        SyntaxError
+            If parsing a malformed stringified list triggers a syntax error.
+        TypeError
+            If constructing a ``AtomSelection`` from a cell value raises a type error.
+
+
+        Further Details
+        ---------------
+        For each row, the method reads the list of target column names from
+        ``atomselection_col`` and attempts to convert the corresponding cells:
+
+        - If a target column listed for a row does not exist in ``self.df``,
+          a warning is logged and that column is skipped for the row.
+        - If the target cell is already a ``AtomSelection`` instance,
+          it is left unchanged.
+        - If the target cell is a ``str``, it is first converted to a tuple
+          followed by ``AtomSelection(value)`` (useful for CSV imports).
+        - If the target cell is a ``dict``, it is converted via
+          ``AtomSelection.from_dict(value)`` (useful for JSON imports).
+        - Empty selector lists are allowed and simply result in no action for that row.
+        - Cells that are falsy (e.g., ``None``, empty string, empty dict) are skipped.
+
+
+        Notes
+        -----
+        - Missing target columns are not fatal; a warning is logged and processing continues.
+        - When importing from CSV, stringified lists in ``atomselection_col`` are parsed
+          with ``ast.literal_eval``; malformed strings will raise ``ValueError`` or ``SyntaxError``.
+        - ``AtomSelection`` construction is delegated; any errors it raises will propagate.
+        """
+        if not atomselection_col in self.df.columns:
+            return None
+
+        for idx, cols in self.df[atomselection_col].items():
+            # if input was a csv file, lists are imported as str
+            if isinstance(cols, str) and cols.startswith("[") and cols.endswith("]"):
+                cols = ast.literal_eval(cols)
+
+            # skip if no resselection cols are defined
+            if not cols:
+                continue
+
+            # check for wrong content in col
+            if not isinstance(cols, (list, tuple)):
+                raise KeyError(f"Could not import residue selection columns from {atomselection_col}! ")
+
+            for col in cols:
+                if col not in self.df.columns:
+                    logging.warning(f"Could not find column {col} in poses dataframe for conversion to ResidueSelection for pose {self.df.at[idx, 'poses_description']}!")
+                    continue
+
+                cell_value = self.df.at[idx, col]
+                if cell_value:
+                    # skip if already a ResidueSelection (e.g. when importing from pickle)
+                    if isinstance(cell_value, AtomSelection):
+                        continue
+                    # pandas 3 infers string-like columns as StringDtype by default, which
+                    # cannot hold ResidueSelection objects unless we widen the column first.
+                    if not pd.api.types.is_object_dtype(self.df[col].dtype):
+                        self.df[col] = self.df[col].astype(object)
+                    # if importing from csv
+                    if isinstance(cell_value, str):
+                        cell_value = ast.literal_eval(cell_value)
+                        self.df.at[idx, col] = AtomSelection(cell_value)
+                    # if importing from json
+                    if isinstance(cell_value, dict):
+                        self.df.at[idx, col] = AtomSelection.from_dict(cell_value)
+
+
     def split_multiline_fasta(self, path: str, encoding: str = "UTF-8") -> list[str]:
         """
         Splits a multiline FASTA file into individual FASTA files, each containing a single sequence.
@@ -1122,6 +1223,7 @@ class Poses:
         out_format = out_format or self.storage_format
 
         temp_df = class_in_df(self.df, ResidueSelection, "import_resselection_cols")
+        temp_df = class_in_df(temp_df, AtomSelection, "import_atomselection_cols")
 
         # make sure the filename conforms to format
         if not out_path.endswith(f".{out_format}"):
