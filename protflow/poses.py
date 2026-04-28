@@ -909,8 +909,65 @@ class Poses:
                         self.df.at[idx, col] = ResidueSelection(cell_value, from_scorefile=True)
 
     def convert_atomselection_cols(self, atomselection_col:str="import_atomselection_cols"):
+        """
+        Converts per-row atom selection descriptors into ``AtomSelection`` objects
+        for the columns listed in a list-like selector column, mutating the DataFrame
+        in place.
 
-        print("öafdöalfo")
+        Parameters
+        ----------
+        atomselection_col : str, optional
+            Name of the column that, for each row, contains a list/tuple of target
+            column names to convert (default is ``import_atomselection_cols``).
+            When reading from CSV, this field may be a stringified tuple (e.g., ``(('A',1,'CA')``),
+            which will be parsed automatically.
+
+
+        Returns
+        -------
+        None
+            This method modifies self.df in place and returns None.
+            If atomselection_col is not present in self.df, the method exits early.
+
+
+        Raises
+        ------
+        KeyError
+            If a row's value in ``atomselection_col`` exists but is not a list or tuple
+            (after optional string-to-list parsing).
+        ValueError
+            If parsing a stringified list with ``ast.literal_eval`` fails due to an
+            invalid literal.
+        SyntaxError
+            If parsing a malformed stringified list triggers a syntax error.
+        TypeError
+            If constructing a ``AtomSelection`` from a cell value raises a type error.
+
+
+        Further Details
+        ---------------
+        For each row, the method reads the list of target column names from
+        ``atomselection_col`` and attempts to convert the corresponding cells:
+
+        - If a target column listed for a row does not exist in ``self.df``,
+          a warning is logged and that column is skipped for the row.
+        - If the target cell is already a ``AtomSelection`` instance,
+          it is left unchanged.
+        - If the target cell is a ``str``, it is first converted to a tuple
+          followed by ``AtomSelection(value)`` (useful for CSV imports).
+        - If the target cell is a ``dict``, it is converted via
+          ``AtomSelection.from_dict(value)`` (useful for JSON imports).
+        - Empty selector lists are allowed and simply result in no action for that row.
+        - Cells that are falsy (e.g., ``None``, empty string, empty dict) are skipped.
+
+
+        Notes
+        -----
+        - Missing target columns are not fatal; a warning is logged and processing continues.
+        - When importing from CSV, stringified lists in ``atomselection_col`` are parsed
+          with ``ast.literal_eval``; malformed strings will raise ``ValueError`` or ``SyntaxError``.
+        - ``AtomSelection`` construction is delegated; any errors it raises will propagate.
+        """
         if not atomselection_col in self.df.columns:
             return None
 
