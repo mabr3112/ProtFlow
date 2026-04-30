@@ -131,6 +131,11 @@ def test_from_rfd3_input_spec_parses_selection_fields_and_ligand(tmp_path):
         ("Z", ("H_LIG", 9, " "), "C1"),
         ("Z", ("H_LIG", 9, " "), "O1"),
     )
+    assert selections["ligands"].to_tuple() == selections["ligand"].to_tuple()
+    assert selections["ligands_fixed_atoms"].to_tuple() == (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+        ("Z", ("H_LIG", 9, " "), "O1"),
+    )
 
 
 def test_from_rfd3_input_spec_derives_fixed_motif_atoms_from_unindex_sequence_and_fixed_overrides(tmp_path):
@@ -187,6 +192,10 @@ def test_from_rfd3_input_spec_derives_fixed_motif_atoms_with_ligand_fixed_overri
         ("Z", ("H_LIG", 9, " "), "C1"),
         ("Z", ("H_LIG", 9, " "), "O1"),
     )
+    assert selections["ligands"].to_tuple() == selections["ligand"].to_tuple()
+    assert selections["ligands_fixed_atoms"].to_tuple() == (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+    )
 
 
 def test_from_rfd3_input_spec_derived_fixed_motif_atoms_respect_select_fixed_atoms_false(tmp_path):
@@ -202,3 +211,8 @@ def test_from_rfd3_input_spec_derived_fixed_motif_atoms_respect_select_fixed_ato
 
     assert selections["fixed_motif_atoms"].to_tuple() == ()
     assert selections["fixed_motif_atoms_with_ligand"].to_tuple() == ()
+    assert selections["ligands"].to_tuple() == (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+        ("Z", ("H_LIG", 9, " "), "O1"),
+    )
+    assert selections["ligands_fixed_atoms"].to_tuple() == ()

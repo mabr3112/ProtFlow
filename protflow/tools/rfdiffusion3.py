@@ -823,6 +823,7 @@ class RFdiffusion3(Runner):
         jobstarter: JobStarter = None,
         convert_cif_to_pdb: bool = True,
         renumber_input: bool = False,
+        parse_atomic_motifs: bool = False,
         strict_remap: bool = True, # if true, fail if residues in motifs are not preserved post-diffusion
         run_clean: bool = True, # delete additional outputs like pre-conversion files
         fail_on_missing_output_poses: bool = False,
@@ -911,6 +912,31 @@ class RFdiffusion3(Runner):
             unchanged.  The scorefile gains a ``renumbered_inputs`` column
             containing the corresponding output path for each design.  Default
             is ``False``.
+        parse_atomic_motifs : bool, optional
+            When ``True``, parse each RFDiffusion3 input specification with
+            :meth:`protflow.residues.AtomSelection.from_rfd3_input_spec` and
+            add the resulting :class:`~protflow.residues.AtomSelection`
+            objects to ``poses.df``. The main columns are remapped through
+            each output's ``diffused_index_map``; matching ``*_original``
+            columns preserve the input-spec numbering before remapping.
+            Columns are named ``<prefix>_<selection_key>`` and
+            ``<prefix>_<selection_key>_original`` and are created only for
+            keys present or derivable in at least one input spec. Expected
+            base column names are ``<prefix>_contig``, ``<prefix>_unindex``,
+            ``<prefix>_select_fixed_atoms``,
+            ``<prefix>_select_unfixed_sequence``,
+            ``<prefix>_fixed_motif_atoms``,
+            ``<prefix>_fixed_motif_atoms_with_ligand``,
+            ``<prefix>_select_buried``,
+            ``<prefix>_select_partially_buried``,
+            ``<prefix>_select_exposed``,
+            ``<prefix>_select_hbond_donor``,
+            ``<prefix>_select_hbond_acceptor``,
+            ``<prefix>_select_hotspots``, ``<prefix>_ligand``,
+            ``<prefix>_ligands``, and ``<prefix>_ligands_fixed_atoms``.
+            Each base column can have a corresponding ``*_original`` column.
+            Missing per-pose values in created columns are represented as
+            empty ``AtomSelection`` objects. Default is ``False``.
         strict_remap : bool, optional
             When ``True`` (default), :func:`remap_rfd3_motifs` raises a
             :exc:`ValueError` if any residue in a motif column is absent
@@ -953,6 +979,13 @@ class RFdiffusion3(Runner):
                 Present when *renumber_input* is ``True``.  Absolute path to
                 the input PDB copy renumbered according to the output's
                 ``diffused_index_map``.
+            ``<prefix>_<selection_key>``
+                Present when *parse_atomic_motifs* is ``True`` for each
+                parsed input-spec atom selection key described above, remapped
+                to output numbering via ``diffused_index_map``.
+            ``<prefix>_<selection_key>_original``
+                Present when *parse_atomic_motifs* is ``True``; contains the
+                corresponding unremapped input-spec atom selection.
             All numeric metrics from the sidecar ``metrics`` block,
             flattened into individual columns (e.g.
             ``<prefix>_plddt``, ``<prefix>_ptm``, etc.).
@@ -1105,6 +1138,17 @@ class RFdiffusion3(Runner):
                 poses.df["poses_description"] = poses.df["description"]
                 logging.info("Populated poses.df from scorefile.")
             else:
+                if parse_atomic_motifs:
+                    scores, added_columns = _add_rfd3_atomic_motif_columns_to_scores(
+                        scores=scores,
+                        params=params,
+                        prefix=prefix,
+                        index_layers=index_layers,
+                        existing_pose_columns=set(poses.df.columns),
+                        strict=strict_remap,
+                    )
+                    if added_columns:
+                        logging.info(f"Parsed RFD3 atomic motif columns: {added_columns}")
                 poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=index_layers).return_poses()
 
                 if update_motifs:
@@ -1177,6 +1221,17 @@ class RFdiffusion3(Runner):
             logging.info(
                 f"Populated poses.df directly from scores {len(poses.df.index)} rows).")
         else:
+            if parse_atomic_motifs:
+                scores, added_columns = _add_rfd3_atomic_motif_columns_to_scores(
+                    scores=scores,
+                    params=params,
+                    prefix=prefix,
+                    index_layers=index_layers,
+                    existing_pose_columns=set(poses.df.columns),
+                    strict=strict_remap,
+                )
+                if added_columns:
+                    logging.info(f"Parsed RFD3 atomic motif columns: {added_columns}")
             poses = RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=index_layers).return_poses()
 
             if update_motifs:
@@ -1377,6 +1432,98 @@ class RFdiffusion3(Runner):
             path = os.path.join(work_dir, subdir)
             if os.path.isdir(path):
                 shutil.rmtree(path)
+
+
+def _rfd3_source_description_from_output(description: str, index_layers: int, index_sep: str = "_") -> str:
+    """
+    Recover the input-spec key represented by one RFDiffusion3 output name.
+    """
+    if not index_layers:
+        return description
+    return index_sep.join(description.split(index_sep)[:-1 * index_layers])
+
+
+def _add_rfd3_atomic_motif_columns_to_scores(
+    scores: pd.DataFrame,
+    params: RFD3Params | dict,
+    prefix: str,
+    index_layers: int,
+    existing_pose_columns: set[str] | None = None,
+    strict: bool = True,
+) -> tuple[pd.DataFrame, list[str]]:
+    """
+    Add remapped and original AtomSelection columns to RFDiffusion3 scores.
+
+    Raw column names are added before :class:`RunnerOutput` prefixes the score
+    columns, so ``contig`` and ``contig_original`` become
+    ``<prefix>_contig`` and ``<prefix>_contig_original`` in ``poses.df``.
+    """
+    if scores.empty:
+        return scores, []
+
+    parsed_by_pose = {}
+    field_names = []
+    for pose_name, input_spec in params.items():
+        selections = AtomSelection.from_rfd3_input_spec(input_spec)
+        parsed_by_pose[pose_name] = selections
+        for field_name in selections:
+            if field_name not in field_names:
+                field_names.append(field_name)
+
+    if not field_names:
+        logging.info("parse_atomic_motifs=True found no atom selections in the RFDiffusion3 input specs.")
+        return scores, []
+
+    raw_column_names = [
+        column_name
+        for field_name in field_names
+        for column_name in (field_name, f"{field_name}_original")
+    ]
+    existing_columns = [column_name for column_name in raw_column_names if column_name in scores.columns]
+    if existing_columns:
+        raise ValueError(f"Cannot parse RFD3 atomic motifs because columns already exist in RFD3 scores: {existing_columns}")
+
+    added_columns = [f"{prefix}_{column_name}" for column_name in raw_column_names]
+    if existing_pose_columns:
+        existing_columns = [column_name for column_name in added_columns if column_name in existing_pose_columns]
+        if existing_columns:
+            raise ValueError(f"Cannot parse RFD3 atomic motifs because columns already exist in poses.df: {existing_columns}")
+
+    col_in_df(scores, "description")
+    col_in_df(scores, "diffused_index_map")
+
+    scores = scores.copy()
+    source_descriptions = [
+        _rfd3_source_description_from_output(description, index_layers=index_layers)
+        for description in scores["description"].to_list()
+    ]
+    diffused_index_maps = scores["diffused_index_map"].to_list()
+
+    for field_name in field_names:
+        original_selections = []
+        remapped_selections = []
+        for source_description, diffused_index_map in zip(source_descriptions, diffused_index_maps):
+            original_selection = parsed_by_pose.get(source_description, {}).get(field_name, AtomSelection(()))
+            diffused_index_map = _ensure_rfd3_index_map(
+                diffused_index_map,
+                motif_col=field_name,
+                strict=strict,
+            )
+            original_selections.append(original_selection)
+            remapped_selections.append(
+                _remap_atom_selection(
+                    original_selection,
+                    diff_idx_map=diffused_index_map,
+                    motif_col=field_name,
+                    strict=strict,
+                )
+            )
+
+        scores[field_name] = remapped_selections
+        scores[f"{field_name}_original"] = original_selections
+
+    return scores, added_columns
+
 
 def _ensure_rfd3_index_map(diff_idx_map: dict | None, motif_col: str, strict: bool) -> dict:
     """
