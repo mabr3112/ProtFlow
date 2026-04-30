@@ -12,7 +12,7 @@ from Bio.PDB.Structure import Structure
 
 # customs
 from protflow.residues import ResidueSelection
-from protflow.utils.biopython_tools import get_atoms, get_atoms_of_motif, load_structure_from_pdbfile
+from protflow.utils.biopython_tools import get_atoms, get_atoms_of_motif, biopython_load_structure
 
 def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_atoms: ResidueSelection = None, target_atoms: ResidueSelection = None, atom_list: list[str] = None, include_het_atoms : bool = False, rmsd_mobile_atoms: ResidueSelection = None, rmsd_target_atoms: ResidueSelection = None, rmsd_atom_list: list[str] = None, rmsd_include_het_atoms: bool = False,) -> Structure:
     '''Superimposes :mobile: onto :target: based on provided :mobile_atoms: and :target_atoms:. Calculates RMSD for :rmsd_mobile_atoms: and :rmsd_target_atoms:'''
@@ -91,8 +91,8 @@ def main(args):
     for target in target_dict:
         opts = target_dict[target]
         rms = motif_superimpose_calc_rmsd(
-            mobile = load_structure_from_pdbfile(opts["ref_pdb"]),
-            target = load_structure_from_pdbfile(target),
+            mobile = biopython_load_structure(opts["ref_pdb"]),
+            target = biopython_load_structure(target),
             mobile_atoms = ResidueSelection(opts["reference_motif"]),
             target_atoms = ResidueSelection(opts["target_motif"]),
             atom_list = super_atoms,
