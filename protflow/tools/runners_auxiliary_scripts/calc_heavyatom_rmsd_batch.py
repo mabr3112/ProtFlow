@@ -11,7 +11,7 @@ from Bio.PDB.Structure import Structure
 
 # customs
 from protflow.residues import ResidueSelection
-from protflow.utils.biopython_tools import get_atoms, get_atoms_of_motif, load_structure_from_pdbfile, save_structure_to_pdbfile
+from protflow.utils.biopython_tools import get_atoms, get_atoms_of_motif, biopython_load_structure, save_structure_to_file
 from protflow.poses import description_from_path
 
 def motif_superimpose_calc_rmsd(mobile: Structure, target: Structure, mobile_atoms: ResidueSelection = None, target_atoms: ResidueSelection = None, atom_list: list[str] = None, output_superimposed:bool=False) -> Structure:
@@ -81,8 +81,8 @@ def main(args):
     for target in target_dict:
         opts = target_dict[target]
         rms, superimposed = motif_superimpose_calc_rmsd(
-            mobile = load_structure_from_pdbfile(target),
-            target = load_structure_from_pdbfile(opts["ref_pdb"]),
+            mobile = biopython_load_structure(target),
+            target = biopython_load_structure(opts["ref_pdb"]),
             mobile_atoms = ResidueSelection(opts["target_motif"]),
             target_atoms = ResidueSelection(opts["reference_motif"]),
             atom_list = atoms,
@@ -94,7 +94,7 @@ def main(args):
             out_dir = os.path.dirname(args.output_path)
             os.makedirs(super_dir := os.path.join(out_dir, "superimposed"), exist_ok=True)
             path = os.path.join(super_dir, f"{description_from_path(target)}.pdb")
-            save_structure_to_pdbfile(superimposed, save_path=path)
+            save_structure_to_file(superimposed, save_path=path)
 
 
         # collect data

@@ -87,7 +87,7 @@ from . import jobstarters, require_config, load_config_path
 from .jobstarters import JobStarter, split_list
 from .residues import ResidueSelection, AtomSelection
 from .utils.utils import parse_fasta_to_dict
-from .utils.biopython_tools import load_structure_from_pdbfile, get_sequence_from_pose
+from .utils.biopython_tools import biopython_load_structure, get_sequence_from_pose
 from .utils.openbabel_tools import openbabel_fileconverter
 from .utils import plotting as plots
 
@@ -1363,7 +1363,7 @@ class Poses:
         """
         if pose_description not in self.df["poses_description"].to_list():
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
-        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0], all_models=all_models)
+        return biopython_load_structure(self.df[self.df["poses_description"] == pose_description]["poses"].values[0], all_models=all_models)
     
     def reindex_poses(self, prefix:str, group_col:str=None, remove_layers:int=None, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
         """
@@ -1658,7 +1658,7 @@ class Poses:
             raise RuntimeError(f"Poses must be of type .pdb, not {self.determine_pose_type()}")
 
         os.makedirs(fasta_dir := os.path.join(self.work_dir, f'{prefix}_fasta_location'), exist_ok=True)
-        seqs = [get_sequence_from_pose(load_structure_from_pdbfile(path_to_pdb=pose), chain_sep=chain_sep) for pose in self.df['poses'].to_list()]
+        seqs = [get_sequence_from_pose(biopython_load_structure(path=pose), chain_sep=chain_sep) for pose in self.df['poses'].to_list()]
 
         fasta_paths = []
         for name, seq in zip(self.df['poses_description'].to_list(), seqs):

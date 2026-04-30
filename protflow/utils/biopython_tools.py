@@ -132,8 +132,13 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
     # sanity
     if not os.path.isfile(path_to_pdb):
         raise FileNotFoundError(f"PDB file {path_to_pdb} not found!")
+
+
+    # there are pdf-file formatted files with different ext, e.g. .ent --> removing
+    """
     if not path_to_pdb.endswith(".pdb"):
         raise ValueError(f"File must be .pdb file. File: {path_to_pdb}")
+    """
 
     # set description as structure name if no other name is provided
     if not handle:
@@ -688,11 +693,11 @@ def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_p
         return path_to_output_structure
 
     # change numbering
-    pose = load_structure_from_pdbfile(pose_path)
+    pose = biopython_load_structure(pose_path)
     pose = renumber_pose_by_residue_mapping(pose=pose, residue_mapping=residue_mapping, keep_chain=keep_chain)
 
     # save pose
-    save_structure_to_pdbfile(pose, path_to_output_structure)
+    save_structure_to_file(pose, path_to_output_structure)
     return path_to_output_structure
 
 def renumber_pose_by_residue_mapping(pose: Bio.PDB.Structure.Structure, residue_mapping: dict, keep_chain: str = "") -> Bio.PDB.Structure.Structure:
@@ -1023,16 +1028,14 @@ def remove_non_residue_residues(model: Model, remove_hydrogens: bool = False) ->
 
     return model
 
-
-
-def biopython_load_protein(protein_path: str, model_id: int = None, handle: str = "structure", file_type: str = None) -> Structure|Model:
+def biopython_load_structure(path: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None, file_type: str = None) -> Union[Structure, Model]:
     """TODO: write proper docstring!
     Loads proteins into biopython Structure/Model objects, irrespective of .pdb or .cif format.
     :file_type: parameter allows to specify explicity which loader should be used. can be {'cif', 'pdb', None}
     """
     # sanitation
     if file_type is None:
-        file_type = os.path.splitext(protein_path)[-1]
+        file_type = os.path.splitext(path)[-1]
 
     match file_type.lower():
         case "pdb" | ".pdb":
@@ -1042,29 +1045,31 @@ def biopython_load_protein(protein_path: str, model_id: int = None, handle: str 
         case _:
             raise ValueError(f":file_type: must be either of {{'cif', 'pdb'}}. Your :file_type: {file_type}")            
 
-    if not os.path.isfile(protein_path):
-        raise FileNotFoundError(protein_path)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(path)
 
     # handle .pdb files
-    if (protein_path.endswith(".pdb") or file_type.lower() == "pdb") and not file_type.lower() == "cif":
+    if (path.endswith(".pdb") or file_type.lower() == "pdb") and not file_type.lower() == "cif":
         protein = load_structure_from_pdbfile(
-            path_to_pdb=protein_path,
-            all_models=model_id is None,
-            model=model_id,
+            path_to_pdb=path,
+            all_models=all_models,
+            model=model,
+            quiet=quiet,
             handle=handle
         )
         return protein
 
     # handle .cif files
-    if protein_path.endswith(".cif") or file_type.lower() == "cif":
-        # load mmcif
-        parser = MMCIFParser()
-        protein = parser.get_structure(handle, protein_path)
+    if path.endswith(".cif") or file_type.lower() == "cif":
+        protein = load_structure_from_ciffile(
+            path_to_cif=path,
+            all_models=all_models,
+            model=model,
+            quiet=quiet,
+            handle=handle
+        )
 
-        # extract model if specified
-        if model_id:
-            protein = protein[model_id]
-        return protein
+    return protein
 
 
 def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
@@ -1087,7 +1092,7 @@ def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
     out_pdb = os.path.join(work_dir, f"{stem}_{ligand_name}.pdb")
     out_sdf = os.path.join(work_dir, f"{stem}_{ligand_name}.sdf")
 
-    structure = biopython_load_protein(path, handle=stem)
+    structure = biopython_load_structure(path, handle=stem)
 
     class _ProteinSelect(Bio.PDB.Select): # inherit from Bio.PDB.Select to write only ATOM records
         def accept_residue(self, residue):
@@ -1111,3 +1116,165 @@ def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
     mol.title = ligand_name
     mol.write("sdf", out_sdf, overwrite=True)
     return None
+
+
+def load_structure_from_ciffile(path_to_cif: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Union[Structure, Model]:
+    """
+    Load a structure from a PDB file using BioPython's PDBParser.
+
+    This function parses a PDB file and returns a structure object. It allows
+    the option to load all models from the PDB file or a specific model.
+
+    Parameters:
+    -----------
+        path_to_pdb (str):
+            Path to the PDB file to be parsed.
+        all_models (bool, optional):
+            If True, all models from the PDB file are returned.
+            If False, only the specified model is returned. Defaults to False.
+        model (int, optional):
+            The index of the model to return. Only used if all_models is False.
+            Defaults to 0 (first model).
+        quiet (bool, optional):
+            If True, suppresses output from the PDBParser. Defaults to True.
+        handle (str, optional):
+            String handle that is passed to the PDBParser's get_structure()
+            method and sets the id of the structure.
+
+    Returns:
+    --------
+        Bio.PDB.Structure:
+            The parsed structure object from the PDB file. If all_models is True,
+            returns a Structure containing all models. Otherwise, returns a single
+            Model object at the specified index.
+
+    Raises:
+    -------
+        FileNotFoundError:
+            If the specified PDB file does not exist.
+        ValueError:
+            If the specified model index is out of range for the PDB file.
+
+    Example:
+    --------
+        To load the first model from a PDB file:
+        >>> structure = load_structure_from_pdbfile("example.pdb")
+
+        To load all models from a PDB file:
+        >>> all_structures = load_structure_from_pdbfile("example.pdb", all_models=True)
+    """
+    # sanity
+    if not os.path.isfile(path_to_cif):
+        raise FileNotFoundError(f"mmCIF file {path_to_cif} not found!")
+
+    # set description as structure name if no other name is provided
+    if not handle:
+        handle = os.path.splitext(os.path.basename(path_to_cif))[0]
+
+    # load poses
+    parser = MMCIFParser(QUIET=quiet)
+    if all_models:
+        return parser.get_structure(handle, path_to_cif)
+    return parser.get_structure(handle, path_to_cif)[model]
+
+
+def save_structure_to_ciffile(pose: Structure, save_path: str) -> None:
+    """
+    Save a BioPython structure object to a cif file.
+
+    This function takes a BioPython `Structure` object and writes it to a specified file in cif format. It is useful for saving modified structures or for converting structures into PDB files for further analysis or visualization.
+
+    Parameters:
+    -----------
+    pose : Bio.PDB.Structure
+        The BioPython `Structure` object to be saved.
+    save_path : str
+        The file path where the cif file will be written. The file will be created if it does not exist, or overwritten if it does.
+
+    Returns:
+    --------
+    None
+
+    Raises:
+    -------
+    IOError
+        If the file cannot be written to the specified path.
+
+    Example:
+    --------
+    Save a BioPython structure to a cif file:
+
+    .. code-block:: python
+
+        from biopython_tools import save_structure_to_ciffile
+
+        structure = biopython_load_structure("example", "example.pdb")
+
+        # Save the structure to a new PDB file
+        save_structure_to_ciffile(structure, "output.pdb")
+    """
+
+    io = Bio.PDB.mmcifio.MMCIFIO()
+    io.set_structure(pose)
+    io.save(save_path)
+
+
+def save_structure_to_file(pose: Structure, save_path: str, multimodel: bool = False, file_type: str = None) -> None:
+    """
+    Save a BioPython structure object to a file of the selected file type (will be determined automatically from save_path if not set).
+
+    This function takes a BioPython `Structure` object and writes it to a specified file. It is useful for saving modified structures or for converting structures into files for further analysis or visualization.
+
+    Parameters:
+    -----------
+    pose : Bio.PDB.Structure
+        The BioPython `Structure` object to be saved.
+    save_path : str
+        The file path where the PDB file will be written. The file will be created if it does not exist, or overwritten if it does.
+    multimodel : bool
+        If the structure to be saved is a multimodel PDB file, write all models. Only works if input is a Structure object, not a model!
+    file_type : str, optional
+        Determines the file type of the output file. Must be either 'cif' or 'pdb'. Is determined from save_path if not set. Defaults to None.
+    
+    Returns:
+    --------
+    None
+
+    Raises:
+    -------
+    IOError
+        If the file cannot be written to the specified path.
+
+    Example:
+    --------
+    Save a BioPython structure to a PDB file:
+
+    .. code-block:: python
+
+        from biopython_tools import save_structure_to_file, biopython_load_structure
+        structure = biopython_load_structure("example.pdb")
+
+        # Save the structure to a new cif file
+        save_structure_to_file(structure, "output.cif")
+    """
+
+    # sanitation
+    if file_type is None:
+        file_type = os.path.splitext(save_path)[-1]
+
+    match file_type.lower():
+        case "pdb" | ".pdb":
+            file_type = "pdb"
+        case "cif" | "mmcif" | ".cif" | ".mmcif":
+            file_type = "cif"
+        case _:
+            raise ValueError(f":file_type: must be either of {{'cif', 'pdb'}}. Your :file_type: {file_type}")
+        
+    if file_type == "pdb":
+        save_structure_to_pdbfile(pose=pose, save_path=save_path, multimodel=multimodel)
+    
+    if file_type == "cif":
+        if multimodel:
+            raise KeyError("Output format cif does not offer multimodel support!")
+        
+        save_structure_to_ciffile(pose=pose, save_path=save_path)

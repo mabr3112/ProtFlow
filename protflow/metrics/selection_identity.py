@@ -81,7 +81,7 @@ from ..runners import Runner, RunnerOutput
 from ..residues import ResidueSelection
 from ..poses import Poses, col_in_df, description_from_path
 from ..jobstarters import JobStarter
-from ..utils.biopython_tools import load_structure_from_pdbfile, three_to_one_AA_code
+from ..utils.biopython_tools import biopython_load_structure, three_to_one_AA_code
 
 class SelectionIdentity(Runner):
     """
@@ -320,7 +320,7 @@ def main(args):
     in_df = pd.read_json(args.input_json)
     selection_resnames = []
     for pose, selection in zip(in_df["location"].to_list(), in_df["selections"].to_list()):
-        pose = load_structure_from_pdbfile(pose)
+        pose = biopython_load_structure(pose)
         residues_dict = {}
         for residue in pose.get_residues():
             chain_id = residue.parent.id

@@ -6,12 +6,12 @@ import json
 from Bio.PDB.Structure import Structure
 
 # customs
-from protflow.utils.biopython_tools import load_structure_from_pdbfile, save_structure_to_pdbfile
+from protflow.utils.biopython_tools import biopython_load_structure, save_structure_to_file
 
 def remove_chain_from_pdb(pdb_path: str, chains: list[str]) -> Structure:
     '''Removes chain from protein given as path to a .pdb file. Returns BioPython Structure object.'''
     # load pose
-    pose = load_structure_from_pdbfile(pdb_path)
+    pose = biopython_load_structure(pdb_path)
 
     # remove chains and return
     if isinstance(chains, str):
@@ -44,7 +44,7 @@ def main(args):
         elif args.output_dir:
             new_path = f"{args.output_dir}/{pdb.rsplit('/', maxsplit=1)[-1]}"
 
-        save_structure_to_pdbfile(pose, save_path=new_path)
+        save_structure_to_file(pose, save_path=new_path)
 
 if __name__ == "__main__":
     import argparse
