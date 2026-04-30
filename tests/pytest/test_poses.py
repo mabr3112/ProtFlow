@@ -612,7 +612,7 @@ def test_get_pose_loads_structure_by_description(tmp_path, monkeypatch):
 
     sentinel = object()
     # mock the loader used inside get_pose
-    with patch("protflow.poses.load_structure_from_pdbfile", return_value=sentinel) as m:
+    with patch("protflow.poses.load_structure_from_file", return_value=sentinel) as m:
         out = p.get_pose("a")
         assert out is sentinel
         m.assert_called_once()
