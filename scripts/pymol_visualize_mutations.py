@@ -28,8 +28,8 @@ def main(args):
 
     # load structures
     logging.info(f"Loading reference and variant structures from:\n{args.reference_pdb}\n{args.variant_pdb}")
-    wt = bio_tools.load_structure_from_pdbfile(args.reference_pdb)
-    var = bio_tools.load_structure_from_pdbfile(args.variant_pdb)
+    wt = bio_tools.biopython_load_structure(args.reference_pdb)
+    var = bio_tools.biopython_load_structure(args.variant_pdb)
 
     # get sequences
     wt_seq = bio_tools.get_sequence_from_pose(wt)

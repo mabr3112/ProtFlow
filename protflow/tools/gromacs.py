@@ -126,11 +126,11 @@ class Gromacs(Runner):
             cleaned_fn = os.path.join(prep_dir, os.path.basename(pose))
             if not os.path.isfile(cleaned_fn) or self.overwrite_prep:
                 # load model using biopython
-                model = bpt.load_structure_from_pdbfile(pose)
+                model = bpt.biopython_load_structure(pose)
 
                 # load and save protein-only file using BioPython (remove non-protein residues)
                 only_residue_model = bpt.remove_non_residue_residues(model)
-                bpt.save_structure_to_pdbfile(only_residue_model, save_path=cleaned_fn)
+                bpt.save_structure_to_file(only_residue_model, save_path=cleaned_fn)
             else:
                 logging.info(f"File {cleaned_fn} exists and overwrite is set to {self.overwrite_prep}. Skipping pdb_cleanup.")
             cleaned_poses.append(cleaned_fn)

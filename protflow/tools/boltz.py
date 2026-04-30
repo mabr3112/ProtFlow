@@ -74,7 +74,7 @@ from ..poses import Poses, get_format
 from .. import load_config_path, require_config
 from ..jobstarters import JobStarter, split_list
 from ..runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string
-from ..utils.biopython_tools import load_sequence_from_fasta, get_sequence_from_pose, biopython_load_protein
+from ..utils.biopython_tools import load_sequence_from_fasta, get_sequence_from_pose, biopython_load_structure
 
 class Boltz(Runner):
     """
@@ -616,7 +616,7 @@ def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, over
         sequence_dict_list = [{idx_to_char(i): chain_seq for i, chain_seq in enumerate(seq.split(_determine_split_char(seq)))} for seq in sequences]
 
     elif all(pose.endswith((".pdb", "cif")) for pose in poses.poses_list()):
-        sequence_dict_list = [get_sequence_from_pose(biopython_load_protein(pose, model_id=0), with_chains=True) for pose in poses.poses_list()]
+        sequence_dict_list = [get_sequence_from_pose(biopython_load_structure(pose), with_chains=True) for pose in poses.poses_list()]
     else:
         raise TypeError("Boltz only supports files in .pdb, .cif, or .fa format!")
 

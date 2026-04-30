@@ -87,7 +87,7 @@ from ..jobstarters import JobStarter, split_list
 from ..runners import Runner, RunnerOutput, col_in_df
 from .. import jobstarters, require_config, load_config_path
 from ..utils.utils import parse_fasta_to_dict, _mutually_exclusive
-from ..utils.biopython_tools import load_structure_from_pdbfile
+from ..utils.biopython_tools import biopython_load_structure
 
 # locals
 
@@ -924,7 +924,7 @@ class ChainRemover(Runner):
 
         # setup preserved chains
         if preserve_chains:
-            chain_list = [[chain.id for chain in load_structure_from_pdbfile(pose).get_chains() if not chain.id in pres_chains] for pose, pres_chains in zip(poses.poses_list(), chain_list)]
+            chain_list = [[chain.id for chain in biopython_load_structure(pose).get_chains() if not chain.id in pres_chains] for pose, pres_chains in zip(poses.poses_list(), chain_list)]
 
         # batch inputs to max_cores
         input_dict = {pose: chain for pose, chain in zip(poses.poses_list(), chain_list)}

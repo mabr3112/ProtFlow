@@ -381,7 +381,7 @@ class BiopythonMetric:
         try:
             atom = self._resolve_atom_from_entity(biomolecule, model_id, chain_id, residue_id, atom_name)
         except KeyError as exc:
-            raise KeyError(f"Could not resolve atom specification {atom_spec}") from exc
+            raise KeyError(f"Could not resolve atom specification {atom_spec} in biomolecule {biomolecule.get_full_id()}") from exc
 
         if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
             atom.disordered_select(altloc)

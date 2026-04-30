@@ -149,9 +149,13 @@ def load_config_path(config: object, path_var: str, is_pre_cmd: bool = False) ->
     Loads a variable from config.py
     If the variable is not set, it returns an error message to set the variable.
     '''
+    # check if variable is present in config
     try:
         var = getattr(config, path_var)
     except AttributeError as exc:
+        # Note: PRE_CMD does not even need to be present in config file
+        if is_pre_cmd or path_var.upper().endswith("PRE_CMD"):
+            return ""
         raise ProtFlowConfigError(config, path_var) from exc
 
     # if the loaded config setting is a pre_cmd, return without checking
