@@ -87,11 +87,15 @@ RFD3_INPUT_SELECTION_FIELDS = (
     "select_hbond_donor",
     "select_hbond_acceptor",
     "select_hotspots",
+    "ligands",
+    "ligands_fixed_atoms",
 )
 
 _RFD3_DERIVED_INPUT_SELECTION_FIELDS = (
     "fixed_motif_atoms",
     "fixed_motif_atoms_with_ligand",
+    "ligands",
+    "ligands_fixed_atoms",
 )
 
 _RFD3_BACKBONE_ATOMS = ("N", "CA", "C", "O")
@@ -1261,13 +1265,16 @@ class AtomSelection:
             ``fixed_motif_atoms``, ``fixed_motif_atoms_with_ligand``,
             ``select_buried``, ``select_partially_buried``,
             ``select_exposed``, ``select_hbond_donor``,
-            ``select_hbond_acceptor``, and ``select_hotspots``. The
-            ``fixed_motif_atoms`` fields are derived from the RFD3 motif,
-            sequence, and coordinate-fixing fields rather than read directly
+            ``select_hbond_acceptor``, ``select_hotspots``, ``ligands``, and
+            ``ligands_fixed_atoms``. The ``fixed_motif_atoms`` and ligand
+            fixed-atom fields are derived from the RFD3 motif, sequence,
+            ligand, and coordinate-fixing fields rather than read directly
             from *input_spec*.
         include_ligand : bool, optional
             If ``True`` (default), parse the RFD3 ``ligand`` field into an
-            AtomSelection under the key ``"ligand"``.
+            AtomSelection under the legacy key ``"ligand"`` and, when
+            requested by *fields*, under ``"ligands"`` and
+            ``"ligands_fixed_atoms"``.
         model_id : int or str, optional
             BioPython model identifier used for structure-backed parsing.
         residue_id_format : {"auto", "compact", "biopython"}, optional
@@ -1278,7 +1285,9 @@ class AtomSelection:
         dict[str, AtomSelection]
             Mapping from each parsed input-specification field to the
             corresponding AtomSelection. Fields absent from *input_spec* or set
-            to ``None`` are omitted.
+            to ``None`` are omitted. ``"ligand"`` is retained as a
+            backwards-compatible alias for all ligand atoms; new code should
+            prefer ``"ligands"`` and ``"ligands_fixed_atoms"``.
 
         Raises
         ------
@@ -1357,12 +1366,22 @@ class AtomSelection:
         if include_ligand and input_spec.get("ligand") is not None:
             # Ligand is not typed as InputSelection in RFD3, but it resolves to
             # a concrete atom set and is useful for downstream atom metrics.
-            selections["ligand"] = AtomSelection.from_rfd3_ligand(
+            ligand_atoms = AtomSelection.from_rfd3_ligand(
                 input_spec["ligand"],
                 pose=pose,
                 model_id=model_id,
                 residue_id_format=residue_id_format,
             )
+            selections["ligand"] = ligand_atoms
+            if "ligands" in fields:
+                selections["ligands"] = ligand_atoms
+            if "ligands_fixed_atoms" in fields:
+                selections["ligands_fixed_atoms"] = _fixed_ligand_atoms_from_rfd3_input_spec(
+                    input_spec,
+                    pose=pose,
+                    model_id=model_id,
+                    residue_id_format=residue_id_format,
+                )
 
         return selections
 
