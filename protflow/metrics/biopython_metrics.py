@@ -22,6 +22,7 @@ from protflow.poses import Poses
 from protflow.runners import Runner, RunnerOutput
 from protflow.jobstarters import JobStarter, split_list
 from protflow.residues import AtomSelectionInput, AtomSelection
+from protflow.utils.utils import vdw_radii
 
 
 def _json_ready(value: Any) -> Any:
@@ -401,14 +402,14 @@ class BiopythonMetric:
             return biomolecule[atom_name]
         raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
 
-    def _parse_atoms(self, biomolecule: Entity, atoms: AtomSelectionInput, expected_counts: tuple[int, ...], parameter_name: str = "atoms") -> list[Atom]:
+    def _parse_atoms(self, biomolecule: Entity, atoms: AtomSelectionInput, expected_counts: tuple[int, ...] = None, parameter_name: str = "atoms") -> list[Atom]:
         '''Resolve an ordered atom selection from a BioPython entity.'''
         try:
             atom_specs = AtomSelection(atoms).to_list()
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{parameter_name} must be an ordered AtomSelection or atom ID list. Got: {atoms}") from exc
 
-        if len(atom_specs) not in expected_counts:
+        if expected_counts and len(atom_specs) not in expected_counts:
             raise ValueError(f"{parameter_name} must contain {expected_counts} atoms. Got {len(atom_specs)}: {atoms}")
         return [self._atom_from_spec(biomolecule, atom_spec) for atom_spec in atom_specs]
 
@@ -570,3 +571,42 @@ class PlaneAngle(BiopythonMetric):
         normal_a = self._plane_normal(atom_list[0], atom_list[1], atom_list[2])
         normal_b = self._plane_normal(atom_list[3], atom_list[4], atom_list[5])
         return self._angle_between_vectors(normal_a, normal_b, degrees=degrees, acute=acute)
+
+class Clashes(BiopythonMetric):
+    # TODO: Add more documentation!
+    '''Check if any atom in a selection clashes with another based on a selected distance cutoff or van der waals radii. Strictness corresponds to multiplicator vor vdw-based clash detection. Return number of clashes'''
+    def __init__(self, name: str | None = None, atoms1: AtomSelectionInput|str = None, atoms2: AtomSelectionInput|str = None, distance: str | float = "vdw", strictness: float = 1) -> None:
+        '''Initialize a Clash detection metric.'''
+        super().__init__(name=name, atoms1=atoms1, atoms2=atoms2, distance=distance, strictness=strictness)
+
+    def calc(self, biomolecule: Entity, atoms1: AtomSelectionInput|str = None, atoms2: AtomSelectionInput|str = None, distance: str | float = "vdw", strictness: float = 1) -> float: #pylint: disable=W0221
+        '''Calculate the number of clashes between two atom selections.'''
+
+        if not isinstance(distance, float) and distance != "vdw":
+            raise ValueError(":distance: must be float or vdw (for calculating clashes based on van der waals radii!")
+        
+        atom1_list = self._parse_atoms(biomolecule, atoms1)
+        atom2_list = self._parse_atoms(biomolecule, atoms2)
+
+        coords1 = np.array([atom.get_coord() for atom in atom1_list])
+        coords2 = np.array([atom.get_coord() for atom in atom2_list])
+
+        # calculate distances between all atoms
+        dgram = np.linalg.norm(coords1[:, np.newaxis] - coords2[np.newaxis, :], axis=-1)
+
+        if distance == "vdw":
+            vdw1 = np.array([vdw_radii()[atom.element.lower()] for atom in atom1_list])
+            vdw2 = np.array([vdw_radii()[atom.element.lower()] for atom in atom2_list])
+
+            if np.any(np.isnan(vdw1)) or np.any(np.isnan(vdw2)):
+                raise KeyError("Could not find Van der Waals radii for all elements in atom selections. Check protflow.utils.vdw_radii and add it, if applicable!")
+
+            # determine minimal distance 
+            distance = vdw1[:, np.newaxis] + vdw2[np.newaxis, :]
+
+            distance = distance * strictness
+
+        # subtract minimal distances from calculated distances
+        check = dgram - distance
+
+        return int(np.sum((check < 0)))
