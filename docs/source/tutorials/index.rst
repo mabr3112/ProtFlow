@@ -8,4 +8,6 @@ Welcome to the ProtFlow tutorials!
 
     load_poses
     run_applications
+    generic_metric
+    biopython_metrics
     binder_design

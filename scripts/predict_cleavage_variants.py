@@ -11,7 +11,7 @@ from protflow import jobstarters
 from protflow.poses import Poses
 from protflow.residues import ResidueSelection
 from protflow.tools.alphafold2 import Alphafold2
-from protflow.utils.biopython_tools import get_sequence_from_pose, load_structure_from_pdbfile
+from protflow.utils.biopython_tools import get_sequence_from_pose, biopython_load_structure
 
 def read_fasta(input_str: str, sep: str) -> dict:
     '''Reads fasta file with singular fasta inside and returns as dict {chain: seq(chain), ...}'''
@@ -25,7 +25,7 @@ def read_fasta(input_str: str, sep: str) -> dict:
 def read_pdb(input_pdb: str, sep: str) -> dict:
     '''Collects sequence from .pdb file and returns sequence as dict {chain: seq(chain), ...}'''
     # load pose:
-    pose = load_structure_from_pdbfile(input_pdb)
+    pose = biopython_load_structure(input_pdb)
 
     # get sequence
     seq = get_sequence_from_pose(pose, sep)

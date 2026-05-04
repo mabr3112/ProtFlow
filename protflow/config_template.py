@@ -76,6 +76,11 @@ MINIFOLD_SCRIPT_PATH = "" # "/path/to/minifold/predict.py"
 MINIFOLD_PYTHON_PATH = "" # "/path/to/mambaforge/envs/minifold/bin/python"
 MINIFOLD_PRE_CMD = ""
 
+# rfdiffusion3
+RFDIFFUSION3_BIN_PATH = "" # "/path/to/mambaforge/envs/rfd3/bin/rfd3"
+RFDIFFUSION3_MODEL_DIR = "" # "/path/to/foundry/models/rfd3/checkpoints/"
+RFDIFFUSION3_PRE_CMD = ""
+
 # protein generator
 PROTEIN_GENERATOR_PYTHON_PATH = ""
 PROTEIN_GENERATOR_SCRIPT_PATH = ""
@@ -92,3 +97,10 @@ CALIBY_PRE_CMD = "" # "source /path/to/caliby/env_setup.sh"
 # frame2seq
 FRAME2SEQ_PYTHON_PATH = "" # "/path/to/mambaforge/envs/frame2seq/bin/python3
 FRAME2SEQ_PRE_CMD = ""
+
+
+# sigmadock
+SIGMADOCK_SCRIPT_PATH = "" # "/path/to/sigmadock/scripts/sample.py"
+SIGMADOCK_PYTHON_PATH = "" # "/path/to/package_manager/envs/sigmadock/bin/python"
+SIGMADOCK_CKPT_PATH = "" # "/path/to/sigmadock/model/sample_checkpoint_0.ckpt"
+SIGMADOCK_PRE_CMD = "" # "export PATH=/path/to/package_manager/envs/sigmadock/bin:$PATH"

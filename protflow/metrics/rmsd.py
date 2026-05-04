@@ -68,6 +68,7 @@ Version
 # import general
 import os
 import json
+import shlex
 from typing import Any
 
 # import dependencies
@@ -75,10 +76,248 @@ import pandas as pd
 
 # import customs
 from ..poses import Poses
-from ..residues import ResidueSelection
+from ..residues import AtomSelection, AtomSelectionInput, ResidueSelection
 from ..jobstarters import JobStarter, split_list
 from ..runners import Runner, RunnerOutput, col_in_df
 from .. import jobstarters, load_config_path, require_config
+
+
+def _setup_atom_selection_list(
+    poses: Poses,
+    selection: AtomSelectionInput,
+    parameter_name: str,
+    allow_none: bool = False,
+) -> list[list[Any] | None]:
+    """Expand static or dataframe-column atom selections into one JSON-ready list per pose."""
+    # None is valid only for optional superimposition selections.
+    if selection is None:
+        if allow_none:
+            return [None for _ in poses]
+        raise ValueError(f"{parameter_name} must be specified.")
+
+    # Strings point to dataframe columns with one ordered selection per pose.
+    if isinstance(selection, str):
+        col_in_df(poses.df, selection)
+        out = []
+        for idx, row_selection in enumerate(poses.df[selection].to_list()):
+            if row_selection is None:
+                if allow_none:
+                    out.append(None)
+                    continue
+                raise ValueError(f"{parameter_name} column '{selection}' contains None at row {idx}.")
+            out.append(AtomSelection(row_selection).to_list())
+        return out
+
+    # Non-column selections are static and reused for every pose.
+    atom_selection = AtomSelection(selection).to_list()
+    return [atom_selection for _ in poses]
+
+
+def _setup_reference_paths(poses: Poses, ref_col: str | None, ref_path: str | None) -> list[str]:
+    """Resolve mutually exclusive reference path sources to one path per pose."""
+    # Users can either pass one static reference path or a column with per-pose paths.
+    if ref_col is not None and ref_path is not None:
+        raise ValueError("ref_col and ref_path are mutually exclusive. Specify only one reference source.")
+    if ref_col is None and ref_path is None:
+        raise ValueError("Either ref_col or ref_path must be specified for atom-level RMSD calculation.")
+
+    if ref_col is not None:
+        col_in_df(poses.df, ref_col)
+        ref_paths = poses.df[ref_col].to_list()
+    else:
+        if not isinstance(ref_path, str):
+            raise TypeError(f"ref_path must be a string path. Got {type(ref_path)}: {ref_path}")
+        ref_paths = [ref_path for _ in poses]
+
+    # Validate early so path issues fail before jobs are submitted.
+    for path in ref_paths:
+        if not isinstance(path, str):
+            raise TypeError(f"Reference paths must be strings. Got {type(path)}: {path}")
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"Reference structure file not found: {path}")
+    return [os.path.abspath(path) for path in ref_paths]
+
+
+class AtomRMSD(Runner):
+    """Runner for atom-level BioPython RMSD calculations."""
+
+    def __init__(
+        self,
+        ref_col: str | None = None,
+        ref_path: str | None = None,
+        ref_atoms: AtomSelectionInput = None,
+        ref_superimpose_atoms: AtomSelectionInput = None,
+        target_atoms: AtomSelectionInput = None,
+        target_superimpose_atoms: AtomSelectionInput = None,
+        return_superimposed: bool = False,
+        jobstarter: JobStarter | None = None,
+        overwrite: bool = False,
+    ) -> None:
+        """Initialize an atom-level RMSD runner."""
+        # setup config
+        config = require_config()
+        self.python = os.path.join(load_config_path(config, "PROTFLOW_ENV"), "python")
+        self.script_dir = load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR")
+
+        # runner setup
+        self.ref_col = ref_col
+        self.ref_path = ref_path
+        self.ref_atoms = ref_atoms
+        self.ref_superimpose_atoms = ref_superimpose_atoms
+        self.target_atoms = target_atoms
+        self.target_superimpose_atoms = target_superimpose_atoms
+        self.return_superimposed = return_superimposed
+        self.jobstarter = jobstarter
+        self.overwrite = overwrite
+        self.name = "atom_rmsd"
+
+    def __str__(self) -> str:
+        return "AtomRMSD"
+
+    def run(
+        self, poses: Poses, prefix: str, jobstarter: JobStarter | None = None, overwrite: bool = False,
+        ref_col: str | None = None, ref_path: str | None = None, ref_atoms: AtomSelectionInput = None,
+        ref_superimpose_atoms: AtomSelectionInput = None, target_atoms: AtomSelectionInput = None, 
+        target_superimpose_atoms: AtomSelectionInput = None, return_superimposed: bool | None = None,
+    ) -> Poses:
+        """Run atom-level RMSD calculation and merge the resulting scores into ``poses``."""
+        # prep inputs
+        ref_col = ref_col or self.ref_col
+        ref_path = ref_path or self.ref_path
+        ref_atoms = ref_atoms or self.ref_atoms
+        ref_superimpose_atoms = ref_superimpose_atoms or self.ref_superimpose_atoms
+        target_atoms = target_atoms or self.target_atoms
+        target_superimpose_atoms = target_superimpose_atoms or self.target_superimpose_atoms
+        overwrite = overwrite or self.overwrite
+        return_superimposed = return_superimposed or self.return_superimposed
+
+        # sanity
+        if not isinstance(return_superimposed, bool):
+            raise TypeError(f"return_superimposed must be bool. Got {type(return_superimposed)}: {return_superimposed}")
+
+        # setup runner
+        script_path = os.path.join(self.script_dir, "calc_atom_rmsd.py")
+        if not os.path.isfile(script_path):
+            raise ValueError(
+                f"Cannot find script 'calc_atom_rmsd.py' at specified directory: '{self.script_dir}'. "
+                "Set AUXILIARY_RUNNER_SCRIPTS_DIR in config.py to the protflow/tools/runners_auxiliary_scripts directory."
+            )
+
+        work_dir, jobstarter = self.generic_run_setup(
+            poses=poses,
+            prefix=prefix,
+            jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter],
+        )
+
+        # check if outputs are present
+        scorefile = os.path.join(work_dir, f"{prefix}_rmsds.{poses.storage_format}")
+        if (rmsd_df := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            return RunnerOutput(poses=poses, results=rmsd_df, prefix=prefix).return_poses()
+
+        # setup full input dict, batch later
+        input_dict = self.setup_input_dict(
+            poses=poses,
+            ref_col=ref_col,
+            ref_path=ref_path,
+            ref_atoms=ref_atoms,
+            ref_superimpose_atoms=ref_superimpose_atoms,
+            target_atoms=target_atoms,
+            target_superimpose_atoms=target_superimpose_atoms,
+            return_superimposed=return_superimposed,
+        )
+
+        if not input_dict:
+            raise ValueError("No poses were provided for atom-level RMSD calculation.")
+
+        # setup pose superimposition output directory
+        superimposed_dir = os.path.join(work_dir, "superimposed")
+        if return_superimposed:
+            os.makedirs(superimposed_dir, exist_ok=True)
+
+        # split input_dict into subdicts
+        split_sublists = split_list(list(input_dict.keys()), n_sublists=jobstarter.max_cores or 1)
+        subdicts = [{target: input_dict[target] for target in sublist} for sublist in split_sublists]
+
+        # write n=max_cores input_json files for calc_atom_rmsd.py
+        json_files = []
+        output_files = []
+        for i, subdict in enumerate(subdicts, start=1):
+            input_json = os.path.join(work_dir, f"atom_rmsd_input_{str(i).zfill(4)}.json")
+            output_json = os.path.join(work_dir, f"atom_rmsd_output_{str(i).zfill(4)}.json")
+            with open(input_json, "w", encoding="UTF-8") as f:
+                json.dump(subdict, f)
+            json_files.append(input_json)
+            output_files.append(output_json)
+
+        # setup commands
+        cmds = []
+        for input_json, output_json in zip(json_files, output_files):
+            cmd = (
+                f"{shlex.quote(self.python)} {shlex.quote(script_path)} "
+                f"--input_json {shlex.quote(input_json)} "
+                f"--output_path {shlex.quote(output_json)}"
+            )
+            if return_superimposed:
+                cmd += f" --superimposed_out_path {shlex.quote(superimposed_dir)}"
+            cmds.append(cmd)
+
+        # run commands
+        jobstarter.start(
+            cmds=cmds,
+            jobname=prefix,
+            wait=True,
+            output_path=work_dir,
+        )
+
+        # collect outputs
+        rmsd_df = pd.concat([pd.read_json(output_path) for output_path in output_files], ignore_index=True)
+        self.save_runner_scorefile(scores=rmsd_df, scorefile=scorefile)
+        return RunnerOutput(poses=poses, results=rmsd_df, prefix=prefix).return_poses()
+
+    def setup_input_dict(
+        self, poses: Poses, ref_col: str | None, ref_path: str | None, ref_atoms: AtomSelectionInput,
+        ref_superimpose_atoms: AtomSelectionInput, target_atoms: AtomSelectionInput,
+        target_superimpose_atoms: AtomSelectionInput, return_superimposed: bool,
+    ) -> dict[str, dict[str, Any]]:
+        """Set up the JSON input dictionary for ``calc_atom_rmsd.py``."""
+
+        # setup parameter lists
+        ref_paths = _setup_reference_paths(poses=poses, ref_col=ref_col, ref_path=ref_path)
+        ref_atoms_list = _setup_atom_selection_list(poses=poses, selection=ref_atoms, parameter_name="ref_atoms")
+        target_atoms_list = _setup_atom_selection_list(poses=poses, selection=target_atoms, parameter_name="target_atoms")
+        ref_superimpose_atoms_list = _setup_atom_selection_list(
+            poses=poses,
+            selection=ref_superimpose_atoms,
+            parameter_name="ref_superimpose_atoms",
+            allow_none=True,
+        )
+        target_superimpose_atoms_list = _setup_atom_selection_list(
+            poses=poses,
+            selection=target_superimpose_atoms,
+            parameter_name="target_superimpose_atoms",
+            allow_none=True,
+        )
+
+        # construct rmsd_input_dict
+        input_dict = {}
+        for i, pose_path in enumerate(poses.poses_list()):
+            ref_super = ref_superimpose_atoms_list[i]
+            target_super = target_superimpose_atoms_list[i]
+            if (ref_super is None) != (target_super is None):
+                raise ValueError(
+                    "ref_superimpose_atoms and target_superimpose_atoms must either both be specified or both be None "
+                    f"for pose {pose_path}."
+                )
+
+            input_dict[os.path.abspath(pose_path)] = {
+                "ref_path": ref_paths[i],
+                "ref_atoms": ref_atoms_list[i],
+                "ref_superimpose_atoms": ref_super,
+                "target_atoms": target_atoms_list[i],
+                "target_superimpose_atoms": target_super,
+                "return_superimposed": return_superimposed,
+            }
+        return input_dict
 
 class BackboneRMSD(Runner):
     """

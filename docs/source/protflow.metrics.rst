@@ -12,6 +12,14 @@ protflow.metrics.fpocket module
    :undoc-members:
    :show-inheritance:
 
+protflow.metrics.generic_metric_runner module
+---------------------------------------------
+
+.. automodule:: protflow.metrics.generic_metric_runner
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 protflow.metrics.protparam module
 ---------------------------------
 

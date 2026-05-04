@@ -1,69 +1,66 @@
-# TODO: Generate proper doc strings!!!
 """
-Generic Metric module
-===========
+Generic metric runner for ProtFlow.
 
-This module provides the functionality to calculate generic metrics within the ProtFlow framework. It offers tools to run calculations, handle inputs and outputs, and process the resulting data in a structured and automated manner.
+This module exposes :class:`GenericMetric`, a lightweight :class:`protflow.runners.Runner`
+that executes any importable Python function over the poses stored in a
+:class:`protflow.poses.Poses` object. The target function must accept a single
+pose path as its first positional argument and return a JSON-serializable value.
+Additional keyword arguments can be forwarded through the runner's ``options``
+dictionary.
 
-Detailed Description
---------------------
-The `GenericMetric`  class encapsulate the functionality necessary to execute generic metrics. Generic metrics can be any function that accepts the path to a single pose as its input and returns e.g. a score. This class manages the configuration of the module and function, sets up the environment, and handles the execution of calculations. It also includes methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.
+How it works
+------------
+``GenericMetric.run()`` resolves the working directory and jobstarter, splits
+``poses.poses_list()`` into manageable chunks, and starts one worker command
+per chunk. Each worker re-enters this module as a small CLI program, imports
+the requested module and function dynamically, evaluates the function on every
+pose path in its chunk, and stores the results as JSON. The parent process then
+concatenates the worker outputs and merges them back into ``poses.df`` through
+``RunnerOutput``.
 
-The module is designed to streamline the integration of calculations into larger computational workflows. It supports the automatic setup of job parameters and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.
-
-Usage
------
-To use this module, create an instance of the `GenericMetric` class and invoke its `run` methods with appropriate parameters. The module will handle the configuration, execution, and result collection processes.
-
-Examples
---------
-Here is an example of how to initialize and use the `BackboneRMSD` class within a ProtFlow pipeline:
+Walkthrough
+-----------
+The example below calculates the radius of gyration for every pose by reusing
+``protflow.utils.metrics.calc_rog_of_pdb``:
 
 .. code-block:: python
 
     from protflow.poses import Poses
-    from protflow.jobstarters import JobStarter
-    from rmsd import BackboneRMSD
+    from protflow.jobstarters import SbatchArrayJobstarter
+    from protflow.metrics.generic_metric_runner import GenericMetric
 
-    # Create instances of necessary classes
-    poses = Poses()
-    jobstarter = JobStarter()
+    poses = Poses(
+        poses=["/data/designs/design_0001.pdb", "/data/designs/design_0002.pdb"],
+        work_dir="/data/protflow_runs"
+    )
+    cpu_jobstarter = SbatchArrayJobstarter(max_cores=10)
 
-    # Initialize the BackboneRMSD class
-    backbone_rmsd = BackboneRMSD()
-
-    # Run the RMSD calculation
-    results = backbone_rmsd.run(
-        poses=poses,
-        prefix="experiment_1",
-        jobstarter=jobstarter,
-        ref_col="reference",
-        chains=["A", "B"],
-        overwrite=True
+    rog = GenericMetric(
+        module="protflow.utils.metrics",
+        function="calc_rog_of_pdb",
+        options={"chain": "A"},
+        jobstarter=cpu_jobstarter,
     )
 
-    # Access and process the results
-    print(results)
+    poses = rog.run(poses=poses, prefix="rog")
 
-Further Details
----------------
-    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the RMSD calculation process.
-    - Customizability: Users can customize the RMSD calculation process through multiple parameters, including the specific atoms and chains to be used in the calculation, as well as jobstarter configurations.
-    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.
+    # GenericMetric stores the returned value in <prefix>_data.
+    print(poses.df[["poses_description", "rog_data"]])
 
-This module is intended for researchers and developers who need to incorporate RMSD calculations into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.
+In that run, ``GenericMetric`` will:
 
-Notes
------
-This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.
+1. Build ``/data/protflow_runs/rog`` as its working directory.
+2. Split the input pose paths into chunks based on ``max_cores`` and a hard
+   limit of 100 poses per command.
+3. Launch worker commands that call ``calc_rog_of_pdb(pose_path, chain="A")``.
+4. Save intermediate JSON files such as ``out_0.json``.
+5. Merge the combined results back into ``poses.df`` as
+   ``rog_data``, ``rog_description``, and ``rog_location``.
 
-Author
-------
-Markus Braun, Adrian Tripp
-
-Version
--------
-0.1.0
+This module is intended for simple, embarrassingly parallel per-pose metrics.
+If your function needs multiple inputs, non-JSON output, or a richer output
+schema than a single ``data`` column, a dedicated runner is usually a better
+fit.
 """
 
 # import general
@@ -83,103 +80,42 @@ from protflow.jobstarters import JobStarter, split_list
 
 class GenericMetric(Runner):
     """
-    BackboneRMSD Class
-    ==================
+    Run a simple Python metric function over every pose in a :class:`Poses`.
 
-    The `BackboneRMSD` class is a specialized class designed to facilitate the calculation of backbone RMSD values within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with RMSD calculations.
+    ``GenericMetric`` is the most lightweight metric runner in ProtFlow. You
+    point it at an importable module and a function name, optionally provide a
+    shared ``options`` dictionary, and the runner takes care of chunking the
+    pose list, dispatching jobs through a :class:`JobStarter`, collecting the
+    JSON outputs, and merging the results back into ``poses.df``.
 
-    Detailed Description
-    --------------------
-    The `BackboneRMSD` class manages all aspects of calculating RMSD for protein backbones. It handles the configuration of necessary scripts and executables, prepares the environment for RMSD calculations, and executes the commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
+    The target function contract is intentionally small:
 
-    Key functionalities include:
-        - Setting up paths to RMSD calculation scripts and Python executables.
-        - Configuring job starter options, either automatically or manually.
-        - Handling the execution of RMSD commands with support for different atoms and chains.
-        - Collecting and processing output data into a pandas DataFrame.
-        - Managing overwrite options and handling existing score files.
+    - The first positional argument must be the pose path.
+    - Optional keyword arguments can be supplied via ``options``.
+    - The return value must be serializable to JSON.
 
-    Returns
-    -------
-    An instance of the `BackboneRMSD` class, configured to run RMSD calculations and handle outputs efficiently.
-
-    Raises
-    ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If atoms or chains are not of the expected type.
-
-    Examples
-    --------
-    Here is an example of how to initialize and use the `BackboneRMSD` class:
-
-    .. code-block:: python
-
-        from protflow.poses import Poses
-        from protflow.jobstarters import JobStarter
-        from rmsd import BackboneRMSD
-
-        # Create instances of necessary classes
-        poses = Poses()
-        jobstarter = LocalJobStarter(max_cores=4)
-
-        # Initialize the BackboneRMSD class
-        backbone_rmsd = BackboneRMSD()
-
-        # Run the RMSD calculation
-        results = backbone_rmsd.run(
-            poses=poses,
-            prefix="experiment_1",
-            jobstarter=jobstarter,
-            ref_col="reference_location",
-            chains=["A", "B"],
-            overwrite=True
-        )
-
-        # Access and process the results
-        print(results)
-
-    Further Details
-    ---------------
-        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.
-        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the RMSD calculation process to their specific needs.
-        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
-
-    The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+    The resulting metric value is stored in ``<prefix>_data`` after the run is
+    merged back into ``poses.df``.
     """
     def __init__(self, python_path: str|None = None, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
         """
-        Initialize the BackboneRMSD class.
+        Initialize a generic per-pose metric runner.
 
-        This constructor sets up the BackboneRMSD instance with default or provided parameters. It configures the reference column, atoms, chains, jobstarter, and overwrite options for RMSD calculations.
-
-        Parameters:
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to ["CA"].
-            chains (list[str], optional): The list of chain names to calculate RMSD over. Defaults to None.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-            jobstarter (str, optional): The jobstarter configuration for running the RMSD calculations. Defaults to None.
-
-        Returns:
-            None
-
-        Examples:
-            Here is an example of how to initialize the BackboneRMSD class:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class with default parameters
-                backbone_rmsd = BackboneRMSD()
-
-                # Initialize the BackboneRMSD class with custom parameters
-                backbone_rmsd = BackboneRMSD(ref_col="reference", atoms=["CA", "CB"], chains=["A", "B"], overwrite=True, jobstarter="custom_starter")
-
-        Further Details:
-            - **Default Values:** If no parameters are provided, the class initializes with default values suitable for basic RMSD calculations.
-            - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
-            - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
+        Parameters
+        ----------
+        python_path : str | None, optional
+            Python interpreter used to launch worker commands. If omitted, the
+            interpreter from the configured ``PROTFLOW_ENV`` is used.
+        module : str | None, optional
+            Importable module path that contains the target metric function.
+        function : str | None, optional
+            Name of the function to call inside ``module``.
+        options : dict | None, optional
+            Keyword arguments forwarded to the target function for every pose.
+        jobstarter : JobStarter | None, optional
+            Default jobstarter used when ``run()`` is called without one.
+        overwrite : bool, optional
+            Whether existing runner scorefiles should be recomputed by default.
         """
         # setup config
         config = require_config()
@@ -198,110 +134,43 @@ class GenericMetric(Runner):
     ########################## Input ################################################
     def set_module(self, module: str) -> None:
         """
-        Set the reference column for RMSD calculations.
+        Set the importable module path that contains the metric function.
 
-        This method sets the default reference column to be used in the RMSD calculation process.
-
-        Parameters:
-            ref_col (str): The reference column for RMSD calculations.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If ref_col is not of type string.
-
-        Examples:
-            Here is an example of how to use the `set_ref_col` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the reference column
-                backbone_rmsd.set_ref_col("reference")
-
-        Further Details:
-            - **Usage:** The reference column is used to identify which column in the input data contains the reference structures for RMSD calculation.
-            - **Validation:** The method includes validation to ensure that the reference column is of the correct type.
-            - **Integration:** The reference column set by this method is used by other methods in the class to perform RMSD calculations.
+        Parameters
+        ----------
+        module : str
+            Importable module path, for example ``"protflow.utils.metrics"``.
         """
         self.module = module
 
     def set_python_path(self, python_path: str) -> None:
-        '''helper function to set default python path for metric execution'''
+        """Set the Python interpreter used for worker execution."""
         self.python_path = python_path
 
     def set_function(self, function: str) -> None:
         """
-        Set the atoms for RMSD calculations.
+        Set the function name to import from ``self.module``.
 
-        This method sets the list of atom names to calculate RMSD over. If "all" is provided, all atoms will be considered.
-
-        Parameters:
-            atoms (list[str]): The list of atom names to calculate RMSD over.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If atoms is not a list of strings.
-
-        Examples:
-            Here is an example of how to use the `set_atoms` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the atoms for RMSD calculation
-                backbone_rmsd.set_atoms(["CA", "CB"])
-
-        Further Details:
-            - **Usage:** The list of atoms specifies which atoms in the protein backbone will be considered during RMSD calculations.
-            - **Validation:** The method includes validation to ensure that the atoms parameter is a list of strings, representing valid atom names.
-            - **Flexibility:** Users can specify any set of atoms or choose to include all atoms by setting the parameter to "all".
+        Parameters
+        ----------
+        function : str
+            Attribute name of the target metric function.
         """
         self.function = function
 
     def set_jobstarter(self, jobstarter: JobStarter) -> None:
         """
-        Set the jobstarter configuration for the BackboneRMSD runner.
+        Set the default jobstarter for this runner instance.
 
-        This method sets the jobstarter configuration to be used in the RMSD calculation process.
+        Parameters
+        ----------
+        jobstarter : JobStarter | None
+            Jobstarter used when ``run()`` does not receive one explicitly.
 
-        Parameters:
-            jobstarter (JobStarter): The jobstarter configuration for running the RMSD calculations.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If jobstarter is not of type JobStarter.
-
-        Examples:
-            Here is an example of how to use the `set_jobstarter` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the jobstarter configuration
-                backbone_rmsd.set_jobstarter("custom_starter")
-
-        Further Details:
-            - **Usage:** The jobstarter configuration specifies how the RMSD calculations will be managed and executed, particularly in HPC environments.
-            - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
-            - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
+        Raises
+        ------
+        ValueError
+            If ``jobstarter`` is neither ``None`` nor a :class:`JobStarter`.
         """
         if isinstance(jobstarter, JobStarter) or jobstarter is None:
             self.jobstarter = jobstarter
@@ -310,36 +179,17 @@ class GenericMetric(Runner):
 
     def set_options(self, options: dict) -> None:
         """
-        Set the jobstarter configuration for the BackboneRMSD runner.
+        Set shared keyword arguments for the metric function.
 
-        This method sets the jobstarter configuration to be used in the RMSD calculation process.
+        Parameters
+        ----------
+        options : dict | None
+            Keyword arguments forwarded as ``function(pose, **options)``.
 
-        Parameters:
-            jobstarter (JobStarter): The jobstarter configuration for running the RMSD calculations.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If jobstarter is not of type JobStarter.
-
-        Examples:
-            Here is an example of how to use the `set_jobstarter` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the jobstarter configuration
-                backbone_rmsd.set_jobstarter("custom_starter")
-
-        Further Details:
-            - **Usage:** The jobstarter configuration specifies how the RMSD calculations will be managed and executed, particularly in HPC environments.
-            - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
-            - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
+        Raises
+        ------
+        ValueError
+            If ``options`` is neither ``None`` nor a dictionary.
         """
         if isinstance(options, dict) or options is None:
             self.options = options
@@ -349,62 +199,73 @@ class GenericMetric(Runner):
     ########################## Calculations ################################################
     def run(self, poses: Poses, prefix: str, python_path: str = None, module: str = None, function: str = None, options: dict = None, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
         """
-        Calculate the backbone RMSD for given poses and jobstarter configuration.
+        Execute the configured metric function across all poses.
 
-        This method sets up and runs the RMSD calculation process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.
+        Parameters
+        ----------
+        poses : Poses
+            Input poses. ``GenericMetric`` reads the pose file paths from
+            ``poses.df["poses"]``.
+        prefix : str
+            Prefix used for the runner work directory, cached scorefile, and
+            merged result columns.
+        python_path : str | None, optional
+            Python interpreter used for worker commands. Defaults to the value
+            configured on the runner instance.
+        module : str | None, optional
+            Importable module path for the metric function. Defaults to the
+            value configured on the runner instance.
+        function : str | None, optional
+            Function name inside ``module``. Defaults to the value configured on
+            the runner instance.
+        options : dict | None, optional
+            Shared keyword arguments forwarded to the metric function. Defaults
+            to the value configured on the runner instance.
+        jobstarter : JobStarter | None, optional
+            Jobstarter used for this invocation. Resolution priority is
+            ``run(jobstarter)`` -> ``self.jobstarter`` ->
+            ``poses.default_jobstarter``.
+        overwrite : bool, optional
+            If ``True``, recompute the metric even when the cached scorefile
+            already exists.
 
-        Parameters:
-            poses (Poses): The Poses object containing the protein structures.
-            prefix (str): A prefix used to name and organize the output files.
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            chains (list[str], optional): A list of chain names to calculate RMSD over. Defaults to None.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
+        Returns
+        -------
+        Poses
+            The input ``Poses`` instance with additional columns such as
+            ``<prefix>_data``, ``<prefix>_description``, and
+            ``<prefix>_location`` merged into ``poses.df``.
 
-        Returns:
-            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.
+        Raises
+        ------
+        ValueError
+            If ``options`` is not a dictionary or if no usable jobstarter is
+            available.
+        RuntimeError
+            If fewer output rows are collected than input poses, which usually
+            indicates failed worker jobs.
 
-        Raises:
-            FileNotFoundError: If required files or directories are not found during the execution process.
-            ValueError: If invalid arguments are provided to the method.
-            TypeError: If chains are not of the expected type.
+        Examples
+        --------
+        .. code-block:: python
 
-        Examples:
-            Here is an example of how to use the `run` method:
+            from protflow.metrics.generic_metric_runner import GenericMetric
 
-            .. code-block:: python
+            rog = GenericMetric(
+                module="protflow.utils.metrics",
+                function="calc_rog_of_pdb",
+                options={"chain": "A"},
+            )
 
-                from protflow.poses import Poses
-                from protflow.jobstarters import JobStarter
-                from rmsd import BackboneRMSD
+            poses = rog.run(poses=poses, prefix="rog", jobstarter=cpu_jobstarter)
 
-                # Create instances of necessary classes
-                poses = Poses()
-                jobstarter = LocalJobStarter(max_cores=4)
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Run the RMSD calculation
-                results = backbone_rmsd.run(
-                    poses=poses,
-                    prefix="experiment_1",
-                    jobstarter=jobstarter,
-                    ref_col="reference",
-                    chains=["A", "B"],
-                    overwrite=True
-                )
-
-                # Access and process the results
-                print(results)
-
-        Further Details:
-            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It supports splitting poses into sublists for parallel processing.
-            - **Input Handling:** The method prepares input JSON files for each sublist of poses and constructs commands for running RMSD calculations using BioPython.
-            - **Output Management:** The method handles the collection and processing of output data from multiple score files, concatenating them into a single DataFrame and saving the results.
-            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the RMSD calculation process to their specific needs, including specifying atoms and chains for RMSD calculations.
-
-        This method is designed to streamline the execution of backbone RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze RMSD calculations.
+        Notes
+        -----
+        Internally, ``run()`` launches this module as a worker script for each
+        pose chunk. Each worker writes a JSON file with the columns ``data``,
+        ``description``, and ``location``. The parent process concatenates
+        those files and lets :class:`RunnerOutput` merge the final table back
+        into ``poses.df``.
         """
         # if self.atoms is all, calculate Allatom RMSD.
 
@@ -428,7 +289,7 @@ class GenericMetric(Runner):
 
         # check if RMSD was calculated if overwrite was not set.
         overwrite = overwrite or self.overwrite
-        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=self.overwrite)) is not None:
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
@@ -469,6 +330,12 @@ class GenericMetric(Runner):
 
 
 def main(args):
+    """Worker entrypoint used by :meth:`GenericMetric.run`.
+
+    The parent runner starts this module as a CLI script, passes a comma-
+    separated list of pose paths plus the import target, and expects a JSON file
+    containing ``data``, ``description``, and ``location`` columns.
+    """
     input_poses = args.poses.split(",")
 
     # import function

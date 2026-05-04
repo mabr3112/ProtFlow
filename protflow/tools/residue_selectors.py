@@ -54,7 +54,7 @@ from itertools import product
 import protflow.residues
 from protflow.poses import Poses, col_in_df
 from protflow.residues import ResidueSelection
-from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.biopython_tools import biopython_load_structure
 
 class ResidueSelector:
     """
@@ -266,7 +266,7 @@ class ChainSelector(ResidueSelector):
         Examples:
             >>> selection = selector.select_single(pose_path='path/to/pose.pdb', chains=['A'])
         """
-        pose = load_structure_from_pdbfile(pose_path)
+        pose = biopython_load_structure(pose_path)
 
         # check if chain is in chains:
         pose_chains = [chain.id for chain in pose.get_chains()]
@@ -372,7 +372,7 @@ class TrueSelector(ResidueSelector):
         Examples:
             >>> selection = selector.select_single(pose_path='path/to/pose.pdb')
         """
-        pose = load_structure_from_pdbfile(pose_path)
+        pose = biopython_load_structure(pose_path)
         return ResidueSelection([residue.parent.id + str(residue.id[1]) for residue in pose.get_residues()])
 
 class NotSelector(ResidueSelector):
@@ -518,7 +518,7 @@ class NotSelector(ResidueSelector):
         Examples:
             >>> selection = selector.select_single(pose_path='path/to/pose.pdb', residue_selection=residue_selection)
         """
-        pose = load_structure_from_pdbfile(pose_path)
+        pose = biopython_load_structure(pose_path)
 
         # load all residues form the pose
         all_res = ResidueSelection([residue.parent.id + str(residue.id[1]) for residue in pose.get_residues()])
@@ -796,7 +796,7 @@ class DistanceSelector(ResidueSelector):
         Examples:
             >>> selection = selector.select_single(pose_path='path/to/pose.pdb', chains=['A'])
         """
-        pose = load_structure_from_pdbfile(pose_path)
+        pose = biopython_load_structure(pose_path)
 
         # get central residues:
         center_res = []

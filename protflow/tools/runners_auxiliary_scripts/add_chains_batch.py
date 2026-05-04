@@ -8,7 +8,7 @@ from Bio.PDB.Structure import Structure
 
 # customs
 from protflow.residues import ResidueSelection
-from protflow.utils.biopython_tools import add_chain, get_atoms, get_atoms_of_motif, load_structure_from_pdbfile, save_structure_to_pdbfile, superimpose
+from protflow.utils.biopython_tools import add_chain, get_atoms, get_atoms_of_motif, biopython_load_structure, save_structure_to_file, superimpose
 
 def setup_superimpose_atoms(target: Structure, reference: Structure, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: str = None, reference_chains: str = None, atom_list: list[str] = None) -> tuple[list,list]:
     '''collects atoms for superimposition based on either chain or target input.'''
@@ -79,8 +79,8 @@ def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: s
         raise ValueError(f"Either :output_dir: or :inplace: parameter has to be set.")
 
     # load .pdbs using BioPython
-    target = load_structure_from_pdbfile(target_pdb)
-    reference = load_structure_from_pdbfile(reference_pdb)
+    target = biopython_load_structure(target_pdb)
+    reference = biopython_load_structure(reference_pdb)
 
     # setup superimposition atoms:
     target_atoms, reference_atoms = setup_superimpose_atoms(
@@ -105,13 +105,13 @@ def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: s
 
     # output
     if inplace:
-        save_structure_to_pdbfile(target_copied, save_path=target_pdb)
+        save_structure_to_file(target_copied, save_path=target_pdb)
         output = target_pdb
 
     elif output_dir:
         pdb = target_pdb.rsplit("/", maxsplit=1)[-1]
         output = os.path.join(output_dir, pdb)
-        save_structure_to_pdbfile(target_copied, save_path=output)
+        save_structure_to_file(target_copied, save_path=output)
 
     return output
 

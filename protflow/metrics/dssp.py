@@ -94,8 +94,8 @@ class DSSP(Runner):
         return application_path
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, overwrite: bool = False,
-            jobstarter: JobStarter = None) -> Poses:  # pylint: disable=W0237
+    def run(self, poses: Poses, prefix: str, overwrite: bool = False, # pylint: disable=W0237
+            jobstarter: JobStarter = None) -> Poses:
         """
         Execute the DSSP calculation on the given protein poses.
 
@@ -194,7 +194,7 @@ class DSSP(Runner):
         # Flags
         if lines[0].startswith("HEADER"):
             return pose_path
-        
+
         # A minimal HEADER: class/keywords/date/idcode are optional placeholders
         header = ["HEADER    DUMMY STRUCTURE                            01-JAN-00   DUM000\n"]
 
@@ -202,7 +202,7 @@ class DSSP(Runner):
 
         with open(pose_path := os.path.join(input_dir, os.path.basename(pose_path)), "w", encoding="utf-8") as f:
             f.writelines(header + lines)
-        
+
         return pose_path
 
     def write_cmd(self, pose_path: str, output_dir: str) -> str:

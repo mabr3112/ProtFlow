@@ -605,7 +605,11 @@ class CalibySequenceDesign(_CalibyRunner):
         self.index_layers = 1
 
 
-    def run(self, poses: Poses, prefix: str, nseq: int = 1, model: str = "caliby", omit_aas: str|list = None, fixed_pos_seq_col: str = None, fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None, pos_constraint_csv: str = None, return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, cif_to_pdb: bool = True, jobstarter: JobStarter = None, overwrite: bool = False, num_batches: int = None, run_clean: bool = True) -> Poses:
+    def run(self, poses: Poses, prefix: str, nseq: int = 1, model: str = "caliby", 
+            omit_aas: str|list = None, fixed_pos_seq_col: str = None, fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, 
+            pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None, pos_constraint_csv: str = None, 
+            return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, cif_to_pdb: bool = True, 
+            jobstarter: JobStarter = None, overwrite: bool = False, run_clean: bool = True) -> Poses:
         """
         run Method
         ==========
@@ -679,10 +683,6 @@ class CalibySequenceDesign(_CalibyRunner):
             If ``False`` (default), an existing scorefile causes the run
             to be skipped and the cached results to be returned.  Set to
             ``True`` to force re-computation.
-        num_batches : int, optional
-            Override the number of parallel batches.  Defaults to
-            ``min(len(poses), jobstarter.max_cores)``. Not identical with
-            caliby batch setting!
         run_clean : bool, optional
             If ``True`` (default), the input directory (``<work_dir>/input/``) 
             is deleted after sequence design completes to free disk space.
@@ -804,13 +804,10 @@ class CalibySequenceDesign(_CalibyRunner):
         opt_dict.setdefault("pos_constraint_csv", self.create_constraint_csv(poses, work_dir, fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col))
         
         # define number of batches
-        if num_batches:
-            num_batches = min([len(poses.poses_list()), num_batches])
-        else:
-            num_batches = min([len(poses.poses_list()), jobstarter.max_cores])
+        n_jobs = min([len(poses.poses_list()), jobstarter.max_cores])
 
         # setup for batch mode
-        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="single")
+        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=n_jobs, work_dir=work_dir, mode="single")
 
         # write caliby cmds:
         cmds = [self.write_cmd(options=opt_dict) for opt_dict in batch_opts]
@@ -918,7 +915,8 @@ class CalibyEnsembleGenerator(_CalibyRunner):
         # setup runner
         self.index_layers = 1
 
-    def run(self, poses: Poses, prefix: str, nstruct: int = 1, options: str = None, cif_to_pdb: bool = True, model_dir: str = None, jobstarter: JobStarter = None, overwrite: bool = False, num_batches: int = None, run_clean: bool = True) -> Poses:
+    def run(self, poses: Poses, prefix: str, nstruct: int = 1, options: str = None, cif_to_pdb: bool = True, 
+            model_dir: str = None, jobstarter: JobStarter = None, overwrite: bool = False, run_clean: bool = True) -> Poses:
         """
         run Method
         ==========
@@ -953,9 +951,6 @@ class CalibyEnsembleGenerator(_CalibyRunner):
             chain (argument → ``self.jobstarter`` → ``poses.default_jobstarter``).
         overwrite : bool, optional
             Re-run even if a scorefile already exists.  Default is ``False``.
-        num_batches : int, optional
-            Number of parallel batches.  Defaults to
-            ``min(len(poses), jobstarter.max_cores)``.
         run_clean : bool, optional
             If ``True`` (default), the input directory
             (``<work_dir>/input/``) is deleted after ensemble generation
@@ -1034,13 +1029,10 @@ class CalibyEnsembleGenerator(_CalibyRunner):
         opt_dict["sampling_yaml_path"] = self.sampling_yaml_path # TODO: this is a hack so caliby does not crash when running outside of installation dir, there might be better ways to solve this
 
         # define number of batches
-        if num_batches:
-            num_batches = min([len(poses.poses_list()), num_batches])
-        else:
-            num_batches = min([len(poses.poses_list()), jobstarter.max_cores])
+        n_jobs = min([len(poses.poses_list()), jobstarter.max_cores])
 
         # setup for batch mode
-        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="single")
+        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=n_jobs, work_dir=work_dir, mode="single")
 
         # write caliby cmds:
         cmds = [self.write_cmd(options=opt_dict) for opt_dict in batch_opts]
@@ -1178,7 +1170,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
             conformer_col: str = None, nseq: int = 1, model: str = "caliby", omit_aas: str|list = None, fixed_pos_seq_col: str = None, 
             fixed_pos_scn_col: str = None, fixed_pos_override_seq_col: str = None, pos_restrict_aatype_col: str = None, symmetry_pos_col: str = None,
             pos_constraint_csv: str = None, return_seq_threaded_pdbs_as_pose: bool = False, options: str = None, cif_to_pdb: bool = True,
-            jobstarter: JobStarter = None, overwrite: bool = False, num_batches: int = None, run_clean: bool = True) -> Poses:
+            jobstarter: JobStarter = None, overwrite: bool = False, run_clean: bool = True) -> Poses:
 
         """Run ensemble-conditioned sequence design, optionally generating ensembles first.
  
@@ -1257,10 +1249,6 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
         overwrite : bool, optional
             Force re-computation even if a cached scorefile exists.
             Default is ``False``.
-        num_batches : int, optional
-            Number of parallel batches for both stages.  Defaults to
-            ``min(len(poses), jobstarter.max_cores)``. Not identical 
-            with caliby batch option!
         run_clean : bool, optional
             If ``True`` (default), the intermediate conformer directory
             (``<work_dir>/conformers/``) is deleted after sequence design
@@ -1362,8 +1350,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
                 prefix=ens_gen_prefix, 
                 nstruct=gen_num_ensembles, 
                 options=gen_ens_options, 
-                num_batches=num_batches, 
-                jobstarter=jobstarter or self.jobstarter,
+                jobstarter=jobstarter,
                 run_clean=run_clean
             )
             
@@ -1404,13 +1391,10 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
         opt_dict.setdefault("pos_constraint_csv", self.create_constraint_csv(poses, work_dir, fixed_pos_seq_col, fixed_pos_scn_col, fixed_pos_override_seq_col, pos_restrict_aatype_col, symmetry_pos_col))
         
         # define number of batches
-        if num_batches:
-            num_batches = min([len(poses.poses_list()), num_batches])
-        else:
-            num_batches = min([len(poses.poses_list()), jobstarter.max_cores])
+        n_jobs = min([len(poses.poses_list()), jobstarter.max_cores])
 
         # setup for batch mode
-        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=num_batches, work_dir=work_dir, mode="ensemble", conformer_col=conformer_col)
+        batch_opts = self.setup_batch_mode(poses=poses, options=opt_dict, num_batches=n_jobs, work_dir=work_dir, mode="ensemble", conformer_col=conformer_col)
 
         # write caliby cmds:
         cmds = [self.write_cmd(options=opt_dict) for opt_dict in batch_opts]
@@ -1452,7 +1436,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
     
-    def run_protpardelle_ensemble_generation(self, poses: Poses, prefix: str , nstruct: int, options: str, num_batches: int, jobstarter: JobStarter, run_clean: bool = True):
+    def run_protpardelle_ensemble_generation(self, poses: Poses, prefix: str , nstruct: int, options: str, jobstarter: JobStarter, run_clean: bool = True):
         """
         run_protpardelle_ensemble_generation Method
         ===========================================
@@ -1484,8 +1468,6 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
             :meth:`CalibyEnsembleGenerator.run`.
         options : str
             Raw Caliby option string for the ensemble-generation stage.
-        num_batches : int
-            Number of parallel batches.
         jobstarter : JobStarter
             Job submission backend for the ensemble-generation step.
         run_clean : bool, optional
@@ -1539,7 +1521,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
             jobstarter=jobstarter)
         
         # run ensemble generation
-        ensgenerator.run(poses=poses, prefix=prefix, nstruct=nstruct, options=options, num_batches=num_batches, run_clean=run_clean)
+        ensgenerator.run(poses=poses, prefix=prefix, nstruct=nstruct, options=options, run_clean=run_clean)
 
         # restore input poses as primary conformers
         poses.df = poses.df[[col for col in poses.df.columns if col.startswith(prefix)]]
