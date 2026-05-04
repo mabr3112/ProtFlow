@@ -19,4 +19,5 @@ from .rfdiffusion import RFdiffusion
 from .rfdiffusion3 import RFdiffusion3
 from .rosetta import Rosetta
 from .esm import ESM
+from .protenix import ProtenixPred
 from .protein_edits import ChainAdder, ChainRemover, SequenceAdder, SequenceRemover

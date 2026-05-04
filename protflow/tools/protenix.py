@@ -1,3 +1,108 @@
+"""
+protenix.py — ProtFlow Runner Module
+======================================
+ 
+.. module:: protflow.runners.protenix
+   :synopsis: ProtFlow runner interface for Protenix, a deep-learning
+              structure prediction model supporting proteins, nucleic acids,
+              ligands, ions, covalent modifications, and geometric constraints.
+ 
+This module provides :class:`ProtenixPred`, a ProtFlow
+:class:`~protflow.runners.Runner` subclass that wraps Protenix's ``pred``
+sub-command for multi-chain biomolecular structure prediction.  The runner
+accepts input as FASTA sequences or PDB/CIF structures, constructs the
+Protenix JSON input format internally, executes predictions via ProtFlow's
+job-submission abstraction, and returns a scored :class:`~protflow.poses.Poses`
+collection.
+ 
+Supported input types
+---------------------
+FASTA (``*.fa`` / ``*.fasta``)
+    Each file may contain one or more chain sequences delimited by *chain_sep*
+    (default ``":"``).  One protein-chain entity is created per subsequence.
+ 
+PDB / CIF (``*.pdb`` / ``*.cif``)
+    Structures are converted to Protenix JSON format using the ``protenix json``
+    sub-command before prediction.
+ 
+Pre-built JSON
+    A column in ``poses.df`` containing paths to pre-built Protenix JSON
+    files can be supplied via *json_column*, bypassing internal JSON
+    construction entirely.
+ 
+Output format
+-------------
+Protenix writes output CIF files and per-sample JSON score files inside a
+``protenix_preds/<pose_name>/seed_<N>/predictions/`` directory hierarchy.
+:func:`collect_scores` traverses this hierarchy, ranks samples by
+``ranking_score``, optionally converts CIF files to PDB via OpenBabel, and
+returns a flat :class:`~pandas.DataFrame`.
+ 
+Configuration
+-------------
+The runner reads its environment from the ProtFlow configuration file
+(``~/.config/protflow/config.py`` by default).  The following keys are
+relevant:
+ 
+``PROTENIX_BIN_PATH``
+    Absolute path to the Protenix binary (``protenix`` or equivalent).
+ 
+``PROTENIX_PRE_CMD``
+    Optional shell preamble executed before every Protenix command (e.g.
+    a ``conda activate`` or ``module load`` statement).
+ 
+Dependencies
+------------
+* :mod:`os`, :mod:`json`, :mod:`shutil`, :mod:`subprocess`,
+  :mod:`random`, :mod:`pathlib`, :mod:`glob`, :mod:`logging`
+  (standard library)
+* `pandas <https://pandas.pydata.org/>`_
+* :mod:`protflow.poses` (:class:`~protflow.poses.Poses`)
+* :mod:`protflow.jobstarters` (:class:`~protflow.jobstarters.JobStarter`)
+* :mod:`protflow.runners` (:class:`~protflow.runners.Runner`,
+  :class:`~protflow.runners.RunnerOutput`)
+* :mod:`protflow.utils.biopython_tools`
+* :mod:`protflow.utils.openbabel_tools`
+ 
+Notes
+-----
+The classes :class:`ProtenixMSA`, :class:`ProtenixMT`, and
+:class:`ProtenixPrep` are planned for future implementation but are not
+yet available in this module.
+ 
+Examples
+--------
+Predict structures from FASTA files::
+ 
+    from protflow.poses import Poses
+    from protflow.jobstarters import SbatchArrayJobstarter
+    from protflow.runners.protenix import ProtenixPred
+ 
+    poses = Poses("sequences/", prefix="pred")
+    jobstarter = SbatchArrayJobstarter(max_cores=4)
+ 
+    runner = ProtenixPred()
+    poses = runner.run(
+        poses=poses,
+        prefix="protenix",
+        nstruct=3,
+        seeds="random",
+        return_top_n_models=1,
+    )
+ 
+Predict a protein–ligand complex::
+ 
+    runner = ProtenixPred()
+    poses = runner.run(
+        poses=poses,
+        prefix="protenix_ligand",
+        nstruct=1,
+        ligands="smiles_col",
+        covalent_bonds="bond_col",
+        convert_cif_to_pdb=True,
+    )
+"""
+
 # general imports
 import os
 import logging
@@ -22,7 +127,66 @@ from ..utils.openbabel_tools import openbabel_fileconverter
 # TODO: implement class ProtenixMSA(Runner), class ProtenixMT(Runner), class ProtenixPrep(Runner):
 
 
+
 class ProtenixPred(Runner):
+    """ProtFlow runner for Protenix biomolecular structure prediction.
+ 
+    :class:`ProtenixPred` inherits from :class:`~protflow.runners.Runner` and
+    wraps Protenix's ``pred`` sub-command.  It handles the full prediction
+    lifecycle: JSON input construction, batch command assembly, job submission,
+    output collection, and scorefile caching.
+ 
+    Protenix supports heterogeneous molecular systems: protein chains, DNA/RNA
+    sequences, small-molecule ligands, ions, covalent modifications, and
+    geometric constraints can all be specified in a single run through the
+    corresponding :meth:`run` parameters.
+ 
+    Parameters
+    ----------
+    bin_path : str, optional
+        Absolute path to the Protenix binary.  Resolved from the ProtFlow
+        config key ``PROTENIX_BIN_PATH`` when omitted.
+    pre_cmd : str, optional
+        Shell preamble prepended to every generated command (e.g.
+        ``"conda activate protenix_env &&"``).  Resolved from
+        ``PROTENIX_PRE_CMD`` when omitted.
+    jobstarter : JobStarter, optional
+        Default :class:`~protflow.jobstarters.JobStarter` instance used when
+        :meth:`run` is called without an explicit *jobstarter* argument.
+ 
+    Attributes
+    ----------
+    bin_path : str
+        Resolved path to the Protenix binary.
+    pre_cmd : str or None
+        Shell preamble, or ``None`` when not set.
+    jobstarter : JobStarter or None
+        Default job submission backend.
+    name : str
+        Runner identifier (``"protenix.py"``).
+    index_layers : int
+        Number of index layers added per pose (``1``).
+ 
+    Notes
+    -----
+    * :meth:`__str__` currently returns ``"colabfold.py"`` — this is a
+      known placeholder carried over from an earlier template and will be
+      corrected in a future version.
+    * When *pose_options* are provided to :meth:`run`, one command is
+      generated per pose (no batching).  Without *pose_options*, poses are
+      distributed evenly across ``min(len(poses), jobstarter.max_cores)``
+      batch JSON files to maximise throughput.
+ 
+    Examples
+    --------
+    ::
+ 
+        from protflow.runners.protenix import ProtenixPred
+ 
+        runner = ProtenixPred()
+        poses = runner.run(poses=poses, prefix="px", nstruct=5)
+    """
+
     def __init__(
             self,
             bin_path: str|None = None,
@@ -48,6 +212,251 @@ class ProtenixPred(Runner):
                           covalent_bonds: str | list | dict = None, constraints: str | list | dict = None, options: str = None, pose_options: str = None,
             jobstarter: JobStarter = None, overwrite: bool = False, return_top_n_models: int = 1, convert_cif_to_pdb: bool = True, 
             seeds: list | int | str = "random", chain_sep: str = ":") -> Poses:
+        """Run Protenix structure prediction on a collection of poses.
+ 
+        Orchestrates the complete prediction pipeline:
+ 
+        1. Creates the working directory and checks for a cached scorefile.
+        2. Builds per-pose Protenix input JSON dictionaries (or loads them
+           from *json_column*).
+        3. Resolves and validates random seeds.
+        4. Distributes poses into batched JSON files and assembles CLI commands.
+        5. Submits commands via the jobstarter and blocks until completion.
+        6. Collects, ranks, and optionally converts output structures.
+        7. Saves the scorefile and returns an updated :class:`~protflow.poses.Poses`.
+ 
+        Parameters
+        ----------
+        poses : Poses
+            Input pose collection.  Accepted pose types are FASTA
+            (``*.fa``, ``*.fasta``), PDB (``*.pdb``), and CIF (``*.cif``).
+            When *json_column* is set, pose files are not read directly;
+            only ``poses_description`` is used from ``poses.df``.
+        prefix : str
+            Column prefix used to namespace all new columns added to
+            ``poses.df`` and to name the working directory
+            (``<poses.work_dir>/<prefix>/``).
+        nstruct : int, optional
+            Number of prediction structures to generate per pose.
+            Implemented via distinct random seeds; each seed produces
+            one independent structure.  Default is ``1``.
+        json_column : str, optional
+            Name of a ``poses.df`` column containing absolute paths to
+            pre-built Protenix JSON files.  When provided, all other
+            molecular-entity parameters (*msa_paired*, *ligands*, etc.)
+            are ignored because the JSON already encodes the full input
+            specification.  The ``"name"`` field inside each JSON is
+            overwritten with the corresponding ``poses_description`` to
+            ensure correct output naming.
+        num_copies : int, optional
+            Stoichiometric copy number applied to every chain in the
+            input structure.  Multiplies the existing ``"count"`` field
+            of each chain entity in the Protenix JSON.  Default is ``1``
+            (no duplication).
+        msa_paired : str, optional
+            Paired MSA specification.  Accepts either:
+ 
+            * A path to an MSA file (applied identically to every pose), **or**
+            * The name of a ``poses.df`` column containing per-pose MSA paths.
+ 
+            Limited to single-chain inputs; raises an error for multi-chain
+            structures (use *json_column* in that case).
+        msa_unpaired : str, optional
+            Unpaired MSA specification.  Same format and restrictions as
+            *msa_paired*.
+        templates : str, optional
+            Template specification.  Accepts a path or a ``poses.df``
+            column name.  Same single-chain restriction as *msa_paired*.
+        modifications : str, list, or dict, optional
+            Post-translational or chemical modifications to apply to
+            protein chains.  Accepts:
+ 
+            * A ``dict`` describing one modification.
+            * A ``list`` of modification dicts.
+            * A ``poses.df`` column name whose values are dicts or lists.
+ 
+            Each modification dict must conform to the Protenix
+            ``modifications`` field schema.
+        ligands : str, list, or dict, optional
+            Small-molecule ligand(s) to include in the complex.  Accepts:
+ 
+            * A SMILES string or SDF file path (applied to all poses).
+            * A list of SMILES/SDF paths.
+            * A ``poses.df`` column name containing any of the above.
+            * A Protenix-format ``{"ligand": {...}}`` entity dict.
+ 
+            Each ligand is appended to the ``"sequences"`` list in the
+            Protenix JSON as a ``"ligand"`` entity.
+        ions : str, list, or dict, optional
+            Ion(s) to include.  Same format as *ligands*, but wrapped as
+            ``"ion"`` entities using CCD codes (e.g. ``"MG"``, ``"ZN"``).
+        additional_entities : str, list, or dict, optional
+            Arbitrary additional molecular entities in fully specified
+            Protenix entity-dict format.  Must contain at least one of the
+            mandatory top-level keys: ``"proteinChain"``, ``"dnaSequence"``,
+            ``"rnaSequence"``, ``"ligand"``, ``"ion"``.  Accepts a single
+            dict, a list of dicts, or a ``poses.df`` column name.
+        covalent_bonds : str, list, or dict, optional
+            Covalent bond definitions between entities.  Accepts:
+ 
+            * A ``dict`` describing one covalent bond.
+            * A ``list`` of bond dicts.
+            * A ``poses.df`` column name containing dicts or lists of dicts.
+ 
+            Bond dicts must conform to the Protenix ``covalent_bonds``
+            schema.
+        constraints : str, list, or dict, optional
+            Geometric constraints applied during structure prediction.
+            Accepts:
+ 
+            * A ``dict`` with a ``"constraint"`` key (unwrapped
+              automatically).
+            * A ``poses.df`` column name whose values are constraint dicts.
+ 
+            Must ultimately resolve to a ``dict``; any other type raises
+            a :exc:`ValueError`.
+        options : str, optional
+            Additional Protenix CLI flags in ``--key value`` format,
+            forwarded verbatim to :meth:`write_cmd` and parsed by
+            :func:`~protflow.runners.parse_generic_options`.
+        pose_options : str, optional
+            Per-pose additional CLI flags.  When provided, batching is
+            disabled and one command per pose is generated.  Parsed by
+            :func:`~protflow.runners.parse_generic_options` with
+            :func:`~protflow.runners.Runner.prep_pose_options`.
+        jobstarter : JobStarter, optional
+            Job submission backend for this run.  Resolved via the
+            standard ProtFlow fallback chain: argument →
+            ``self.jobstarter`` → ``poses.default_jobstarter``.
+        overwrite : bool, optional
+            When ``True``, any existing scorefile and the ``input_jsons/``,
+            ``protenix_preds/``, and ``output_predictions/`` sub-directories
+            in the working directory are deleted before re-running.  When
+            ``False`` (default), an existing scorefile causes immediate
+            return of cached results.
+        return_top_n_models : int, optional
+            Number of top-ranked models (by ``ranking_score``, descending)
+            to retain per seed per pose.  Default is ``1``.
+        convert_cif_to_pdb : bool, optional
+            When ``True`` (default), output CIF files are converted to PDB
+            format via OpenBabel.  When ``False``, the ``location`` column
+            in the returned poses points to renamed CIF files.
+        seeds : list, int, or str, optional
+            Random seeds controlling Protenix sampling:
+ 
+            * ``"random"`` (default) — *nstruct* seeds are drawn uniformly
+              at random from [1, 10 000].
+            * ``int`` — a single seed; automatically wrapped in a list.
+              Requires *nstruct* == 1.
+            * ``list`` — an explicit list of integer seeds.  Length must
+              equal *nstruct*.
+            * Falsy value (``None``, ``0``, ``False``) — seeds
+              ``[0, 1, …, nstruct-1]`` are used.
+ 
+        chain_sep : str, optional
+            Separator character used to split multi-chain sequences within
+            a single FASTA file entry.  Default is ``":"``.
+ 
+        Returns
+        -------
+        Poses
+            Updated :class:`~protflow.poses.Poses` with new columns
+            prefixed by *prefix*, including:
+ 
+            ``<prefix>_location``
+                Absolute path to the output PDB or CIF file for each
+                predicted model.
+            ``<prefix>_description``
+                Unique identifier derived from the output filename stem.
+            ``<prefix>_ranking_score``
+                Protenix model ranking score (higher is better).
+            ``<prefix>_seed``
+                Random seed used for this prediction.
+            ``<prefix>_sample``
+                Sample index within the seed (``"0"`` … ``"N"``).
+            ``<prefix>_input``
+                Description of the parent input pose.
+            All other numeric metrics written to the per-sample JSON by
+            Protenix (e.g. pTM, iPTM, pLDDT-related fields).
+ 
+        Raises
+        ------
+        ValueError
+            If the length of an explicit *seeds* list does not equal *nstruct*.
+        ValueError
+            If *msa_paired*, *msa_unpaired*, or *templates* are specified
+            for a multi-chain input structure (must use *json_column*
+            instead).
+        ValueError
+            If *modifications* is not a dict, a list of dicts, or a valid
+            column name.
+        ValueError
+            If *constraints* resolves to a non-dict value.
+        ValueError
+            If *covalent_bonds* is not a dict, a list of dicts, or a valid
+            column name.
+        ValueError
+            If an entity in *ligands*, *ions*, or *additional_entities*
+            does not contain a recognised Protenix entity-type key.
+        ValueError
+            If the input pose type is not one of ``.fa``, ``.fasta``,
+            ``.pdb``, or ``.cif``.
+        RuntimeError
+            If the number of collected output poses is smaller than the
+            number of input poses (indicating crashed prediction jobs).
+ 
+        Notes
+        -----
+        * **Batching vs. per-pose commands**: when *pose_options* is
+          ``None`` (the common case), poses are grouped into
+          ``min(len(poses), jobstarter.max_cores)`` batch JSON files, each
+          containing multiple pose specifications.  Protenix processes all
+          entries in a single JSON sequentially.  When *pose_options* is
+          provided, one JSON and one command is produced per pose.
+        * **Seed handling**: all seeds are passed as a comma-separated
+          string to Protenix's ``-s`` flag.  One output model per seed is
+          generated per pose, giving ``nstruct × len(poses)`` total models
+          before top-N filtering.
+        * **PDB-input path**: when poses are PDB/CIF files, Protenix's
+          ``protenix json`` sub-command is called via :func:`json_from_structure`
+          to convert them to JSON.  Temporary directories (``temp_jsons/``
+          and ``temp_pdbs/``) are created inside *work_dir* and deleted
+          after conversion.
+ 
+        Examples
+        --------
+        Single-seed prediction from FASTA with a ligand per pose::
+ 
+            runner = ProtenixPred()
+            poses = runner.run(
+                poses=poses,
+                prefix="complex",
+                nstruct=1,
+                ligands="ligand_smiles_col",
+                covalent_bonds="bond_col",
+                convert_cif_to_pdb=True,
+            )
+ 
+        Multi-seed prediction retaining the top 2 models per seed::
+ 
+            poses = runner.run(
+                poses=poses,
+                prefix="multi_seed",
+                nstruct=5,
+                seeds=[42, 1337, 999, 7, 12345],
+                return_top_n_models=2,
+            )
+ 
+        Prediction from pre-built JSON files::
+ 
+            poses = runner.run(
+                poses=poses,
+                prefix="from_json",
+                json_column="protenix_json_path",
+                nstruct=2,
+                seeds="random",
+            )
+        """
 
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
@@ -150,6 +559,58 @@ class ProtenixPred(Runner):
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
     
     def write_cmd(self, in_json: str, output_dir: str, seeds: list, options: str = None, pose_options: str = None):
+        """Compose a single Protenix ``pred`` shell command string.
+ 
+        Combines :attr:`bin_path` with the mandatory ``-i``, ``-o``, and
+        ``-s`` flags, then appends any additional options and boolean flags
+        parsed from *options* and *pose_options*.
+ 
+        Parameters
+        ----------
+        in_json : str
+            Absolute path to the batch input JSON file.  Passed as
+            ``-i <in_json>`` to Protenix.
+        output_dir : str
+            Directory where Protenix should write its ``<pose>/seed_*/``
+            output hierarchy.  Passed as ``-o <output_dir>``.
+        seeds : list of str
+            Seed values as strings.  Joined with commas and passed as
+            ``-s <seed1>,<seed2>,...``.
+        options : str, optional
+            Global additional CLI options in ``--key value`` or ``--flag``
+            format.  Parsed by
+            :func:`~protflow.runners.parse_generic_options` with ``sep="--"``.
+        pose_options : str, optional
+            Per-pose additional CLI options, merged with *options* during
+            parsing.
+ 
+        Returns
+        -------
+        str
+            A complete shell command string, e.g.::
+ 
+                /opt/protenix/protenix pred -i /run/input_jsons/batch_0.json \
+                    -o /run/protenix_preds -s 42,1337 --num_workers 4
+ 
+        Notes
+        -----
+        * Options are serialised as ``--key value`` pairs; boolean flags
+          (no value) are serialised as ``--flag``.
+        * *options* and *pose_options* are merged before serialisation by
+          :func:`~protflow.runners.parse_generic_options`; pose-level values
+          override global ones for the same key.
+ 
+        Examples
+        --------
+        ::
+ 
+            cmd = runner.write_cmd(
+                in_json="/run/input_jsons/batch_0.json",
+                output_dir="/run/protenix_preds",
+                seeds=["42", "1337"],
+                options="--num_workers 4",
+            )
+        """
 
         # parse options
         opts, flags = runners.parse_generic_options(options=options, pose_options=pose_options, sep="--")
@@ -160,7 +621,147 @@ class ProtenixPred(Runner):
     def create_input_dicts(self, poses: Poses, work_dir: str, num_copies: int, msa_paired: str = None, msa_unpaired: str = None, 
                             templates: str = None, modifications: str | list | dict = None, ligands: str | list | dict = None, ions: str | list | dict = None, additional_entities: str | list | dict = None, 
                             covalent_bonds: str | list | dict = None, constraints: str | list | dict = None, chain_sep: str = ":") -> list:
-            
+        """Build a list of Protenix input dictionaries, one per pose.
+ 
+        Determines the input type of *poses* (FASTA or PDB/CIF), constructs
+        a base input dict for each pose, then augments each dict with MSAs,
+        templates, modifications, ligands, ions, covalent bonds, and
+        constraints as specified.
+ 
+        Parameters
+        ----------
+        poses : Poses
+            Input pose collection.  All poses must have the same file
+            extension (homogeneous collection).
+        work_dir : str
+            Working directory.  Used to create temporary sub-directories
+            (``temp_jsons/`` and ``temp_pdbs/``) when poses are PDB/CIF
+            files.  These are deleted after JSON generation.
+        num_copies : int
+            Stoichiometric copy number applied to every chain entity.
+            Multiplied into the existing ``"count"`` field.
+        msa_paired : str, optional
+            Path to a paired MSA file or a ``poses.df`` column name.
+            Applied only to single-chain inputs.
+        msa_unpaired : str, optional
+            Path to an unpaired MSA file or a ``poses.df`` column name.
+            Applied only to single-chain inputs.
+        templates : str, optional
+            Path to a templates file or a ``poses.df`` column name.
+            Applied only to single-chain inputs.
+        modifications : str, list, or dict, optional
+            Post-translational modifications.  See :meth:`run` for
+            accepted formats.
+        ligands : str, list, or dict, optional
+            Ligand specifications.  See :meth:`run` for accepted formats.
+        ions : str, list, or dict, optional
+            Ion specifications.  See :meth:`run` for accepted formats.
+        additional_entities : str, list, or dict, optional
+            Fully specified additional molecular entities.  See
+            :meth:`run` for accepted formats.
+        covalent_bonds : str, list, or dict, optional
+            Covalent bond definitions.  See :meth:`run` for accepted
+            formats.
+        constraints : str, list, or dict, optional
+            Geometric constraint definitions.  See :meth:`run` for
+            accepted formats.
+        chain_sep : str, optional
+            Separator used to split multi-chain FASTA entries.
+            Default is ``":"``.
+ 
+        Returns
+        -------
+        list of dict
+            One Protenix input dict per pose.  Each dict contains at
+            minimum the keys ``"name"`` (pose description) and
+            ``"sequences"`` (list of entity dicts).  Additional keys
+            (``"pairedMsaPath"``, ``"modifications"``, ``"covalent_bonds"``,
+            ``"constraint"``, etc.) are present only when the corresponding
+            parameters are supplied.
+ 
+        Raises
+        ------
+        ValueError
+            If the pose file extension is not one of ``.fa``, ``.fasta``,
+            ``.pdb``, ``.cif``.
+        ValueError
+            If *msa_paired*, *msa_unpaired*, or *templates* are set for
+            a multi-chain input structure.
+        ValueError
+            If *modifications* resolves to something other than a dict or
+            a list of dicts.
+        ValueError
+            If *covalent_bonds* resolves to something other than a dict or
+            a list of dicts.
+        ValueError
+            If *constraints* resolves to a non-dict value.
+        ValueError
+            If an entity in *ligands*, *ions*, or *additional_entities*
+            does not contain a recognised Protenix entity-type key.
+ 
+        Notes
+        -----
+        **FASTA path**: sequences are loaded via
+        :func:`~protflow.utils.biopython_tools.load_sequence_from_fasta`
+        and split by *chain_sep*; one ``"proteinChain"`` entity with
+        ``"count": 1`` is created per sub-sequence.
+ 
+        **PDB/CIF path**: all pose files are copied into a temporary
+        ``temp_pdbs/`` directory, the ``protenix json`` sub-command is
+        called via :func:`json_from_structure`, and the resulting JSONs
+        are merged back into ``poses.df`` via a left-join on
+        ``poses_description``.  The ``strip_list=True`` option of
+        :func:`read_json` unwraps the outer list that ``protenix json``
+        writes.
+ 
+        **Internal helpers** (nested functions defined inside this method):
+ 
+        ``add_msa_template_modifications(term, in_type, pose_dict, pose_row)``
+            Resolves *term* to a value (optionally by looking it up as a
+            column in *pose_row*), validates it, and sets the corresponding
+            top-level key (``"pairedMsaPath"``, ``"unpairedMsaPath"``,
+            ``"templatesPath"``, or ``"modifications"``) in *pose_dict*.
+ 
+        ``add_additional_entities(pose_dict, pose_row, ligands, ions, additional_entities)``
+            Appends ligand, ion, and arbitrary-entity dicts to the
+            ``"sequences"`` list in *pose_dict*, using ``identify_entities``
+            and ``check_entity`` for validation and normalisation.
+ 
+        ``identify_entities(pose_row, entity, entity_type)``
+            Recursively resolves *entity* (column name, SMILES/path string,
+            list, or dict) to a validated Protenix entity dict or list of
+            dicts of the given *entity_type*.
+ 
+        ``check_entity(entity)``
+            Validates that a dict or list of dicts contains at least one
+            mandatory Protenix entity key (``"proteinChain"``,
+            ``"dnaSequence"``, ``"rnaSequence"``, ``"ligand"``, ``"ion"``).
+            Returns a list for uniform downstream handling.
+ 
+        ``identify_bonds(pose_row, bonds)``
+            Resolves *bonds* (column name, dict, or list of dicts) to a
+            validated list of covalent-bond dicts.
+ 
+        ``create_dict_from_fa(name, path, sep)``
+            Reads a FASTA file, splits by *sep*, and returns a minimal
+            Protenix input dict with one ``"proteinChain"`` entity per
+            sub-sequence.
+ 
+        Examples
+        --------
+        ::
+ 
+            dicts = runner.create_input_dicts(
+                poses=poses,
+                work_dir="/scratch/protenix_run",
+                num_copies=1,
+                ligands="smiles_col",
+                chain_sep=":",
+            )
+            # len(dicts) == len(poses)
+            # dicts[0].keys() == {"name", "sequences"}
+        """
+
         def add_msa_template_modifications(term: str, in_type:str, pose_dict: dict, pose_row: pd.Series) -> dict:
 
             if not term:
@@ -337,6 +938,77 @@ class ProtenixPred(Runner):
 
 
 def json_from_structure(protenix_path: str, in_dir: str, out_dir:str, altloc:str=None, assembly_id:str=None, include_discont_poly_poly_bonds:bool=False) -> str:
+    """Convert a directory of PDB/CIF structures to Protenix JSON format.
+ 
+    Calls the ``protenix json`` sub-command to convert all structure files
+    in *in_dir* into Protenix-compatible JSON input files written to
+    *out_dir*.  Each output JSON encodes the full molecular system
+    (chains, residues, modifications) parsed from the input structure.
+ 
+    Parameters
+    ----------
+    protenix_path : str
+        Absolute path to the Protenix binary.
+    in_dir : str
+        Directory containing input PDB or CIF structure files.  All files
+        in the directory are processed; subdirectories are ignored.
+    out_dir : str
+        Directory where the generated JSON files will be written.  One
+        JSON file is created per input structure, named after the input
+        file stem.
+    altloc : str, optional
+        Alternate location indicator to use when multiple conformers are
+        present in the input structure (e.g. ``"A"``).  Passed as
+        ``--altloc <altloc>`` to Protenix.  When omitted, Protenix uses
+        its default selection.
+    assembly_id : str, optional
+        Biological assembly ID to extract from the input structure (e.g.
+        ``"1"``).  Passed as ``--assembly_id <assembly_id>``.  When
+        omitted, the first assembly (or asymmetric unit) is used.
+    include_discont_poly_poly_bonds : bool, optional
+        When ``True``, covalent bonds between discontinuous polymer chains
+        are included in the output JSON.  Passed as
+        ``--include_discont_poly_poly_bonds``.  Default is ``False``.
+ 
+    Returns
+    -------
+    None
+        Output files are written to *out_dir*; nothing is returned.
+ 
+    Raises
+    ------
+    subprocess.CalledProcessError
+        Caught internally; the error message and stderr are printed to
+        stdout but the exception is not re-raised.  Callers should verify
+        that output JSON files exist in *out_dir* after this call.
+ 
+    Notes
+    -----
+    * The command is executed via :func:`subprocess.run` with
+      ``shell=True``, ``check=True``, and ``capture_output=True``.  Any
+      non-zero exit code triggers the exception handler.
+    * Because the exception is caught and printed rather than propagated,
+      this function can silently produce zero output files if Protenix
+      fails.  :meth:`ProtenixPred.create_input_dicts` detects this
+      implicitly when the ``glob`` of ``*.json`` in *out_dir* returns an
+      empty list.
+    * This function is called internally by
+      :meth:`ProtenixPred.create_input_dicts` when poses are PDB/CIF
+      files.  It is exposed as a public module-level function for direct
+      use in custom pipelines.
+ 
+    Examples
+    --------
+    ::
+ 
+        json_from_structure(
+            protenix_path="/opt/protenix/protenix",
+            in_dir="/scratch/input_pdbs",
+            out_dir="/scratch/input_jsons",
+            altloc="A",
+        )
+        # /scratch/input_jsons/<stem>.json written for each PDB in in_dir
+    """
 
     cmd = f"{protenix_path} json -i {in_dir} -o {out_dir}"
 
@@ -357,6 +1029,98 @@ def json_from_structure(protenix_path: str, in_dir: str, out_dir:str, altloc:str
 
 
 def collect_scores(work_dir: str, convert_cif_to_pdb: bool = True, return_top_n_models: int = 1) -> pd.DataFrame:
+    """Collect, rank, convert, and consolidate Protenix prediction outputs.
+ 
+    Traverses the ``protenix_preds/`` directory hierarchy produced by a
+    completed Protenix run, reads the per-sample JSON score files, ranks
+    samples within each seed by ``ranking_score``, retains the top *N*,
+    optionally converts CIF output files to PDB format, copies results to a
+    flat ``output_predictions/`` directory with zero-padded filenames, and
+    returns a consolidated :class:`~pandas.DataFrame`.
+ 
+    Parameters
+    ----------
+    work_dir : str
+        Root working directory of the Protenix run.  Must contain a
+        ``protenix_preds/`` sub-directory produced by Protenix.
+    convert_cif_to_pdb : bool, optional
+        When ``True`` (default), each selected CIF file is converted to
+        PDB format via
+        :func:`~protflow.utils.openbabel_tools.openbabel_fileconverter`
+        and the PDB is written to ``<work_dir>/output_predictions/``.
+        When ``False``, the CIF file is copied (without conversion) to
+        the same directory.  In both cases the ``location`` column points
+        to the file in ``output_predictions/``.
+    return_top_n_models : int, optional
+        Number of models to retain per seed per pose, ranked by
+        ``ranking_score`` in descending order.  Default is ``1``
+        (only the best model per seed is kept).
+ 
+    Returns
+    -------
+    pandas.DataFrame
+        One row per retained model with the following guaranteed columns:
+ 
+        ``location`` : str
+            Absolute path to the output PDB or CIF file in
+            ``<work_dir>/output_predictions/``.
+        ``description`` : str
+            Filename stem of the output file, used as the pose identifier
+            in ProtFlow.  Format: ``<input_name>_<zero_padded_counter>``.
+        ``ranking_score`` : float
+            Protenix model ranking score (higher is better).
+        ``seed`` : int
+            Random seed used to generate this model.
+        ``sample`` : str
+            Sample index within the seed, extracted from the per-sample
+            JSON filename.
+        ``input`` : str
+            Name of the parent pose (the sub-directory name under
+            ``protenix_preds/``).
+        All other fields written to the per-sample JSON by Protenix
+        (e.g. pTM, iPTM, chain-level pLDDT metrics).
+ 
+    Notes
+    -----
+    **Directory structure traversal**:
+    The expected hierarchy is::
+ 
+        <work_dir>/
+        └── protenix_preds/
+            └── <pose_name>/          ← one per input pose
+                └── seed_<N>/         ← one per seed
+                    └── predictions/
+                        ├── <pose_name>_sample_<K>.cif
+                        └── <pose_name>_sample_<K>.json
+ 
+    Sub-directories named ``"ERR"`` inside ``protenix_preds/`` are
+    silently excluded.
+ 
+    **File naming**: output files in ``output_predictions/`` are named
+    ``<input>_<NNNN>.pdb`` (or ``.cif``), where ``<NNNN>`` is a
+    zero-padded counter that increments across all seeds for the same
+    pose.  This counter ensures unique filenames and the correct number
+    of index layers for ProtFlow merging.
+ 
+    **Temporary columns**: intermediate columns prefixed with ``"temp_"``
+    (``temp_location``, ``temp_counter``) are created during processing
+    and dropped before the DataFrame is returned.
+ 
+    Examples
+    --------
+    Collect with PDB conversion (default)::
+ 
+        scores = collect_scores("/scratch/protenix_run")
+        print(scores[["description", "location", "ranking_score"]].head())
+ 
+    Collect CIF files and keep the top 3 models per seed::
+ 
+        scores = collect_scores(
+            "/scratch/protenix_run",
+            convert_cif_to_pdb=False,
+            return_top_n_models=3,
+        )
+    """
 
     def cif_to_pdb(input_cif: str, output_format: str, output:str):
         openbabel_fileconverter(input_file=input_cif, output_format=output_format, output_file=output)
