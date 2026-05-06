@@ -71,6 +71,7 @@ from collections import OrderedDict, defaultdict
 import os
 import re
 from typing import Any, TypeAlias
+from Bio.PDB import Entity, Residue, Atom
 
 AtomID: TypeAlias = tuple[Any, ...]
 
@@ -1647,6 +1648,43 @@ class ResidueSelection:
         # Combine all parts into the final contig string
         contig_str = ",".join(contig_parts)
         return contig_str
+    
+    @classmethod
+    def from_resname(cls, resname: str, pose: Any, strict: bool = True) -> "ResidueSelection":
+        """Creates a selection by searching for a specific residue name."""
+        pose = _normalize_biopython_entity(pose)
+        # Extract raw tuples (chain, resnum)
+        data = [cls._extract_bp_residue_data(res) for res in pose.get_residues() if res.get_resname() == resname]
+        
+        if strict and not data:
+            raise RuntimeError(f"No residues found with name {resname}")
+        
+        return cls(data, fast=True)
+
+    @classmethod
+    def from_biopython_residue(cls, residue: Any) -> "ResidueSelection":
+        """Creates a selection from a single Biopython Residue object."""
+        return cls([cls._extract_bp_residue_data(residue)], fast=True)
+
+    @classmethod
+    def from_biopython_entity(cls, entity: Any) -> "ResidueSelection":
+        """Handles Residue, Atom, or Chain/Model entities."""
+        if hasattr(entity, "get_residues"):
+            data = [cls._extract_bp_residue_data(res) for res in entity.get_residues()]
+        elif hasattr(entity, "get_parent"):
+            # If it's an atom, get parent residue; otherwise assume it's a residue
+            res = entity if hasattr(entity, "resname") else entity.get_parent()
+            data = [cls._extract_bp_residue_data(res)]
+        else:
+            raise TypeError(f"Unsupported type: {type(entity)}")
+            
+        return cls(data, fast=True)
+
+    @staticmethod
+    def _extract_bp_residue_data(residue: Any) -> tuple:
+        """Helper to get the (chain, resnum) tuple Biopython style."""
+        return (residue.parent.id, residue.id[1])
+
 
 def fast_parse_selection(input_selection: tuple[tuple[str, int]]) -> tuple[tuple[str, int]]:
     """
