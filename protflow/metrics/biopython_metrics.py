@@ -12,7 +12,7 @@ from typing import Any
 # dependencies
 import numpy as np
 import pandas as pd
-from Bio.PDB import Entity
+from Bio.PDB import Entity, SASA
 from Bio.PDB.Atom import Atom
 from Bio.PDB.vectors import Vector, calc_angle, calc_dihedral
 
@@ -610,3 +610,19 @@ class Clashes(BiopythonMetric):
         check = dgram - distance
 
         return int(np.sum((check < 0)))
+    
+class Sasa(BiopythonMetric):
+
+    def __init__(self, name: str | None = None, target: AtomSelectionInput|str = None, probe_radius: float = 1.4, n_points: int = 100, radii_dict: dict = None) -> None:
+        '''Initialize a Clash detection metric.'''
+        super().__init__(name=name, target=target, probe_radius=probe_radius, n_points=n_points, radii_dict=radii_dict)
+
+    def calc(self, biomolecule: Entity, target: AtomSelectionInput|str = None, probe_radius: float = 1.4, n_points: int = 100, radii_dict: dict = None) -> float: #pylint: disable=W0221
+
+        sasa_calc = SASA.ShrakeRupley(probe_radius=probe_radius, n_points=n_points, radii_dict=radii_dict)
+
+        sasa_calc.compute(biomolecule, biomolecule.get_level())
+
+        target_atoms = self._parse_atoms(biomolecule, target)
+
+        return sum([atom.sasa for atom in target_atoms])
