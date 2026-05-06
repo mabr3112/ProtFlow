@@ -19,6 +19,7 @@ from .rfdiffusion import RFdiffusion
 from .rfdiffusion3 import RFdiffusion3, RFD3Params
 from .rosetta import Rosetta
 from .esm import ESM
+from .protenix import ProtenixPred
 from .sigmadock import SigmaDock
 from .protein_edits import ChainAdder, ChainRemover, SequenceAdder, SequenceRemover
 from .minifold import Minifold
