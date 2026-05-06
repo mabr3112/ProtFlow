@@ -375,12 +375,23 @@ class BiopythonMetric:
         else:
             raise ValueError(f"Atom specifications must have 3, 4, 5, or 6 elements. Got {len(atom_spec)}: {atom_spec}")
 
+        allow_compact_residue_lookup = not isinstance(residue_id, (list, tuple))
         residue_id = self._normalize_residue_id(residue_id)
         atom_name, altloc = self._normalize_atom_id(atom_id)
 
         try:
             atom = self._resolve_atom_from_entity(biomolecule, model_id, chain_id, residue_id, atom_name)
         except KeyError as exc:
+            if allow_compact_residue_lookup:
+                try:
+                    atom = self._resolve_atom_from_compact_residue_id(biomolecule, model_id, chain_id, residue_id, atom_name)
+                except KeyError:
+                    pass
+                else:
+                    if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
+                        atom.disordered_select(altloc)
+                        atom = atom.selected_child
+                    return atom
             raise KeyError(f"Could not resolve atom specification {atom_spec} in biomolecule {biomolecule.get_full_id()}") from exc
 
         if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
@@ -400,6 +411,40 @@ class BiopythonMetric:
         if level == "R":
             return biomolecule[atom_name]
         raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
+
+    def _resolve_atom_from_compact_residue_id(self, biomolecule: Entity, model_id: Any, chain_id: str, residue_id: tuple[str, int, str], atom_name: str) -> Atom:
+        '''Resolve compact residue IDs against hetero residues when exact BioPython lookup fails.'''
+        _, residue_number, insertion_code = residue_id
+        level = biomolecule.get_level()
+        if level == "S":
+            chain = biomolecule[self._normalize_model_id(model_id)][chain_id]
+        elif level == "M":
+            chain = biomolecule[chain_id]
+        elif level == "C":
+            chain = biomolecule
+        elif level == "R":
+            if int(biomolecule.id[1]) == residue_number and biomolecule.id[2] == insertion_code:
+                return biomolecule[atom_name]
+            raise KeyError((chain_id, residue_id, atom_name))
+        else:
+            raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
+
+        matches = [
+            residue
+            for residue in chain.get_residues()
+            if int(residue.id[1]) == residue_number
+            and residue.id[2] == insertion_code
+            and atom_name in residue
+        ]
+        if len(matches) == 1:
+            return matches[0][atom_name]
+        if len(matches) > 1:
+            match_ids = [residue.id for residue in matches]
+            raise ValueError(
+                f"Ambiguous compact residue ID {chain_id}{residue_number}{insertion_code.strip()} "
+                f"for atom {atom_name}; matching BioPython residue IDs: {match_ids}"
+            )
+        raise KeyError((chain_id, residue_id, atom_name))
 
     def _parse_atoms(self, biomolecule: Entity, atoms: AtomSelectionInput, expected_counts: tuple[int, ...], parameter_name: str = "atoms") -> list[Atom]:
         '''Resolve an ordered atom selection from a BioPython entity.'''
