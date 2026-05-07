@@ -67,11 +67,12 @@ Creating and manipulating `ResidueSelection` objects:
 This module simplifies the process of handling residue selections in bioinformatics workflows, providing a consistent interface for different types of input and output formats.
 """
 # imports
+from __future__ import annotations
+
 from collections import OrderedDict, defaultdict
 import os
 import re
 from typing import Any, TypeAlias
-from Bio.PDB import Entity, Residue, Atom
 
 AtomID: TypeAlias = tuple[Any, ...]
 
@@ -1385,6 +1386,49 @@ class AtomSelection:
                 )
 
         return selections
+    
+    @staticmethod
+    def from_residueselection(
+        res_selection: ResidueSelection,
+        atoms: list | str,
+        pose: Any = None,
+        residue_id_format: str = "auto",
+    ) -> "AtomSelection":
+        """
+        Create an AtomSelection from a ResidueSelection with specified atoms. Accepts RFD3 inputs like BKBN, TIP, ALL etc as atoms specification.
+
+        Parameters
+        ----------
+        res_selection : ResidueSelection
+            Input ResidueSelection.
+        atoms : list or str
+            Names of selected atoms. Can be a list of atom names, a single atom
+            name, or RFD3-style atom specifications like BKBN, TIP or ALL.
+        pose : str, os.PathLike, Bio.PDB entity
+            Input structure containing the selected atoms. Only required if
+            RFD3-style atom specifications (BKBN, TIP, ALL) are used.
+        residue_id_format : {"auto", "compact", "biopython"}, optional
+            Controls residue ID formatting for atoms loaded from *pose*.
+
+        Returns
+        -------
+        AtomSelection
+            Selection containing all atoms selected by the residue and atoms
+            specification.
+
+        Examples
+        --------
+        Select all CA and CB atoms in residues A1-25 and B1-10 named ``LIG`` and ``ACT``::
+
+            ressel = from_contig("A1-25, B1-10")
+            AtomSelection.from_residueselection(ressel, ["CA", "CB"])
+        """
+        if isinstance(atoms, list):
+            atoms = ",".join(atoms)
+        
+        atomdict = {res_selection.to_rfdiffusion_contig(): atoms}
+        return AtomSelection.from_rfd3_input_selection(atomdict, pose=pose, residue_id_format=residue_id_format)
+
 
     ####################################### OUTPUT #############################################
     def to_tuple(self) -> tuple[AtomID, ...]:
@@ -1416,6 +1460,18 @@ class AtomSelection:
 
         # Convert back to a regular dict and return
         return dict(rfd3_dict)
+    
+    def to_boltz_atom(self) -> list:
+        """Return a list formatted like a Boltz input atom for bond constraints (e.g. ["A", 5, "CA"]). Only for single atoms."""
+
+        if len(self.atoms) != 1:
+            raise KeyError("Boltz-style format is only allowed for single atoms!")
+        
+        # unpack single atom
+        atm = self.to_list()[0]
+
+        # return list
+        return [atm[0], atm[1], atm[2]]
 
 
 AtomSelectionInput: TypeAlias = str | tuple[Any, ...] | list[Any] | dict[str, Any] | AtomSelection | None
