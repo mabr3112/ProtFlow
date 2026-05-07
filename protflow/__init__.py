@@ -170,7 +170,7 @@ def load_config_path(config: object, path_var: str, is_pre_cmd: bool = False) ->
     var = var if ("/" in var or "\\" in var) else which(var)
 
     # check if file exists and return
-    out_path = Path(_expand(var)).resolve()
+    out_path = Path(_expand(var)).absolute()
     if out_path.exists():
         return out_path
     raise FileNotFoundError(out_path)

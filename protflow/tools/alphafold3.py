@@ -467,20 +467,22 @@ def collect_scores(work_dir: str, convert_cif_to_pdb_dir: str = None, return_top
 
     def load_all_models(out_dir: str) -> pd.DataFrame:
         os.makedirs(model_dir := os.path.join(out_dir, "models"), exist_ok=True)
-        ranks = pd.read_csv(os.path.join(out_dir, "ranking_scores.csv"))
+        ranks = pd.read_csv(os.path.join(out_dir, f"{os.path.basename(out_dir)}_ranking_scores.csv"))
         ranks.sort_values("ranking_score", ascending=False, inplace=True)
         ranks.reset_index(drop=True, inplace=True)
-        data = os.path.join(out_dir, f"{os.path.basename(out_dir)}_data.json")
+        in_name = os.path.basename(out_dir)
+        data = os.path.join(out_dir, f"{in_name}_data.json")
         with open(data, 'r', encoding="UTF-8") as file:
             data = file.read()
         data = json.loads(data)
         scores = []
         for i, row in ranks.iterrows():
             model_dir = os.path.join(out_dir, f"seed-{int(row['seed'])}_sample-{int(row['sample'])}")
-            confidences = pd.read_json(os.path.join(model_dir, "confidences.json"), typ='series', orient='records')
-            summary = pd.read_json(os.path.join(model_dir, "summary_confidences.json"), typ='series', orient='records')
+            model_id = in_name + "_" + os.path.basename(model_dir)
+            confidences = pd.read_json(os.path.join(model_dir, f"{model_id}_confidences.json"), typ='series', orient='records')
+            summary = pd.read_json(os.path.join(model_dir, f"{model_id}_summary_confidences.json"), typ='series', orient='records')
             score = pd.concat([summary, confidences])
-            model = os.path.join(model_dir, "model.cif")
+            model = os.path.join(model_dir, f"{model_id}_model.cif")
             score["location"] = os.path.abspath(shutil.copy(model, os.path.join(model_dir, f"{data['name']}_{i+1:04d}.cif")))
             score["description"] = description_from_path(score["location"])
             scores.append(score)
@@ -644,9 +646,9 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
 
         # AF3 will create MSAs automatically if options are not specified
         if isinstance(row_msa_unpaired, str):
-            pose_data["protein"].update({"unpairedMsaPath": row_msa_unpaired})
+            pose_data["protein"].update({"unpairedMsa": row_msa_unpaired})
         if isinstance(row_msa_paired, str):
-            pose_data["protein"].update({"pairedMsaPath": row_msa_paired})
+            pose_data["protein"].update({"pairedMsa": row_msa_paired})
 
         # AF3 will use templates automatically if options are not specified
         if isinstance(row_templates, list):
@@ -674,6 +676,8 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
             "name": row["poses_description"],
             "modelSeeds": seeds,
             "sequences": sequences,
+            "dialect": "alphafold3",
+            "version": 4
         }
 
         # add additional settings
@@ -684,8 +688,6 @@ def create_input_json_dir(out_dir, num_batches, poses, nstruct, num_copies, msa_
         elif row_bonded_atom_pairs:
             raise ValueError(f"Input to :bonded_atom_pairs: must be a nested list of bonds or a dictionary in the AF3 input format, not {type(user_ccd)}!")
 
-        print(row_user_ccd)
-        print(type(row_user_ccd))
         if row_user_ccd and isinstance(row_user_ccd, str) and os.path.isfile(row_user_ccd):
             record.update(import_custom_ccd(row_user_ccd))
         elif row_user_ccd and isinstance(row_user_ccd, str):

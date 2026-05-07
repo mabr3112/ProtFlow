@@ -8,6 +8,7 @@ from . import residue_selectors, rfdiffusion, rosetta, esm, rfdiffusion3, sigmad
 from .alphafold3 import AlphaFold3
 from .attnpacker import AttnPacker
 from .boltz import Boltz, BoltzParams
+from .intellifold import Intellifold, IntellifoldParams
 from .colabfold import Colabfold
 from .esmfold import ESMFold
 from .gnina import GNINA
@@ -19,6 +20,7 @@ from .rfdiffusion import RFdiffusion
 from .rfdiffusion3 import RFdiffusion3, RFD3Params
 from .rosetta import Rosetta
 from .esm import ESM
+from .protenix import ProtenixPred
 from .sigmadock import SigmaDock
 from .protein_edits import ChainAdder, ChainRemover, SequenceAdder, SequenceRemover
 from .minifold import Minifold

@@ -119,7 +119,7 @@ class _CalibyRunner(Runner):
         # setup config
         config = require_config()
         self.caliby_dir = caliby_dir or load_config_path(config, "CALIBY_DIR_PATH")
-        self.model_dir = model_dir or os.path.join(self.caliby_dir, "model_params")
+        self.model_dir = model_dir or load_config_path(config, "CALIBY_MODELS_PATH")
         self.python_path = python_path or load_config_path(config, "CALIBY_PYTHON_PATH")
         self.pre_cmd = pre_cmd or load_config_path(config, "CALIBY_PRE_CMD", is_pre_cmd=True)
         self.jobstarter = jobstarter
@@ -600,7 +600,7 @@ class CalibySequenceDesign(_CalibyRunner):
         )
         
         self.script_path = os.path.join(self.caliby_dir, "caliby/eval/sampling/seq_des.py")
-        self.sampling_cfg = os.path.join(self.caliby_dir, "caliby/configs/seq_des/atom_mpnn_inference.yaml")
+        self.sampling_cfg = os.path.join(self.caliby_dir, "caliby/configs/seq_des/inference.yaml")
         
         self.index_layers = 1
 
@@ -1159,7 +1159,7 @@ class CalibyEnsembleSeqDesign(_CalibyRunner):
         self.script_path = os.path.join(self.caliby_dir, "caliby/eval/sampling/seq_des_ensemble.py")
 
         # TODO: find a better way, but otherwise caliby will look in wrong directory because of relative paths
-        self.sampling_cfg = os.path.join(self.caliby_dir, "caliby/configs/seq_des/atom_mpnn_inference.yaml")
+        self.sampling_cfg = os.path.join(self.caliby_dir, "caliby/configs/seq_des/inference.yaml")
 
         self.index_layers = 1
 
