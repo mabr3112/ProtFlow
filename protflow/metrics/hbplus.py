@@ -966,6 +966,7 @@ class HBplus(Runner):
         )
 
         scores = pd.concat([pd.read_json(out) for out in output])
+        scores.reset_index(drop=True, inplace=True)
 
         self.save_runner_scorefile(scores, scorefile)
 
