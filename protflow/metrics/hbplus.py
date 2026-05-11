@@ -924,7 +924,7 @@ class HBplus(Runner):
 
         # Look for present outputs
         scorefile = os.path.join(work_dir, f"{prefix}_scores.{poses.storage_format}")
-        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=True)) is not None:
+        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
         
         query_dict = {query.name: query.data for query in queries}

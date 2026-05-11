@@ -104,3 +104,6 @@ SIGMADOCK_SCRIPT_PATH = "" # "/path/to/sigmadock/scripts/sample.py"
 SIGMADOCK_PYTHON_PATH = "" # "/path/to/package_manager/envs/sigmadock/bin/python"
 SIGMADOCK_CKPT_PATH = "" # "/path/to/sigmadock/model/sample_checkpoint_0.ckpt"
 SIGMADOCK_PRE_CMD = "" # "export PATH=/path/to/package_manager/envs/sigmadock/bin:$PATH"
+
+# hbplus
+HPLUS_PATH = "" # "/path/to/hbplus/hbplus"
