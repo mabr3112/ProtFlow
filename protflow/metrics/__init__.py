@@ -13,3 +13,4 @@ from ..residues import AtomSelection
 from .rmsd import AtomRMSD, MotifRMSD, BackboneRMSD
 from .selection_identity import SelectionIdentity
 from .tmscore import TMalign, TMscore
+from .hbplus import HBplus, HBplus_query
