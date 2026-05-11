@@ -759,7 +759,7 @@ class HBplus(Runner):
         poses = RunnerOutput(poses, scores, prefix, index_layers=self.index_layers).return_poses()
 
         if queries:
-            poses = self.query(poses=poses, queries=queries, hbplus_prefix=prefix)
+            poses = self.query(poses=poses, queries=queries, hbplus_prefix=prefix, overwrite=overwrite)
         return poses
     
     def query(self, poses: Poses, queries: list[HBplus_query] | HBplus_query, hbplus_prefix: str, jobstarter: JobStarter = None, full_output: bool = False, overwrite: bool = False):
