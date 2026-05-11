@@ -885,6 +885,17 @@ class AtomSelection:
 
             AtomSelection.from_list([("A", 1, "N"), ("A", 1, "CA")])
         """
+        # Check if we need to unpack any AtomSelection objects
+        if any(isinstance(item, AtomSelection) for item in atoms):
+            flattened_ids = []
+            for item in atoms:
+                if isinstance(item, AtomSelection):
+                    flattened_ids.extend(item.atoms)
+                else:
+                    # This allows raw IDs (tuples/lists) to live alongside objects
+                    flattened_ids.append(item)
+            return AtomSelection(flattened_ids) # preserves non-uniqueness of input atoms compared to __add__ approaches
+
         return AtomSelection(atoms)
 
     @staticmethod
@@ -1472,6 +1483,12 @@ class AtomSelection:
 
         # return list
         return [atm[0], atm[1], atm[2]]
+
+    ####################################### FUNCTION #############################################
+    def deduplicate(self) -> AtomSelection:
+        """Removes duplicate atoms"""
+        self.atoms = _unique_atom_ids(self.to_list())
+        return self
 
 
 AtomSelectionInput: TypeAlias = str | tuple[Any, ...] | list[Any] | dict[str, Any] | AtomSelection | None
