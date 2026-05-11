@@ -759,7 +759,7 @@ class HBplus(Runner):
         poses = RunnerOutput(poses, scores, prefix, index_layers=self.index_layers).return_poses()
 
         if queries:
-            poses = self.query(poses=poses, queries=queries, hbplus_prefix=prefix)
+            poses = self.query(poses=poses, queries=queries, hbplus_prefix=prefix, jobstarter=jobstarter, overwrite=overwrite)
         return poses
     
     def query(self, poses: Poses, queries: list[HBplus_query] | HBplus_query, hbplus_prefix: str, jobstarter: JobStarter = None, full_output: bool = False, overwrite: bool = False):
@@ -966,6 +966,7 @@ class HBplus(Runner):
         )
 
         scores = pd.concat([pd.read_json(out) for out in output])
+        scores.reset_index(drop=True, inplace=True)
 
         self.save_runner_scorefile(scores, scorefile)
 
