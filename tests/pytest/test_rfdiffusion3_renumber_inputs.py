@@ -1,7 +1,18 @@
 import gzip
 import json
+import sys
+from pathlib import Path
 
-from protflow.tools.rfdiffusion3 import collect_scores, renumber_rfd3_input_pdb
+import pandas as pd
+import pytest
+
+from protflow.jobstarters import LocalJobStarter
+from protflow.tools.rfdiffusion3 import add_renumbered_inputs_to_scores, collect_scores, renumber_rfd3_input_pdb
+
+
+
+def _worker_script() -> str:
+    return str(Path(__file__).resolve().parents[2] / "protflow" / "tools" / "runners_auxiliary_scripts" / "rfd3_renumber_inputs.py")
 
 
 def _atom_line(record: str, serial: int, atom: str, resname: str, chain: str, resseq: int) -> str:
@@ -81,6 +92,9 @@ def test_collect_scores_adds_renumbered_inputs_column(tmp_path):
         cif_to_pdb=False,
         run_clean=False,
         renumber_input=True,
+        jobstarter=LocalJobStarter(max_cores=2),
+        python_path=sys.executable,
+        script_path=_worker_script(),
     )
 
     renumbered_input = tmp_path / "renumbered_inputs" / "design_0001_0001.pdb"
@@ -89,3 +103,79 @@ def test_collect_scores_adds_renumbered_inputs_column(tmp_path):
     assert renumbered_input.is_file()
     assert renumbered_input.read_text(encoding="UTF-8").splitlines()[0][21] == "C"
     assert renumbered_input.read_text(encoding="UTF-8").splitlines()[0][22:26] == "   5"
+
+
+
+def test_add_renumbered_inputs_requires_jobstarter(tmp_path):
+    with pytest.raises(ValueError, match="requires a jobstarter"):
+        add_renumbered_inputs_to_scores(
+            scores=pd.DataFrame({"description": ["design_0001_0001"], "location": ["design_0001_0001.pdb"]}),
+            work_dir=str(tmp_path),
+            overwrite=True,
+        )
+
+def test_add_renumbered_inputs_infers_ligand_chain_moves_with_jobstarter(tmp_path):
+    input_pdb = tmp_path / "input.pdb"
+    input_pdb.write_text(
+        "".join(
+            [
+                _atom_line("ATOM", 1, "N", "ALA", "A", 1),
+                _atom_line("HETATM", 2, "C1", "LIG", "Z", 9),
+                "END\n",
+            ]
+        ),
+        encoding="UTF-8",
+    )
+
+    output_pdb = tmp_path / "design_0001_0001.pdb"
+    output_pdb.write_text(
+        "".join(
+            [
+                _atom_line("ATOM", 1, "N", "ALA", "B", 10),
+                _atom_line("HETATM", 2, "C1", "LIG", "C", 12),
+                "END\n",
+            ]
+        ),
+        encoding="UTF-8",
+    )
+
+    output_dir = tmp_path / "outputs"
+    output_dir.mkdir()
+    (output_dir / "design_0001_0001.json").write_text(
+        json.dumps(
+            {
+                "diffused_index_map": {"A1": "B10"},
+                "metrics": {"plddt": 0.95},
+                "specification": {"input": str(input_pdb), "ligand": "LIG"},
+            }
+        ),
+        encoding="UTF-8",
+    )
+
+    scores = pd.DataFrame(
+        {
+            "description": ["design_0001_0001"],
+            "location": [str(output_pdb)],
+            "diffused_index_map": [{"A1": "B10"}],
+        }
+    )
+
+    scores = add_renumbered_inputs_to_scores(
+        scores=scores,
+        work_dir=str(tmp_path),
+        overwrite=True,
+        jobstarter=LocalJobStarter(max_cores=2),
+        python_path=sys.executable,
+        script_path=_worker_script(),
+    )
+
+    renumbered_input = tmp_path / "renumbered_inputs" / "design_0001_0001.pdb"
+    assert scores.at[0, "renumbered_inputs"] == str(renumbered_input)
+    assert scores.at[0, "ligand_renumbering_map"] == {"Z9": "C12"}
+    assert scores.at[0, "ligand_renumbering_changed"]
+
+    lines = renumbered_input.read_text(encoding="UTF-8").splitlines()
+    assert lines[0][21] == "B"
+    assert lines[0][22:26] == "  10"
+    assert lines[1][21] == "C"
+    assert lines[1][22:26] == "  12"

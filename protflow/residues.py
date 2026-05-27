@@ -495,8 +495,9 @@ def _unique_atom_ids(atom_ids: list[AtomID]) -> tuple[AtomID, ...]:
     return tuple(OrderedDict.fromkeys(_as_tuple_recursive(atom_id) for atom_id in atom_ids))
 
 
-def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
-    """Collapse one normalized atom ID to the `(chain, residue_number)` pair."""
+def atom_id_to_residue(atom_id: AtomID) -> tuple[str, int]:
+    """Collapse one AtomSelection atom ID to ``(chain, residue_number)``."""
+    atom_id = _as_tuple_recursive(atom_id)
     _validate_atom_id(atom_id)
 
     if len(atom_id) == 3:
@@ -512,6 +513,11 @@ def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
         residue_id = residue_id[1]
 
     return (chain_id, int(residue_id))
+
+
+def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
+    """Collapse one normalized atom ID to the `(chain, residue_number)` pair."""
+    return atom_id_to_residue(atom_id)
 
 
 def _atom_name_from_atom_id(atom_id: AtomID) -> str:
@@ -1559,7 +1565,7 @@ class ResidueSelection:
         collapse to one residue while preserving encounter order.
         """
         atom_selection = AtomSelection(atom_selection)
-        residues = reduce_to_unique(tuple(_residue_from_atom_id(atom_id) for atom_id in atom_selection))
+        residues = reduce_to_unique(tuple(atom_id_to_residue(atom_id) for atom_id in atom_selection))
         return cls(residues, fast=True)
 
     def from_selection(self, selection) -> "ResidueSelection":
