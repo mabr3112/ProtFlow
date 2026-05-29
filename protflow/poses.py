@@ -1731,10 +1731,9 @@ class Poses:
         - Logs the filtering process, including any errors or warnings related to the ranking criteria.
 
         """
-
         if group_col and remove_layers:
             raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
-    
+
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
             if self.filter_dir is None:
@@ -1748,6 +1747,10 @@ class Poses:
 
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
+
+            # save prefiltered df
+            prefilter_output_name = os.path.join(self.filter_dir, f"{prefix}_prefilter.{storage_format}")
+            getattr(self.df, FORMAT_STORAGE_DICT.get(storage_format))(prefilter_output_name)
 
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
             if not overwrite and os.path.isfile(output_name):
@@ -1868,6 +1871,10 @@ class Poses:
 
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
+
+            # save prefiltered df
+            prefilter_output_name = os.path.join(self.filter_dir, f"{prefix}_prefilter.{storage_format}")
+            getattr(self.df, FORMAT_STORAGE_DICT.get(storage_format))(prefilter_output_name)
 
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
             if not overwrite and os.path.isfile(output_name):
