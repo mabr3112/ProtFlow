@@ -2,7 +2,7 @@
 from . import biopython_metrics, dssp, fpocket, generic_metric_runner, ligand, propka, protparam, rmsd, selection_identity, tmscore
 
 # import runners directly
-from .biopython_metrics import Angle, BiopythonMetric, BiopythonMetricRunner, Dihedral, Distance, PlaneAngle
+from .biopython_metrics import Angle, BiopythonMetric, BiopythonMetricRunner, ContactOrder, Dihedral, Distance, PlaneAngle
 from .dssp import DSSP
 from .fpocket import FPocket
 from .generic_metric_runner import GenericMetric

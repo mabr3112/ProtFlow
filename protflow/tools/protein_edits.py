@@ -82,7 +82,7 @@ import pandas as pd
 
 # customs
 from ..poses import Poses
-from ..residues import ResidueSelection
+from ..residues import AtomSelection, ResidueSelection
 from ..jobstarters import JobStarter, split_list
 from ..runners import Runner, RunnerOutput, col_in_df
 from .. import jobstarters, require_config, load_config_path
@@ -284,7 +284,7 @@ class ChainAdder(Runner):
         )
         return chains_added
 
-    def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, overwrite: bool = False) -> Poses:
+    def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, target_motif: ResidueSelection|AtomSelection|str = None, reference_motif: ResidueSelection|AtomSelection|str = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, overwrite: bool = False) -> Poses:
         """
         Add a protein chain after superimposition on a motif or chain.
 
@@ -297,8 +297,8 @@ class ChainAdder(Runner):
             ref_col (str): The column in the poses DataFrame that references the structures to be used.
             copy_chain (str): The chain identifier to copy.
             jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
-            target_motif (ResidueSelection, optional): The target motif for superimposition. Defaults to None.
-            reference_motif (ResidueSelection, optional): The reference motif for superimposition. Defaults to None.
+            target_motif (ResidueSelection | AtomSelection | str, optional): The target motif for superimposition. Strings are interpreted as poses.df columns. Defaults to None.
+            reference_motif (ResidueSelection | AtomSelection | str, optional): The reference motif for superimposition. Strings are interpreted as poses.df columns. Defaults to None.
             target_chains (list, optional): A list of target chains for superimposition. Defaults to None.
             reference_chains (list, optional): A list of reference chains for superimposition. Defaults to None.
             translate_x (float, optional): Translate the chain to copy by x Angstrom in x-axis. This option can e.g. be used to set up multi-state design with LigandMPNN.
@@ -404,7 +404,7 @@ class ChainAdder(Runner):
 
         return poses.change_poses_dir(work_dir, copy=False)
 
-    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None) -> dict:
+    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str, target_motif: ResidueSelection|AtomSelection|str = None, reference_motif: ResidueSelection|AtomSelection|str = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None) -> dict:
         '''Prepares motif and chain specifications for superimposer setup.
         Returns dictionary (dict) that holds the kwargs for superimposition: {'target_motif': [target_motif_list], ...}'''
         # safety
@@ -440,63 +440,30 @@ class ChainAdder(Runner):
 
         return out_dict
 
-    def parse_motif(self, motif: ResidueSelection|str, pose: pd.Series) -> str:
+    def parse_motif(self, motif: ResidueSelection|AtomSelection|str|dict, pose: pd.Series) -> str|dict:
         """
-        Set up motif from target_motif input.
+        Set up a residue or atom motif from user input.
 
-        This method converts a given motif, either a `ResidueSelection` object or a string, into a string format suitable for further processing. 
-        If the motif is a string, it checks if it is a column in the `pose` DataFrame and assumes it points to a `ResidueSelection` object.
-
-        Parameters:
-            motif (ResidueSelection | str): The motif to be parsed. It can be either a `ResidueSelection` object or a string.
-            pose (pd.Series): A row from the poses DataFrame that contains information about the protein structure.
-
-        Returns:
-            str: The motif in string format.
-
-        Raises:
-            ValueError: If the motif is a string but not a column in the `poses.df` DataFrame.
-            TypeError: If the motif is neither a `ResidueSelection` object nor a string.
-
-        Examples:
-            Here is an example of how to use the `parse_motif` method:
-
-            .. code-block:: python
-
-                from protflow.residues import ResidueSelection
-                from protein_edits import ChainAdder
-                import pandas as pd
-
-                # Initialize the ChainAdder class
-                chain_adder = ChainAdder()
-
-                # Example pose DataFrame row
-                pose = pd.Series({'motif_column': ResidueSelection(...)})
-
-                # Parse a ResidueSelection object
-                motif = ResidueSelection(...)
-                motif_str = chain_adder.parse_motif(motif, pose)
-
-                # Parse a string that is a column in the pose DataFrame
-                motif_str = chain_adder.parse_motif('motif_column', pose)
-
-                # Access the result
-                print(motif_str)
-
-        Further Details
-        ---------------
-        - **ResidueSelection Handling:** The method directly converts a `ResidueSelection` object to its string representation using its `to_string` method.
-        - **String Handling:** If a string is provided, the method checks if it is a column in the `pose` DataFrame that points to a `ResidueSelection` object, converting it to a string.
-        - **Error Handling:** The method raises appropriate errors if the input is not of the expected type or if the string does not correspond to a valid column in the DataFrame.
+        ResidueSelection objects are serialized with their legacy string
+        representation. AtomSelection objects are serialized through their
+        scorefile-compatible dictionary form so the auxiliary worker can
+        resolve exact atom IDs. If *motif* is a string, it must name a column in
+        the pose row whose value is a ResidueSelection or AtomSelection.
         """
         if isinstance(motif, ResidueSelection):
             return motif.to_string()
+        if isinstance(motif, AtomSelection):
+            return motif.to_dict()
+        if isinstance(motif, dict):
+            if "atoms" in motif:
+                return AtomSelection(motif).to_dict()
+            if "residues" in motif:
+                return ResidueSelection(motif, from_scorefile=True).to_string()
         if isinstance(motif, str):
             if motif in pose:
-                # assumes motif is a column in pose (row in poses.df) that points to a ResidueSelection object
-                return pose[motif].to_string()
-            raise ValueError("If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
-        raise TypeError(f"Unsupportet parameter type for motif: {type(motif)} - Only ResidueSelection or str allowed!")
+                return self.parse_motif(pose[motif], pose)
+            raise ValueError("If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection or AtomSelection object.")
+        raise TypeError(f"Unsupported parameter type for motif: {type(motif)} - Only ResidueSelection, AtomSelection, serialized selection dict or str allowed!")
 
     def add_sequence(self, prefix: str, poses: Poses, seq: str = None, seq_col: str = None, sep: str = ":") -> None:
         """

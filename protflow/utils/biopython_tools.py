@@ -61,7 +61,7 @@ Markus Braun, Adrian Tripp
 import copy
 import os
 import string
-from typing import Union
+from typing import Any, Union
 import Bio.PDB.Entity
 import numpy as np
 import pandas as pd
@@ -82,7 +82,7 @@ import Bio.PDB.Structure
 from openbabel import pybel # needed for sdf saving, could be moved entierly to runner if we want to keep this module strictly biopython related
 
 # customs
-from ..residues import ResidueSelection
+from ..residues import AtomSelection, AtomSelectionInput, ResidueSelection
 
 def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Union[Structure, Model]:
     """
@@ -368,6 +368,148 @@ def superimpose(mobile: Structure, target: Structure, mobile_atoms: list = None,
     super_imposer.set_atoms(target_atoms, mobile_atoms)
     super_imposer.apply(mobile)
     return mobile
+
+def _normalize_atom_spec_residue_id(residue_id: Any) -> tuple[str, int, str]:
+    """Normalize compact residue IDs to BioPython residue IDs."""
+    if isinstance(residue_id, (list, tuple)):
+        if len(residue_id) != 3:
+            raise ValueError(f"BioPython residue IDs must have three elements. Got: {residue_id}")
+        hetero_flag, residue_number, insertion_code = residue_id
+        return (hetero_flag or " ", int(residue_number), insertion_code or " ")
+    return (" ", int(residue_id), " ")
+
+def _normalize_atom_spec_atom_id(atom_id: Any) -> tuple[Any, Any]:
+    """Normalize BioPython atom IDs and optional altloc identifiers."""
+    if isinstance(atom_id, list):
+        atom_id = tuple(atom_id)
+    if isinstance(atom_id, tuple) and len(atom_id) == 2:
+        return atom_id[0], atom_id[1]
+    return atom_id, None
+
+def _normalize_atom_spec_model_id(model_id: Any) -> Any:
+    """Normalize JSON-loaded model IDs where possible."""
+    try:
+        return int(model_id)
+    except (TypeError, ValueError):
+        return model_id
+
+def _resolve_atom_from_entity(
+    biomolecule: Bio.PDB.Entity.Entity,
+    model_id: Any,
+    chain_id: str,
+    residue_id: tuple[str, int, str],
+    atom_name: str,
+):
+    """Resolve an atom from a BioPython Structure, Model, Chain, or Residue."""
+    level = biomolecule.get_level()
+    if level == "S":
+        return biomolecule[_normalize_atom_spec_model_id(model_id)][chain_id][residue_id][atom_name]
+    if level == "M":
+        return biomolecule[chain_id][residue_id][atom_name]
+    if level == "C":
+        return biomolecule[residue_id][atom_name]
+    if level == "R":
+        return biomolecule[atom_name]
+    raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
+
+def _resolve_atom_from_compact_residue_id(
+    biomolecule: Bio.PDB.Entity.Entity,
+    model_id: Any,
+    chain_id: str,
+    residue_id: tuple[str, int, str],
+    atom_name: str,
+):
+    """Resolve compact residue IDs against hetero residues when exact lookup fails."""
+    _, residue_number, insertion_code = residue_id
+    level = biomolecule.get_level()
+    if level == "S":
+        chain = biomolecule[_normalize_atom_spec_model_id(model_id)][chain_id]
+    elif level == "M":
+        chain = biomolecule[chain_id]
+    elif level == "C":
+        chain = biomolecule
+    elif level == "R":
+        if int(biomolecule.id[1]) == residue_number and biomolecule.id[2] == insertion_code:
+            return biomolecule[atom_name]
+        raise KeyError((chain_id, residue_id, atom_name))
+    else:
+        raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
+
+    matches = [
+        residue
+        for residue in chain.get_residues()
+        if int(residue.id[1]) == residue_number
+        and residue.id[2] == insertion_code
+        and atom_name in residue
+    ]
+    if len(matches) == 1:
+        return matches[0][atom_name]
+    if len(matches) > 1:
+        match_ids = [residue.id for residue in matches]
+        raise ValueError(
+            f"Ambiguous compact residue ID {chain_id}{residue_number}{insertion_code.strip()} "
+            f"for atom {atom_name}; matching BioPython residue IDs: {match_ids}"
+        )
+    raise KeyError((chain_id, residue_id, atom_name))
+
+def atom_from_selection_spec(
+    biomolecule: Bio.PDB.Entity.Entity,
+    atom_spec: Any,
+    default_model: int = 0,
+):
+    """
+    Resolve one atom from a compact or full BioPython atom specification.
+
+    Supported atom ID forms match :class:`protflow.residues.AtomSelection`.
+    """
+    if not isinstance(atom_spec, (list, tuple)):
+        raise TypeError(f"Atom specifications must be tuple/list-like. Got {type(atom_spec)}: {atom_spec}")
+
+    atom_spec = list(atom_spec)
+    if len(atom_spec) == 3:
+        model_id = default_model
+        chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 4:
+        model_id, chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 5:
+        _, model_id, chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 6:
+        _, model_id, chain_id, residue_id, atom_name, altloc = atom_spec
+        atom_id = (atom_name, altloc)
+    else:
+        raise ValueError(f"Atom specifications must have 3, 4, 5, or 6 elements. Got {len(atom_spec)}: {atom_spec}")
+
+    allow_compact_residue_lookup = not isinstance(residue_id, (list, tuple))
+    residue_id = _normalize_atom_spec_residue_id(residue_id)
+    atom_name, altloc = _normalize_atom_spec_atom_id(atom_id)
+
+    try:
+        atom = _resolve_atom_from_entity(biomolecule, model_id, chain_id, residue_id, atom_name)
+    except KeyError as exc:
+        if allow_compact_residue_lookup:
+            try:
+                atom = _resolve_atom_from_compact_residue_id(biomolecule, model_id, chain_id, residue_id, atom_name)
+            except KeyError:
+                pass
+            else:
+                if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
+                    atom.disordered_select(altloc)
+                    atom = atom.selected_child
+                return atom
+        raise KeyError(f"Could not resolve atom specification {atom_spec} in biomolecule {biomolecule.get_full_id()}") from exc
+
+    if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
+        atom.disordered_select(altloc)
+        atom = atom.selected_child
+    return atom
+
+def get_atoms_of_atom_selection(
+    pose: Bio.PDB.Entity.Entity,
+    atom_selection: AtomSelectionInput,
+) -> list:
+    """Resolve an ordered :class:`~protflow.residues.AtomSelection` to BioPython atoms."""
+    atom_specs = AtomSelection(atom_selection).to_list()
+    return [atom_from_selection_spec(pose, atom_spec) for atom_spec in atom_specs]
 
 def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None, include_het_atoms: bool = False) -> list:
     '''

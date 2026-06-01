@@ -656,6 +656,124 @@ class Clashes(BiopythonMetric):
 
         return int(np.sum((check < 0)))
     
+class ContactOrder(BiopythonMetric):
+    '''Calculate relative contact order from residue-level contacts.'''
+    def __init__(
+        self,
+        name: str | None = None,
+        contact_distance: float = 8.0,
+        contact_atom: str = "CA",
+        min_sequence_separation: int = 1,
+        chains: str|list[str]|tuple[str, ...] = None,
+    ) -> None:
+        '''Initialize a relative contact-order metric.'''
+        super().__init__(
+            name=name or "contact_order",
+            contact_distance=contact_distance,
+            contact_atom=contact_atom,
+            min_sequence_separation=min_sequence_separation,
+            chains=chains,
+        )
+
+    @staticmethod
+    def _normalize_chains(chains: str|list[str]|tuple[str, ...]|None) -> list[str]|None:
+        '''Normalize an optional chain filter to a list of chain IDs.'''
+        if chains is None:
+            return None
+        if isinstance(chains, str):
+            return [chains]
+        if isinstance(chains, (list, tuple)) and all(isinstance(chain, str) for chain in chains):
+            return list(chains)
+        raise TypeError(f"chains must be None, a chain ID string, or a list/tuple of chain ID strings. Got: {chains}")
+
+    @staticmethod
+    def _selected_chains(biomolecule: Entity, chains: list[str]|None) -> list:
+        '''Return selected BioPython chains while preserving structure order.'''
+        level = biomolecule.get_level()
+        if level == "S" or level == "M":
+            chain_list = list(biomolecule.get_chains())
+        elif level == "C":
+            chain_list = [biomolecule]
+        elif level == "R":
+            chain_list = [biomolecule.get_parent()]
+        else:
+            raise ValueError(f"Cannot calculate contact order from BioPython entity level '{level}'.")
+
+        if chains is None:
+            return chain_list
+        selected = [chain for chain in chain_list if chain.id in chains]
+        missing = sorted(set(chains) - {chain.id for chain in selected})
+        if missing:
+            raise KeyError(f"Chains not found for contact-order calculation: {missing}")
+        return selected
+
+    @staticmethod
+    def _contact_atom_records(biomolecule: Entity, chains: list[str]|None, contact_atom: str) -> list[tuple[str, int, Atom]]:
+        '''Collect one representative atom per protein residue for contact-order calculation.'''
+        records = []
+        for chain in ContactOrder._selected_chains(biomolecule, chains):
+            residues = [biomolecule] if biomolecule.get_level() == "R" else list(chain.get_residues())
+            sequence_index = 0
+            for residue in residues:
+                # Contact order is defined for protein residues; skip hetero residues.
+                if residue.id[0] != " ":
+                    continue
+                if contact_atom not in residue:
+                    continue
+                records.append((chain.id, sequence_index, residue[contact_atom]))
+                sequence_index += 1
+        return records
+
+    def calc(
+        self,
+        biomolecule: Entity,
+        contact_distance: float = 8.0,
+        contact_atom: str = "CA",
+        min_sequence_separation: int = 1,
+        chains: str|list[str]|tuple[str, ...] = None,
+    ) -> float: #pylint: disable=W0221
+        '''Calculate relative contact order: sum(|i-j|) / (protein_length * contact_count).'''
+        if not isinstance(contact_distance, (int, float)) or contact_distance <= 0:
+            raise ValueError(f"contact_distance must be a positive number. Got: {contact_distance}")
+        if not isinstance(contact_atom, str) or not contact_atom:
+            raise TypeError(f"contact_atom must be a non-empty atom-name string. Got: {contact_atom}")
+        if not isinstance(min_sequence_separation, int) or min_sequence_separation < 1:
+            raise ValueError(f"min_sequence_separation must be an integer >= 1. Got: {min_sequence_separation}")
+
+        chains = self._normalize_chains(chains)
+        records = self._contact_atom_records(biomolecule, chains=chains, contact_atom=contact_atom)
+        protein_length = len(records)
+        if protein_length < 2:
+            raise ValueError(
+                f"Contact order requires at least two selected protein residues with atom '{contact_atom}'. "
+                f"Found {protein_length}."
+            )
+
+        chain_ids = np.array([chain_id for chain_id, _, _ in records], dtype=object)
+        sequence_indices = np.array([sequence_index for _, sequence_index, _ in records], dtype=int)
+        coords = np.array([atom.get_coord() for _, _, atom in records], dtype=float)
+
+        distances = np.linalg.norm(coords[:, np.newaxis, :] - coords[np.newaxis, :, :], axis=-1)
+        sequence_separations = np.abs(sequence_indices[:, np.newaxis] - sequence_indices[np.newaxis, :])
+        same_chain = chain_ids[:, np.newaxis] == chain_ids[np.newaxis, :]
+        upper_triangle = np.triu(np.ones((protein_length, protein_length), dtype=bool), k=1)
+
+        contact_mask = (
+            upper_triangle
+            & same_chain
+            & (sequence_separations >= min_sequence_separation)
+            & (distances <= float(contact_distance))
+        )
+        contact_count = int(np.sum(contact_mask))
+        if contact_count == 0:
+            raise ValueError(
+                "Cannot calculate contact order because no residue contacts matched "
+                f"contact_distance={contact_distance}, contact_atom='{contact_atom}', "
+                f"min_sequence_separation={min_sequence_separation}."
+            )
+
+        return float(np.sum(sequence_separations[contact_mask]) / (protein_length * contact_count))
+
 class Sasa(BiopythonMetric):
 
     def __init__(self, name: str | None = None, target: AtomSelectionInput|str = None, probe_radius: float = 1.4, n_points: int = 100, radii_dict: dict = None) -> None:
