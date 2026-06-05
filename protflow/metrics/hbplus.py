@@ -179,8 +179,6 @@ class HBplus_query(UserDict):
     ----------
     name : str
         The query identifier.
-    poses : Poses
-        Reference to the pose collection.
     data : dict
         The underlying query dictionary.  Keys are pose descriptions;
         values are dicts mapping filter names to their values.  Populated
@@ -208,30 +206,35 @@ class HBplus_query(UserDict):
     Query for all donor H-bonds from a binding-site residue selection,
     restricted to side-chain atoms, targeting any partner::
  
-        query = HBplus_query(name="binding_site_donors", poses=poses)
+        query = HBplus_query(name="binding_site_donors")
         query.set_target(target_res=ResidueSelection("A12,A57"))
         query.set_target_type("donor")
         query.set_target_category("S")
  
     Query using per-pose residue selections stored in a DataFrame column::
  
-        query = HBplus_query(name="per_pose_target", poses=poses)
+        query = HBplus_query(name="per_pose_target")
         query.set_target(target_res="active_site_col", res_from_pose_col=True)
         query.set_target_category(["S", "H"])
  
     Query for H-bonds between a target residue and a ligand (heteroatom)::
  
-        query = HBplus_query(name="target_ligand_hbonds", poses=poses)
+        query = HBplus_query(name="target_ligand_hbonds")
         query.set_target(target_res=ResidueSelection("A57"))
         query.set_partner(partner_res=ResidueSelection("A200"))
         query.set_partner_category("H")
     """
 
-    def __init__(self, name: str, poses: Poses):
+    def __init__(self, name: str):
         super().__init__()
-        self.poses = poses
         self.name = name
-        self.reset()
+        self.target_atms = None
+        self.target_res = None
+        self.partner_atms = None
+        self.partner_res = None
+        self.target_type = None
+        self.target_category = None
+        self.partner_category = None
 
     def set_target(self, target_atms: AtomSelection = None, target_res: ResidueSelection = None, atms_from_pose_col: bool = False, res_from_pose_col: bool = False):
         """Set the target atom or residue selection for H-bond detection.
@@ -287,7 +290,9 @@ class HBplus_query(UserDict):
  
             query.set_target(target_res="binding_site_col", res_from_pose_col=True)
         """
-        return self._set_selection(name="target", sel_atms=target_atms, sel_res=target_res, atms_from_pose_col=atms_from_pose_col, res_from_pose_col=res_from_pose_col)        
+        self.target_atms = (target_atms, atms_from_pose_col)
+        self.target_res = (target_res, res_from_pose_col)
+        return self
 
     def set_partner(self, partner_atms: AtomSelection = None, partner_res: ResidueSelection = None, atms_from_pose_col: bool = False, res_from_pose_col: bool = False):
         """Filter for H-bonds between the target and a specific partner selection.
@@ -330,7 +335,9 @@ class HBplus_query(UserDict):
             query.set_target(target_res=ResidueSelection("A57"))
             query.set_partner(partner_res=ResidueSelection("A200"))
         """
-        return self._set_selection(name="partner", sel_atms=partner_atms, sel_res=partner_res, atms_from_pose_col=atms_from_pose_col, res_from_pose_col=res_from_pose_col)        
+        self.partner_atms = (partner_atms, atms_from_pose_col)
+        self.partner_res = (partner_res, res_from_pose_col)
+        return self
 
     def set_target_type(self, target_type: str, from_pose_col: bool = False):
         """Restrict the target to a specific H-bond role: donor or acceptor.
@@ -368,17 +375,9 @@ class HBplus_query(UserDict):
             # Per-pose donor/acceptor role from a DataFrame column:
             query.set_target_type("role_col", from_pose_col=True)
         """
-        if from_pose_col:
-            col_in_df(self.poses.df, target_type)
-            target_type = self.poses.df[target_type].to_list()
-        else:
-            target_type = [target_type for _ in self.poses.poses_list()]
-
-        if not all(t_type in HBPLUS_QUERY_STYLE["target_type"] for t_type in target_type):
-            raise KeyError(f":target_type: must be one of {HBPLUS_QUERY_STYLE['target_type']}!")
-
-        return self._set_filter("target_type", target_type)
-
+        self.target_type = (target_type, from_pose_col)
+        return
+    
     def set_target_category(self, target_cat: str | list, from_pose_col: bool = False):
         """Filter for H-bonds originating from main-chain, side-chain, or heteroatoms.
  
@@ -412,7 +411,8 @@ class HBplus_query(UserDict):
             query.set_target_category("S")          # side-chain only
             query.set_target_category(["S", "H"])   # side-chain or heteroatom
         """
-        return self._set_category(target_cat, "target", from_pose_col)
+        self.target_category = (target_cat, from_pose_col)
+        return self
 
     def set_partner_category(self, partner_cat: str | list, from_pose_col: bool = False):
         """Filter for H-bonds where the partner belongs to a specific category.
@@ -445,43 +445,49 @@ class HBplus_query(UserDict):
  
             query.set_partner_category("H")   # partner must be a heteroatom
         """
-        return self._set_category(partner_cat, "partner", from_pose_col)
+        self.partner_category = (partner_cat, from_pose_col)
+
+        return self
            
-    def reset(self):
-        """Clear all filter specifications and restore empty per-pose dicts.
- 
-        Replaces :attr:`data` with a fresh dictionary containing one empty
-        ``{}`` entry per pose description.  All previously set target, partner,
-        type, and category filters are discarded.
- 
-        Returns
-        -------
-        HBplus_query
-            ``self``, to allow method chaining.
- 
-        Examples
-        --------
-        ::
- 
-            query.set_target(target_res=ResidueSelection("A57"))
-            query.reset()
-            # query.data == {"pose_001": {}, "pose_002": {}, ...}
-        """
+    def parse_query(self, poses: Poses) -> dict:
         query_dict = {}
-        for pose in self.poses.df["poses_description"]:
+        for pose in poses.df["poses_description"]:
             query_dict[pose] = {}
+        
+        if self.target_atms or self.target_res:
+            query_dict = self._set_selection(query_dict, "target", poses, self.target_atms[0], self.target_res[0], self.target_atms[1], self.target_res[1])
 
-        self.data = query_dict
-        return self
+        if self.partner_atms or self.partner_res:
+            query_dict = self._set_selection(query_dict, "partner", poses, self.partner_atms[0], self.partner_res[0], self.partner_atms[1], self.partner_res[1])
 
-    def _set_filter(self, name, values):
+        if self.target_type:
+            if self.target_type[1]:
+                col_in_df(poses.df, self.target_type[0])
+                target_type = poses.df[target_type[0]].to_list()
+            else:
+                target_type = [target_type for _ in poses.poses_list()]
+
+            if not all(t_type in HBPLUS_QUERY_STYLE["target_type"] for t_type in target_type):
+                raise KeyError(f":target_type: must be one of {HBPLUS_QUERY_STYLE['target_type']}!")
+            
+            query_dict = self._set_filter(query_dict, "target_type", target_type)
+        
+        if self.target_category:
+            query_dict = self._set_category(query_dict, "target_category", poses, self.target_category[0], self.target_category[1])
+
+        if self.partner_category:
+            query_dict = self._set_category(query_dict, "partner_category", poses, self.partner_category[0], self.partner_category[1])
+
+        return query_dict
+
+    def _set_filter(self, query_dict: dict, name: str, values) -> dict:
         """Assign a per-pose filter value to every pose in :attr:`data`."""
-        for pose, value in zip(self.data.keys(), values):
-            self.data[pose][name] = value
+        for pose, value in zip(query_dict.keys(), values):
+            query_dict[pose][name] = value
 
-        return self
+        return query_dict
 
-    def _set_selection(self, name, sel_atms: AtomSelection = None, sel_res: ResidueSelection = None, atms_from_pose_col: bool = False, res_from_pose_col: bool = False):
+    def _set_selection(self, query_dict: dict, name, poses: Poses, sel_atms: AtomSelection = None, sel_res: ResidueSelection = None, atms_from_pose_col: bool = False, res_from_pose_col: bool = False):
         """Resolve atom/residue selections (optionally from DataFrame columns) and
         store them as a per-pose :class:`~protflow.residues.AtomSelection` list
         via :meth:`_set_filter`."""
@@ -490,43 +496,43 @@ class HBplus_query(UserDict):
 
         if sel_atms:
             if atms_from_pose_col:
-                col_in_df(self.poses.df, sel_atms)
-                sel_atms = self.poses.df[sel_atms].to_list()
+                col_in_df(poses.df, sel_atms)
+                sel_atms = poses.df[sel_atms].to_list()
             else:
-                sel_atms = [sel_atms for _ in self.poses.poses_list()]
+                sel_atms = [sel_atms for _ in poses.poses_list()]
 
         if sel_res:
             if res_from_pose_col:
-                col_in_df(self.poses.df, sel_res)
-                sel_res = self.poses.df[sel_res].to_list()
+                col_in_df(poses.df, sel_res)
+                sel_res = poses.df[sel_res].to_list()
 
             else:
-                sel_res = [sel_res for _ in self.poses.poses_list()]
+                sel_res = [sel_res for _ in poses.poses_list()]
 
             # use any atm for resselections (ALL works as well, but then all poses have to be loaded)
             sel_res_atms = [AtomSelection.from_residueselection(res, ".*") for res in sel_res]
         
         if sel_atms and sel_res:
             sel_atms = [atms +  res_atms for atms, res_atms in zip(sel_atms, sel_res_atms)]
-        elif sel_res_atms:
+        elif sel_res:
             sel_atms = sel_res_atms
 
-        return self._set_filter(name, sel_atms)
+        return self._set_filter(query_dict, name, sel_atms)
     
-    def _set_category(self, cat: str | list, name: str, from_pose_col: bool = False):
+    def _set_category(self, query_dict: dict, name: str, poses: Poses, cat: str | list, from_pose_col: bool = False):
         """Validate and assign a category filter (``target_category`` or
         ``partner_category``) for each pose via :meth:`_set_filter`."""
         if from_pose_col:
-            col_in_df(self.poses.df, cat)
-            cat = self.poses.df[cat].to_list()
+            col_in_df(poses.df, cat)
+            cat = poses.df[cat].to_list()
         else:
-            cat = [cat for _ in self.poses.poses_list()]
+            cat = [cat for _ in poses.poses_list()]
 
         for c in cat:
             if not all(i in HBPLUS_QUERY_STYLE[f"{name}_category"] for i in c):
                 raise KeyError(f":{name}_cat: must be one of {HBPLUS_QUERY_STYLE[f'{name}_category']}!")
         
-        self._set_filter(f"{name}_category", cat)
+        return self._set_filter(query_dict, f"{name}_category", cat)
 
 
 class HBplus(Runner):
@@ -727,7 +733,10 @@ class HBplus(Runner):
 
             return poses
 
-
+        # hbplus only works on pdbs
+        ext = poses.determine_pose_type("poses")
+        if not ext == [".pdb"]:
+            poses.convert_poses(f"{prefix}_conversion", "pdb", jobstarter=jobstarter, overwrite=overwrite)
 
         # prep options:
         options_l = self._prep_hbplus_options(poses, options, pose_options)
@@ -927,7 +936,9 @@ class HBplus(Runner):
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
         
-        query_dict = {query.name: query.data for query in queries}
+        query_dict = {}
+        for query in queries:
+            query_dict[query.name] = query.parse_query(poses)
 
         query_path = _save_dict_to_json(query_dict, os.path.join(work_dir, "queries.json"))
 
