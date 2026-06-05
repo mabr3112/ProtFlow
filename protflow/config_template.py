@@ -107,3 +107,7 @@ SIGMADOCK_PRE_CMD = "" # "export PATH=/path/to/package_manager/envs/sigmadock/bi
 
 # hbplus
 HPLUS_PATH = "" # "/path/to/hbplus/hbplus"
+
+# esmfold2
+ESMFOLD2_PYTHON = "" # "/path/to/env/bin/python"
+ESMFOLD2_PRE_CMD = ""

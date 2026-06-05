@@ -25,3 +25,4 @@ from .sigmadock import SigmaDock
 from .protein_edits import ChainAdder, ChainRemover, SequenceAdder, SequenceRemover
 from .minifold import Minifold
 from .caliby import CalibySequenceDesign, CalibyEnsembleSeqDesign, CalibyEnsembleGenerator
+from .esmfold2 import ESMFold2, ESMFold2Params
