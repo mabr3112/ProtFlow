@@ -838,7 +838,7 @@ class RFdiffusion3(Runner):
         convert_cif_to_pdb: bool = True,
         renumber_input: bool = False,
         parse_atomic_motifs: bool = False,
-        strict_remap: bool = True, # if true, fail if residues in motifs are not preserved post-diffusion
+        strict_remap: bool = True, # if true, fail when a required remapping map is missing
         run_clean: bool = True, # delete additional outputs like pre-conversion files
         fail_on_missing_output_poses: bool = False,
         overwrite: bool = False,
@@ -933,7 +933,8 @@ class RFdiffusion3(Runner):
             :meth:`protflow.residues.AtomSelection.from_rfd3_input_spec` and
             add the resulting :class:`~protflow.residues.AtomSelection`
             objects to ``poses.df``. The main columns are remapped through
-            each output's ``diffused_index_map``; matching ``*_original``
+            each output's ``diffused_index_map`` plus any available or
+            inferred ligand renumbering map; matching ``*_original``
             columns preserve the input-spec numbering before remapping.
             Columns are named ``<prefix>_<selection_key>`` and
             ``<prefix>_<selection_key>_original`` and are created only for
@@ -955,10 +956,10 @@ class RFdiffusion3(Runner):
             empty ``AtomSelection`` objects. Default is ``False``.
         strict_remap : bool, optional
             When ``True`` (default), :func:`remap_rfd3_motifs` raises a
-            :exc:`ValueError` if any residue in a motif column is absent
-            from the ``diffused_index_map``, or if the map itself is missing
-            for any pose.  Set to ``False`` to silently skip unmapped
-            residues.
+            :exc:`ValueError` if the remapping map itself is missing for any
+            pose. Residues absent from the effective RFD3 remapping map are
+            preserved unchanged with a warning. Set to ``False`` to also
+            tolerate missing maps.
         run_clean : bool, optional
             When ``True`` (default), intermediate files (compressed ``.cif.gz``
             and, when *convert_cif_to_pdb* is ``True``, the intermediate
@@ -1006,7 +1007,7 @@ class RFdiffusion3(Runner):
             ``<prefix>_<selection_key>``
                 Present when *parse_atomic_motifs* is ``True`` for each
                 parsed input-spec atom selection key described above, remapped
-                to output numbering via ``diffused_index_map``.
+                to output numbering via ``diffused_index_map`` plus any ligand remapping.
             ``<prefix>_<selection_key>_original``
                 Present when *parse_atomic_motifs* is ``True``; contains the
                 corresponding unremapped input-spec atom selection.
@@ -1167,6 +1168,7 @@ class RFdiffusion3(Runner):
                 scores=scores,
                 params=params,
                 prefix=prefix,
+                work_dir=work_dir,
                 index_layers=index_layers,
                 parse_atomic_motifs=parse_atomic_motifs,
                 strict_remap=strict_remap,
@@ -1237,6 +1239,7 @@ class RFdiffusion3(Runner):
             scores=scores,
             params=params,
             prefix=prefix,
+            work_dir=work_dir,
             index_layers=index_layers,
             parse_atomic_motifs=parse_atomic_motifs,
             strict_remap=strict_remap,
@@ -1257,6 +1260,7 @@ class RFdiffusion3(Runner):
         scores: pd.DataFrame,
         params: RFD3Params,
         prefix: str,
+        work_dir: str,
         index_layers: int,
         parse_atomic_motifs: bool,
         strict_remap: bool,
@@ -1277,6 +1281,7 @@ class RFdiffusion3(Runner):
                 params=params,
                 prefix=prefix,
                 index_layers=index_layers,
+                work_dir=work_dir,
                 existing_pose_columns=set(poses.df.columns),
                 strict=strict_remap,
             )
@@ -1493,6 +1498,7 @@ def _add_rfd3_atomic_motif_columns_to_scores(
     params: RFD3Params | dict,
     prefix: str,
     index_layers: int,
+    work_dir: str | None = None,
     existing_pose_columns: set[str] | None = None,
     strict: bool = True,
 ) -> tuple[pd.DataFrame, list[str]]:
@@ -1543,14 +1549,20 @@ def _add_rfd3_atomic_motif_columns_to_scores(
         for description in scores["description"].to_list()
     ]
     diffused_index_maps = scores["diffused_index_map"].to_list()
+    ligand_renumbering_maps = _ligand_renumbering_maps_for_scores(
+        scores=scores,
+        params=params,
+        work_dir=work_dir,
+    )
 
     for field_name in field_names:
         original_selections = []
         remapped_selections = []
-        for source_description, diffused_index_map in zip(source_descriptions, diffused_index_maps):
+        for source_description, diffused_index_map, ligand_renumbering_map in zip(source_descriptions, diffused_index_maps, ligand_renumbering_maps):
             original_selection = parsed_by_pose.get(source_description, {}).get(field_name, AtomSelection(()))
-            diffused_index_map = _ensure_rfd3_index_map(
-                diffused_index_map,
+            effective_index_map = _effective_rfd3_index_map(
+                diffused_index_map=diffused_index_map,
+                ligand_renumbering_map=ligand_renumbering_map,
                 motif_col=field_name,
                 strict=strict,
             )
@@ -1558,7 +1570,7 @@ def _add_rfd3_atomic_motif_columns_to_scores(
             remapped_selections.append(
                 _remap_atom_selection(
                     original_selection,
-                    diff_idx_map=diffused_index_map,
+                    diff_idx_map=effective_index_map,
                     motif_col=field_name,
                     strict=strict,
                 )
@@ -1568,6 +1580,102 @@ def _add_rfd3_atomic_motif_columns_to_scores(
         scores[f"{field_name}_original"] = original_selections
 
     return scores, added_columns
+
+
+def _rfd3_params_include_ligands(params: RFD3Params | dict) -> bool:
+    """Return True when any RFD3 input spec names a ligand."""
+    return any(
+        isinstance(input_spec, dict) and input_spec.get("ligand") is not None
+        for input_spec in params.values()
+    )
+
+
+def _is_missing_rfd3_value(value) -> bool:
+    """Return True for common missing-value sentinels without treating containers as missing."""
+    if value is None:
+        return True
+    try:
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def _normalize_ligand_renumbering_map(value, description: str | None = None) -> dict[str, str]:
+    """Validate one optional ligand renumbering map from an RFD3 score row."""
+    if isinstance(value, dict):
+        return value
+    if _is_missing_rfd3_value(value):
+        return {}
+    row_label = f" for {description}" if description else ""
+    raise ValueError(f"Expected ligand_renumbering_map{row_label} to be a dictionary. Got {type(value)}: {value}")
+
+
+def _infer_ligand_renumbering_maps_from_scores(scores: pd.DataFrame, work_dir: str) -> list[dict[str, str]]:
+    """Infer ligand renumbering maps for collected score rows without writing files."""
+    records = _renumbered_input_records_from_scores(scores=scores, work_dir=work_dir, overwrite=False)
+    maps_by_description = {}
+    for record in records:
+        sidecar_json = record["sidecar_json"]
+        sidecar_data = read_json(sidecar_json)
+        specification = sidecar_data.get("specification") or {}
+        ligand_renumbering_map = {}
+        if specification.get("ligand") and record.get("output_structure"):
+            ligand_renumbering_map = _infer_ligand_renumbering_map(
+                input_pdb=_input_pdb_from_rfd3_sidecar(sidecar_data, sidecar_json=sidecar_json),
+                output_structure=record["output_structure"],
+                ligand=specification.get("ligand"),
+            )
+        maps_by_description[record["description"]] = ligand_renumbering_map
+
+    return [maps_by_description.get(description, {}) for description in scores["description"].to_list()]
+
+
+def _ligand_renumbering_maps_for_scores(
+    scores: pd.DataFrame,
+    params: RFD3Params | dict,
+    work_dir: str | None = None,
+) -> list[dict[str, str]]:
+    """Return per-score ligand maps, preferring collected score columns when present."""
+    if "ligand_renumbering_map" in scores.columns:
+        return [
+            _normalize_ligand_renumbering_map(value, description=description)
+            for description, value in zip(scores["description"].to_list(), scores["ligand_renumbering_map"].to_list())
+        ]
+
+    empty_maps = [{} for _ in scores.index]
+    if not _rfd3_params_include_ligands(params):
+        return empty_maps
+    if work_dir is None:
+        logging.warning(
+            "Could not infer RFDiffusion3 ligand renumbering maps for parsed atomic motifs without a work_dir; "
+            "ligand atoms will keep input numbering."
+        )
+        return empty_maps
+
+    try:
+        return _infer_ligand_renumbering_maps_from_scores(scores=scores, work_dir=work_dir)
+    except (FileNotFoundError, RuntimeError, ValueError) as exc:
+        logging.warning(
+            "Could not infer RFDiffusion3 ligand renumbering maps for parsed atomic motifs; "
+            "ligand atoms will keep input numbering. Error: %s",
+            exc,
+        )
+        return empty_maps
+
+
+def _effective_rfd3_index_map(
+    diffused_index_map: dict | None,
+    ligand_renumbering_map: dict | None,
+    motif_col: str,
+    strict: bool,
+) -> dict:
+    """Merge RFD3 residue remapping with inferred ligand-only remapping."""
+    diffused_index_map = _ensure_rfd3_index_map(diffused_index_map, motif_col=motif_col, strict=strict)
+    ligand_renumbering_map = _normalize_ligand_renumbering_map(ligand_renumbering_map)
+    return _merged_rfd3_renumbering_map(
+        diffused_index_map=diffused_index_map,
+        ligand_renumbering_map=ligand_renumbering_map,
+    )
 
 def convert_selection_to_contig(selection):
     """Converts input selections to rfd3 contig strings. Returns original if not a Residue- or AtomSelection."""
@@ -1634,7 +1742,7 @@ def _warn_preserved_unmapped_residues(missing_residues: list[str], motif_col: st
 
     unique_missing = list(dict.fromkeys(missing_residues))
     logging.warning(
-        "[remap_motifs] %s column '%s' contains residues absent from diffused_index_map; "
+        "[remap_motifs] %s column '%s' contains residues absent from the effective RFD3 remapping map; "
         "keeping their original identifiers unchanged: %s. This is expected for ligands "
         "or other residues that keep their original numbering.",
         selection_type,
@@ -1839,7 +1947,8 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
     :class:`~protflow.residues.AtomSelection` columns from their original
     input-structure numbering to the corresponding positions in the diffused
     output structures, using the per-pose ``diffused_index_map`` entries
-    produced by RFDiffusion3 and stored in ``poses.df`` by :func:`collect_scores`.
+    produced by RFDiffusion3 plus any optional ligand remapping stored in
+    ``<prefix>_ligand_renumbering_map``.
 
     The motif columns are updated **in place**, matching the convention
     established by the RFDiffusion 1 runner in ProtFlow.
@@ -1869,13 +1978,13 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
         * Raises a :exc:`ValueError` if the pose has no usable
           ``diffused_index_map`` object at all, for example ``None`` or a
           non-dictionary value.
-        * Preserves residues absent from a valid ``diffused_index_map``
-          unchanged and emits a warning. This covers ligands and other
-          residues that keep their original numbering in the output.
+        * Preserves residues absent from the effective remapping map
+          unchanged and emits a warning. This covers ligands when no inferred
+          ligand map is available and residues that keep their original numbering.
 
         When ``False``, missing or invalid maps are treated like empty maps.
-        Residues absent from the map are still preserved unchanged and warned
-        about.
+        Residues absent from the effective map are still preserved unchanged
+        and warned about.
 
     Returns
     -------
@@ -1904,19 +2013,19 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
       :meth:`~protflow.residues.ResidueSelection.to_list` representation.
     * AtomSelection values keep atom order, atom names, model IDs, structure
       IDs, altlocs, and BioPython hetero flags unchanged. Only the chain and
-      numeric residue index are replaced according to ``diffused_index_map``.
-    * Residues absent from ``diffused_index_map`` are preserved unchanged and
-      trigger a warning. This is necessary because RFDiffusion3 does not write
-      ligand residues into ``diffused_index_map``.
+      numeric residue index are replaced according to ``diffused_index_map``
+      and, when present, ``<prefix>_ligand_renumbering_map``.
+    * Residues absent from both maps are preserved unchanged and trigger a
+      warning. This covers ligands when no inferred ligand map is available.
     * BioPython insertion codes in AtomSelection residue IDs are reset to blank
       after remapping, because RFD3 ``diffused_index_map`` values do not carry
       insertion-code information.
     * This function is called automatically from :meth:`RFdiffusion3.run`
       when *update_motifs* is provided.  It can also be called manually
       on previously computed poses.
-    * The ``diffused_index_map`` is a ``dict`` keyed by input residue
-      identifiers (e.g. ``"A5"``) with values being the corresponding
-      identifiers in the diffused structure.
+    * The ``diffused_index_map`` and optional ``<prefix>_ligand_renumbering_map``
+      are ``dict`` objects keyed by input residue identifiers (e.g. ``"A5"``)
+      with values being the corresponding identifiers in the diffused structure.
 
     Examples
     --------
@@ -1952,8 +2061,14 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
     """
 
     diff_index_map_name = f"{prefix}_diffused_index_map"
+    ligand_map_name = f"{prefix}_ligand_renumbering_map"
     col_in_df(poses.df, diff_index_map_name)
     diffused_index_maps = poses.df[diff_index_map_name].to_list()
+    ligand_renumbering_maps = (
+        poses.df[ligand_map_name].to_list()
+        if ligand_map_name in poses.df.columns
+        else [{} for _ in poses.df.index]
+    )
 
     logging.info(f"[remap_motifs] Motifs to remap: {motifs}")
 
@@ -1975,11 +2090,16 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
             raise ValueError(f"All motifs in column {motif_col} must be either ResidueSelections or AtomSelections!")
 
         updated_motifs = []
-        for diff_idx_map, ref_motif in zip(diffused_index_maps, ref_motifs):
-            # Validate the per-pose map once, then dispatch to the selection
-            # type-specific remapper selected above.
-            diff_idx_map = _ensure_rfd3_index_map(diff_idx_map, motif_col=motif_col, strict=strict)
-            updated_motifs.append(remap_selection(ref_motif, diff_idx_map=diff_idx_map, motif_col=motif_col, strict=strict))
+        for diff_idx_map, ligand_renumbering_map, ref_motif in zip(diffused_index_maps, ligand_renumbering_maps, ref_motifs):
+            # Validate the per-pose map once, merge any inferred ligand moves,
+            # then dispatch to the selection type-specific remapper selected above.
+            effective_index_map = _effective_rfd3_index_map(
+                diffused_index_map=diff_idx_map,
+                ligand_renumbering_map=ligand_renumbering_map,
+                motif_col=motif_col,
+                strict=strict,
+            )
+            updated_motifs.append(remap_selection(ref_motif, diff_idx_map=effective_index_map, motif_col=motif_col, strict=strict))
         poses.df[motif_col] = updated_motifs
 
     logging.info(f"[remap_motifs] All motifs remapped successfully for prefix='{prefix}'.")

@@ -30,10 +30,10 @@ Notes
   Use `protflow.config` utilities to set these once per environment.
 - MSA handling
   Boltz can run with an empty MSA or fetch MSAs from a server. The runner
-  exposes `msa_setting` to steer YAML content (`"empty"` vs `"server"`),
-  while the CLI switch `--use_msa_server` remains the source of truth for
-  server fetching. See `Boltz._parse_msa_setting` and
-  `convert_chain_seq_dict_to_yaml_dict`.
+  exposes `msa_setting` to steer YAML content (`"empty"` writes `msa: empty`;
+  `"server"` omits `msa`), while the CLI switch `--use_msa_server`
+  remains the source of truth for server fetching. See
+  `Boltz._parse_msa_setting` and `convert_chain_seq_dict_to_yaml_dict`.
 
 Examples
 --------
@@ -174,13 +174,13 @@ class Boltz(Runner):
         """
         return "Boltz"
 
-    def _parse_msa_setting(self, options: str, msa_setting: list[str]) -> str:
+    def _parse_msa_setting(self, options: str, msa_setting: str) -> str:
         """
         Normalize/resolve the MSA strategy used for YAML generation.
 
         The runner allows two MSA modes in the produced pose YAMLs:
         - ``"empty"``: write ``msa: empty`` for each chain.
-        - ``"server"``: also write ``msa: empty``, but *expect* the CLI option
+        - ``"server"``: omit ``msa`` and expect the CLI option
           ``--use_msa_server`` to instruct Boltz to fetch MSAs during runtime.
 
         Resolution order:
@@ -493,7 +493,7 @@ class Boltz(Runner):
         # if BoltzParams are given, use BoltzParams to generate new poses based on params
         if params:
             boltz_input_dir = os.path.join(work_dir, "boltz_inputs")
-            params.generate_yaml_files(poses, boltz_input_dir)
+            params.generate_yaml_files(poses, boltz_input_dir, default_msa=msa_setting)
 
         # if pose_options are specified, run as is. Otherwise batch predictions
         boltz_inputs = self._parse_poses(
@@ -553,7 +553,7 @@ def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, over
         Subdirectory name under ``poses.work_dir`` where YAMLs are written.
     msa : str or None
         One of ``"server"``, ``"empty"``, or a path to a custom ``.a3m`` file.
-        ``"server"`` writes empty MSA entries and expects Boltz to fetch MSAs.
+        ``"server"`` omits MSA entries and expects Boltz to fetch MSAs.
     overwrite : bool, optional
         If ``True``, existing YAMLs for the same prefix are replaced.
     reset_poses : bool, optional
@@ -637,6 +637,23 @@ def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, over
     if reset_poses:
         poses.df["poses"] = out_fn_list
     return None
+
+def _normalize_boltz_msa_for_yaml(msa: str|bool|None, ignore_nonexistent_msa_file: bool = False, default_msa: str|None = None) -> str|None:
+    """Return the Boltz YAML value for an MSA setting, or None to omit it."""
+    if msa is False and default_msa is not None:
+        msa = default_msa
+
+    match msa:
+        case "server":
+            return None
+        case "empty" | "auto" | None | False | "":
+            return "empty"
+        case str():
+            if not os.path.isfile(msa) and not ignore_nonexistent_msa_file:
+                raise FileNotFoundError(f"Specified MSA file not found: {msa}")
+            return msa
+        case _:
+            raise ValueError(f"Not allowed: {msa}. Either provide a path to an existing MSA, None, 'server' (to get msa from msa-server), or 'empty'.")
 
 def edit_boltz_yaml(*args, **kwargs) -> None:
     """
@@ -1003,7 +1020,7 @@ class BoltzParams:
         property_dict = {property_type: processed_kwargs}
         self.properties.append(property_dict)
 
-    def generate_yaml_files(self, poses: Poses, out_dir: str, reset_poses: bool = True) -> None:
+    def generate_yaml_files(self, poses: Poses, out_dir: str, reset_poses: bool = True, default_msa: str|None = None) -> None:
         '''Converts poses into new .yaml files at 'prefix' based on current paramters.
         or: render accumulated parameters into per-pose YAML files.
 
@@ -1019,6 +1036,9 @@ class BoltzParams:
             Output directory where YAML files are written.
         reset_poses : bool, optional
             If ``True``, replace the ``poses`` column with the new YAML paths.
+        default_msa : str, optional
+            MSA mode to use for added proteins whose ``msa`` value is left as
+            the ``add_protein`` default. ``"server"`` omits the YAML field.
 
         Returns
         -------
@@ -1035,6 +1055,13 @@ class BoltzParams:
                 key: pose[val] if is_pose_col else val # selects value from pose.df if pose_col was specified.
                 for key, (val, is_pose_col) in entity_dict.items()
             }
+            return {key: val for key, val in parsed_dict.items() if val is not None}
+
+        def _parse_protein_dict_for_pose(pose: pd.Series, entity_dict: dict) -> dict:
+            parsed_dict = _parse_dict_for_pose(pose, entity_dict)
+            msa_val = _normalize_boltz_msa_for_yaml(parsed_dict.pop("msa", False), default_msa=default_msa)
+            if msa_val is not None:
+                parsed_dict["msa"] = msa_val
             return parsed_dict
 
         def _add_key_if_not_there(input_dict, key, value) -> None:
@@ -1060,7 +1087,7 @@ class BoltzParams:
             # add sequences
             for protein_dict in self.proteins:
                 _add_key_if_not_there(pose_yaml, "sequences", [])
-                pose_yaml["sequences"].append({"protein": _parse_dict_for_pose(pose, protein_dict)})
+                pose_yaml["sequences"].append({"protein": _parse_protein_dict_for_pose(pose, protein_dict)})
 
             for dna_dict in self.dna:
                 pose_yaml["sequences"].append({"dna": _parse_dict_for_pose(pose, dna_dict)})
@@ -1098,10 +1125,10 @@ class BoltzParams:
             poses.df["poses"] = new_poses
         logging.info(f"Finished converting poses to .yaml files based on BoltzParams.\nAdded {len(self.proteins)} proteins, {len(self.ligands)} ligands, {len(self.dna)} DNA molecules, and {len(self.rna)} RNA molecules.\nAdded {len(self.constraints)} constraints, {len(self.templates)} templates, and {len(self.properties)} properties.")
 
-def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str = None, ignore_nonexistent_msa_file: bool = False) -> dict[str,str]:
+def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str|None = None, ignore_nonexistent_msa_file: bool = False) -> list[dict[str,str]]:
     '''
     Converts dictionary that contains {chain: seq, ...} into boltz-compatible protein entries {}.
-    When msa is set to 'server', the function will set <msa: empty> (use option --use_msa_server!)
+    When msa is set to 'server', the function omits the MSA field (use option --use_msa_server!).
 
     Convert a chain→sequence mapping into Boltz YAML "protein" entries.
 
@@ -1110,7 +1137,8 @@ def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str 
     chain_seq_dict : dict[str, str]
         Mapping from chain ID to amino-acid sequence.
     msa : {"server", "empty", "auto"} or str or None, optional
-        If ``"server"/"empty"/"auto"/None`` → write ``"msa": "empty"`` per chain.
+        If ``"server"`` → omit ``msa`` per chain. If
+        ``"empty"/"auto"/None`` → write ``"msa": "empty"`` per chain.
         If a string path → use it as the MSA file for all chains (exists unless
         ``ignore_nonexistent_msa_file=True``).
     ignore_nonexistent_msa_file : bool, optional
@@ -1119,7 +1147,8 @@ def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str 
     Returns
     -------
     list of dict
-        One dict per chain with keys ``id``, ``sequence``, and ``msa``.
+        One dict per chain with keys ``id`` and ``sequence``; ``msa`` is included
+        unless server-side MSA generation is requested.
 
     Raises
     ------
@@ -1133,26 +1162,17 @@ def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str 
     >>> convert_chain_seq_dict_to_yaml_dict({"A": "ACDE", "B": "FGHI"}, msa="empty")
     [{'id': 'A', 'sequence': 'ACDE', 'msa': 'empty'}, {'id': 'B', 'sequence': 'FGHI', 'msa': 'empty'}]
     '''
-    # parse MSA option
-    match msa:
-        case "server" | "empty" | "auto" | None:
-            msa_val = "empty"
-        case str():
-            msa_val = msa
-            if not os.path.isfile(msa) and not ignore_nonexistent_msa_file:
-                raise FileNotFoundError(f"Specified MSA file not found: {msa}")
-        case _:
-            raise ValueError(f"Not allowed: {msa}. Either provide a path to an existing MSA, None, 'server' (to get msa from msa-server), or 'empty'.")
-
     # create protein yaml for each chain.
-    protein_yaml = [
-        {
+    msa_val = _normalize_boltz_msa_for_yaml(msa, ignore_nonexistent_msa_file=ignore_nonexistent_msa_file)
+    protein_yaml = []
+    for chain, seq in chain_seq_dict.items():
+        chain_yaml = {
             "id": chain,
             "sequence": seq,
-            "msa": msa_val
         }
-        for chain, seq in chain_seq_dict.items()
-    ]
+        if msa_val is not None:
+            chain_yaml["msa"] = msa_val
+        protein_yaml.append(chain_yaml)
     return protein_yaml
 
 def _folders_in_dir(dir_path: str) -> list:
