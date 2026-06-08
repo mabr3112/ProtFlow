@@ -58,7 +58,7 @@ def setup_superimpose_atoms(target: Structure, reference: Structure, target_moti
 
     return target_atoms, reference_atoms
 
-def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: str, target_atoms: list = None, reference_atoms: list = None, translate_x: float = None) -> Structure:
+def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: str|list[str], target_atoms: list = None, reference_atoms: list = None, translate_x: float = None, chain_mapping: dict[str, str] = None) -> Structure:
     '''Superimposes :copy_chain: from :reference: onto :target: '''
     # if atoms specified, superimpose:
     if reference_atoms and target_atoms:
@@ -69,17 +69,27 @@ def superimpose_add_chain(target: Structure, reference: Structure, copy_chain: s
             target_atoms = reference_atoms
         )
 
-    # copy chain.
-    target_with_chain = add_chain(
-        reference = reference,
-        target = target,
-        copy_chain = copy_chain,
-        translate_x = translate_x
-    )
+    copy_chains = [copy_chain] if isinstance(copy_chain, str) else copy_chain
+    if not isinstance(copy_chains, list) or not all(isinstance(chain, str) for chain in copy_chains):
+        raise TypeError(f"copy_chain must be a chain ID or list of chain IDs. Type: {type(copy_chain)}")
+
+    chain_mapping = chain_mapping or {}
+    if not isinstance(chain_mapping, dict) or not all(isinstance(key, str) and isinstance(value, str) for key, value in chain_mapping.items()):
+        raise TypeError("chain_mapping must be a dictionary mapping source chain IDs to target chain IDs.")
+
+    target_with_chain = target
+    for chain in copy_chains:
+        target_with_chain = add_chain(
+            reference = reference,
+            target = target_with_chain,
+            copy_chain = chain,
+            translate_x = translate_x,
+            new_chain_id = chain_mapping.get(chain, chain)
+        )
 
     return target_with_chain
 
-def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: str, target_motif: ResidueSelection|AtomSelection = None, reference_motif: ResidueSelection|AtomSelection = None, target_chains: list[str] = None, reference_chains: list[str] = None, translate_x: float = None, inplace: bool = False, output_dir: str = False, atom_list: list[str] = None) -> str:
+def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: str|list[str], target_motif: ResidueSelection|AtomSelection = None, reference_motif: ResidueSelection|AtomSelection = None, target_chains: list[str] = None, reference_chains: list[str] = None, translate_x: float = None, inplace: bool = False, output_dir: str = False, atom_list: list[str] = None, chain_mapping: dict[str, str] = None) -> str:
     '''Superimposes a chain onto a .pdb file'''
     # safety
     atom_list = atom_list or ["N", "CA", "O"]
@@ -108,7 +118,8 @@ def superimpose_add_chain_pdb(target_pdb: str, reference_pdb: str, copy_chain: s
         copy_chain=copy_chain,
         target_atoms=target_atoms,
         reference_atoms=reference_atoms,
-        translate_x=translate_x
+        translate_x=translate_x,
+        chain_mapping=chain_mapping
     )
 
     # output
@@ -162,7 +173,8 @@ def parse_input_json(input_json: str) -> dict:
         "target_chains",
         "reference_chains",
         "atoms",
-        "translate_x"
+        "translate_x",
+        "chain_mapping"
     ]
 
     # parse json file
@@ -198,6 +210,7 @@ def main(args) -> None:
             target_chains = opts["target_chains"],
             reference_chains = opts["reference_chains"],
             translate_x = opts["translate_x"],
+            chain_mapping = opts["chain_mapping"],
             inplace=args.inplace,
             output_dir=args.output_dir
         )

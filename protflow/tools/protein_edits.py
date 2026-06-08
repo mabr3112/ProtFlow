@@ -216,7 +216,7 @@ class ChainAdder(Runner):
         '''.run() not implemented for ChainAdder class. Use methods like: .add_chain() or .superimpose_add_chain() instead!!!'''
         raise NotImplementedError
 
-    def add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
+    def add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str|list[str], jobstarter: JobStarter = None, overwrite: bool = False, translate_x: float = None, chain_mapping: dict[str, str] = None) -> Poses:
         """
         Add a chain to the poses.
 
@@ -226,9 +226,11 @@ class ChainAdder(Runner):
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
             ref_col (str): The column in the poses DataFrame that references the structures to be used.
-            copy_chain (str): The chain identifier to copy.
+            copy_chain (str | list[str]): The chain identifier(s) to copy.
+            chain_mapping (dict[str, str], optional): Mapping from reference chain IDs to copied chain IDs. Defaults to None.
             jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.
+            translate_x (float, optional): Translate copied chains by x Angstrom along the x-axis. Defaults to None.
 
         Returns:
             Poses: An updated Poses object with the new chain added.
@@ -280,11 +282,13 @@ class ChainAdder(Runner):
             ref_col=ref_col,
             copy_chain=copy_chain,
             jobstarter=jobstarter,
-            overwrite=overwrite
+            translate_x=translate_x,
+            overwrite=overwrite,
+            chain_mapping=chain_mapping
         )
         return chains_added
 
-    def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, target_motif: ResidueSelection|AtomSelection|str = None, reference_motif: ResidueSelection|AtomSelection|str = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, overwrite: bool = False) -> Poses:
+    def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str|list[str], jobstarter: JobStarter = None, target_motif: ResidueSelection|AtomSelection|str = None, reference_motif: ResidueSelection|AtomSelection|str = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, overwrite: bool = False, chain_mapping: dict[str, str] = None) -> Poses:
         """
         Add a protein chain after superimposition on a motif or chain.
 
@@ -295,13 +299,14 @@ class ChainAdder(Runner):
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
             ref_col (str): The column in the poses DataFrame that references the structures to be used.
-            copy_chain (str): The chain identifier to copy.
+            copy_chain (str | list[str]): The chain identifier(s) to copy.
             jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
             target_motif (ResidueSelection | AtomSelection | str, optional): The target motif for superimposition. Strings are interpreted as poses.df columns. Defaults to None.
             reference_motif (ResidueSelection | AtomSelection | str, optional): The reference motif for superimposition. Strings are interpreted as poses.df columns. Defaults to None.
             target_chains (list, optional): A list of target chains for superimposition. Defaults to None.
             reference_chains (list, optional): A list of reference chains for superimposition. Defaults to None.
             translate_x (float, optional): Translate the chain to copy by x Angstrom in x-axis. This option can e.g. be used to set up multi-state design with LigandMPNN.
+            chain_mapping (dict[str, str], optional): Mapping from reference chain IDs to copied chain IDs. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.
 
         Returns:
@@ -378,7 +383,8 @@ class ChainAdder(Runner):
             reference_motif = reference_motif,
             target_chains = target_chains,
             reference_chains = reference_chains,
-            translate_x = translate_x
+            translate_x = translate_x,
+            chain_mapping = chain_mapping
         )
 
         # split input_dict into subdicts
@@ -404,7 +410,7 @@ class ChainAdder(Runner):
 
         return poses.change_poses_dir(work_dir, copy=False)
 
-    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str, target_motif: ResidueSelection|AtomSelection|str = None, reference_motif: ResidueSelection|AtomSelection|str = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None) -> dict:
+    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str|list[str], target_motif: ResidueSelection|AtomSelection|str = None, reference_motif: ResidueSelection|AtomSelection|str = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, chain_mapping: dict[str, str] = None) -> dict:
         '''Prepares motif and chain specifications for superimposer setup.
         Returns dictionary (dict) that holds the kwargs for superimposition: {'target_motif': [target_motif_list], ...}'''
         # safety
@@ -421,6 +427,12 @@ class ChainAdder(Runner):
             assert isinstance(translate_x, (float, int)), f"Parameter translate_x must be of type(float). type(translate_x): {type(translate_x)}"
             for pose in poses:
                 out_dict[pose["poses"]]["translate_x"] = translate_x
+
+        if chain_mapping is not None:
+            if not isinstance(chain_mapping, dict) or not all(isinstance(key, str) and isinstance(value, str) for key, value in chain_mapping.items()):
+                raise TypeError("Parameter chain_mapping must be a dictionary mapping source chain IDs to target chain IDs.")
+            for pose in poses:
+                out_dict[pose["poses"]]["chain_mapping"] = chain_mapping
 
         # if nothing is specified, return nothing.
         if all ((opt is None for opt in [reference_motif, target_motif, reference_chains, target_chains])):
@@ -622,7 +634,7 @@ class ChainAdder(Runner):
         # update poses.df['poses'] to new location
         poses.change_poses_dir(out_dir, copy=False)
 
-def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
+def setup_chain_list(chain_arg, poses: Poses) -> list[str|list[str]]:
     """
     Set up chains for add_chains_batch.py.
 
@@ -636,11 +648,11 @@ def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
         poses (Poses): The Poses object containing the protein structures.
 
     Returns:
-        list[str]: A list of chain identifiers to be used in `add_chains_batch.py`.
+        list[str | list[str]]: Per-pose chain identifier(s) to be used in `add_chains_batch.py`.
 
     Raises:
-        ValueError: If the `chain_arg` value is inappropriate, such as when the specified column does not exist in the DataFrame 
-                    or the length of the list does not match the number of poses.
+        ValueError: If the `chain_arg` value is inappropriate, such as when it is neither a chain ID, 
+                    a column containing chain IDs, nor a list of chain IDs.
 
     Examples:
         Here is an example of how to use the `setup_chain_list` function:
@@ -670,23 +682,33 @@ def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
     - **Single Chain Identifier:** If a single chain identifier (e.g., 'A') is provided, it is used for all poses.
     - **DataFrame Column:** If the name of a column in the `poses` DataFrame is provided, the function extracts the chain identifiers 
                            from that column for each pose.
-    - **List of Chains:** If a list of chain identifiers is provided, it must match the length of the `poses` DataFrame. 
-                           The function raises an error if this condition is not met.
+    - **List of Chains:** If a list of chain identifiers is provided, all chains in the list are added to every pose.
     """
+    def prep_copy_chain(chain):
+        if isinstance(chain, str) and len(chain) == 1:
+            return chain
+        if isinstance(chain, list) and all(isinstance(chain_, str) and len(chain_) == 1 for chain_ in chain):
+            return list(chain)
+        raise ValueError(f"Inappropriate value for copy_chain: {chain}. Specify a chain ID or a list of chain IDs.")
+
     if isinstance(chain_arg, str):
         if len(chain_arg) == 1:
             return [chain_arg for _ in poses]
         else:
-            return [pose[chain_arg] for pose in poses]
+            return [prep_copy_chain(pose[chain_arg]) for pose in poses]
+    if isinstance(chain_arg, list) and all(isinstance(chain, str) and len(chain) == 1 for chain in chain_arg):
+        return [list(chain_arg) for _ in poses]
     if isinstance(chain_arg, list) and len(chain_arg) == len(poses):
-        return chain_arg
-    raise ValueError("Inappropriate value for parameter :chain_arg:. Specify the chain (e.g. 'A'), the column where the chains are listed (e.g. 'chain_col') or give a list of chains the same length as poses.df (e.g. ['A', ...])")
+        return [prep_copy_chain(chain) for chain in chain_arg]
+    raise ValueError("Inappropriate value for parameter :chain_arg:. Specify the chain (e.g. 'A'), the column where the chains are listed (e.g. 'chain_col') or give a list of chains to add (e.g. ['A', 'B']).")
 
-def parse_chain(chain, pose: pd.Series) -> str:
+def parse_chain(chain, pose: pd.Series) -> str|list[str]:
     '''Sets up chain for add_chains_batch.py'''
     if isinstance(chain, str):
         return chain if len(chain) == 1 else pose[chain]
-    raise TypeError(f"Inappropriate parameter type for parameter :chain: {type(chain)}. Only :str: allowed!")
+    if isinstance(chain, list) and all(isinstance(chain_, str) for chain_ in chain):
+        return chain
+    raise TypeError(f"Inappropriate parameter type for parameter :chain: {type(chain)}. Only :str: or list[str] allowed!")
 
 class ChainRemover(Runner):
     """

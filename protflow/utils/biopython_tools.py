@@ -635,7 +635,7 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
         out_atoms += res_atoms
     return out_atoms
 
-def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = False) -> Structure:
+def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = False, new_chain_id: str = None) -> Structure:
     """
     Add a chain from a reference structure to a target structure, optionally translating it and handling ID conflicts.
 
@@ -647,11 +647,13 @@ def add_chain(target: Structure, reference: Structure, copy_chain: str, translat
         The structure from which the chain will be copied.
     copy_chain : str
         The chain ID in the reference structure to be copied.
+    new_chain_id : str, optional
+        The chain ID to assign to the copied chain in the target structure. Defaults to copy_chain.
     translate_x : float, optional
         The distance by which to translate the new chain along the x-axis (default is None).
     overwrite : bool, optional
         Whether to overwrite the chain in the target structure if a chain with the same ID already exists.
-        If False and a conflict occurs, a new unique chain ID will be generated (default is True).
+        If False and a conflict occurs, a new unique chain ID will be generated (default is False).
 
     Returns
     -------
@@ -659,11 +661,11 @@ def add_chain(target: Structure, reference: Structure, copy_chain: str, translat
         The updated target structure with the added chain.
     """
     existing_chain_ids = {chain.id for chain in target.get_chains()}
-    new_chain_id = copy_chain
+    new_chain_id = new_chain_id or copy_chain
 
-    if copy_chain in existing_chain_ids:
+    if new_chain_id in existing_chain_ids:
         if overwrite:
-            target.detach_child(copy_chain)
+            target.detach_child(new_chain_id)
         else:
             new_chain_id = get_next_chain_id(existing_chain_ids)
 

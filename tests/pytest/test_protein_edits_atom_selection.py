@@ -2,9 +2,21 @@ import pandas as pd
 from Bio.PDB import PDBParser
 
 from protflow.residues import AtomSelection, ResidueSelection
-from protflow.tools.protein_edits import ChainAdder
-from protflow.tools.runners_auxiliary_scripts.add_chains_batch import parse_motif_spec, setup_superimpose_atoms
+from protflow.tools.protein_edits import ChainAdder, setup_chain_list
+from protflow.tools.runners_auxiliary_scripts.add_chains_batch import parse_motif_spec, setup_superimpose_atoms, superimpose_add_chain
 from protflow.utils.biopython_tools import get_atoms_of_atom_selection
+
+
+class _FakePoses:
+    def __init__(self, rows):
+        self.rows = [pd.Series(row) for row in rows]
+        self.df = pd.DataFrame(rows)
+
+    def __iter__(self):
+        return iter(self.rows)
+
+    def __len__(self):
+        return len(self.rows)
 
 
 def _pdb_line(record, serial, atom_name, resname, chain, resseq, x, y, z, element):
@@ -82,3 +94,88 @@ def test_setup_superimpose_atoms_uses_exact_atomselection_atoms(tmp_path):
 
     assert [atom.name for atom in target_atoms] == ["CB", "C1"]
     assert [atom.name for atom in reference_atoms] == ["O", "CA"]
+
+
+def test_setup_chain_list_accepts_multiple_copy_chains():
+    poses = _FakePoses([
+        {"copy_chains": ["B", "C"]},
+        {"copy_chains": "D"},
+    ])
+
+    assert setup_chain_list(["B", "C"], poses) == [["B", "C"], ["B", "C"]]
+    assert setup_chain_list("copy_chains", poses) == [["B", "C"], "D"]
+
+
+def test_add_chain_forwards_translate_x_and_chain_mapping_to_superimpose_add_chain():
+    adder = object.__new__(ChainAdder)
+    calls = {}
+
+    def fake_superimpose_add_chain(**kwargs):
+        calls.update(kwargs)
+        return kwargs["poses"]
+
+    adder.superimpose_add_chain = fake_superimpose_add_chain
+    poses = object()
+
+    result = adder.add_chain(
+        poses=poses,
+        prefix="multi",
+        ref_col="ref",
+        copy_chain=["B", "C"],
+        translate_x=12.5,
+        chain_mapping={"B": "D", "X": "Y"},
+    )
+
+    assert result is poses
+    assert calls["copy_chain"] == ["B", "C"]
+    assert calls["translate_x"] == 12.5
+    assert calls["chain_mapping"] == {"B": "D", "X": "Y"}
+
+
+def test_setup_superimposition_args_serializes_chain_mapping(tmp_path):
+    adder = object.__new__(ChainAdder)
+    target_path = str(tmp_path / "target.pdb")
+    reference_path = str(tmp_path / "reference.pdb")
+    poses = _FakePoses([{"poses": target_path, "ref": reference_path}])
+
+    args = adder._setup_superimposition_args(
+        poses=poses,
+        ref_col="ref",
+        copy_chain=["B", "C"],
+        chain_mapping={"B": "D", "X": "Y"},
+    )
+
+    assert args[target_path]["copy_chain"] == ["B", "C"]
+    assert args[target_path]["chain_mapping"] == {"B": "D", "X": "Y"}
+
+
+def test_worker_superimpose_add_chain_accepts_copy_chain_list_and_chain_mapping(tmp_path):
+    target_path = tmp_path / "target.pdb"
+    target_path.write_text(
+        "\n".join([
+            _pdb_line("ATOM", 1, "CA", "ALA", "A", 1, 0.0, 0.0, 0.0, "C"),
+            _pdb_line("ATOM", 2, "CA", "THR", "B", 1, 3.0, 0.0, 0.0, "C"),
+            "TER",
+            "END",
+        ]) + "\n",
+        encoding="utf-8",
+    )
+    reference_path = tmp_path / "reference.pdb"
+    reference_path.write_text(
+        "\n".join([
+            _pdb_line("ATOM", 1, "CA", "GLY", "B", 1, 1.0, 0.0, 0.0, "C"),
+            _pdb_line("ATOM", 2, "CA", "SER", "C", 1, 2.0, 0.0, 0.0, "C"),
+            "TER",
+            "END",
+        ]) + "\n",
+        encoding="utf-8",
+    )
+
+    parser = PDBParser(QUIET=True)
+    target = parser.get_structure("target", target_path)[0]
+    reference = parser.get_structure("reference", reference_path)[0]
+
+    copied = superimpose_add_chain(target, reference, ["B", "C"], chain_mapping={"B": "D", "X": "Y"})
+
+    assert [chain.id for chain in copied.get_chains()] == ["A", "B", "D", "C"]
+
