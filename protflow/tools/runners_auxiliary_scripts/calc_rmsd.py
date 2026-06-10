@@ -39,6 +39,8 @@ def main(args) -> None:
             poses_dict = json.loads(f.read())
     elif (args.input_pdb and args.reference_pdb):
         poses_dict = {args.input_pdb, args.reference_pdb}
+    else:
+        raise ValueError("Provide properly structured inputs. Either an --input_json or an --input_pdb + --reference_pdb!")
 
     # parse atoms and chains:
     atoms = [atom.strip() for atom in args.atoms.split(",") if atom] if args.atoms else None

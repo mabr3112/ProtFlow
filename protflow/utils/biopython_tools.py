@@ -1422,3 +1422,17 @@ def save_structure_to_file(pose: Structure, save_path: str, multimodel: bool = F
             raise KeyError("Output format cif does not offer multimodel support!")
         
         save_structure_to_ciffile(pose=pose, save_path=save_path)
+
+
+def biopython_fileconverter(input_file: str, output_format: str, output_file: str = None, input_format: str = None) -> str:
+    """Convert PDB/CIF structure files with BioPython."""
+
+    file, ext = os.path.splitext(input_file)
+    if not input_format:
+        input_format = ext[1:]
+    if not output_file:
+        output_file = file + f".{output_format}"
+
+    pose = biopython_load_structure(input_file, file_type=input_format)
+    save_structure_to_file(pose=pose, save_path=output_file, file_type=output_format)
+    return output_file
