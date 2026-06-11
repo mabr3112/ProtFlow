@@ -10,6 +10,6 @@ from .ligand import LigandClashes, LigandContacts
 from .propka import Propka
 from .protparam import ProtParam
 from ..residues import AtomSelection
-from .rmsd import AtomRMSD, MotifRMSD, BackboneRMSD
+from .rmsd import AtomRMSD, MotifRMSD, BackboneRMSD, MotifSeparateSuperpositionRMSD
 from .selection_identity import SelectionIdentity
 from .tmscore import TMalign, TMscore
