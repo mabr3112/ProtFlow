@@ -121,7 +121,6 @@ import json
 
 # dependencies
 import pandas as pd
-from collections import UserDict
 from numpy import array_split, sort
 
 # custom
@@ -140,7 +139,7 @@ HBPLUS_QUERY_STYLE = {
         # partner_type is redundant as it is already defined via target_type
     }
                                                                                                                                                                                                                                                                                                                                                                           
-class HBplus_query(UserDict):
+class HBplus_query:
     """
     Builder for H-bond filter queries on HBplus output.
  
@@ -226,7 +225,6 @@ class HBplus_query(UserDict):
     """
 
     def __init__(self, name: str):
-        super().__init__()
         self.name = name
         self.target_atms = None
         self.target_res = None
@@ -737,7 +735,7 @@ class HBplus(Runner):
         ext = poses.determine_pose_type("poses")
         if not ext == [".pdb"]:
             poses.convert_poses(f"{prefix}_conversion", "pdb", jobstarter=jobstarter, overwrite=overwrite)
-
+        
         # prep options:
         options_l = self._prep_hbplus_options(poses, options, pose_options)
 
@@ -909,7 +907,7 @@ class HBplus(Runner):
  
             poses = runner.query(poses=poses, queries=[q1, q2], hbplus_prefix="hb")
         """
-
+        
         score_col = f"{hbplus_prefix}_hb2_scores"
         if score_col not in poses.df.columns:
             raise KeyError(f"Could not find HBplus score column called {score_col} in poses dataframe! Did you run HBplus with the selected prefix?")
