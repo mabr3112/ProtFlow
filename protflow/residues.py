@@ -1728,6 +1728,30 @@ class ResidueSelection:
         contig_str = ",".join(contig_parts)
         return contig_str
     
+    def to_index(self, convert_to_zero_indexed:bool=False) -> int|list:
+        """
+        Parses ResidueSelection object to a list of residue indices (or a single index for selections containing a single residue).
+        Fails if multiple chains are present in the ResidueSelection. If convert_to_zero_indexed is set, 1 will be subtracted from
+        all residue indices.
+
+        Example:
+            If self.residues = (("A", 1), ("A", 2), ("A", 3)),
+            the output will be [1, 2, 3].
+            If self.residues = (("B", 4)),
+            the output will be 4.
+        """
+        resdict = self.to_dict()
+        if len(resdict) > 1:
+            raise KeyError("Multiple chains detected. Conversion to residue indices will not work.")
+        res_indices = list(resdict.values())
+        if convert_to_zero_indexed:
+            res_indices = [idx - 1 for idx in res_indices]
+        if len(res_indices) == 1:
+            return res_indices[0]
+        else:
+            return res_indices
+
+
     @classmethod
     def from_resname(cls, resname: str, pose: Any, strict: bool = True) -> "ResidueSelection":
         """Creates a selection by searching for a specific residue name."""
