@@ -182,6 +182,18 @@ class SigmaDock(Runner):
             Number of independent stochastic draws per pose (``num_seeds``
             in SigmaDock's Hydra config).  Each seed produces one docked
             pose, written as ``{description}_{i:04d}.pdb``.
+
+            **Caution — this does not parallelise across GPUs.** All draws for
+            a pose run in a single process on one GPU (the runner fixes
+            ``hardware.devices=1``), so the effective batch becomes
+            ``batch_size × num_seeds`` and a large value can exhaust GPU memory
+            (OOM).  Keep ``num_seeds`` moderate sized to fit one GPU's
+            memory.  To dock many poses at once, scale out with the jobstarter
+            (e.g. ``SbatchArrayJobstarter(max_cores=N, gpus=1)``), which runs
+            one process per pose across up to ``N`` GPUs.  For large pose
+            diversity prefer several runs / a SLURM job array over a very large
+            ``num_seeds`` (SigmaDock's authors recommend this for cleaner
+            reproducibility too).
         seed:
             Master random seed (``seed`` in SigmaDock's Hydra config).
             SigmaDock derives ``num_seeds`` per-draw seeds from this value,
