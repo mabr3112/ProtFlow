@@ -2020,6 +2020,9 @@ def from_contig(input_contig: str) -> ResidueSelection:
     sel = []
     elements = [x.strip() for x in input_contig.split(",") if x]
     for element in elements:
+        if not element[0].isalpha():
+            # skip diffused parts like 10-25
+            continue
         subsplit = element.split("-")
         if len(subsplit) > 1:
             sel += [element[0] + str(i) for i in range(int(subsplit[0][1:]), int(subsplit[-1])+1)]
