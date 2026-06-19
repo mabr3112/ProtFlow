@@ -2102,7 +2102,7 @@ def renumber_rfd3_input_pdb(
             if residue_key in residue_mapping:
                 chain_id, residue_number = residue_mapping[residue_key]
                 line = _format_pdb_residue_line(line, chain_id=chain_id, residue_number=residue_number)
-            output_handle.write(line)
+                output_handle.write(line)
 
     return output_pdb
 
