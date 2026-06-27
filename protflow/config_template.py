@@ -5,7 +5,7 @@ This module contains all paths to tools integrated in ProtFlow. PRE_CMD are comm
 PROTFLOW_DIR = "" # "/path/to/ProtFlow/"
 
 # protflow environment python
-PROTFLOW_ENV = "" # "/path/to/package_manager/envs/protflow/bin/python3"
+PROTFLOW_ENV = "" # "/path/to/package_manager/envs/protflow/bin/"
 
 # auxiliary runners directory path
 #TODO: @Markus Implement checkup if AUXILIARY_RUNNER_SCRIPTS_DIR points to the correct directory (Think about pointing to protflow directory)!
