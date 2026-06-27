@@ -182,11 +182,26 @@ class SigmaDock(Runner):
             Number of independent stochastic draws per pose (``num_seeds``
             in SigmaDock's Hydra config).  Each seed produces one docked
             pose, written as ``{description}_{i:04d}.pdb``.
+
+            **Caution — this does not parallelise across GPUs.** All draws for
+            a pose run in a single process on one GPU (the runner fixes
+            ``hardware.devices=1``), so the effective batch becomes
+            ``batch_size × num_seeds`` and a large value can exhaust GPU memory
+            (OOM).  Keep ``num_seeds`` moderate sized to fit one GPU's
+            memory.  To dock many poses at once, scale out with the jobstarter
+            (e.g. ``SbatchArrayJobstarter(max_cores=N, gpus=1)``), which runs
+            one process per pose across up to ``N`` GPUs.  For large pose
+            diversity prefer several runs / a SLURM job array over a very large
+            ``num_seeds`` (SigmaDock's authors recommend this for cleaner
+            reproducibility too).
         seed:
             Master random seed (``seed`` in SigmaDock's Hydra config).
             SigmaDock derives ``num_seeds`` per-draw seeds from this value,
             so the same ``seed`` + ``num_seeds`` combination always reproduces
-            the same set of poses.  Stored as ``{prefix}_master_seed``.
+            the same set of poses.  The effective per-draw seed of each result
+            is recorded in the ``{prefix}_seed`` column, read back from
+            SigmaDock's output records (so per-pose overrides via
+            ``pose_options`` are reflected correctly).
         query_ligands:
             Absolute SDF paths for crossdocking from complex.  One list is
             shared across all poses.
@@ -280,7 +295,6 @@ class SigmaDock(Runner):
 
         if len(scores.index) == 0:
             raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output logs and runner output directory ({work_dir})")
-        scores["master_seed"] = seed
         if len(scores.index) < len(poses) * num_seeds:
             logging.warning("%s: expected %d rows (%d poses × %d seeds), got %d — some runs may have crashed.", self, len(poses) * num_seeds, len(poses), num_seeds, len(scores.index))
 
