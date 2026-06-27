@@ -107,3 +107,7 @@ SIGMADOCK_PRE_CMD = "" # "export PATH=/path/to/package_manager/envs/sigmadock/bi
 
 # hbplus
 HPLUS_PATH = "" # "/path/to/hbplus/hbplus"
+
+# hydraprot
+HYDRAPROT_DIR_PATH = "" #"/path/to/HydraProt"
+HYDRAPROT_PYTHON_PATH = "" # "/path/to/miniconda3/envs/hydraprot/bin/python"
