@@ -2360,7 +2360,7 @@ class Poses:
         self.df = self.df.merge(on='poses_description')
         return self
 
-    def convert_poses(self, prefix: str, out_format: str, jobstarter: JobStarter = None, overwrite: bool = False, conversion_engine: str = "biopython"):
+    def convert_poses(self, prefix: str, out_format: str, jobstarter: JobStarter = None, overwrite: bool = False, conversion_engine: str = "openbabel"):
         """
         Converts input poses to the selected output format.
 
