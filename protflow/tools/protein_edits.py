@@ -980,7 +980,7 @@ class SequenceRemover(Runner):
         })
         return out_df
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, chains: list[int] = None, sep: str = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, chains: list[int] = None, sep: str = None, overwrite: bool = False, keep_chains: bool = False) -> Poses:
         '''
         Parameters:
         chains: can either be a list that contains chain idx to drop, or a str that points to the column in poses.df that contains this list for every pose.
@@ -1015,8 +1015,9 @@ class SequenceRemover(Runner):
             input_json_list.append(fp)
 
         # write cmd
-        script_path = self.script_path # TODO: check why sep is not accessed in this runner!
-        cmds = [f"{self.python} {script_path} --input_json {input_json} --output_dir {work_dir}" for input_json in input_json_list]
+        script_path = self.script_path
+        keep = " --keep" if keep_chains else ""
+        cmds = [f"{self.python} {script_path} --input_json {input_json} --output_dir {work_dir} --sep='{sep}'{keep}" for input_json in input_json_list]
 
         # execute with jobstarter
         jobstarter.start(cmds=cmds, jobname=prefix, output_path=work_dir)
