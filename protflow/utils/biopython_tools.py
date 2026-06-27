@@ -1238,6 +1238,14 @@ def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
 
     structure = biopython_load_structure(path, handle=stem)
 
+    # fail fast if the requested ligand is absent, instead of silently writing an empty SDF
+    if not any(residue.resname == ligand_name for residue in structure.get_residues()):
+        hetatms = sorted({residue.resname for residue in structure.get_residues() if residue.id[0] != " "})
+        raise ValueError(
+            f"No residue named '{ligand_name}' found in {path}. "
+            f"HETATM residues present: {hetatms or 'none'}. Check the ligand_name argument."
+        )
+
     class _ProteinSelect(Bio.PDB.Select): # inherit from Bio.PDB.Select to write only ATOM records
         def accept_residue(self, residue):
             return residue.id[0] == " "
