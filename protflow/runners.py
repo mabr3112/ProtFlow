@@ -734,7 +734,7 @@ def options_flags_to_string(options: dict, flags: list, sep="--", no_quotes: boo
     def value_in_quotes(value) -> str:
         '''Makes sure that split commandline options are passed in quotes: --option='quoted list of args' '''
         # make value safe for bash (if spaces in value or a pipe symbol. This might be extended later)
-        if len(str(value).split(" ")) > 1 or "|" in value:
+        if len(str(value).split(" ")) > 1 or "|" in str(value):
             if not ((value.startswith("'") and value.endswith("'")) or (value.startswith('"') and value.endswith('"'))):
                 return f"'{value}'"
         return value
