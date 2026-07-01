@@ -10,7 +10,7 @@ import shlex
 import shutil
 from dataclasses import dataclass, field, fields, is_dataclass
 from glob import glob
-from typing import Any
+from typing import Any, ClassVar
 
 import pandas as pd
 import yaml
@@ -63,7 +63,7 @@ class PottsMPNN(Runner):
         prefix: str,
         jobstarter: JobStarter | None = None,
         script: str | None = "sample_seqs",
-        params: "PottsMPNNParams | None" = None,
+        params: SampleSequencePottsMPNNParams | EnergyPredictionPottsMPNNParams | None = None,
         options: str | None = None,
         pose_options: str | list[str] | None = None,
         include_scores: list[str] | None = None,
@@ -77,7 +77,12 @@ class PottsMPNN(Runner):
         # sanitize script_path and params:
         script_path, script_key = self._resolve_script(script)
         index_layers = 1 if script_key == "sample_seqs" else 0
-        params = params or PottsMPNNParams(script_key)
+        if params is None:
+            params = (
+                SampleSequencePottsMPNNParams()
+                if script_key == "sample_seqs"
+                else EnergyPredictionPottsMPNNParams()
+            )
         if params.script != script_key:
             raise ValueError(f"Params for '{params.script}' cannot be used with script '{script_key}'.")
         if script_key == "sample_seqs":
@@ -344,31 +349,9 @@ class EnergyPredictionParams:
     inference: EnergyPredictionInferenceParams = field(default_factory=EnergyPredictionInferenceParams)
 
 
-class PottsMPNNParams:
-    """YAML config builder for PottsMPNN scripts."""
-
-    PARAMS_DICT = {
-        "sample_seqs": SampleSequenceParams,
-        "sample_sequence": SampleSequenceParams,
-        "energy_prediction": EnergyPredictionParams,
-    }
-
-    def __init__(self, script: str = "sample_seqs", **kwargs: Any) -> None:
-        """Initialize defaults for a supported PottsMPNN script config."""
-        # normalize script name
-        script_key = _script_key(script)
-        if script_key not in self.PARAMS_DICT:
-            raise ValueError(f"Unsupported PottsMPNN params type: {script}")
-        self.script = "sample_seqs" if script_key == "sample_sequence" else script_key
-
-        # copy dataclass defaults onto this wrapper
-        defaults = self.PARAMS_DICT[script_key]()
-        self._batchable_params = copy.deepcopy(getattr(defaults, "batchable_params", []))
-        for param_field in fields(defaults):
-            setattr(self, param_field.name, copy.deepcopy(getattr(defaults, param_field.name)))
-        # apply user overrides
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+class PottsMPNNParamsBase:
+    """Share YAML config helpers across typed PottsMPNN parameter classes."""
+    script: ClassVar[str]
 
     def _compile_attrs_dict(self, flat: bool = False) -> dict[str, Any]:
         """Return parameter values as a nested or flattened dictionary."""
@@ -497,7 +480,24 @@ class PottsMPNNParams:
             raise KeyError(f"PoseCol column(s) not found in poses.df: {missing}")
 
 
-def params_to_config(poses: Poses, n_batches: int, work_dir: str, params: PottsMPNNParams) -> tuple[bool, list[str]]:
+@dataclass
+class SampleSequencePottsMPNNParams(SampleSequenceParams, PottsMPNNParamsBase):
+    """Typed params for sample_seqs.py."""
+    script: ClassVar[str] = "sample_seqs"
+
+
+@dataclass
+class EnergyPredictionPottsMPNNParams(EnergyPredictionParams, PottsMPNNParamsBase):
+    """Typed params for energy_prediction.py."""
+    script: ClassVar[str] = "energy_prediction"
+
+
+def params_to_config(
+    poses: Poses,
+    n_batches: int,
+    work_dir: str,
+    params: SampleSequencePottsMPNNParams | EnergyPredictionPottsMPNNParams,
+) -> tuple[bool, list[str]]:
     """Generate PottsMPNN config files and report whether they are batched."""
     # params are required so script-specific defaults are explicit
     if params is None:
@@ -672,12 +672,9 @@ def _split_pose_dataframe(poses: Poses, n_batches: int) -> list[pd.DataFrame]:
 
 def _iter_param_values(obj: Any, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any, bool]]:
     """Yield nested parameter paths, values, and batchability flags."""
-    # recurse through wrapper and dataclass parameter containers
+    # recurse through dataclass parameter containers
     out = []
-    if isinstance(obj, PottsMPNNParams):
-        names = [key for key in vars(obj) if not key.startswith("_") and key != "script"]
-        batchable = set(getattr(obj, "_batchable_params", []))
-    elif is_dataclass(obj):
+    if is_dataclass(obj):
         names = [param_field.name for param_field in fields(obj)]
         batchable = set(getattr(obj, "batchable_params", []))
     else:
@@ -695,11 +692,8 @@ def _iter_param_values(obj: Any, path: tuple[str, ...] = ()) -> list[tuple[tuple
 
 def _params_to_dict(obj: Any, include_custom: bool) -> dict[str, Any]:
     """Convert parameter objects into YAML-serializable dictionaries."""
-    # unwrap parameter wrapper or dataclass fields
-    if isinstance(obj, PottsMPNNParams):
-        source = {key: value for key, value in vars(obj).items() if not key.startswith("_") and key != "script"}
-    else:
-        source = {param_field.name: getattr(obj, param_field.name) for param_field in fields(obj)}
+    # unwrap dataclass fields
+    source = {param_field.name: getattr(obj, param_field.name) for param_field in fields(obj)}
     out = {}
     for key, value in source.items():
         if not include_custom and key.endswith("_custom"):

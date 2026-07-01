@@ -22,7 +22,12 @@ from .rosetta import Rosetta
 from .esm import ESM
 from .protenix import ProtenixPred
 from .sigmadock import SigmaDock
-from .pottsmpnn import PottsMPNN, PottsMPNNParams, PoseCol
+from .pottsmpnn import (
+    EnergyPredictionPottsMPNNParams,
+    PottsMPNN,
+    PoseCol,
+    SampleSequencePottsMPNNParams,
+)
 from .protein_edits import ChainAdder, ChainRemover, SequenceAdder, SequenceRemover
 from .minifold import Minifold
 from .caliby import CalibySequenceDesign, CalibyEnsembleSeqDesign, CalibyEnsembleGenerator
