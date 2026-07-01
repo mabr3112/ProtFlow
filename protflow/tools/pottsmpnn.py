@@ -1,94 +1,60 @@
-"""Runner template for ProtFlow tool integrations.
+"""PottsMPNN runner integration."""
 
-How to use this template
-------------------------
-1. Copy this file (or class) to a new module in ``protflow/tools`` or ``protflow/metrics``.
-2. Rename ``ExampleRunner`` and ``example_runner`` to your tool name.
-3. Replace all ``TODO`` markers.
-4. Keep the run lifecycle intact:
-   setup workdir -> reuse cached outputs -> prep options -> build commands -> run jobs -> collect scores -> return RunnerOutput.
-5. Implement ``collect_scores(...)`` as a **module function**.
-
-Design goals
-------------
-- Keep runner behavior consistent across ProtFlow.
-- Make it obvious where tool-specific logic belongs.
-- Avoid re-implementing common logic already provided by ``Runner``.
-- Keep score parsing callable without constructing a runner instance.
-"""
-
-# imports
 from __future__ import annotations
+
+import copy
 import json
 import logging
 import os
-from glob import glob
-from dataclasses import dataclass
+import shlex
 import shutil
-import copy
+from dataclasses import dataclass, field, fields, is_dataclass
+from glob import glob
+from typing import Any
 
-# dependencies
 import pandas as pd
 import yaml
 
-# customs
 from protflow import load_config_path, require_config
-from protflow.jobstarters import JobStarter
+from protflow.jobstarters import JobStarter, split_list
 from protflow.poses import Poses
 from protflow.runners import (
     Runner,
     RunnerOutput,
-    parse_generic_options,
     options_flags_to_string,
+    parse_generic_options,
     prepend_cmd,
 )
 
-class PottsMPNN(Runner):
-    """Template class for implementing a new ProtFlow runner.
+# scripts with upstream --config YAML entrypoints.
+SUPPORTED_CONFIG_SCRIPTS = {"sample_seqs", "energy_prediction"}
 
-    Developer instructions
-    ----------------------
-    - Keep this class focused on one external tool.
-    - Put all user-facing run parameters on ``run(...)``.
-    - Use config values as defaults in ``__init__``.
-    - Keep score parsing in the module-level ``collect_scores(...)`` function.
-    - Ensure output parsing returns a dataframe with:
-      - ``description``: basename without extension of each produced pose
-      - ``location``: absolute path to produced pose file
-    - Always return ``RunnerOutput(...).return_poses()``.
-    """
+class PottsMPNN(Runner):
+    """Run PottsMPNN ``sample_seqs.py`` or ``energy_prediction.py``."""
 
     def __init__(
         self,
-        application_path: str | None = None,
         python_path: str | None = None,
+        pottsmpnn_dir: str | None = None,
         pre_cmd: str | None = None,
         jobstarter: JobStarter | None = None,
     ) -> None:
-        """Initialize tool paths and static runner metadata.
-
-        Developer instructions
-        ----------------------
-        - Load paths from config by default.
-        - Keep constructor lightweight; do not run jobs here.
-        - Define ``self.index_layers`` according to output naming:
-          - ``0`` if output descriptions match input pose descriptions.
-          - ``>0`` if your tool appends index layers like ``_0001``.
-        """
+        """Initialize PottsMPNN paths and runner metadata."""
         # config required
         config = require_config()
 
-        # setup config.
-        self.pottsmpnn_dir = pottsmpnn_dir or load_config_path(config, "POTSSMPNN_DIR")
-        self.python_path = python_path or load_config_path(config, "POTTSMPNN_PYTHON")
+        # setup config paths
+        self.pottsmpnn_dir = str(pottsmpnn_dir or load_config_path(config, "POTTSMPNN_DIR"))
+        self.python_path = str(python_path or load_config_path(config, "POTTSMPNN_PYTHON"))
         self.pre_cmd = pre_cmd or load_config_path(config, "POTTSMPNN_PRE_CMD", is_pre_cmd=True)
 
+        # setup runner state
         self.jobstarter = jobstarter
         self.name = "pottsmpnn"
-        self.index_layers = 1
+        self.index_layers = 0
 
     def __str__(self) -> str:
-        """Return a short runner name used in logs."""
+        """Return the short runner name."""
         return self.name
 
     def run(
@@ -96,36 +62,28 @@ class PottsMPNN(Runner):
         poses: Poses,
         prefix: str,
         jobstarter: JobStarter | None = None,
-        script: str = None,
-        params: PottsMPNNParams = None,
+        script: str | None = "sample_seqs",
+        params: "PottsMPNNParams | None" = None,
         options: str | None = None,
-        pose_options: str|list[str] = None,
+        pose_options: str | list[str] | None = None,
         include_scores: list[str] | None = None,
         overwrite: bool = False,
     ) -> Poses:
-        """Execute the full runner lifecycle and merge results into ``poses``.
-
-        Developer instructions
-        ----------------------
-        The canonical order is:
-        1. Generic setup (prefix check, jobstarter resolution, workdir creation).
-        2. Reuse cached scorefile when available and ``overwrite=False``.
-        3. Prepare per-pose options.
-        4. Build command list.
-        5. Execute via selected jobstarter.
-        6. Collect scores into required dataframe format.
-        7. Save runner scorefile and merge with ``RunnerOutput``.
-
-        Notes on ``include_scores``
-        ---------------------------
-        ``include_scores`` is passed through to module-level ``collect_scores``.
-        Use it to opt into heavy optional score fields (e.g., per-residue vectors
-        or 2D matrices) that should not be loaded by default.
-        """
+        """Run PottsMPNN and merge collected results into poses."""
         # sanity
-        script = self._resolve_script(script)
-        
-        # 1) Generic setup shared by all runners.
+        if pose_options is not None:
+            raise ValueError("PottsMPNN uses YAML configs; use PoseCol params instead of pose_options.")
+
+        # sanitize script_path and params:
+        script_path, script_key = self._resolve_script(script)
+        index_layers = 1 if script_key == "sample_seqs" else 0
+        params = params or PottsMPNNParams(script_key)
+        if params.script != script_key:
+            raise ValueError(f"Params for '{params.script}' cannot be used with script '{script_key}'.")
+        if script_key == "sample_seqs":
+            _check_sample_descriptions(poses)
+
+        # setup run directory and jobstarter
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
@@ -133,504 +91,765 @@ class PottsMPNN(Runner):
         )
         logging.info("Running %s in %s on %d poses", self, work_dir, len(poses))
 
-        # 2) Scorefile reuse shortcut.
+        # scorefile reuse shortcut
         scorefile = os.path.join(work_dir, f"{self.name}_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
-            logging.info("Reusing existing scorefile: %s", scorefile)
-            return RunnerOutput(
+            outputs = RunnerOutput(
                 poses=poses,
                 results=scores,
                 prefix=prefix,
-                index_layers=self.index_layers,
-            ).return_poses()
+                index_layers=index_layers
+            )
+            return outputs.return_poses()
 
-        # Optional cleanup when overwrite is requested.
+        # cleanup previous outputs
         if overwrite:
-            self._cleanup_previous_outputs(work_dir=work_dir)
+            self._cleanup_previous_outputs(work_dir)
 
-        # 3) Prep config files from specified params and pose options
-        pose_options_list = self.prep_pose_options(poses=poses, pose_options=pose_options)
-        config_files_list = params_to_config(poses=poses, prefix=prefix, params=params, work_dir=work_dir)
-
-        # 4) Build commands.
-        cmds = self._build_commands(
-            script=script,
-            config_files=config_files_list,
+        # prepare config files
+        batched, config_files = params_to_config(
+            poses=poses,
+            n_batches=jobstarter.max_cores,
             work_dir=work_dir,
-            options=options,
+            params=params,
+        )
+        # build commands
+        cmds = self._build_commands(
+            script=script_path,
+            config_files=config_files,
+            options=options
         )
 
+        # prepend configured environment command
         if self.pre_cmd:
             cmds = prepend_cmd(cmds=cmds, pre_cmd=self.pre_cmd)
 
-        # 5) Execute commands.
+        # execute jobs
         jobstarter.start(
             cmds=cmds,
             jobname=self.name,
             wait=True,
-            output_path=work_dir,
+            output_path=work_dir
         )
 
-        # 6) Collect and validate scores (module function, by convention).
-        scores = collect_scores(work_dir=work_dir, include_scores=include_scores)
-
+        # collect and validate scores
+        scores = collect_scores(
+            work_dir=work_dir,
+            script=script_key,
+            batched=batched,
+            include_scores=include_scores
+        )
+        scores = _fill_missing_locations(scores=scores, poses=poses, index_layers=index_layers)
         if len(scores.index) == 0:
-            raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output logs and runner output directory ({work_dir})")
+            raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output directory: {work_dir}")
 
-        # 7) Persist and merge back into poses.
+        # save scores and merge back into poses
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
-        return RunnerOutput(
+        outputs = RunnerOutput(
             poses=poses,
             results=scores,
             prefix=prefix,
-            index_layers=self.index_layers,
-        ).return_poses()
+            index_layers=index_layers
+        )
+        return outputs.return_poses()
 
-    def _resolve_script(self, script: str) -> str:
-        '''quick helper to resolve the script path for pottsmpnn scripts.'''
-        if os.path.isfile(script):
-            return script
-        if os.path.isfile(os.path.join(self.pottsmpnn_dir, script)):
-            return os.path.join(self.pottsmpnn_dir, script)
-        raise FileNotFoundError(f"File not found by itself or in pottsmpnn_dir: {script} {os.path.join(self.pottsmpnn_dir, script)}")
+    def _resolve_script(self, script: str | None) -> tuple[str, str]:
+        """Resolve script aliases to an executable upstream script path."""
+        # normalize script alias
+        script = script or "sample_seqs"
+        script_key = _script_key(script)
+        # restrict to config-based scripts
+        if script_key not in SUPPORTED_CONFIG_SCRIPTS:
+            raise NotImplementedError(
+                "Only PottsMPNN scripts with a '--config' YAML interface are supported: "
+                f"{sorted(SUPPORTED_CONFIG_SCRIPTS)}"
+            )
 
-    def _build_commands(
-        self,
-        script: str,
-        config_files: list[str],
-        work_dir: str,
-        options: str | None,
-    ) -> list[str]:
-        """Create one shell command per pose.
+        # search direct path and checkout-relative path
+        candidates = [str(script)]
+        if not str(script).endswith(".py"):
+            candidates.append(f"{script}.py")
+        candidates.extend(
+            os.path.join(self.pottsmpnn_dir, candidate)
+            for candidate in list(candidates)
+        )
 
-        Developer instructions
-        ----------------------
-        - Convert a global options string + per-pose options into final CLI options.
-        - Keep all command assembly in one place to simplify debugging.
-        - Return a list with deterministic order matching ``poses`` rows.
-        """
-        # sanity
-        options = options or ""
+        # return first valid script path.
+        for candidate in candidates:
+            if os.path.isfile(candidate):
+                return os.path.abspath(candidate), script_key
+        raise FileNotFoundError(f"Could not find PottsMPNN script '{script}' in {self.pottsmpnn_dir}.")
 
-        # setup output directory
-        out_dir = os.path.join(work_dir, "outputs")
-        os.makedirs(out_dir, exist_ok=True)
+    def _prep_pottsmpnn_opts(self, raw_opts: str | None) -> str:
+        """Normalize extra CLI options and drop managed config overrides."""
+        # parse generic CLI options
+        if not raw_opts:
+            return ""
+        opts, flags = parse_generic_options(raw_opts, "", sep="--")
 
-        cmds: list[str] = []
-        for config_file in config_files.poses_list():
-            cmds.append(self.write_cmd(script=script, config_path=config_file, cli_args=options))
+        # config files are managed by the runner
+        if "config" in opts:
+            logging.warning("Ignoring user-specified PottsMPNN --config option: %s", opts["config"])
+            del opts["config"]
+        return options_flags_to_string(opts, flags, sep="--")
+
+    def _build_commands(self, script: str, config_files: list[str], options: str | None) -> list[str]:
+        """Build one PottsMPNN command per generated config file."""
+        # options are shared across generated configs
+        cli_args = self._prep_pottsmpnn_opts(options)
+        cmds = [
+            self.write_cmd(script=script, config_path=config_file, cli_args=cli_args)
+            for config_file in config_files
+        ]
         return cmds
 
-    def write_cmd(self, script: str, config_path: str, cli_args: str) -> str:
-        """Return the exact shell command for one pose.
-
-        Developer instructions
-        ----------------------
-        - Build an executable command string only; do not execute here.
-        - Ensure output filename preserves or predictably derives from pose description.
-        - Keep quoting robust for paths with spaces.
-        """
+    def write_cmd(self, script: str, config_path: str, cli_args: str = "") -> str:
+        """Format the shell command for a single PottsMPNN config."""
+        # run from PottsMPNN checkout so relative model paths work
         cmd = (
-            f"{self.python_path} {script} "
-            f"--config '{config_path}' {cli_args}"
+            f"cd {shlex.quote(self.pottsmpnn_dir)}; "
+            f"{shlex.quote(self.python_path)} {shlex.quote(script)} --config {shlex.quote(config_path)}"
         )
-        # TODO: replace with your tool's real command structure.
-        return cmd
+        return f"{cmd} {cli_args}" if cli_args else cmd
 
     def _cleanup_previous_outputs(self, work_dir: str) -> None:
-        """Delete/clear runner-specific output artifacts before rerun.
-
-        Developer instructions
-        ----------------------
-        - Keep cleanup scoped to this runner's own output directories.
-        - Never remove unrelated files outside ``work_dir``.
-        - This method is optional but useful for tools that append stale outputs.
-        """
+        """Remove previous runner-owned outputs inside the work directory."""
+        # remove only files/directories inside runner work_dir
         if not os.path.isdir(work_dir):
             return
-
-        for file_path in glob(os.path.join(work_dir, "*")):
-            os.remove(file_path)
-
-def _is_heavy_value(value: object) -> bool:
-    """Heuristic for values that can bloat score tables (2D/per-residue objects)."""
-    if isinstance(value, (list, tuple)):
-        if value and isinstance(value[0], (list, tuple, dict)):
-            return True
-        if len(value) > 200:
-            return True
-
-    shape = getattr(value, "shape", None)
-    if isinstance(shape, tuple) and len(shape) >= 2:
-        return True
-
-    return False
+        for path in glob(os.path.join(work_dir, "*")):
+            if os.path.isdir(path):
+                shutil.rmtree(path)
+            else:
+                os.remove(path)
 
 
-def _extract_score_dict(
-    payload: dict,
-    include_scores: set[str],
-    prefix: str = "",
-) -> dict[str, object]:
-    """Flatten nested score dictionaries with optional inclusion of heavy values.
-
-    Notes
-    -----
-    - Do not hardcode score names where possible; parse what is present.
-    - By default, this returns scalar values and skips heavy values.
-    - Heavy values are included only if their key (or flattened key path) is in
-      ``include_scores``.
-    """
-    out: dict[str, object] = {}
-    for key, value in payload.items():
-        flat_key = f"{prefix}_{key}" if prefix else str(key)
-
-        if isinstance(value, dict):
-            out.update(_extract_score_dict(value, include_scores, prefix=flat_key))
-            continue
-
-        if _is_heavy_value(value):
-            if key in include_scores or flat_key in include_scores:
-                out[flat_key] = json.dumps(value)
-            continue
-
-        out[flat_key] = value
-
-    return out
-
-def collect_scores(work_dir: str, include_scores: list[str] | None = None) -> pd.DataFrame:
-    """Parse runner outputs and return the canonical scores dataframe.
-
-    Developer instructions
-    ----------------------
-    - Keep this function at module scope, not inside the runner class.
-    - Required output columns:
-      - ``description``
-      - ``location``
-    - Favor score auto-discovery (read keys present in outputs) over hardcoded
-      column lists, because external tools frequently rename score terms.
-    - Avoid reading heavy per-residue / matrix-like data by default.
-      Use ``include_scores`` to opt-in to specific heavy fields.
-    - Keep function callable standalone (for debugging/re-parsing old runs).
-    """
-    include_set = set(include_scores or [])
-    output_dir = os.path.join(work_dir, "outputs")
-    output_paths = sorted(
-        glob(os.path.join(output_dir, "*.pdb")) +
-        glob(os.path.join(output_dir, "*.cif"))
-    )
-
-    rows: list[dict[str, object]] = []
-    for path in output_paths:
-        desc = os.path.splitext(os.path.basename(path))[0]
-        row: dict[str, object] = {
-            "description": desc,
-            "location": os.path.abspath(path),
-        }
-
-        # TODO: Adjust sidecar discovery for your tool's naming convention.
-        sidecars = sorted(glob(os.path.join(output_dir, f"{desc}*.json")))
-        for sidecar in sidecars:
-            with open(sidecar, "r", encoding="utf-8") as handle:
-                parsed = json.load(handle)
-
-            if isinstance(parsed, dict):
-                row.update(_extract_score_dict(parsed, include_set))
-
-        rows.append(row)
-
-    return pd.DataFrame(rows)
-
-
-# TODO @Codex I intend to designate PoseCol as a class. This is to allow PottsMPNN params to check directly for the type of parameter it received. Depending on that, either the string or the poses.df[string] will be set for the config file.
 class PoseCol(str):
-    def __init__(self, col_name: str):
-        '''wrapper class'''
-        super.__init__()
-        self.col_name = col_name
+    """Marker string for PottsMPNN parameters read from ``poses.df``."""
 
-    def __str__(self):
-        return self.col_name
-    #TODO @Codex how do I specify that passing the PoseCol instance will automatically pass PoseCol.col_name instead of the PoseCol object ID (for everything)? Basically, this class should behave exactly like a string but just be of type PoseCol. Is the code I wrote for self.pose_col and __str__ even necessary?
+    def __new__(cls, col_name: str) -> "PoseCol":
+        """Create a string subclass that preserves PoseCol type checks."""
+        return super().__new__(cls, col_name)
+
+    @property
+    def col_name(self) -> str:
+        """Return the referenced poses dataframe column name."""
+        return str(self)
+
 
 @dataclass
 class PottsMPNNModelParams:
-    check_path: str = ""
-    hidden_dim: int = 128
-    edge_features: int = 128
-    potts_dim: int = 400
-    num_layers: int = 3
-    num_edges: int = 48
-    vocab: int = 21
-        
+    """Store PottsMPNN model configuration fields."""
+    check_path: str | PoseCol = "vanilla_model_weights/pottsmpnn_20.pt"
+    hidden_dim: int | PoseCol = 128
+    edge_features: int | PoseCol = 128
+    potts_dim: int | PoseCol = 400
+    num_layers: int | PoseCol = 3
+    num_edges: int | PoseCol = 48
+    vocab: int | PoseCol = 21
+
 
 @dataclass
 class SampleSequenceInferenceParams:
-    # sample_sequence params
-    num_samples: int|PoseCol = 1
-    temperature: int|PoseCol = 0.1
-    noise: int|PoseCol = 0.1
-    skip_gaps: bool|PoseCol = False
-    fix_decoding_order: bool|PoseCol = True
-    decoding_order_offset: int|PoseCol = 0
-    optimization_mode: str|PoseCol = "potts"
-    optimization_temperature: float|PoseCol = 0.0
-    binding_energy_optimization: bool|PoseCol = None
-    binding_energy_json: str|PoseCol = "null"
-    binding_energy_cutoff: int|PoseCol = 8
-    optimize_pdb: bool|PoseCol = False
-    optimize_fasta: str|PoseCol = ''
-    write_pdb: bool|PoseCol = True
-    fixed_positions_json: str|PoseCol = ''
-    pssm_json: str|PoseCol = ''
-    omit_AA_json: str|PoseCol = ''
-    bias_AA_json: str|PoseCol = ''
-    tied_positions_json: str|PoseCol = ''
-    bias_by_res_json: str|PoseCol = ''
-    fixed_positions_custom: str|PoseCol = ''
-    pssm_custom: str|PoseCol = ''
-    omit_AA_custom: str|PoseCol = ''
-    bias_AA_custom: str|PoseCol = ''
-    tied_positions_custom: str|PoseCol = ''
-    bias_by_res_custom: str|PoseCol = ''
-    omit_AAs: list|PoseCol = []
-    pssm_threshold: float|PoseCol = 0.0
-    pssm_multi: float|PoseCol = 0.0
-    pssm_log_odds_flag: bool|PoseCol = False
-    pssm_bias_flag: bool|PoseCol = False
+    """Store sample_seqs.py inference configuration fields."""
+    num_samples: int | PoseCol = 1
+    temperature: float | PoseCol = 0.1
+    noise: float | PoseCol = 0.0
+    skip_gaps: bool | PoseCol = False
+    fix_decoding_order: bool | PoseCol = True
+    decoding_order_offset: int | PoseCol = 0
+    optimization_mode: str | PoseCol = "potts"
+    optimization_temperature: float | PoseCol = 0.0
+    binding_energy_optimization: str | PoseCol = "none"
+    binding_energy_json: str | None | PoseCol = None
+    binding_energy_cutoff: float | PoseCol = 8
+    optimize_pdb: bool | PoseCol = False
+    optimize_fasta: str | PoseCol = ""
+    write_pdb: bool | PoseCol = True
+    fixed_positions_json: str | PoseCol = ""
+    pssm_json: str | PoseCol = ""
+    omit_AA_json: str | PoseCol = ""
+    bias_AA_json: str | PoseCol = ""
+    tied_positions_json: str | PoseCol = ""
+    tied_epistasis: bool | PoseCol = False
+    bias_by_res_json: str | PoseCol = ""
+    fixed_positions_custom: str | PoseCol = ""
+    pssm_custom: str | PoseCol = ""
+    omit_AA_custom: str | PoseCol = ""
+    bias_AA_custom: str | PoseCol = ""
+    tied_positions_custom: str | PoseCol = ""
+    bias_by_res_custom: str | PoseCol = ""
+    omit_AAs: list[str] | PoseCol = field(default_factory=list)
+    pssm_threshold: float | PoseCol = 0.0
+    pssm_multi: float | PoseCol = 0.0
+    pssm_log_odds_flag: bool | PoseCol = False
+    pssm_bias_flag: bool | PoseCol = False
 
-    # general param
     batchable_params = [
-        "fixed_positions_custom", "pssm_custom", "omit_AA_custom",
-        "bias_AA_custom", "tied_positions_custom", "bias_by_res_custom"
+        "fixed_positions_custom",
+        "pssm_custom",
+        "omit_AA_custom",
+        "bias_AA_custom",
+        "tied_positions_custom",
+        "bias_by_res_custom",
     ]
+
 
 @dataclass
 class SampleSequenceParams:
-    dev: str | PoseCol = "cuda"
-    #TODO @Codex: The params out_dir, out_name, and input_list should not be exposed to the user. Is there a way to hide them? (These are set by ProtFlow automatically)
-    out_dir: str | PoseCol = ""
-    out_name: str | PoseCol = ""
-    input_list: str | PoseCol = ""
-    chain_dict_json: str | PoseCol = "null"
-    chain_dict_custom: str | PoseCol
-    model: PottsMPNNModelParams = PottsMPNNModelParams()
-    inference: SampleSequenceInferenceParams = SampleSequenceInferenceParams()
-
-    # batchable
-    batchable_params = ["chain_dict_custom"]
-
-@dataclass
-class EnergyPredictionInferenceParams:
-    ddG: bool | PoseCol = True
-    mean_norm: bool | PoseCol = False
-    max_tokens: int | PoseCol = 20000
-    filter: bool | PoseCol = False
-    binding_energy_json: str | PoseCol = "null"
-    binding_energy_custom: str | PoseCol = ""
-    binding_energy_cutoff: int | PoseCol = 8
-    skip_gaps: bool | PoseCol = False
-    noise: float | PoseCol = 0.0
-    chain_dict: str | PoseCol = "null"
-    chain_ranges: str | PoseCol = "null"
-
-    # batchable
-    batchable_params = ["binding_energy_custom"]
-
-@dataclass
-class EnergyPredictionParams:
+    """Store top-level sample_seqs.py YAML configuration fields."""
     dev: str | PoseCol = "cuda"
     out_dir: str | PoseCol = ""
     out_name: str | PoseCol = ""
     input_list: str | PoseCol = ""
     input_dir: str | PoseCol = ""
-    mutant_fasta: str | PoseCol = "null"
-    mutant_csv: str | PoseCol = "null"
-    model: PottsMPNNModelParams = PottsMPNNModelParams()
-    inference: EnergyPredictionInferenceParams = EnergyPredictionInferenceParams()
+    chain_dict_json: str | None | PoseCol = None
+    chain_dict_custom: str | PoseCol = ""
+    model: PottsMPNNModelParams = field(default_factory=PottsMPNNModelParams)
+    inference: SampleSequenceInferenceParams = field(default_factory=SampleSequenceInferenceParams)
+
+    batchable_params = ["chain_dict_custom"]
+
+
+@dataclass
+class EnergyPredictionInferenceParams:
+    """Store energy_prediction.py inference configuration fields."""
+    ddG: bool | PoseCol = True
+    mean_norm: bool | PoseCol = False
+    max_tokens: int | PoseCol = 20000
+    filter: bool | PoseCol = False
+    binding_energy_json: str | None | PoseCol = None
+    binding_energy_custom: str | PoseCol = ""
+    binding_energy_cutoff: float | PoseCol = 8
+    skip_gaps: bool | PoseCol = False
+    noise: float | PoseCol = 0.0
+    chain_dict: str | None | PoseCol = None
+    chain_ranges: str | None | PoseCol = None
+    exclude_chains: list[str] | None | PoseCol = None
+
+    batchable_params = ["binding_energy_custom"]
+
+
+@dataclass
+class EnergyPredictionParams:
+    """Store top-level energy_prediction.py YAML configuration fields."""
+    dev: str | PoseCol = "cuda"
+    out_dir: str | PoseCol = ""
+    out_name: str | PoseCol = ""
+    input_list: str | PoseCol = ""
+    input_dir: str | PoseCol = ""
+    mutant_fasta: str | None | PoseCol = None
+    mutant_csv: str | None | PoseCol = None
+    model: PottsMPNNModelParams = field(default_factory=PottsMPNNModelParams)
+    inference: EnergyPredictionInferenceParams = field(default_factory=EnergyPredictionInferenceParams)
+
 
 class PottsMPNNParams:
+    """YAML config builder for PottsMPNN scripts."""
+
     PARAMS_DICT = {
+        "sample_seqs": SampleSequenceParams,
         "sample_sequence": SampleSequenceParams,
-        "energy_prediction": PottsMPNNModelParams
+        "energy_prediction": EnergyPredictionParams,
     }
-    def __init__(self, script: str) -> None:
-        '''
-        Sets up PottsMPNNParams.
-        type: {sample_sequence, energy_prediction} type of params to generate.
-        '''
-        self._set_attrs(script)
-        self.script = script
 
-    def _set_attrs(self, script: str):
-        #TODO @Codex set attributes of this class -> combined dataclasses (-> should be directly parseable to .yaml)
-        self.PARAMS_DICT[script]()
+    def __init__(self, script: str = "sample_seqs", **kwargs: Any) -> None:
+        """Initialize defaults for a supported PottsMPNN script config."""
+        # normalize script name
+        script_key = _script_key(script)
+        if script_key not in self.PARAMS_DICT:
+            raise ValueError(f"Unsupported PottsMPNN params type: {script}")
+        self.script = "sample_seqs" if script_key == "sample_sequence" else script_key
 
+        # copy dataclass defaults onto this wrapper
+        defaults = self.PARAMS_DICT[script_key]()
+        self._batchable_params = copy.deepcopy(getattr(defaults, "batchable_params", []))
+        for param_field in fields(defaults):
+            setattr(self, param_field.name, copy.deepcopy(getattr(defaults, param_field.name)))
+        # apply user overrides
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
-    def _compile_attrs_dict(self, flat: bool = False) -> dict:
-        '''Function that creates a dictionary of the attributes of this class. Class nesting is carried over into dict nesting if flat=False.'''
-        return attrs_dict #TODO @Codex: Please code this out.
+    def _compile_attrs_dict(self, flat: bool = False) -> dict[str, Any]:
+        """Return parameter values as a nested or flattened dictionary."""
+        if flat:
+            return {".".join(path): value for path, value, _ in _iter_param_values(self)}
+        return _params_to_dict(self, include_custom=True)
 
-    def _non_batchable_attrs(self) -> list:
-        '''Returns list of attributes that are batchable'''
-        # collect all non-batchable attrs recursively (check against list of batchable attributes)
-        return non_batchable_attrs  #@Codex please fill code
+    def _non_batchable_attrs(self) -> list[Any]:
+        """Return parameter values that prevent batched execution."""
+        return [value for _, value, is_batchable in _iter_param_values(self) if not is_batchable]
 
     def _params_are_batchable(self) -> bool:
-        '''Helper that checks whether this set of Parameters can be batched. (batching = combining config files of multiple poses)'''
-        # iterate through attributes listed in 'is_batchable' and check if any of them is of type PoseCol
-        return not any((isinstance(attr, PoseCol) for attr in self._non_batchable_attrs())) # all non-batchables must be non PoseCol type
+        """Return whether all PoseCol values can be materialized per batch."""
+        return not any(isinstance(value, PoseCol) for value in self._non_batchable_attrs())
 
     def resolve_pose_cols_batched(self, poses: Poses, n_batches: int, work_dir: str) -> list[str]:
-        '''Converts PoseCol types in PottsMPNNParams into actual values. Returns list of .config files. Batches config files.'''
-        # split poses in batches
-        batch_df_list: list[pd.DataFrame] = _split_into_batches(poses) #TODO @Codex fill in whatever is the canonical way to do this
+        """Write batched configs while materializing batch-compatible PoseCols."""
+        # validate PoseCol references
+        self._check_pose_cols(poses)
 
-        # iterate over batches and convert PoseCol attributes into values denoted in poses.
-        batch_config_files = []
-        for i, pose_batch in enumerate(batch_df_list, start=1):
-            # initialize new batch params
+        # split poses into job-sized batches
+        batches = _split_pose_dataframe(poses=poses, n_batches=n_batches)
+
+        config_files = []
+        for i, pose_batch in enumerate(batches, start=1):
+            # stage batch input PDBs and metadata
             batch_params = copy.deepcopy(self)
-
-            # create batch input dir
             batch_dir = os.path.abspath(os.path.join(work_dir, f"batch_{i}"))
-            batch_pdb_dir = os.path.join(batch_dir, "input_pdbs")
-            list_of_poses = pose_batch["poses"].to_list()
-            list_of_pose_descriptions = pose_batch["poses_description"].to_list()
+            batch_input_dir = os.path.join(batch_dir, "input_pdbs")
+            json_dir = os.path.join(batch_dir, "json_files")
+            os.makedirs(batch_input_dir, exist_ok=True)
+            os.makedirs(json_dir, exist_ok=True)
 
-            # move batch poses to batch_dir
-            os.makedirs(batch_pdb_dir, exist_ok=True)
-            for pose in list_of_poses:
-                shutil.copy(pose, batch_pdb_dir)
+            for pose_path in pose_batch["poses"].to_list():
+                shutil.copy(pose_path, os.path.join(batch_input_dir, os.path.basename(pose_path)))
 
-            # write input_list.txt
             input_list_fn = os.path.join(batch_dir, "input_list.txt")
-            with open(input_list_fn, 'w', encoding="UTF-8") as f:
-                f.write("\n".join(list_of_pose_descriptions))
+            pose_descriptions = pose_batch["poses_description"].to_list()
+            _write_lines(input_list_fn, pose_descriptions)
 
-            # configure i/o params
-            batch_params.out_dir = os.path.join(batch_dir, "outputs")
-            batch_params.out_name = f"batch_{i}"
-            batch_params.input_list = input_list_fn
+            batch_params.out_dir = os.path.join(batch_dir, "outputs") #pylint: disable=w0201
+            batch_params.out_name = f"batch_{i}" #pylint: disable=w0201
+            batch_params.input_list = input_list_fn #pylint: disable=w0201
+            batch_params.input_dir = batch_input_dir #pylint: disable=w0201
 
-            # now go through each attribute in params and convert any PoseCol into an input_json file.
-            for attr, val in self._compile_attrs_dict(flat=True):
-                # skip values that are already  
-                if not isinstance(val, PoseCol):
+            # materialize PoseCol-backed JSON files
+            for path, value, is_batchable in _iter_param_values(self):
+                if not isinstance(value, PoseCol):
                     continue
-                # assign value from pose_col:
+                if not is_batchable:
+                    raise ValueError(f"Internal error: non-batchable PoseCol reached batched setup: {'.'.join(path)}")
+                json_path = os.path.join(json_dir, f"batch_{i}_{'_'.join(path)}.json")
+                _write_json(json_path, {row["poses_description"]: row[str(value)] for _, row in pose_batch.iterrows()})
+                _set_nested_attr(batch_params, _custom_path_to_json_path(path), json_path)
 
-                # values for each pose must be written into a .json file. The .json file becomes the new attribute.
-                batch_attr_dict = {pose["poses"]: pose[val] for _, pose in pose_batch.iterrows()}
+            # write final YAML
+            config_path = os.path.join(batch_dir, "config.yaml")
+            batch_params.to_yaml(config_path)
+            config_files.append(config_path)
 
-                # write out batch json
-                batch_attr_json_name = f"batch_{i}_{attr}.json"
-                with open(batch_attr_json_name, 'w', encoding="UTF-8") as f:
-                    json.dump(batch_attr_dict, f)
+        return config_files
 
-                # add to batch_params
-                setattr(batch_params, attr.replace("custom", "json"), batch_attr_json_name) # <--- attribute points to json file that contains the info from pose_cols #TODO @Codex make sure to only replace the ending here? (regex or something?)
-
-            # write batch config.yaml
-            batch_config_fn = os.path.join(batch_dir, "config.yaml")
-            #TODO @Codex please write the .yaml file here (I'm unfamiliar with yaml library)
-            batch_config_files.append(batch_config_fn)
-            # next batch
-        return batch_config_files
-
-
-    def resolve_pose_cols(self, poses: Poses, n_batches: int, work_dir: str) -> list[str]:
-        '''Converts PoseCol types in PottsMPNNParams into actual values. Returns list of .config files. Batches config files if possible.'''
-        # first, check if current set of params are batchable
+    def resolve_pose_cols(self, poses: Poses, n_batches: int, work_dir: str) -> tuple[bool, list[str]]:
+        """Return batch mode and generated config paths."""
+        # choose batched mode only when every PoseCol can be encoded per batch
         if self._params_are_batchable():
-            return self.resolve_pose_cols_batched(self, poses=poses, n_batches=n_batches, work_dir=work_dir)
+            return True, self.resolve_pose_cols_batched(poses=poses, n_batches=n_batches, work_dir=work_dir)
+        return False, self.resolve_pose_cols_unbatched(poses=poses, work_dir=work_dir)
 
-        # otherwise run in non-batch mode: iterate over poses.
-        # create i/o directories
-        work_dir = os.path.abspath(work_dir)
-        config_files_dir = os.path.join(work_dir, "config_files")
-        json_files_dir = os.path.join(work_dir, "json_files")
+    def resolve_pose_cols_unbatched(self, poses: Poses, work_dir: str) -> list[str]:
+        """Write one config per pose for non-batchable PoseCol values."""
+        # validate PoseCol references
+        self._check_pose_cols(poses)
+
+        # setup output directories
+        config_dir = os.path.join(work_dir, "config_files")
         input_list_dir = os.path.join(work_dir, "input_lists")
+        json_dir = os.path.join(work_dir, "json_files")
         output_dir = os.path.join(work_dir, "outputs")
-        os.makedirs(config_files_dir, exist_ok=True)
-        os.makedirs(input_list_dir, exist_ok=True)
-        os.makedirs(output_dir, exist_ok=True)
-        os.makedirs(json_files_dir, exist_ok=True)
+        for path in (config_dir, input_list_dir, json_dir, output_dir):
+            os.makedirs(path, exist_ok=True)
 
-        # iterate over every pose and create config file
+        # write one config per pose
         config_files = []
         for pose in poses:
             pose_params = copy.deepcopy(self)
+            desc = pose["poses_description"]
 
-            # write input_list file:
-            input_list_fn = os.path.join(input_list_dir, f"{pose['description']}_input_list.txt")
-            with open(input_list_fn, 'w', encoding="UTF-8") as f:
-                f.write(pose["description"])
+            input_list = os.path.join(input_list_dir, f"{desc}_input_list.txt")
+            _write_lines(input_list, [desc])
 
-            # set i/o params
-            pose_params.out_dir = output_dir
-            pose_params.out_name = pose["description"]
-            pose_params.input_list = input_list_fn
-            pose_params.input_dir = os.path.dirname(pose["poses"])
+            pose_params.out_dir = output_dir #pylint: disable=w0201
+            pose_params.out_name = desc #pylint: disable=w0201
+            pose_params.input_list = input_list #pylint: disable=w0201
+            pose_params.input_dir = os.path.dirname(pose["poses"]) #pylint: disable=w0201
 
-            for attr, val in self._compile_attrs_dict(flat=True):
-                # skip params that aren't PoseCol type (they're fine already)
-                if not isinstance(val, PoseCol):
+            # resolve PoseCol values for this pose
+            for path, value, _ in _iter_param_values(self):
+                if not isinstance(value, PoseCol):
                     continue
-
-                # for _custom attributes, write PoseCol val into json file and pass .json file as param.
-                if attr.endswith("custom"):
-                    # convert PoseCol into actual value
-                    attr_json_fn = os.path.join(json_files_dir, f"{pose['poses_description']}_{attr}.json")
-                    attr_dict = {pose["description"]: pose[val]}
-
-                    # write actual value into .json file and pass .json filepath to attr.
-                    with open(attr_json_fn, 'w', encoding="UTF-8") as f:
-                        json.dump(attr_dict, f)
-
-                    setattr(pose_params, attr.replace("_custom", "_json"), attr_json_fn) #TODO @Codex make sure to only replace the ending here? (regex or something?)
-
-                # for any other attribute, write PoseCol val directly from PoseCol
+                if path[-1].endswith("_custom"):
+                    json_path = os.path.join(json_dir, f"{desc}_{'_'.join(path)}.json")
+                    _write_json(json_path, {desc: pose[str(value)]})
+                    _set_nested_attr(pose_params, _custom_path_to_json_path(path), json_path)
                 else:
-                    setattr(pose_params, attr, pose["val"])
+                    _set_nested_attr(pose_params, path, pose[str(value)])
 
-            # set params_name
-            config_fn = os.path.join(config_files_dir, str(pose['description']) + "_config.yaml")
-            self.to_yaml(config_fn)
-            config_files.append(config_fn)
+            config_path = os.path.join(config_dir, f"{desc}_config.yaml")
+            pose_params.to_yaml(config_path)
+            config_files.append(config_path)
+
         return config_files
 
     def to_yaml(self, out_path: str) -> None:
-        '''Write PottsMPNNModelParams out as a config file at 'out_path'. '''
+        """Write this parameter set as a PottsMPNN YAML config."""
+        # exclude *_custom helpers from upstream YAML
+        os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+        with open(out_path, "w", encoding="UTF-8") as handle:
+            yaml.safe_dump(_params_to_dict(self, include_custom=False), handle, sort_keys=False)
 
-        #TODO @Codex please write this function. Make sure to exclude any parameters that end with "_custom". Those are the ones we can set custom with PoseCols.
-
-
-def params_to_config(poses: Poses, prefix: str, work_dir: str, params: PottsMPNNParams) -> list[str]:
-    '''Generates physical config files for PottsMPNN and stores paths under 'prefix'.'''
-    # setup prefix for config files
-    config_files_dir = os.path.join(work_dir, "config_files")
-    os.makedirs(config_files_dir, exist_ok=True)
-    config_files_prefix = f"{prefix}_config_files_location"
-    poses.check_prefix(config_files_prefix)
-
-    # check for batching
-    config_files = params.resolve_pose_cols()
-    return config_files
+    def _check_pose_cols(self, poses: Poses) -> None:
+        """Validate that all PoseCol references exist in poses.df."""
+        # collect missing dataframe columns once for a clear error
+        missing = sorted({str(value) for _, value, _ in _iter_param_values(self) if isinstance(value, PoseCol)} - set(poses.df.columns))
+        if missing:
+            raise KeyError(f"PoseCol column(s) not found in poses.df: {missing}")
 
 
-# Optional: lightweight checklist for developers implementing a new runner.
-IMPLEMENTATION_CHECKLIST: tuple[str, ...] = (
-    "Set config variable names in __init__.",
-    "Set correct index_layers for your output naming.",
-    "Implement write_cmd with real CLI syntax.",
-    "Implement module-level collect_scores (not a class method) with description/location columns.",
-    "Make collect_scores auto-discover score keys from tool outputs where possible.",
-    "Skip heavy per-residue/matrix outputs by default; gate them behind include_scores list.",
-    "Ensure scorefile reuse works when overwrite=False.",
-    "Confirm RunnerOutput merge updates poses as expected.",
-    "Export runner in protflow/tools/__init__.py (submodule import + class import).",
-    "Document API and add tool page in docs/source/tools/<tool>.rst (and tools/index.rst toctree if new).",
-    "Build docs warning-free: sphinx-build -b html -W docs/source docs/_build/html",
-    "Add/extend unit tests for parsing and option handling.",
-)
+def params_to_config(poses: Poses, n_batches: int, work_dir: str, params: PottsMPNNParams) -> tuple[bool, list[str]]:
+    """Generate PottsMPNN config files and report whether they are batched."""
+    # params are required so script-specific defaults are explicit
+    if params is None:
+        raise ValueError("PottsMPNN params must not be None.")
+    return params.resolve_pose_cols(poses=poses, n_batches=n_batches, work_dir=work_dir)
+
+
+def fasta_to_df(fasta_file: str, desc_col_name: str = "description", seq_col_name: str = "sequence") -> pd.DataFrame:
+    """Parse a FASTA file into description and sequence columns."""
+    # parse records manually to avoid adding another parser dependency
+    records = []
+    description = None
+    seq_chunks: list[str] = []
+    with open(fasta_file, "r", encoding="UTF-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                if description is not None:
+                    records.append({desc_col_name: description, seq_col_name: "".join(seq_chunks)})
+                description = line[1:].strip()
+                seq_chunks = []
+            else:
+                seq_chunks.append(line)
+    if description is not None:
+        records.append({desc_col_name: description, seq_col_name: "".join(seq_chunks)})
+    return pd.DataFrame(records, columns=[desc_col_name, seq_col_name])
+
+
+def collect_scores_sample_seqs(work_dir: str, batched: bool, include_scores: list[str] | None = None) -> pd.DataFrame:
+    """Collect sample_seqs.py FASTA and loss outputs into score rows."""
+    # include_scores is unused because sample outputs are scalar and FASTA-based
+    del include_scores
+
+    # discover output directories from generated configs
+    configs = _load_run_configs(work_dir)
+    out_dirs = _output_dirs_from_configs(configs, batched=batched)
+    av_loss_files = _glob_output_files(out_dirs, "*_av_loss.csv")
+    raw_seq_files = [
+        path for path in _glob_output_files(out_dirs, "*.fasta")
+        if "_optimized_" not in os.path.splitext(os.path.basename(path))[0]
+    ]
+    optimized_seq_files = _glob_output_files(out_dirs, "*_optimized_*.fasta")
+
+    if not raw_seq_files and not optimized_seq_files:
+        raise FileNotFoundError(f"No PottsMPNN FASTA outputs found under {work_dir}.")
+
+    # parse raw sequences, optimized sequences, and loss metrics
+    raw_df = _read_sample_fastas(raw_seq_files, configs, "sequence")
+    optimized_df = _read_sample_fastas(optimized_seq_files, configs, "optimized_potts_sequence")
+    av_loss_df = _read_av_loss_files(av_loss_files, configs)
+
+    # prefer optimized sequences as output poses when present
+    if not optimized_df.empty and not raw_df.empty:
+        scores = raw_df.merge(optimized_df, on=["raw_description", "description", "sample_idx"], how="outer")
+    elif not optimized_df.empty:
+        scores = optimized_df
+    else:
+        scores = raw_df
+
+    if not av_loss_df.empty:
+        scores = scores.merge(av_loss_df, on=["raw_description", "description", "sample_idx"], how="left")
+
+    # write per-sequence FASTA files for RunnerOutput locations
+    fasta_output_dir = os.path.join(work_dir, "output_fastas")
+    os.makedirs(fasta_output_dir, exist_ok=True)
+    seq_col = "optimized_potts_sequence" if "optimized_potts_sequence" in scores.columns else "sequence"
+    locations = []
+    for _, row in scores.iterrows():
+        fasta_path = os.path.abspath(os.path.join(fasta_output_dir, f"{row['description']}.fa"))
+        with open(fasta_path, "w", encoding="UTF-8") as handle:
+            handle.write(f">{row['description']}\n{row[seq_col]}\n")
+        locations.append(fasta_path)
+    scores["location"] = locations
+    return scores
+
+
+def collect_scores_energy_prediction(work_dir: str, batched: bool, include_scores: list[str] | None = None) -> pd.DataFrame:
+    """Collect energy_prediction.py CSV outputs into score rows."""
+    # include_scores is unused because full per-pose CSV rows are stored sidecar-style
+    del include_scores
+    configs = _load_run_configs(work_dir)
+    out_dirs = _output_dirs_from_configs(configs, batched=batched)
+    score_files = _glob_output_files(out_dirs, "*_scores.csv")
+    if not score_files:
+        raise FileNotFoundError(f"No PottsMPNN energy prediction score files found under {work_dir}.")
+
+    # split combined score CSVs into per-pose JSON sidecars
+    output_dir = os.path.join(work_dir, "output_scores")
+    os.makedirs(output_dir, exist_ok=True)
+    rows = []
+    for score_file in score_files:
+        score_df = pd.read_csv(score_file)
+        stats_file = score_file.replace("_scores.csv", "_stats.csv")
+        for desc in score_df["pdb"].unique():
+            pose_df = score_df[score_df["pdb"] == desc]
+            pose_scorefile = os.path.abspath(os.path.join(output_dir, f"{desc}.json"))
+            pose_df.to_json(pose_scorefile, orient="records")
+            row = {
+                "description": desc,
+                "energy_prediction_scorefile": pose_scorefile,
+                "energy_prediction_n_mutations": len(pose_df.index),
+            }
+            if os.path.isfile(stats_file):
+                stats_df = pd.read_csv(stats_file)
+                pose_stats = stats_df[stats_df["pdb"] == desc]
+                if not pose_stats.empty:
+                    row["energy_prediction_pearson_r"] = pose_stats.iloc[0].get("Pearson r")
+            rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+def collect_scores(work_dir: str, script: str, batched: bool, include_scores: list[str] | None = None) -> pd.DataFrame:
+    """Dispatch score collection for the selected PottsMPNN script."""
+    # map script aliases to collector functions
+    script_key = _script_key(script)
+    collectors = {
+        "sample_seqs": collect_scores_sample_seqs,
+        "energy_prediction": collect_scores_energy_prediction,
+    }
+    if script_key not in collectors:
+        raise NotImplementedError(f"Score collection is not implemented for PottsMPNN script: {script}")
+    return collectors[script_key](work_dir=work_dir, batched=batched, include_scores=include_scores)
+
+
+def _script_key(script: str | None) -> str:
+    """Normalize a script path or alias to its basename key."""
+    if not script:
+        return "sample_seqs"
+    return os.path.splitext(os.path.basename(str(script)))[0]
+
+
+def _check_sample_descriptions(poses: Poses) -> None:
+    """Reject input names that collide with sample output suffixes."""
+    # optimized output suffixes are reserved by upstream PottsMPNN
+    bad_suffixes = ("_optimized_potts", "_optimized_nodes")
+    bad = [desc for desc in poses.df["poses_description"].to_list() if str(desc).endswith(bad_suffixes)]
+    if bad:
+        raise ValueError(
+            "PottsMPNN sample output parsing reserves descriptions ending in "
+            f"{bad_suffixes}. Rename these poses first: {bad}"
+        )
+
+
+def _fill_missing_locations(scores: pd.DataFrame, poses: Poses, index_layers: int) -> pd.DataFrame:
+    """Map locationless score rows back to the input pose paths."""
+    # score collectors may omit locations when the input pose remains active
+    if "location" in scores.columns:
+        return scores
+    scores = scores.copy()
+    select_col = scores["description"].astype(str)
+    if index_layers:
+        select_col = select_col.str.split("_").str[:-index_layers].str.join("_")
+    pose_locations = poses.df.set_index("poses_description")["poses"]
+    scores["location"] = select_col.map(pose_locations)
+    if scores["location"].isna().any():
+        missing = scores.loc[scores["location"].isna(), "description"].to_list()
+        raise ValueError(f"Could not map PottsMPNN score rows back to input poses: {missing}")
+    return scores
+
+
+def _split_pose_dataframe(poses: Poses, n_batches: int) -> list[pd.DataFrame]:
+    """Split poses.df into up to n_batches dataframe chunks."""
+    # empty poses produce no config batches
+    if len(poses) == 0:
+        return []
+    batches = split_list(list(poses.df.index), n_sublists=max(1, n_batches or 1))
+    return [poses.df.loc[batch].reset_index(drop=True) for batch in batches]
+
+
+def _iter_param_values(obj: Any, path: tuple[str, ...] = ()) -> list[tuple[tuple[str, ...], Any, bool]]:
+    """Yield nested parameter paths, values, and batchability flags."""
+    # recurse through wrapper and dataclass parameter containers
+    out = []
+    if isinstance(obj, PottsMPNNParams):
+        names = [key for key in vars(obj) if not key.startswith("_") and key != "script"]
+        batchable = set(getattr(obj, "_batchable_params", []))
+    elif is_dataclass(obj):
+        names = [param_field.name for param_field in fields(obj)]
+        batchable = set(getattr(obj, "batchable_params", []))
+    else:
+        return out
+
+    for name in names:
+        value = getattr(obj, name)
+        next_path = path + (name,)
+        if is_dataclass(value):
+            out.extend(_iter_param_values(value, next_path))
+        else:
+            out.append((next_path, value, name in batchable))
+    return out
+
+
+def _params_to_dict(obj: Any, include_custom: bool) -> dict[str, Any]:
+    """Convert parameter objects into YAML-serializable dictionaries."""
+    # unwrap parameter wrapper or dataclass fields
+    if isinstance(obj, PottsMPNNParams):
+        source = {key: value for key, value in vars(obj).items() if not key.startswith("_") and key != "script"}
+    else:
+        source = {param_field.name: getattr(obj, param_field.name) for param_field in fields(obj)}
+    out = {}
+    for key, value in source.items():
+        if not include_custom and key.endswith("_custom"):
+            continue
+        if is_dataclass(value):
+            out[key] = _params_to_dict(value, include_custom=include_custom)
+        elif isinstance(value, PoseCol):
+            out[key] = str(value)
+        else:
+            out[key] = value
+    return out
+
+
+def _set_nested_attr(obj: Any, path: tuple[str, ...], value: Any) -> None:
+    """Set a nested attribute on a parameter object."""
+    # walk to the owning nested object before assignment
+    target = obj
+    for name in path[:-1]:
+        target = getattr(target, name)
+    setattr(target, path[-1], value)
+
+
+def _custom_path_to_json_path(path: tuple[str, ...]) -> tuple[str, ...]:
+    """Convert a *_custom parameter path to its paired *_json path."""
+    # upstream expects JSON path fields, not ProtFlow custom helper fields
+    leaf = path[-1]
+    if not leaf.endswith("_custom"):
+        raise ValueError(f"Expected custom parameter path, got {'.'.join(path)}")
+    return path[:-1] + (f"{leaf[:-len('_custom')]}_json",)
+
+
+def _write_lines(path: str, lines: list[str]) -> None:
+    """Write text lines to a file, creating parent directories."""
+    # ensure parent directory exists before writing
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="UTF-8") as handle:
+        handle.write("\n".join(lines))
+
+
+def _write_json(path: str, payload: dict[str, Any]) -> None:
+    """Write JSON payload to a file, creating parent directories."""
+    # ensure parent directory exists before writing
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    with open(path, "w", encoding="UTF-8") as handle:
+        json.dump(payload, handle)
+
+
+def _load_run_configs(work_dir: str) -> list[dict[str, Any]]:
+    """Load generated PottsMPNN YAML configs from a work directory."""
+    # configs live in either unbatched config_files or batch_* directories
+    config_files = sorted(glob(os.path.join(work_dir, "config_files", "*.yaml")))
+    config_files += sorted(glob(os.path.join(work_dir, "batch_*", "config.yaml")))
+    configs = []
+    for config_file in config_files:
+        with open(config_file, "r", encoding="UTF-8") as handle:
+            cfg = yaml.safe_load(handle) or {}
+        cfg["_config_path"] = config_file
+        cfg["_input_descriptions"] = _read_input_descriptions(cfg.get("input_list"))
+        cfg["out_dir"] = os.path.abspath(cfg["out_dir"])
+        configs.append(cfg)
+    return configs
+
+
+def _read_input_descriptions(input_list: str | None) -> list[str]:
+    """Read base pose descriptions from a PottsMPNN input list."""
+    if not input_list:
+        return []
+    with open(input_list, "r", encoding="UTF-8") as handle:
+        return [line.strip().split("|", maxsplit=1)[0] for line in handle if line.strip()]
+
+
+def _output_dirs_from_configs(configs: list[dict[str, Any]], batched: bool) -> list[str]:
+    """Return unique output directories declared by generated configs."""
+    # output directories are encoded in YAML for both batched and unbatched runs
+    del batched
+    return sorted({cfg["out_dir"] for cfg in configs})
+
+
+def _glob_output_files(out_dirs: list[str], pattern: str) -> list[str]:
+    """Find output files matching a pattern across output directories."""
+    return sorted(path for out_dir in out_dirs for path in glob(os.path.join(out_dir, pattern)))
+
+
+def _config_for_output_file(path: str, configs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Find the generated config that produced an output file."""
+    # match by output directory and configured out_name prefix
+    stem = os.path.splitext(os.path.basename(path))[0]
+    out_dir = os.path.abspath(os.path.dirname(path))
+    matches = []
+    for cfg in configs:
+        if os.path.abspath(cfg["out_dir"]) != out_dir:
+            continue
+        out_name = str(cfg["out_name"])
+        if stem == out_name or stem == f"{out_name}_av_loss" or stem.startswith(f"{out_name}_optimized_") or stem == f"{out_name}_scores":
+            matches.append(cfg)
+    if not matches:
+        raise ValueError(f"Could not match PottsMPNN output file to a generated config: {path}")
+    return max(matches, key=lambda cfg: len(str(cfg["out_name"])))
+
+
+def _canonical_sample_description(raw_description: str, input_descriptions: list[str]) -> tuple[str, int]:
+    """Convert PottsMPNN sample names to ProtFlow merge descriptions."""
+    # prefer the longest input description to handle names containing underscores
+    input_descriptions = sorted(input_descriptions, key=len, reverse=True)
+    for input_desc in input_descriptions:
+        if raw_description == input_desc:
+            return f"{input_desc}_0001", 1
+        prefix = f"{input_desc}_"
+        if raw_description.startswith(prefix):
+            suffix = raw_description[len(prefix):]
+            if suffix.isdigit():
+                sample_idx = int(suffix) + 1
+                return f"{input_desc}_{sample_idx:04d}", sample_idx
+    if raw_description.rsplit("_", maxsplit=1)[-1].isdigit():
+        base, idx = raw_description.rsplit("_", maxsplit=1)
+        return f"{base}_{int(idx) + 1:04d}", int(idx) + 1
+    return f"{raw_description}_0001", 1
+
+
+def _read_sample_fastas(files: list[str], configs: list[dict[str, Any]], seq_col: str) -> pd.DataFrame:
+    """Read sample or optimized FASTA outputs into normalized rows."""
+    # normalize upstream sample names before merging into poses
+    rows = []
+    for fasta_file in files:
+        cfg = _config_for_output_file(fasta_file, configs)
+        df = fasta_to_df(fasta_file, desc_col_name="raw_description", seq_col_name=seq_col)
+        for _, row in df.iterrows():
+            description, sample_idx = _canonical_sample_description(row["raw_description"], cfg["_input_descriptions"])
+            rows.append({
+                "raw_description": row["raw_description"],
+                "description": description,
+                "sample_idx": sample_idx,
+                seq_col: row[seq_col],
+            })
+    return pd.DataFrame(rows)
+
+
+def _read_av_loss_files(files: list[str], configs: list[dict[str, Any]]) -> pd.DataFrame:
+    """Read average-loss CSV files into normalized score rows."""
+    # keep upstream metrics while replacing pdb with normalized descriptions
+    rows = []
+    for av_loss_file in files:
+        cfg = _config_for_output_file(av_loss_file, configs)
+        df = pd.read_csv(av_loss_file)
+        for _, row in df.iterrows():
+            raw_description = row["pdb"]
+            description, sample_idx = _canonical_sample_description(raw_description, cfg["_input_descriptions"])
+            out = row.to_dict()
+            out["raw_description"] = raw_description
+            out["description"] = description
+            out["sample_idx"] = sample_idx
+            rows.append(out)
+    return pd.DataFrame(rows)
