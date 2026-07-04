@@ -1113,6 +1113,12 @@ class RFdiffusion3(Runner):
 
         if not multiplex_poses:
             multiplex_poses = 1
+        
+        if update_motifs:
+            if not isinstance(update_motifs, list):
+                raise ValueError(f"Parameter update_motifs must contain list of pose_cols! update_motifs: {update_motifs}")
+            if not all(isinstance(item, str) for item in update_motifs):
+                raise ValueError(f"Parameter update_motifs must contain list of pose_cols! update_motifs: {update_motifs}")
 
         # update index layers as RFD3 adds 3 layers (later removed via reindexing)
         index_layers = self.index_layers + 2
@@ -2059,11 +2065,6 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
             strict=False,
         )
     """
-    # safety
-    if not motifs:
-        logging.info("Remap_rfd3_motifs did not receive any motifs to remap. Skipping remap.")
-        return
-
     diff_index_map_name = f"{prefix}_diffused_index_map"
     ligand_map_name = f"{prefix}_ligand_renumbering_map"
     col_in_df(poses.df, diff_index_map_name)
