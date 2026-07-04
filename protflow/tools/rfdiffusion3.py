@@ -2059,6 +2059,10 @@ def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
             strict=False,
         )
     """
+    # safety
+    if not motifs:
+        logging.info("Remap_rfd3_motifs did not receive any motifs to remap. Skipping remap.")
+        return
 
     diff_index_map_name = f"{prefix}_diffused_index_map"
     ligand_map_name = f"{prefix}_ligand_renumbering_map"
