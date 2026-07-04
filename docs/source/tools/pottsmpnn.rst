@@ -76,7 +76,7 @@ exposes nested ``model`` and ``inference`` attributes for IDE autocomplete.
     params = SampleSequencePottsMPNNParams()
     params.inference.num_samples = 4
     params.inference.temperature = 0.1
-    params.inference.optimization_mode = "none"  # required for multiple samples
+    params.model.check_path = "vanilla_model_weights/pottsmpnn_msa_20.pt"
 
     runner = PottsMPNN()
     poses = runner.run(
