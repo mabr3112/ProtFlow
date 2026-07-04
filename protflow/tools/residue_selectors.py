@@ -54,7 +54,7 @@ from itertools import product
 import protflow.residues
 from protflow.poses import Poses, col_in_df
 from protflow.residues import ResidueSelection
-from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.biopython_tools import biopython_load_structure
 
 class ResidueSelector:
     """
@@ -266,7 +266,7 @@ class ChainSelector(ResidueSelector):
         Examples:
             >>> selection = selector.select_single(pose_path='path/to/pose.pdb', chains=['A'])
         """
-        pose = load_structure_from_pdbfile(pose_path)
+        pose = biopython_load_structure(pose_path)
 
         # check if chain is in chains:
         pose_chains = [chain.id for chain in pose.get_chains()]
@@ -372,7 +372,7 @@ class TrueSelector(ResidueSelector):
         Examples:
             >>> selection = selector.select_single(pose_path='path/to/pose.pdb')
         """
-        pose = load_structure_from_pdbfile(pose_path)
+        pose = biopython_load_structure(pose_path)
         return ResidueSelection([residue.parent.id + str(residue.id[1]) for residue in pose.get_residues()])
 
 class NotSelector(ResidueSelector):
@@ -518,7 +518,7 @@ class NotSelector(ResidueSelector):
         Examples:
             >>> selection = selector.select_single(pose_path='path/to/pose.pdb', residue_selection=residue_selection)
         """
-        pose = load_structure_from_pdbfile(pose_path)
+        pose = biopython_load_structure(pose_path)
 
         # load all residues form the pose
         all_res = ResidueSelection([residue.parent.id + str(residue.id[1]) for residue in pose.get_residues()])
@@ -759,16 +759,16 @@ class DistanceSelector(ResidueSelector):
         if not len(centers) == len(poses.poses_list()):
             raise ValueError("Number of input ResidueSelections ({len(center)}) must be the same as the number of poses ({len(self.poses.poses_list())})!")
 
-        center_atoms = center_atoms or self.center_atoms
+        center_atoms = self.center_atoms if center_atoms is None else center_atoms
         if isinstance(center_atoms, str):
             center_atoms = [center_atoms]
-        elif not isinstance(center_atoms, list):
+        elif center_atoms is not None and not isinstance(center_atoms, list):
             raise ValueError("Input to center_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
 
-        noncenter_atoms = noncenter_atoms or self.noncenter_atoms
+        noncenter_atoms = self.noncenter_atoms if noncenter_atoms is None else noncenter_atoms
         if isinstance(noncenter_atoms, str):
             noncenter_atoms = [noncenter_atoms]
-        elif not isinstance(noncenter_atoms, list):
+        elif noncenter_atoms is not None and not isinstance(noncenter_atoms, list):
             raise ValueError("Input to neighbor_atoms must be a list of atom names (e.g. ['N', 'CA', 'C']) or a single atom name (e.g. 'CA')!")
 
         # select Residues
@@ -796,7 +796,7 @@ class DistanceSelector(ResidueSelector):
         Examples:
             >>> selection = selector.select_single(pose_path='path/to/pose.pdb', chains=['A'])
         """
-        pose = load_structure_from_pdbfile(pose_path)
+        pose = biopython_load_structure(pose_path)
 
         # get central residues:
         center_res = []
@@ -866,4 +866,3 @@ class DistanceSelector(ResidueSelector):
                 selected.append(noncenter_atm.parent)
 
         return list(set(selected))
-        

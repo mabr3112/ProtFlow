@@ -75,17 +75,20 @@ from typing import Union
 import shutil
 import logging
 import ast
+import json
 
 # dependencies
 import pandas as pd
 import Bio.PDB
 
 # customs
-from . import jobstarters
-from .jobstarters import JobStarter
-from .residues import ResidueSelection
+import protflow.utils.openbabel_tools
+from . import jobstarters, require_config, load_config_path
+from .jobstarters import JobStarter, split_list
+from .residues import ResidueSelection, AtomSelection
 from .utils.utils import parse_fasta_to_dict
-from .utils.biopython_tools import load_structure_from_pdbfile, get_sequence_from_pose
+from .utils.biopython_tools import biopython_fileconverter, biopython_load_structure, get_sequence_from_pose
+from .utils.openbabel_tools import openbabel_fileconverter
 from .utils import plotting as plots
 
 FORMAT_STORAGE_DICT = {
@@ -648,6 +651,7 @@ class Poses:
         if isinstance(poses, pd.DataFrame):
             self.df = self.check_poses_df_integrity(poses)
             self.convert_resselection_cols(resselection_col="import_resselection_cols")
+            self.convert_atomselection_cols(atomselection_col="import_atomselection_cols")
             return None
 
         if isinstance(poses, str) and any([poses.endswith(ext) for ext in ['csv', 'json', 'parquet', 'pickle', 'feather']]):
@@ -656,6 +660,7 @@ class Poses:
             if 'Unnamed: 0' in self.df.columns: self.df.drop('Unnamed: 0', axis=1, inplace=True)
             self.df = self.check_poses_df_integrity(self.df)
             self.convert_resselection_cols(resselection_col="import_resselection_cols")
+            self.convert_atomselection_cols(atomselection_col="import_atomselection_cols")
             return None
 
         # if Poses are initialized freshly (with input poses as strings:)
@@ -903,6 +908,105 @@ class Poses:
                     if isinstance(cell_value, dict):
                         self.df.at[idx, col] = ResidueSelection(cell_value, from_scorefile=True)
 
+    def convert_atomselection_cols(self, atomselection_col:str="import_atomselection_cols"):
+        """
+        Converts per-row atom selection descriptors into ``AtomSelection`` objects
+        for the columns listed in a list-like selector column, mutating the DataFrame
+        in place.
+
+        Parameters
+        ----------
+        atomselection_col : str, optional
+            Name of the column that, for each row, contains a list/tuple of target
+            column names to convert (default is ``import_atomselection_cols``).
+            When reading from CSV, this field may be a stringified tuple (e.g., ``(('A',1,'CA')``),
+            which will be parsed automatically.
+
+
+        Returns
+        -------
+        None
+            This method modifies self.df in place and returns None.
+            If atomselection_col is not present in self.df, the method exits early.
+
+
+        Raises
+        ------
+        KeyError
+            If a row's value in ``atomselection_col`` exists but is not a list or tuple
+            (after optional string-to-list parsing).
+        ValueError
+            If parsing a stringified list with ``ast.literal_eval`` fails due to an
+            invalid literal.
+        SyntaxError
+            If parsing a malformed stringified list triggers a syntax error.
+        TypeError
+            If constructing a ``AtomSelection`` from a cell value raises a type error.
+
+
+        Further Details
+        ---------------
+        For each row, the method reads the list of target column names from
+        ``atomselection_col`` and attempts to convert the corresponding cells:
+
+        - If a target column listed for a row does not exist in ``self.df``,
+          a warning is logged and that column is skipped for the row.
+        - If the target cell is already a ``AtomSelection`` instance,
+          it is left unchanged.
+        - If the target cell is a ``str``, it is first converted to a tuple
+          followed by ``AtomSelection(value)`` (useful for CSV imports).
+        - If the target cell is a ``dict``, it is converted via
+          ``AtomSelection.from_dict(value)`` (useful for JSON imports).
+        - Empty selector lists are allowed and simply result in no action for that row.
+        - Cells that are falsy (e.g., ``None``, empty string, empty dict) are skipped.
+
+
+        Notes
+        -----
+        - Missing target columns are not fatal; a warning is logged and processing continues.
+        - When importing from CSV, stringified lists in ``atomselection_col`` are parsed
+          with ``ast.literal_eval``; malformed strings will raise ``ValueError`` or ``SyntaxError``.
+        - ``AtomSelection`` construction is delegated; any errors it raises will propagate.
+        """
+        if not atomselection_col in self.df.columns:
+            return None
+
+        for idx, cols in self.df[atomselection_col].items():
+            # if input was a csv file, lists are imported as str
+            if isinstance(cols, str) and cols.startswith("[") and cols.endswith("]"):
+                cols = ast.literal_eval(cols)
+
+            # skip if no resselection cols are defined
+            if not cols:
+                continue
+
+            # check for wrong content in col
+            if not isinstance(cols, (list, tuple)):
+                raise KeyError(f"Could not import residue selection columns from {atomselection_col}! ")
+
+            for col in cols:
+                if col not in self.df.columns:
+                    logging.warning(f"Could not find column {col} in poses dataframe for conversion to ResidueSelection for pose {self.df.at[idx, 'poses_description']}!")
+                    continue
+
+                cell_value = self.df.at[idx, col]
+                if cell_value:
+                    # skip if already a ResidueSelection (e.g. when importing from pickle)
+                    if isinstance(cell_value, AtomSelection):
+                        continue
+                    # pandas 3 infers string-like columns as StringDtype by default, which
+                    # cannot hold ResidueSelection objects unless we widen the column first.
+                    if not pd.api.types.is_object_dtype(self.df[col].dtype):
+                        self.df[col] = self.df[col].astype(object)
+                    # if importing from csv
+                    if isinstance(cell_value, str):
+                        cell_value = ast.literal_eval(cell_value)
+                        self.df.at[idx, col] = AtomSelection(cell_value)
+                    # if importing from json
+                    if isinstance(cell_value, dict):
+                        self.df.at[idx, col] = AtomSelection.from_dict(cell_value)
+
+
     def split_multiline_fasta(self, path: str, encoding: str = "UTF-8") -> list[str]:
         """
         Splits a multiline FASTA file into individual FASTA files, each containing a single sequence.
@@ -1119,6 +1223,7 @@ class Poses:
         out_format = out_format or self.storage_format
 
         temp_df = class_in_df(self.df, ResidueSelection, "import_resselection_cols")
+        temp_df = class_in_df(temp_df, AtomSelection, "import_atomselection_cols")
 
         # make sure the filename conforms to format
         if not out_path.endswith(f".{out_format}"):
@@ -1258,7 +1363,7 @@ class Poses:
         """
         if pose_description not in self.df["poses_description"].to_list():
             raise KeyError(f"Pose {pose_description} not Found in Poses DataFrame!")
-        return load_structure_from_pdbfile(self.df[self.df["poses_description"] == pose_description]["poses"].values[0], all_models=all_models)
+        return biopython_load_structure(self.df[self.df["poses_description"] == pose_description]["poses"].values[0], all_models=all_models)
     
     def reindex_poses(self, prefix:str, group_col:str=None, remove_layers:int=None, force_reindex:bool=False, sep:str="_", overwrite:bool=False) -> None:
         """
@@ -1553,7 +1658,7 @@ class Poses:
             raise RuntimeError(f"Poses must be of type .pdb, not {self.determine_pose_type()}")
 
         os.makedirs(fasta_dir := os.path.join(self.work_dir, f'{prefix}_fasta_location'), exist_ok=True)
-        seqs = [get_sequence_from_pose(load_structure_from_pdbfile(path_to_pdb=pose), chain_sep=chain_sep) for pose in self.df['poses'].to_list()]
+        seqs = [get_sequence_from_pose(biopython_load_structure(path=pose), chain_sep=chain_sep) for pose in self.df['poses'].to_list()]
 
         fasta_paths = []
         for name, seq in zip(self.df['poses_description'].to_list(), seqs):
@@ -1626,10 +1731,9 @@ class Poses:
         - Logs the filtering process, including any errors or warnings related to the ranking criteria.
 
         """
-
         if group_col and remove_layers:
             raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
-    
+
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
             if self.filter_dir is None:
@@ -1643,6 +1747,10 @@ class Poses:
 
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
+
+            # save prefiltered df
+            prefilter_output_name = os.path.join(self.filter_dir, f"{prefix}_prefilter.{storage_format}")
+            getattr(self.df, FORMAT_STORAGE_DICT.get(storage_format))(prefilter_output_name)
 
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
             if not overwrite and os.path.isfile(output_name):
@@ -1763,6 +1871,10 @@ class Poses:
 
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
+
+            # save prefiltered df
+            prefilter_output_name = os.path.join(self.filter_dir, f"{prefix}_prefilter.{storage_format}")
+            getattr(self.df, FORMAT_STORAGE_DICT.get(storage_format))(prefilter_output_name)
 
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
             if not overwrite and os.path.isfile(output_name):
@@ -2248,6 +2360,139 @@ class Poses:
         self.df = self.df.merge(on='poses_description')
         return self
 
+    def convert_poses(self, prefix: str, out_format: str, jobstarter: JobStarter = None, overwrite: bool = False, conversion_engine: str = "biopython"):
+        """
+        Converts input poses to the selected output format.
+
+        Parameters
+        ----------
+        prefix : str
+            Defines output folder and output column prefix.
+        out_format : str
+            The target output format. BioPython supports PDB and CIF/mmCIF; Open Babel supports additional chemistry formats.
+        jobstarter : Jobstarter, optional
+            If set, delegates conversion to a jobstarter instead of running conversions locally (useful if converting many poses in parallel). Default is None.
+        overwrite : bool, optional
+            Whether to overwrite previous outputs. Default is False.
+        conversion_engine : str, optional
+            Conversion backend. Must be either "biopython" or "openbabel". Default is "biopython".
+
+        Returns
+        -------
+        self
+            The instance of the class with updated pose paths.
+
+        Raises
+        ------
+        KeyError
+            If prefix is already present in poses DataFrame.
+        RuntimeError
+            If conversion for one or more poses fails.
+        """
+
+        def replace_extension(path: str, ext: str):
+            """replaces file extensions"""
+            return f"{os.path.splitext(path)[0]}.{ext}"
+
+        def parse_conversion_engine(conversion_engine: str) -> str:
+            """validates and normalizes conversion engine names"""
+            conversion_engine = conversion_engine.lower()
+            if conversion_engine not in {"biopython", "openbabel"}:
+                raise ValueError("conversion_engine must be either 'biopython' or 'openbabel'.")
+            return conversion_engine
+
+        def select_fileconverter(conversion_engine: str):
+            """selects the structure file conversion backend"""
+            return {"biopython": biopython_fileconverter, "openbabel": openbabel_fileconverter}[conversion_engine]
+
+        def convert(path: str, out_format: str, out_dir: str, overwrite: bool = False, conversion_engine: str = "biopython"):
+            """converts poses to output format"""
+            out_path = os.path.join(out_dir, replace_extension(os.path.basename(path), out_format))
+            if not os.path.isfile(out_path) or overwrite is True:
+                select_fileconverter(conversion_engine)(path, out_format, out_path)
+            return out_path
+        
+
+        def write_conversion_batch_json(poses: list[str], out_path: str, out_format: str, out_dir: str, overwrite: bool = False):
+            """creates input jsons for batch conversion with a jobstarter"""
+            in_dict = {"input_poses": poses, "out_dir": out_dir, "out_format": out_format, "overwrite": overwrite}
+
+            with open(out_path, 'w', encoding="UTF-8") as j:
+                json.dump(in_dict, j, indent=2)
+
+            return out_path
+        
+        def write_conversion_cmd(json_path: str, env_path: str, script_path: str, conversion_engine: str):
+            """creates cmds for batch conversion with a jobstarter"""
+            python = os.path.join(env_path, 'python')
+            if conversion_engine == "openbabel":
+                script_path = os.path.abspath(protflow.utils.openbabel_tools.__file__)
+            return f"{python} {script_path} --input_json {json_path}"
+
+        conversion_engine = parse_conversion_engine(conversion_engine)
+
+        if f"{prefix}_location" in self.df.columns or f"{prefix}_description" in self.df.columns:
+            raise KeyError(f"Column {prefix} found in Poses DataFrame! Pick different Prefix!")
+
+        if out_format == "cif":
+            logging.warning("cif file set as target format. Be aware that 'mmcif' is the correct format for macromolecules!")
+
+        out_dir = os.path.join(self.work_dir, prefix)
+
+        # delete previous outputs
+        if overwrite and os.path.isdir(out_dir):
+            shutil.rmtree(out_dir)
+
+        # create dir for converted poses
+        os.makedirs(out_dir := os.path.join(self.work_dir, prefix), exist_ok=True)
+
+        if not jobstarter:
+            # convert poses directly
+            self.df["poses"] = self.df.apply(lambda row: convert(row["poses"], out_format, out_dir, overwrite, conversion_engine), axis=1)
+            self.df[f"{prefix}_location"] = self.df["poses"]
+            self.df[f"{prefix}_description"] = self.df["poses_description"]
+
+        else:
+            # load config
+            config = require_config()
+            env = load_config_path(config, "PROTFLOW_ENV")
+            script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "biopython_fileconverter.py")
+
+            # define number of batches
+            n_batches = min([len(self.df.index), jobstarter.max_cores])
+
+            # split poses into n_batches sublists
+            poses_sublists = split_list(self.poses_list(), n_sublists=n_batches)
+
+            # write input jsons
+            jsons = [write_conversion_batch_json(poses_sublist, os.path.join(out_dir, f"in_{i}.json"), out_format, out_dir, overwrite) for i, poses_sublist in enumerate(poses_sublists)]
+
+            # write cmds
+            cmds = [write_conversion_cmd(json_path, env, script_path, conversion_engine) for json_path in jsons]
+
+            # start conversion
+            jobstarter.start(cmds, "convert_poses", wait=True, output_path=out_dir)
+
+            # gather output
+            poses = glob(os.path.join(out_dir, f"*.{out_format}"))
+
+            # check for missing poses
+            if not len(poses) == len(self.df.index):
+                raise RuntimeError(f"Not all input poses could be converted! Check logs at {out_dir}!")
+            
+            # create dataframe
+            converted_df = pd.DataFrame({f"{prefix}_location": poses, f"{prefix}_description": [description_from_path(pose) for pose in poses]})
+
+            # merge with input poses
+            self.df = self.df.merge(converted_df, left_on="poses_description", right_on=f"{prefix}_description")
+
+            # update pose locations
+            self.df["poses"] = self.df[f"{prefix}_location"]
+
+            # save
+            self.save_scores()
+        
+        return self
 
 def normalize_series(ser: pd.Series, scale: bool = False) -> pd.Series:
     """

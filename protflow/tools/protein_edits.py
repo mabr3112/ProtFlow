@@ -82,12 +82,12 @@ import pandas as pd
 
 # customs
 from ..poses import Poses
-from ..residues import ResidueSelection
+from ..residues import AtomSelection, ResidueSelection
 from ..jobstarters import JobStarter, split_list
 from ..runners import Runner, RunnerOutput, col_in_df
 from .. import jobstarters, require_config, load_config_path
 from ..utils.utils import parse_fasta_to_dict, _mutually_exclusive
-from ..utils.biopython_tools import load_structure_from_pdbfile
+from ..utils.biopython_tools import biopython_load_structure
 
 # locals
 
@@ -216,7 +216,7 @@ class ChainAdder(Runner):
         '''.run() not implemented for ChainAdder class. Use methods like: .add_chain() or .superimpose_add_chain() instead!!!'''
         raise NotImplementedError
 
-    def add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, overwrite: bool = False) -> Poses:
+    def add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str|list[str], jobstarter: JobStarter = None, overwrite: bool = False, translate_x: float = None, chain_mapping: dict[str, str] = None) -> Poses:
         """
         Add a chain to the poses.
 
@@ -226,9 +226,11 @@ class ChainAdder(Runner):
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
             ref_col (str): The column in the poses DataFrame that references the structures to be used.
-            copy_chain (str): The chain identifier to copy.
+            copy_chain (str | list[str]): The chain identifier(s) to copy.
+            chain_mapping (dict[str, str], optional): Mapping from reference chain IDs to copied chain IDs. Defaults to None.
             jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.
+            translate_x (float, optional): Translate copied chains by x Angstrom along the x-axis. Defaults to None.
 
         Returns:
             Poses: An updated Poses object with the new chain added.
@@ -280,11 +282,13 @@ class ChainAdder(Runner):
             ref_col=ref_col,
             copy_chain=copy_chain,
             jobstarter=jobstarter,
-            overwrite=overwrite
+            translate_x=translate_x,
+            overwrite=overwrite,
+            chain_mapping=chain_mapping
         )
         return chains_added
 
-    def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str, jobstarter: JobStarter = None, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, overwrite: bool = False) -> Poses:
+    def superimpose_add_chain(self, poses: Poses, prefix: str, ref_col: str, copy_chain: str|list[str], jobstarter: JobStarter = None, target_motif: ResidueSelection|AtomSelection|str = None, reference_motif: ResidueSelection|AtomSelection|str = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, overwrite: bool = False, chain_mapping: dict[str, str] = None) -> Poses:
         """
         Add a protein chain after superimposition on a motif or chain.
 
@@ -295,13 +299,14 @@ class ChainAdder(Runner):
             poses (Poses): The Poses object containing the protein structures.
             prefix (str): A prefix used to name and organize the output files.
             ref_col (str): The column in the poses DataFrame that references the structures to be used.
-            copy_chain (str): The chain identifier to copy.
+            copy_chain (str | list[str]): The chain identifier(s) to copy.
             jobstarter (JobStarter, optional): An instance of the JobStarter class to manage job execution. Defaults to None.
-            target_motif (ResidueSelection, optional): The target motif for superimposition. Defaults to None.
-            reference_motif (ResidueSelection, optional): The reference motif for superimposition. Defaults to None.
+            target_motif (ResidueSelection | AtomSelection | str, optional): The target motif for superimposition. Strings are interpreted as poses.df columns. Defaults to None.
+            reference_motif (ResidueSelection | AtomSelection | str, optional): The reference motif for superimposition. Strings are interpreted as poses.df columns. Defaults to None.
             target_chains (list, optional): A list of target chains for superimposition. Defaults to None.
             reference_chains (list, optional): A list of reference chains for superimposition. Defaults to None.
             translate_x (float, optional): Translate the chain to copy by x Angstrom in x-axis. This option can e.g. be used to set up multi-state design with LigandMPNN.
+            chain_mapping (dict[str, str], optional): Mapping from reference chain IDs to copied chain IDs. Defaults to None.
             overwrite (bool, optional): If True, overwrite existing outputs. Defaults to False.
 
         Returns:
@@ -378,7 +383,8 @@ class ChainAdder(Runner):
             reference_motif = reference_motif,
             target_chains = target_chains,
             reference_chains = reference_chains,
-            translate_x = translate_x
+            translate_x = translate_x,
+            chain_mapping = chain_mapping
         )
 
         # split input_dict into subdicts
@@ -404,7 +410,7 @@ class ChainAdder(Runner):
 
         return poses.change_poses_dir(work_dir, copy=False)
 
-    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str, target_motif: ResidueSelection = None, reference_motif: ResidueSelection = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None) -> dict:
+    def _setup_superimposition_args(self, poses: Poses, ref_col: str, copy_chain: str|list[str], target_motif: ResidueSelection|AtomSelection|str = None, reference_motif: ResidueSelection|AtomSelection|str = None, target_chains: list = None, reference_chains: list = None, translate_x: float = None, chain_mapping: dict[str, str] = None) -> dict:
         '''Prepares motif and chain specifications for superimposer setup.
         Returns dictionary (dict) that holds the kwargs for superimposition: {'target_motif': [target_motif_list], ...}'''
         # safety
@@ -421,6 +427,12 @@ class ChainAdder(Runner):
             assert isinstance(translate_x, (float, int)), f"Parameter translate_x must be of type(float). type(translate_x): {type(translate_x)}"
             for pose in poses:
                 out_dict[pose["poses"]]["translate_x"] = translate_x
+
+        if chain_mapping is not None:
+            if not isinstance(chain_mapping, dict) or not all(isinstance(key, str) and isinstance(value, str) for key, value in chain_mapping.items()):
+                raise TypeError("Parameter chain_mapping must be a dictionary mapping source chain IDs to target chain IDs.")
+            for pose in poses:
+                out_dict[pose["poses"]]["chain_mapping"] = chain_mapping
 
         # if nothing is specified, return nothing.
         if all ((opt is None for opt in [reference_motif, target_motif, reference_chains, target_chains])):
@@ -440,63 +452,30 @@ class ChainAdder(Runner):
 
         return out_dict
 
-    def parse_motif(self, motif: ResidueSelection|str, pose: pd.Series) -> str:
+    def parse_motif(self, motif: ResidueSelection|AtomSelection|str|dict, pose: pd.Series) -> str|dict:
         """
-        Set up motif from target_motif input.
+        Set up a residue or atom motif from user input.
 
-        This method converts a given motif, either a `ResidueSelection` object or a string, into a string format suitable for further processing. 
-        If the motif is a string, it checks if it is a column in the `pose` DataFrame and assumes it points to a `ResidueSelection` object.
-
-        Parameters:
-            motif (ResidueSelection | str): The motif to be parsed. It can be either a `ResidueSelection` object or a string.
-            pose (pd.Series): A row from the poses DataFrame that contains information about the protein structure.
-
-        Returns:
-            str: The motif in string format.
-
-        Raises:
-            ValueError: If the motif is a string but not a column in the `poses.df` DataFrame.
-            TypeError: If the motif is neither a `ResidueSelection` object nor a string.
-
-        Examples:
-            Here is an example of how to use the `parse_motif` method:
-
-            .. code-block:: python
-
-                from protflow.residues import ResidueSelection
-                from protein_edits import ChainAdder
-                import pandas as pd
-
-                # Initialize the ChainAdder class
-                chain_adder = ChainAdder()
-
-                # Example pose DataFrame row
-                pose = pd.Series({'motif_column': ResidueSelection(...)})
-
-                # Parse a ResidueSelection object
-                motif = ResidueSelection(...)
-                motif_str = chain_adder.parse_motif(motif, pose)
-
-                # Parse a string that is a column in the pose DataFrame
-                motif_str = chain_adder.parse_motif('motif_column', pose)
-
-                # Access the result
-                print(motif_str)
-
-        Further Details
-        ---------------
-        - **ResidueSelection Handling:** The method directly converts a `ResidueSelection` object to its string representation using its `to_string` method.
-        - **String Handling:** If a string is provided, the method checks if it is a column in the `pose` DataFrame that points to a `ResidueSelection` object, converting it to a string.
-        - **Error Handling:** The method raises appropriate errors if the input is not of the expected type or if the string does not correspond to a valid column in the DataFrame.
+        ResidueSelection objects are serialized with their legacy string
+        representation. AtomSelection objects are serialized through their
+        scorefile-compatible dictionary form so the auxiliary worker can
+        resolve exact atom IDs. If *motif* is a string, it must name a column in
+        the pose row whose value is a ResidueSelection or AtomSelection.
         """
         if isinstance(motif, ResidueSelection):
             return motif.to_string()
+        if isinstance(motif, AtomSelection):
+            return motif.to_dict()
+        if isinstance(motif, dict):
+            if "atoms" in motif:
+                return AtomSelection(motif).to_dict()
+            if "residues" in motif:
+                return ResidueSelection(motif, from_scorefile=True).to_string()
         if isinstance(motif, str):
             if motif in pose:
-                # assumes motif is a column in pose (row in poses.df) that points to a ResidueSelection object
-                return pose[motif].to_string()
-            raise ValueError("If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection object.")
-        raise TypeError(f"Unsupportet parameter type for motif: {type(motif)} - Only ResidueSelection or str allowed!")
+                return self.parse_motif(pose[motif], pose)
+            raise ValueError("If string is passed as motif, it has to be a column of the poses.df DataFrame. Otherwise pass a ResidueSelection or AtomSelection object.")
+        raise TypeError(f"Unsupported parameter type for motif: {type(motif)} - Only ResidueSelection, AtomSelection, serialized selection dict or str allowed!")
 
     def add_sequence(self, prefix: str, poses: Poses, seq: str = None, seq_col: str = None, sep: str = ":") -> None:
         """
@@ -655,7 +634,7 @@ class ChainAdder(Runner):
         # update poses.df['poses'] to new location
         poses.change_poses_dir(out_dir, copy=False)
 
-def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
+def setup_chain_list(chain_arg, poses: Poses) -> list[str|list[str]]:
     """
     Set up chains for add_chains_batch.py.
 
@@ -669,11 +648,11 @@ def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
         poses (Poses): The Poses object containing the protein structures.
 
     Returns:
-        list[str]: A list of chain identifiers to be used in `add_chains_batch.py`.
+        list[str | list[str]]: Per-pose chain identifier(s) to be used in `add_chains_batch.py`.
 
     Raises:
-        ValueError: If the `chain_arg` value is inappropriate, such as when the specified column does not exist in the DataFrame 
-                    or the length of the list does not match the number of poses.
+        ValueError: If the `chain_arg` value is inappropriate, such as when it is neither a chain ID, 
+                    a column containing chain IDs, nor a list of chain IDs.
 
     Examples:
         Here is an example of how to use the `setup_chain_list` function:
@@ -703,23 +682,33 @@ def setup_chain_list(chain_arg, poses: Poses) -> list[str]:
     - **Single Chain Identifier:** If a single chain identifier (e.g., 'A') is provided, it is used for all poses.
     - **DataFrame Column:** If the name of a column in the `poses` DataFrame is provided, the function extracts the chain identifiers 
                            from that column for each pose.
-    - **List of Chains:** If a list of chain identifiers is provided, it must match the length of the `poses` DataFrame. 
-                           The function raises an error if this condition is not met.
+    - **List of Chains:** If a list of chain identifiers is provided, all chains in the list are added to every pose.
     """
+    def prep_copy_chain(chain):
+        if isinstance(chain, str) and len(chain) == 1:
+            return chain
+        if isinstance(chain, list) and all(isinstance(chain_, str) and len(chain_) == 1 for chain_ in chain):
+            return list(chain)
+        raise ValueError(f"Inappropriate value for copy_chain: {chain}. Specify a chain ID or a list of chain IDs.")
+
     if isinstance(chain_arg, str):
         if len(chain_arg) == 1:
             return [chain_arg for _ in poses]
         else:
-            return [pose[chain_arg] for pose in poses]
+            return [prep_copy_chain(pose[chain_arg]) for pose in poses]
+    if isinstance(chain_arg, list) and all(isinstance(chain, str) and len(chain) == 1 for chain in chain_arg):
+        return [list(chain_arg) for _ in poses]
     if isinstance(chain_arg, list) and len(chain_arg) == len(poses):
-        return chain_arg
-    raise ValueError("Inappropriate value for parameter :chain_arg:. Specify the chain (e.g. 'A'), the column where the chains are listed (e.g. 'chain_col') or give a list of chains the same length as poses.df (e.g. ['A', ...])")
+        return [prep_copy_chain(chain) for chain in chain_arg]
+    raise ValueError("Inappropriate value for parameter :chain_arg:. Specify the chain (e.g. 'A'), the column where the chains are listed (e.g. 'chain_col') or give a list of chains to add (e.g. ['A', 'B']).")
 
-def parse_chain(chain, pose: pd.Series) -> str:
+def parse_chain(chain, pose: pd.Series) -> str|list[str]:
     '''Sets up chain for add_chains_batch.py'''
     if isinstance(chain, str):
         return chain if len(chain) == 1 else pose[chain]
-    raise TypeError(f"Inappropriate parameter type for parameter :chain: {type(chain)}. Only :str: allowed!")
+    if isinstance(chain, list) and all(isinstance(chain_, str) for chain_ in chain):
+        return chain
+    raise TypeError(f"Inappropriate parameter type for parameter :chain: {type(chain)}. Only :str: or list[str] allowed!")
 
 class ChainRemover(Runner):
     """
@@ -924,7 +913,7 @@ class ChainRemover(Runner):
 
         # setup preserved chains
         if preserve_chains:
-            chain_list = [[chain.id for chain in load_structure_from_pdbfile(pose).get_chains() if not chain.id in pres_chains] for pose, pres_chains in zip(poses.poses_list(), chain_list)]
+            chain_list = [[chain.id for chain in biopython_load_structure(pose).get_chains() if not chain.id in pres_chains] for pose, pres_chains in zip(poses.poses_list(), chain_list)]
 
         # batch inputs to max_cores
         input_dict = {pose: chain for pose, chain in zip(poses.poses_list(), chain_list)}
@@ -991,7 +980,7 @@ class SequenceRemover(Runner):
         })
         return out_df
 
-    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, chains: list[int] = None, sep: str = None, overwrite: bool = False) -> Poses:
+    def run(self, poses: Poses, prefix: str, jobstarter: JobStarter = None, chains: list[int] = None, sep: str = None, overwrite: bool = False, keep_chains: bool = False) -> Poses:
         '''
         Parameters:
         chains: can either be a list that contains chain idx to drop, or a str that points to the column in poses.df that contains this list for every pose.
@@ -1026,8 +1015,9 @@ class SequenceRemover(Runner):
             input_json_list.append(fp)
 
         # write cmd
-        script_path = self.script_path # TODO: check why sep is not accessed in this runner!
-        cmds = [f"{self.python} {script_path} --input_json {input_json} --output_dir {work_dir}" for input_json in input_json_list]
+        script_path = self.script_path
+        keep = " --keep" if keep_chains else ""
+        cmds = [f"{self.python} {script_path} --input_json {input_json} --output_dir {work_dir} --sep='{sep}'{keep}" for input_json in input_json_list]
 
         # execute with jobstarter
         jobstarter.start(cmds=cmds, jobname=prefix, output_path=work_dir)

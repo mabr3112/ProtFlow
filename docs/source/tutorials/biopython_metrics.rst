@@ -6,7 +6,7 @@ Calculate BioPython Geometry Metrics
 Use :class:`protflow.metrics.biopython_metrics.BiopythonMetricRunner` when you
 want to calculate simple atom-level geometry metrics from BioPython structures.
 The runner can calculate several metrics for every pose in one ``run()`` call,
-including distances, angles, dihedrals, and plane angles.
+including distances, angles, dihedrals, plane angles, and relative contact order.
 
 This is useful when you want to track geometry such as:
 
@@ -16,6 +16,7 @@ This is useful when you want to track geometry such as:
 - a bond angle or vector angle
 - a dihedral angle
 - the angle between two atom-defined planes
+- relative contact order from residue-level contacts
 
 The basic idea
 --------------
@@ -47,6 +48,7 @@ Setup
    from protflow.metrics.biopython_metrics import (
        Angle,
        BiopythonMetricRunner,
+       ContactOrder,
        Dihedral,
        Distance,
        PlaneAngle,
@@ -149,6 +151,12 @@ metrics.
            name="residue_1_2_plane_angle",
            atoms="plane_angle_atoms",
        ),
+       ContactOrder(
+           name="relative_contact_order",
+           contact_distance=8.0,
+           contact_atom="CA",
+           chains="A",
+       ),
    ]
 
    biopython_metrics = BiopythonMetricRunner()
@@ -171,6 +179,7 @@ metrics.
                "bio_geom_n_ca_c_angle",
                "bio_geom_n_ca_c_o_dihedral",
                "bio_geom_residue_1_2_plane_angle",
+               "bio_geom_relative_contact_order",
            ]
        ]
    )
@@ -198,6 +207,14 @@ Four-atom distances are ambiguous, so specify ``distance_type`` explicitly.
 define the second plane. By default, the metric returns the acute angle between
 the two planes.
 
+``ContactOrder`` calculates relative contact order as the sum of intrachain
+sequence separations over contacting residue pairs divided by protein length and
+contact count. By default it treats two residues as contacting when their ``CA``
+atoms are within 8 A, includes residue pairs separated by at least one sequence
+position, and uses all chains. Pass ``chains="A"`` for monomeric-chain
+calculations or adjust ``contact_distance``, ``contact_atom``, and
+``min_sequence_separation`` for a different contact definition.
+
 Results and caching
 -------------------
 
@@ -214,6 +231,7 @@ For the example above, the output columns include:
    bio_geom_n_ca_c_angle
    bio_geom_n_ca_c_o_dihedral
    bio_geom_residue_1_2_plane_angle
+   bio_geom_relative_contact_order
 
 If you run the same prefix again with ``overwrite=False``, ProtFlow reuses the
 cached scorefile instead of recalculating the BioPython metrics.

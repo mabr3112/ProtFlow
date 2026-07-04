@@ -7,7 +7,7 @@ import Bio.PDB
 import pandas as pd
 
 # customs
-from protflow.utils.biopython_tools import load_structure_from_pdbfile, get_atoms
+from protflow.utils.biopython_tools import biopython_load_structure, get_atoms
 
 def calc_rmsd(target: Bio.PDB.Structure.Structure, reference: Bio.PDB.Structure.Structure, atoms:list[str], chains:list[str]) -> float:
     '''Superimposes and calculates RMSD between target and reference for specified atoms and chains.'''
@@ -27,8 +27,8 @@ def calc_rmsd(target: Bio.PDB.Structure.Structure, reference: Bio.PDB.Structure.
 def calc_rmsd_pdb(target_pdb: Bio.PDB.Structure.Structure, reference_pdb: Bio.PDB.Structure.Structure, atoms:list[str], chains:list[str]) -> float:
     '''Same as calc_rmsd, but for .pdb files as input.
     Superimposes and calculates RMSD between target and reference for specified atoms and chains.'''
-    target = load_structure_from_pdbfile(target_pdb)
-    reference = load_structure_from_pdbfile(reference_pdb)
+    target = biopython_load_structure(target_pdb)
+    reference = biopython_load_structure(reference_pdb)
     return calc_rmsd(target, reference, atoms=atoms, chains=chains)
 
 def main(args) -> None:
@@ -39,6 +39,8 @@ def main(args) -> None:
             poses_dict = json.loads(f.read())
     elif (args.input_pdb and args.reference_pdb):
         poses_dict = {args.input_pdb, args.reference_pdb}
+    else:
+        raise ValueError("Provide properly structured inputs. Either an --input_json or an --input_pdb + --reference_pdb!")
 
     # parse atoms and chains:
     atoms = [atom.strip() for atom in args.atoms.split(",") if atom] if args.atoms else None

@@ -67,6 +67,8 @@ Creating and manipulating `ResidueSelection` objects:
 This module simplifies the process of handling residue selections in bioinformatics workflows, providing a consistent interface for different types of input and output formats.
 """
 # imports
+from __future__ import annotations
+
 from collections import OrderedDict, defaultdict
 import os
 import re
@@ -79,12 +81,23 @@ RFD3_INPUT_SELECTION_FIELDS = (
     "unindex",
     "select_fixed_atoms",
     "select_unfixed_sequence",
+    "fixed_motif_atoms",
+    "fixed_motif_atoms_with_ligand",
     "select_buried",
     "select_partially_buried",
     "select_exposed",
     "select_hbond_donor",
     "select_hbond_acceptor",
     "select_hotspots",
+    "ligands",
+    "ligands_fixed_atoms",
+)
+
+_RFD3_DERIVED_INPUT_SELECTION_FIELDS = (
+    "fixed_motif_atoms",
+    "fixed_motif_atoms_with_ligand",
+    "ligands",
+    "ligands_fixed_atoms",
 )
 
 _RFD3_BACKBONE_ATOMS = ("N", "CA", "C", "O")
@@ -482,6 +495,232 @@ def _unique_atom_ids(atom_ids: list[AtomID]) -> tuple[AtomID, ...]:
     return tuple(OrderedDict.fromkeys(_as_tuple_recursive(atom_id) for atom_id in atom_ids))
 
 
+def atom_id_to_residue(atom_id: AtomID) -> tuple[str, int]:
+    """Collapse one AtomSelection atom ID to ``(chain, residue_number)``."""
+    atom_id = _as_tuple_recursive(atom_id)
+    _validate_atom_id(atom_id)
+
+    if len(atom_id) == 3:
+        chain_id, residue_id, _ = atom_id
+    elif len(atom_id) == 4:
+        _, chain_id, residue_id, _ = atom_id
+    elif len(atom_id) == 5:
+        _, _, chain_id, residue_id, _ = atom_id
+    else:
+        _, _, chain_id, residue_id, _, _ = atom_id
+
+    if isinstance(residue_id, (list, tuple)):
+        residue_id = residue_id[1]
+
+    return (chain_id, int(residue_id))
+
+
+def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
+    """Collapse one normalized atom ID to the `(chain, residue_number)` pair."""
+    return atom_id_to_residue(atom_id)
+
+
+def _atom_name_from_atom_id(atom_id: AtomID) -> str:
+    """Return the atom-name component from one normalized atom ID."""
+    _validate_atom_id(atom_id)
+
+    if len(atom_id) == 3:
+        atom_name = atom_id[2]
+    elif len(atom_id) == 4:
+        atom_name = atom_id[3]
+    elif len(atom_id) == 5:
+        atom_name = atom_id[4]
+    else:
+        atom_name = atom_id[4]
+
+    if isinstance(atom_name, (list, tuple)):
+        atom_name = atom_name[0]
+    return str(atom_name).strip()
+
+
+def _sidechain_atom_selection(atom_selection: "AtomSelection") -> "AtomSelection":
+    """Return non-backbone atoms from an AtomSelection."""
+    return AtomSelection(
+        tuple(
+            atom
+            for atom in atom_selection
+            if _atom_name_from_atom_id(atom) not in _RFD3_BACKBONE_ATOMS
+        )
+    )
+
+
+def _atom_selection_residues(atom_selection: "AtomSelection") -> set[tuple[str, int]]:
+    """Return residue identifiers covered by an AtomSelection."""
+    return {_residue_from_atom_id(atom) for atom in atom_selection}
+
+
+def _rfd3_selection_components(input_selection: Any) -> list[str]:
+    """Return component strings referenced by an RFD3 InputSelection-like value."""
+    if isinstance(input_selection, str):
+        return _rfd3_components_from_string(input_selection)
+    if isinstance(input_selection, dict) and "atoms" not in input_selection:
+        components = []
+        for component_spec in input_selection:
+            components.extend(_rfd3_components_from_string(str(component_spec)))
+        return components
+    return []
+
+
+def _residues_from_rfd3_component(component: str, entity: Any, model_id: Any = 0) -> set[tuple[str, int]]:
+    """Resolve one RFD3 component to residue identifiers."""
+    residue_components = _parse_rfd3_residue_component(component)
+    if residue_components is not None:
+        return {(chain, int(resi)) for chain, resi in residue_components}
+    if entity is None:
+        raise ValueError(
+            f"RFD3 component '{component}' requires a pose because it is not an indexed residue component."
+        )
+    return {
+        (_residue_chain_id(residue), int(residue.id[1]))
+        for residue in _matching_residues_for_rfd3_component(
+            component,
+            entity=entity,
+            model_id=model_id,
+        )
+    }
+
+
+def _covered_residues_from_rfd3_selection(
+    input_selection: Any,
+    pose: Any = None,
+    model_id: Any = 0,
+) -> set[tuple[str, int]]:
+    """
+    Return residues explicitly covered by an RFD3 InputSelection-like value.
+
+    This preserves the distinction between "selected atoms" and "covered
+    residues" needed for RFD3 override fields such as select_fixed_atoms, where
+    selecting a subset of atoms in one residue unselects the remaining atoms in
+    that same residue but does not affect unrelated residues.
+    """
+    if input_selection is None:
+        return set()
+    if (
+        isinstance(input_selection, AtomSelection)
+        or (isinstance(input_selection, dict) and "atoms" in input_selection)
+        or isinstance(input_selection, (list, tuple))
+    ):
+        return _atom_selection_residues(AtomSelection(input_selection))
+
+    entity = _normalize_biopython_entity(pose, model_id=model_id)
+    if isinstance(input_selection, bool):
+        if entity is None:
+            raise ValueError(f"RFD3 boolean InputSelection={input_selection} requires a pose.")
+        return {
+            (_residue_chain_id(residue), int(residue.id[1]))
+            for residue in _iter_biopython_residues(entity, model_id=model_id)
+        }
+
+    residues = set()
+    for component in _rfd3_selection_components(input_selection):
+        residues.update(
+            _residues_from_rfd3_component(component, entity=entity, model_id=model_id)
+        )
+    return residues
+
+
+def _apply_rfd3_fixed_atom_overrides(
+    atom_selection: "AtomSelection",
+    select_fixed_atoms: Any,
+    pose: Any = None,
+    model_id: Any = 0,
+    residue_id_format: str = "auto",
+) -> "AtomSelection":
+    """Apply RFD3 select_fixed_atoms coordinate-fixing semantics to a selection."""
+    if select_fixed_atoms is None:
+        return atom_selection
+    if isinstance(select_fixed_atoms, bool):
+        return atom_selection if select_fixed_atoms else AtomSelection(())
+
+    fixed_atoms = AtomSelection.from_rfd3_input_selection(
+        select_fixed_atoms,
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+    fixed_atom_set = set(fixed_atoms.atoms)
+    covered_residues = _covered_residues_from_rfd3_selection(
+        select_fixed_atoms,
+        pose=pose,
+        model_id=model_id,
+    )
+    return AtomSelection(
+        tuple(
+            atom
+            for atom in atom_selection
+            if _residue_from_atom_id(atom) not in covered_residues or atom in fixed_atom_set
+        )
+    )
+
+
+def _fixed_motif_atoms_from_rfd3_input_spec(
+    input_spec: dict[str, Any],
+    pose: Any = None,
+    model_id: Any = 0,
+    residue_id_format: str = "auto",
+) -> "AtomSelection":
+    """Derive coordinate-fixed unindexed motif atoms from an RFD3 input spec."""
+    if input_spec.get("unindex") is None:
+        return AtomSelection(())
+
+    fixed_motif_atoms = AtomSelection.from_rfd3_input_selection(
+        input_spec["unindex"],
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+    fixed_motif_atoms = _apply_rfd3_fixed_atom_overrides(
+        fixed_motif_atoms,
+        input_spec.get("select_fixed_atoms"),
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+
+    if input_spec.get("select_unfixed_sequence") is not None:
+        unfixed_sequence_atoms = AtomSelection.from_rfd3_input_selection(
+            input_spec["select_unfixed_sequence"],
+            pose=pose,
+            model_id=model_id,
+            residue_id_format=residue_id_format,
+        )
+        fixed_motif_atoms = fixed_motif_atoms - _sidechain_atom_selection(
+            unfixed_sequence_atoms
+        )
+
+    return fixed_motif_atoms
+
+
+def _fixed_ligand_atoms_from_rfd3_input_spec(
+    input_spec: dict[str, Any],
+    pose: Any = None,
+    model_id: Any = 0,
+    residue_id_format: str = "auto",
+) -> "AtomSelection":
+    """Derive coordinate-fixed ligand atoms from an RFD3 input spec."""
+    if input_spec.get("ligand") is None:
+        return AtomSelection(())
+
+    ligand_atoms = AtomSelection.from_rfd3_ligand(
+        input_spec["ligand"],
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+    return _apply_rfd3_fixed_atom_overrides(
+        ligand_atoms,
+        input_spec.get("select_fixed_atoms"),
+        pose=pose,
+        model_id=model_id,
+        residue_id_format=residue_id_format,
+    )
+
+
 class AtomSelection:
     """
     Represent an ordered selection of atoms in a protein structure.
@@ -652,6 +891,17 @@ class AtomSelection:
 
             AtomSelection.from_list([("A", 1, "N"), ("A", 1, "CA")])
         """
+        # Check if we need to unpack any AtomSelection objects
+        if any(isinstance(item, AtomSelection) for item in atoms):
+            flattened_ids = []
+            for item in atoms:
+                if isinstance(item, AtomSelection):
+                    flattened_ids.extend(item.atoms)
+                else:
+                    # This allows raw IDs (tuples/lists) to live alongside objects
+                    flattened_ids.append(item)
+            return AtomSelection(flattened_ids) # preserves non-uniqueness of input atoms compared to __add__ approaches
+
         return AtomSelection(atoms)
 
     @staticmethod
@@ -1031,12 +1281,19 @@ class AtomSelection:
             InputSelection field names to parse. Defaults to all RFD3
             InputSelection fields known to ProtFlow: ``contig``, ``unindex``,
             ``select_fixed_atoms``, ``select_unfixed_sequence``,
+            ``fixed_motif_atoms``, ``fixed_motif_atoms_with_ligand``,
             ``select_buried``, ``select_partially_buried``,
             ``select_exposed``, ``select_hbond_donor``,
-            ``select_hbond_acceptor``, and ``select_hotspots``.
+            ``select_hbond_acceptor``, ``select_hotspots``, ``ligands``, and
+            ``ligands_fixed_atoms``. The ``fixed_motif_atoms`` and ligand
+            fixed-atom fields are derived from the RFD3 motif, sequence,
+            ligand, and coordinate-fixing fields rather than read directly
+            from *input_spec*.
         include_ligand : bool, optional
             If ``True`` (default), parse the RFD3 ``ligand`` field into an
-            AtomSelection under the key ``"ligand"``.
+            AtomSelection under the legacy key ``"ligand"`` and, when
+            requested by *fields*, under ``"ligands"`` and
+            ``"ligands_fixed_atoms"``.
         model_id : int or str, optional
             BioPython model identifier used for structure-backed parsing.
         residue_id_format : {"auto", "compact", "biopython"}, optional
@@ -1047,7 +1304,9 @@ class AtomSelection:
         dict[str, AtomSelection]
             Mapping from each parsed input-specification field to the
             corresponding AtomSelection. Fields absent from *input_spec* or set
-            to ``None`` are omitted.
+            to ``None`` are omitted. ``"ligand"`` is retained as a
+            backwards-compatible alias for all ligand atoms; new code should
+            prefer ``"ligands"`` and ``"ligands_fixed_atoms"``.
 
         Raises
         ------
@@ -1079,6 +1338,8 @@ class AtomSelection:
 
         selections = {}
         for field in fields:
+            if field in _RFD3_DERIVED_INPUT_SELECTION_FIELDS:
+                continue
             if field in input_spec and input_spec[field] is not None:
                 # Parse each requested InputSelection independently so callers
                 # can inspect the semantic source field after conversion.
@@ -1089,17 +1350,102 @@ class AtomSelection:
                     residue_id_format=residue_id_format,
                 )
 
-        if include_ligand and input_spec.get("ligand") is not None:
-            # Ligand is not typed as InputSelection in RFD3, but it resolves to
-            # a concrete atom set and is useful for downstream atom metrics.
-            selections["ligand"] = AtomSelection.from_rfd3_ligand(
-                input_spec["ligand"],
+        if "fixed_motif_atoms" in fields and input_spec.get("unindex") is not None:
+            selections["fixed_motif_atoms"] = _fixed_motif_atoms_from_rfd3_input_spec(
+                input_spec,
                 pose=pose,
                 model_id=model_id,
                 residue_id_format=residue_id_format,
             )
 
+        if "fixed_motif_atoms_with_ligand" in fields and (
+            input_spec.get("unindex") is not None
+            or (include_ligand and input_spec.get("ligand") is not None)
+        ):
+            fixed_motif_atoms = selections.get("fixed_motif_atoms")
+            if fixed_motif_atoms is None:
+                fixed_motif_atoms = _fixed_motif_atoms_from_rfd3_input_spec(
+                    input_spec,
+                    pose=pose,
+                    model_id=model_id,
+                    residue_id_format=residue_id_format,
+                )
+            fixed_ligand_atoms = (
+                _fixed_ligand_atoms_from_rfd3_input_spec(
+                    input_spec,
+                    pose=pose,
+                    model_id=model_id,
+                    residue_id_format=residue_id_format,
+                )
+                if include_ligand
+                else AtomSelection(())
+            )
+            selections["fixed_motif_atoms_with_ligand"] = fixed_motif_atoms + fixed_ligand_atoms
+
+        if include_ligand and input_spec.get("ligand") is not None:
+            # Ligand is not typed as InputSelection in RFD3, but it resolves to
+            # a concrete atom set and is useful for downstream atom metrics.
+            ligand_atoms = AtomSelection.from_rfd3_ligand(
+                input_spec["ligand"],
+                pose=pose,
+                model_id=model_id,
+                residue_id_format=residue_id_format,
+            )
+            selections["ligand"] = ligand_atoms
+            if "ligands" in fields:
+                selections["ligands"] = ligand_atoms
+            if "ligands_fixed_atoms" in fields:
+                selections["ligands_fixed_atoms"] = _fixed_ligand_atoms_from_rfd3_input_spec(
+                    input_spec,
+                    pose=pose,
+                    model_id=model_id,
+                    residue_id_format=residue_id_format,
+                )
+
         return selections
+    
+    @staticmethod
+    def from_residueselection(
+        res_selection: ResidueSelection,
+        atoms: list | str,
+        pose: Any = None,
+        residue_id_format: str = "auto",
+    ) -> "AtomSelection":
+        """
+        Create an AtomSelection from a ResidueSelection with specified atoms. Accepts RFD3 inputs like BKBN, TIP, ALL etc as atoms specification.
+
+        Parameters
+        ----------
+        res_selection : ResidueSelection
+            Input ResidueSelection.
+        atoms : list or str
+            Names of selected atoms. Can be a list of atom names, a single atom
+            name, or RFD3-style atom specifications like BKBN, TIP or ALL.
+        pose : str, os.PathLike, Bio.PDB entity
+            Input structure containing the selected atoms. Only required if
+            RFD3-style atom specifications (BKBN, TIP, ALL) are used.
+        residue_id_format : {"auto", "compact", "biopython"}, optional
+            Controls residue ID formatting for atoms loaded from *pose*.
+
+        Returns
+        -------
+        AtomSelection
+            Selection containing all atoms selected by the residue and atoms
+            specification.
+
+        Examples
+        --------
+        Select all CA and CB atoms in residues A1-25 and B1-10 named ``LIG`` and ``ACT``::
+
+            ressel = from_contig("A1-25, B1-10")
+            AtomSelection.from_residueselection(ressel, ["CA", "CB"])
+        """
+        if isinstance(atoms, list):
+            atoms = ",".join(atoms)
+        
+        atomdict = {res_selection.to_rfdiffusion_contig(): atoms}
+        return AtomSelection.from_rfd3_input_selection(atomdict, pose=pose, residue_id_format=residue_id_format)
+
 
     ####################################### OUTPUT #############################################
     def to_tuple(self) -> tuple[AtomID, ...]:
@@ -1113,6 +1459,42 @@ class AtomSelection:
     def to_dict(self) -> dict[str, list[Any]]:
         """Return a scorefile-friendly dictionary representation."""
         return {"atoms": self.to_list()}
+
+    def to_rfd3_dict(self) -> dict[str, str]:
+        """Return a dict formatted like an RFdiffusion3 input contig (e.g. {"A5": "CA,N,O"})."""
+
+        # initialize a defaultdict with list as the default factory
+        rfd3_dict = defaultdict(list)
+
+        for chain, num, atm in self.atoms:
+            # create the key by concatenating the string and the integer
+            key = f"{chain}{num}"
+            rfd3_dict[key].append(atm)
+
+        # convert list to comma-separated str
+        for res, atms in rfd3_dict.items():
+            rfd3_dict[res] = ",".join(atms)
+
+        # Convert back to a regular dict and return
+        return dict(rfd3_dict)
+    
+    def to_boltz_atom(self) -> list:
+        """Return a list formatted like a Boltz input atom for bond constraints (e.g. ["A", 5, "CA"]). Only for single atoms."""
+
+        if len(self.atoms) != 1:
+            raise KeyError("Boltz-style format is only allowed for single atoms!")
+        
+        # unpack single atom
+        atm = self.to_list()[0]
+
+        # return list
+        return [atm[0], atm[1], atm[2]]
+
+    ####################################### FUNCTION #############################################
+    def deduplicate(self) -> AtomSelection:
+        """Removes duplicate atoms"""
+        self.atoms = _unique_atom_ids(self.to_list())
+        return self
 
 
 AtomSelectionInput: TypeAlias = str | tuple[Any, ...] | list[Any] | dict[str, Any] | AtomSelection | None
@@ -1173,6 +1555,19 @@ class ResidueSelection:
         return NotImplemented
 
     ####################################### INPUT ##############################################
+    @classmethod
+    def from_atomselection(cls, atom_selection: AtomSelection|AtomSelectionInput) -> "ResidueSelection":
+        """
+        Create a ResidueSelection from an AtomSelection-like input.
+
+        Residues are ordered by the first atom index at which they appear in
+        the atom selection. Repeated atoms from the same residue therefore
+        collapse to one residue while preserving encounter order.
+        """
+        atom_selection = AtomSelection(atom_selection)
+        residues = reduce_to_unique(tuple(atom_id_to_residue(atom_id) for atom_id in atom_selection))
+        return cls(residues, fast=True)
+
     def from_selection(self, selection) -> "ResidueSelection":
         """
         Constructs a ResidueSelection instance from the provided selection.
@@ -1332,6 +1727,67 @@ class ResidueSelection:
         # Combine all parts into the final contig string
         contig_str = ",".join(contig_parts)
         return contig_str
+    
+    def to_index(self, convert_to_zero_indexed:bool=False) -> int|list:
+        """
+        Parses ResidueSelection object to a list of residue indices (or a single index for selections containing a single residue).
+        Fails if multiple chains are present in the ResidueSelection. If convert_to_zero_indexed is set, 1 will be subtracted from
+        all residue indices.
+
+        Example:
+            If self.residues = (("A", 1), ("A", 2), ("A", 3)),
+            the output will be [1, 2, 3].
+            If self.residues = (("B", 4)),
+            the output will be 4.
+        """
+        resdict = self.to_dict()
+        if len(resdict) > 1:
+            raise KeyError("Multiple chains detected. Conversion to residue indices will not work.")
+        res_indices = list(resdict.values())
+        if convert_to_zero_indexed:
+            res_indices = [idx - 1 for idx in res_indices]
+        if len(res_indices) == 1:
+            return res_indices[0]
+        else:
+            return res_indices
+
+
+    @classmethod
+    def from_resname(cls, resname: str, pose: Any, strict: bool = True) -> "ResidueSelection":
+        """Creates a selection by searching for a specific residue name."""
+        pose = _normalize_biopython_entity(pose)
+        # Extract raw tuples (chain, resnum)
+        data = [cls._extract_bp_residue_data(res) for res in pose.get_residues() if res.get_resname() == resname]
+        
+        if strict and not data:
+            raise RuntimeError(f"No residues found with name {resname}")
+        
+        return cls(data, fast=True)
+
+    @classmethod
+    def from_biopython_residue(cls, residue: Any) -> "ResidueSelection":
+        """Creates a selection from a single Biopython Residue object."""
+        return cls([cls._extract_bp_residue_data(residue)], fast=True)
+
+    @classmethod
+    def from_biopython_entity(cls, entity: Any) -> "ResidueSelection":
+        """Handles Residue, Atom, or Chain/Model entities."""
+        if hasattr(entity, "get_residues"):
+            data = [cls._extract_bp_residue_data(res) for res in entity.get_residues()]
+        elif hasattr(entity, "get_parent"):
+            # If it's an atom, get parent residue; otherwise assume it's a residue
+            res = entity if hasattr(entity, "resname") else entity.get_parent()
+            data = [cls._extract_bp_residue_data(res)]
+        else:
+            raise TypeError(f"Unsupported type: {type(entity)}")
+            
+        return cls(data, fast=True)
+
+    @staticmethod
+    def _extract_bp_residue_data(residue: Any) -> tuple:
+        """Helper to get the (chain, resnum) tuple Biopython style."""
+        return (residue.parent.id, residue.id[1])
+
 
 def fast_parse_selection(input_selection: tuple[tuple[str, int]]) -> tuple[tuple[str, int]]:
     """
@@ -1564,6 +2020,9 @@ def from_contig(input_contig: str) -> ResidueSelection:
     sel = []
     elements = [x.strip() for x in input_contig.split(",") if x]
     for element in elements:
+        if not element[0].isalpha():
+            # skip diffused parts like 10-25
+            continue
         subsplit = element.split("-")
         if len(subsplit) > 1:
             sel += [element[0] + str(i) for i in range(int(subsplit[0][1:]), int(subsplit[-1])+1)]

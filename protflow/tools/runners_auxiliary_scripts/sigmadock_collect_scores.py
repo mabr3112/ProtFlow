@@ -40,6 +40,9 @@ description : str
     Stem of the pose directory name (matches ``poses.df["description"]``).
 location : str
     Absolute path to the written complex PDB.
+seed : int
+    Effective per-draw random seed used by SigmaDock for this pose
+    (read from the prediction record; reflects per-pose ``pose_options``).
 affinity : float
     Predicted binding affinity from ``rescoring.pt`` (lower is better).
 intramolecular_energy : float
@@ -162,6 +165,7 @@ def collect(work_dir: str, include_scores: set[str] | None = None) -> list[dict]
                 row = {
                     "description": description,
                     "location":    str(out_complex.resolve()),
+                    "seed":        s.get("seed"),  # effective per-draw seed from SigmaDock's record
                 }
 
                 if rescore is not None:

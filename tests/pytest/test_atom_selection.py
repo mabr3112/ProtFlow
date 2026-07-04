@@ -1,4 +1,4 @@
-from protflow.residues import AtomSelection
+from protflow.residues import AtomSelection, ResidueSelection
 
 
 def _pdb_line(record, serial, atom_name, resname, chain, resseq, x, y, z, element):
@@ -39,6 +39,24 @@ def test_atom_selection_add_and_subtract_preserve_order():
 
     assert (first + second).to_tuple() == (("A", 1, "N"), ("A", 1, "CA"), ("A", 1, "C"))
     assert (first - second).to_tuple() == (("A", 1, "N"),)
+
+
+def test_residue_selection_from_atomselection_preserves_first_atom_order():
+    atom_selection = AtomSelection.from_list(
+        [
+            ("B", 3, "CB"),
+            ("A", 1, "N"),
+            ("B", 3, "CA"),
+            ("A", 2, "CA"),
+            ("A", 1, "CA"),
+            ("Z", ("H_LIG", 9, " "), "C1"),
+            ("A", 2, "C"),
+        ]
+    )
+
+    selection = ResidueSelection.from_atomselection(atom_selection)
+
+    assert selection.residues == (("B", 3), ("A", 1), ("A", 2), ("Z", 9))
 
 
 def test_from_dict_parses_rfd3_input_selection_without_pose_when_atoms_explicit():
@@ -113,3 +131,88 @@ def test_from_rfd3_input_spec_parses_selection_fields_and_ligand(tmp_path):
         ("Z", ("H_LIG", 9, " "), "C1"),
         ("Z", ("H_LIG", 9, " "), "O1"),
     )
+    assert selections["ligands"].to_tuple() == selections["ligand"].to_tuple()
+    assert selections["ligands_fixed_atoms"].to_tuple() == (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+        ("Z", ("H_LIG", 9, " "), "O1"),
+    )
+
+
+def test_from_rfd3_input_spec_derives_fixed_motif_atoms_from_unindex_sequence_and_fixed_overrides(tmp_path):
+    pdb_path = _write_test_pdb(tmp_path)
+    input_spec = {
+        "input": str(pdb_path),
+        "unindex": "A1-2",
+        "select_fixed_atoms": {"A1": "BKBN"},
+        "select_unfixed_sequence": "A2",
+    }
+
+    selections = AtomSelection.from_rfd3_input_spec(input_spec)
+
+    expected = (
+        ("A", 1, "N"),
+        ("A", 1, "CA"),
+        ("A", 1, "C"),
+        ("A", 1, "O"),
+        ("A", 2, "N"),
+        ("A", 2, "CA"),
+        ("A", 2, "C"),
+        ("A", 2, "O"),
+    )
+    assert selections["fixed_motif_atoms"].to_tuple() == expected
+    assert selections["fixed_motif_atoms_with_ligand"].to_tuple() == expected
+
+
+def test_from_rfd3_input_spec_derives_fixed_motif_atoms_with_ligand_fixed_overrides(tmp_path):
+    pdb_path = _write_test_pdb(tmp_path)
+    input_spec = {
+        "input": str(pdb_path),
+        "unindex": "A2",
+        "select_fixed_atoms": {"LIG": "C1"},
+        "ligand": "LIG",
+    }
+
+    selections = AtomSelection.from_rfd3_input_spec(input_spec)
+
+    fixed_motif_atoms = (
+        ("A", 2, "N"),
+        ("A", 2, "CA"),
+        ("A", 2, "C"),
+        ("A", 2, "O"),
+        ("A", 2, "CB"),
+        ("A", 2, "CG"),
+        ("A", 2, "OD1"),
+        ("A", 2, "ND2"),
+    )
+    assert selections["fixed_motif_atoms"].to_tuple() == fixed_motif_atoms
+    assert selections["fixed_motif_atoms_with_ligand"].to_tuple() == fixed_motif_atoms + (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+    )
+    assert selections["ligand"].to_tuple() == (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+        ("Z", ("H_LIG", 9, " "), "O1"),
+    )
+    assert selections["ligands"].to_tuple() == selections["ligand"].to_tuple()
+    assert selections["ligands_fixed_atoms"].to_tuple() == (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+    )
+
+
+def test_from_rfd3_input_spec_derived_fixed_motif_atoms_respect_select_fixed_atoms_false(tmp_path):
+    pdb_path = _write_test_pdb(tmp_path)
+    input_spec = {
+        "input": str(pdb_path),
+        "unindex": "A1",
+        "select_fixed_atoms": False,
+        "ligand": "LIG",
+    }
+
+    selections = AtomSelection.from_rfd3_input_spec(input_spec)
+
+    assert selections["fixed_motif_atoms"].to_tuple() == ()
+    assert selections["fixed_motif_atoms_with_ligand"].to_tuple() == ()
+    assert selections["ligands"].to_tuple() == (
+        ("Z", ("H_LIG", 9, " "), "C1"),
+        ("Z", ("H_LIG", 9, " "), "O1"),
+    )
+    assert selections["ligands_fixed_atoms"].to_tuple() == ()

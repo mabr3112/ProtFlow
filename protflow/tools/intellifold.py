@@ -1,21 +1,21 @@
 """
-ProtFlow runner for Boltz.
+ProtFlow runner for Intellifold.
 
-This module provides a high-level `Boltz` runner that:
-(1) prepares Boltz-compatible YAML inputs from sequences or structures,
+This module provides a high-level `Intellifold` runner that:
+(1) prepares Intellifold-compatible YAML inputs from sequences or structures,
 (2) composes command lines from global and pose-specific options,
 (3) distributes inference across available cores via a `JobStarter`,
-and (4) aggregates Boltz outputs (confidence, affinity, NPZ artifacts) into a
+and (4) aggregates Intellifold outputs (confidence, affinity, NPZ artifacts) into a
 single score table for downstream orchestration.
 
 The typical workflow is:
 
-1. Ensure paths and environment hooks for Boltz are configured
-   (see Notes on `BOLTZ_PATH`, `BOLTZ_PYTHON`, `BOLTZ_PRE_CMD`).
+1. Ensure paths and environment hooks for Intellifold are configured
+   (see Notes on `INTELLIFOLD_PATH`, `INTELLIFOLD_PYTHON`, `INTELLIFOLD_PRE_CMD`).
 2. Provide inputs as a `Poses` collection (FASTA, PDB/CIF, or already
-   Boltz-formatted YAML). If needed, convert to YAML with
-   `convert_poses_to_boltz_yaml`.
-3. Call `Boltz.run(...)` with command-line `options` and optional
+   Intellifold-formatted YAML). If needed, convert to YAML with
+   `convert_poses_to_intellifold_yaml`.
+3. Call `Intellifold.run(...)` with command-line `options` and optional
    `pose_options` to fan-out runs.
 4. Consume the returned `Poses` object whose `.df` is augmented with a
    per-model score table and file locations of produced artifacts.
@@ -24,32 +24,32 @@ Notes
 -----
 - Configuration keys
   The runner reads its defaults from ProtFlow’s config via:
-  `BOLTZ_PATH` (path to the `boltz` CLI entry point or module),
-  `BOLTZ_PYTHON` (interpreter used to invoke Boltz), and
-  `BOLTZ_PRE_CMD` (shell prefix such as environment activation).
+  `INTELLIFOLD_PATH` (path to the `intellifold` CLI entry point or module),
+  `INTELLIFOLD_PYTHON` (interpreter used to invoke Intellifold), and
+  `INTELLIFOLD_PRE_CMD` (shell prefix such as environment activation).
   Use `protflow.config` utilities to set these once per environment.
 - MSA handling
-  Boltz can run with an empty MSA or fetch MSAs from a server. The runner
-  exposes `msa_setting` to steer YAML content (`"empty"` writes `msa: empty`;
-  `"server"` omits `msa`), while the CLI switch `--use_msa_server`
-  remains the source of truth for server fetching. See
-  `Boltz._parse_msa_setting` and `convert_chain_seq_dict_to_yaml_dict`.
+  Intellifold can run with an empty MSA or fetch MSAs from a server. The runner
+  exposes `msa_setting` to steer YAML content (`"empty"` vs `"server"`),
+  while the CLI switch `--use_msa_server` remains the source of truth for
+  server fetching. See `Intellifold._parse_msa_setting` and
+  `convert_chain_seq_dict_to_yaml_dict`.
 
 Examples
 --------
-Run Boltz on a batch of structures, writing outputs to a fresh work directory
+Run Intellifold on a batch of structures, writing outputs to a fresh work directory
 and collecting scores:
 
->>> from protflow.runners.boltz import Boltz
+>>> from protflow.runners.intellifold import Intellifold
 >>> from protflow.poses import Poses
 >>> poses = Poses(
 ...     files=["A.pdb", "B.pdb", "C.pdb"],
-...     work_dir="work/boltz_demo"
+...     work_dir="work/intellifold_demo"
 ... )
->>> runner = Boltz()  # uses config defaults (BOLTZ_PATH/PYTHON/PRE_CMD)
+>>> runner = Intellifold()  # uses config defaults (INTELLIFOLD_PATH/PYTHON/PRE_CMD)
 >>> poses = runner.run(
 ...     poses=poses,
-...     prefix="boltz_run",
+...     prefix="intellifold_run",
 ...     options="--num_samples 4 --use_msa_server",
 ...     overwrite=False,
 ... )
@@ -70,44 +70,44 @@ import yaml
 import pandas as pd
 
 # custom
-from ..poses import Poses, get_format
+from ..poses import Poses, get_format, description_from_path
 from .. import load_config_path, require_config
 from ..jobstarters import JobStarter, split_list
 from ..runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string
 from ..utils.biopython_tools import load_sequence_from_fasta, get_sequence_from_pose, biopython_load_structure
 
-class Boltz(Runner):
+class Intellifold(Runner):
     """
-    The Boltz runner prepares inputs (optionally batching by core), assembles Boltz commands,
+    The Intellifold runner prepares inputs (optionally batching by core), assembles Intellifold commands,
     dispatches them via a `JobStarter`, and aggregates results into a unified
     score file stored in the run directory.
 
     Parameters
     ----------
-    boltz_path : str, optional
+    intellifold_path : str, optional
         Executable or module path used with `predict` subcommand.
-        If not provided, loaded from `BOLTZ_PATH` in the ProtFlow config.
-    boltz_python : str, optional
-        Python interpreter used to execute Boltz. Defaults to `BOLTZ_PYTHON`
+        If not provided, loaded from `INTELLIFOLD_PATH` in the ProtFlow config.
+    intellifold_python : str, optional
+        Python interpreter used to execute Intellifold. Defaults to `INTELLIFOLD_PYTHON`
         from the ProtFlow config.
     pre_cmd : str, optional
         Shell prefix prepended to each command. Use this to activate
-        environments or modules (e.g., `conda activate boltz`). If omitted,
-        taken from `BOLTZ_PRE_CMD` in the ProtFlow config.
+        environments or modules (e.g., `conda activate intellifold`). If omitted,
+        taken from `INTELLIFOLD_PRE_CMD` in the ProtFlow config.
     jobstarter : JobStarter, optional
         Default jobstarter to use if none is provided to `run()`.
 
     Attributes
     ----------
     name : str
-        Fixed runner name: `"Boltz"`.
+        Fixed runner name: `"Intellifold"`.
     index_layers : int
         Number of index layers used when merging outputs (defaults to 2).
     jobstarter : JobStarter or None
         Optional default jobstarter stored on the runner instance.
-    boltz_path : str
-        Resolved Boltz executable/module path.
-    boltz_python : str
+    intellifold_path : str
+        Resolved Intellifold executable/module path.
+    intellifold_python : str
         Resolved interpreter path.
     pre_cmd : str
         Resolved shell prefix (may be empty).
@@ -117,7 +117,7 @@ class Boltz(Runner):
     - Score caching
       If a score file already exists for the given `prefix` and format and
       `overwrite` is `False` (and `--override` not present in `options`),
-      existing results are returned without re-running Boltz.
+      existing results are returned without re-running Intellifold.
     - Batching behavior
       If `pose_options` are *not* provided, inputs are automatically split
       into at most `jobstarter.max_cores` batches to improve throughput.
@@ -126,26 +126,26 @@ class Boltz(Runner):
     --------
     Minimal run with default configuration, batched across cores:
 
-    >>> runner = Boltz()
+    >>> runner = Intellifold()
     >>> poses = runner.run(
     ...     poses, prefix="demo",
     ...     options="--num_samples 2 --use_msa_server"
     ... )
     """
-    def __init__(self, boltz_path: str = None, boltz_python: str = None, pre_cmd: str = None, jobstarter: JobStarter = None):
+    def __init__(self, intellifold_path: str = None, intellifold_python: str = None, pre_cmd: str = None, jobstarter: JobStarter = None):
         """
-        Initialize the Boltz runner and resolve configuration.
+        Initialize the Intellifold runner and resolve configuration.
 
         Parameters
         ----------
-        boltz_path : str, optional
-            Path to the Boltz program or module (with `predict` subcommand).
-            Defaults to `BOLTZ_PATH` from ProtFlow config.
-        boltz_python : str, optional
-            Interpreter to call Boltz with. Defaults to `BOLTZ_PYTHON`.
+        intellifold_path : str, optional
+            Path to the Intellifold program or module (with `predict` subcommand).
+            Defaults to `INTELLIFOLD_PATH` from ProtFlow config.
+        intellifold_python : str, optional
+            Interpreter to call Intellifold with. Defaults to `INTELLIFOLD_PYTHON`.
         pre_cmd : str, optional
             Shell prefix (e.g., environment activation). Defaults to
-            `BOLTZ_PRE_CMD`.
+            `INTELLIFOLD_PRE_CMD`.
         jobstarter : JobStarter, optional
             Default jobstarter to use when `run(jobstarter=None)`.
 
@@ -155,12 +155,12 @@ class Boltz(Runner):
             If required configuration keys are missing from the ProtFlow config.
         """
         config = require_config()
-        self.boltz_path = boltz_path or load_config_path(config, "BOLTZ_PATH")
-        self.boltz_python = boltz_python or load_config_path(config, "BOLTZ_PYTHON")
-        self.pre_cmd = pre_cmd or load_config_path(config, "BOLTZ_PRE_CMD", is_pre_cmd=True)
+        self.intellifold_path = intellifold_path or load_config_path(config, "INTELLIFOLD_PATH")
+        self.intellifold_python = intellifold_python or load_config_path(config, "INTELLIFOLD_PYTHON")
+        self.pre_cmd = pre_cmd or load_config_path(config, "INTELLIFOLD_PRE_CMD", is_pre_cmd=True)
 
-        self.name = "Boltz"
-        self.index_layers = 2 # boltz can output many samples. We will always add index layers to reduce code complexity
+        self.name = "Intellifold"
+        self.index_layers = 2 # intellifold can output many samples. We will always add index layers to reduce code complexity
         self.jobstarter = jobstarter
 
     def __str__(self):
@@ -170,18 +170,18 @@ class Boltz(Runner):
         Returns
         -------
         str
-            The literal string ``"Boltz"``.
+            The literal string ``"Intellifold"``.
         """
-        return "Boltz"
+        return "Intellifold"
 
-    def _parse_msa_setting(self, options: str, msa_setting: str) -> str:
+    def _parse_msa_setting(self, options: str, msa_setting: list[str]) -> str:
         """
         Normalize/resolve the MSA strategy used for YAML generation.
 
         The runner allows two MSA modes in the produced pose YAMLs:
         - ``"empty"``: write ``msa: empty`` for each chain.
-        - ``"server"``: omit ``msa`` and expect the CLI option
-          ``--use_msa_server`` to instruct Boltz to fetch MSAs during runtime.
+        - ``"server"``: also write ``msa: empty``, but *expect* the CLI option
+          ``--use_msa_server`` to instruct Intellifold to fetch MSAs during runtime.
 
         Resolution order:
         1) If `msa_setting` is provided, it must be one of
@@ -193,7 +193,7 @@ class Boltz(Runner):
         Parameters
         ----------
         options : str
-            Command-line options that will be passed to Boltz.
+            Command-line options that will be passed to Intellifold.
         msa_setting : str
             Desired YAML MSA mode or an empty/None value to auto-detect.
 
@@ -233,9 +233,9 @@ class Boltz(Runner):
         return msa_setting
 
     def _parse_options(self, poses: Poses, options: str, pose_options: str|list[str], max_cores: int, out_dir: str, overwrite: bool = False) -> list[str]:
-        '''Internal helper to parse options for boltz.
+        '''Internal helper to parse options for intellifold.
         
-        Construct one or more fully-formed option strings for Boltz.
+        Construct one or more fully-formed option strings for Intellifold.
 
         If `pose_options` are supplied (string or list of strings), the runner
         expands them per input pose. Otherwise, a single options string is
@@ -257,14 +257,14 @@ class Boltz(Runner):
         max_cores : int
             Maximum number of concurrent batches (via `JobStarter`).
         out_dir : str
-            Directory where Boltz should write outputs for this run.
+            Directory where Intellifold should write outputs for this run.
         overwrite : bool, optional
             If `True`, ensure `--override` is present in the options.
 
         Returns
         -------
         list of str
-            One options string per Boltz command to be executed.
+            One options string per Intellifold command to be executed.
 
         Raises
         ------
@@ -305,9 +305,9 @@ class Boltz(Runner):
     def _parse_poses(self, poses: Poses, pose_options: str|list[str], work_dir: str, max_cores: int) -> list[str]:
         '''helper function to parse poses for batch processing.
 
-        Determine Boltz input units (per pose vs. per batch subfolder).
+        Determine Intellifold input units (per pose vs. per batch subfolder).
 
-        When `pose_options` are provided, Boltz consumes each pose file directly.
+        When `pose_options` are provided, Intellifold consumes each pose file directly.
         Otherwise, the runner creates up to `max_cores` batch subdirectories
         under ``{work_dir}/batch_inputs/batch_XXXX/`` and copies a partition of
         pose files into each to improve throughput.
@@ -330,7 +330,7 @@ class Boltz(Runner):
         '''
         if pose_options:
             # parse poses
-            boltz_inputs = poses.poses_list()
+            intellifold_inputs = poses.poses_list()
 
         else:
              # batch input files into number of maximum specified cores:
@@ -338,7 +338,7 @@ class Boltz(Runner):
             poses_sublists = split_list(poses.poses_list(), n_sublists=max_cores)
 
             # create input dirs and move sublist input files there
-            boltz_inputs = []
+            intellifold_inputs = []
             for i, pose_sublist in enumerate(poses_sublists, start=1):
                 # create subdir for batched inputs
                 subdir_name = os.path.join(work_dir, "batch_inputs", f"batch_{str(i).zfill(4)}")
@@ -348,21 +348,21 @@ class Boltz(Runner):
                 for pose in pose_sublist:
                     shutil.copy(pose, subdir_name)
 
-                # add to boltz input_list
-                boltz_inputs.append(subdir_name)
-        return boltz_inputs
+                # add to intellifold input_list
+                intellifold_inputs.append(subdir_name)
+        return intellifold_inputs
 
-    def _write_cmds(self, boltz_inputs: list[str], parsed_options: list[str]) -> list[str]:
+    def _write_cmds(self, intellifold_inputs: list[str], parsed_options: list[str]) -> list[str]:
         '''
-        Compose Boltz command strings from resolved inputs and options.
+        Compose Intellifold command strings from resolved inputs and options.
 
         Each command is of the form:
 
-        ``{pre_cmd} {boltz_python} {boltz_path} predict {input} {options}``
+        ``{pre_cmd} {intellifold_python} {intellifold_path} predict {input} {options}``
 
         Parameters
         ----------
-        boltz_inputs : list of str
+        intellifold_inputs : list of str
             Per-command input path (individual YAML or batch directory).
         parsed_options : list of str
             Per-command options string as produced by `_parse_options`.
@@ -373,22 +373,22 @@ class Boltz(Runner):
             Shell commands ready to be dispatched via `JobStarter.start()`.
         '''
         cmd_list = [
-            f"{self.pre_cmd} {self.boltz_python} {self.boltz_path} predict {input_fn} {parsed_options}".strip()
-            for input_fn, parsed_options in zip(boltz_inputs, parsed_options)
+            f"{self.pre_cmd} {self.intellifold_python} {self.intellifold_path} predict {input_fn} {parsed_options}".strip()
+            for input_fn, parsed_options in zip(intellifold_inputs, parsed_options)
         ]
         return cmd_list
 
     def run(
             self, poses: Poses, prefix: str, jobstarter: JobStarter = None,
-            options: str = None, pose_options: str|list[str] = None, params: "BoltzParams" = None,
+            options: str = None, pose_options: str|list[str] = None, params: "IntellifoldParams" = None,
             overwrite: bool = False, msa_setting: str = ""
         ) -> Poses:
         '''
-        Execute Boltz on the given `poses` and collect results.
+        Execute Intellifold on the given `poses` and collect results.
 
-        The runner prepares inputs (converting to Boltz YAML if needed),
+        The runner prepares inputs (converting to Intellifold YAML if needed),
         resolves MSA behavior, optionally augments pose YAMLs using a provided
-        `BoltzParams` object, dispatches the commands via `JobStarter`, then
+        `IntellifoldParams` object, dispatches the commands via `JobStarter`, then
         aggregates prediction confidence/affinity scores and artifact paths
         into a DataFrame saved as ``{prefix}/{name}_scores.{storage_format}``.
 
@@ -396,24 +396,24 @@ class Boltz(Runner):
         ----------
         poses : Poses
             Input poses. Has to be protflow.poses.Poses class with poses in FASTA, 
-            PDB/CIF, or Boltz YAML; if not YAML, they are converted 
-            with `convert_poses_to_boltz_yaml`.
+            PDB/CIF, or Intellifold YAML; if not YAML, they are converted 
+            with `convert_poses_to_intellifold_yaml`.
         prefix : str
             Run prefix / subdirectory under `poses.work_dir`. 
-            Boltz outputs will be stored in {poses.work_dir}/{prefix}/output
+            Intellifold outputs will be stored in {poses.work_dir}/{prefix}/output
         jobstarter : JobStarter, optional
             Overrides the runner’s default jobstarter. If omitted, the runner
             tries, in order: the provided value, the instance default, and
             `poses.default_jobstarter`.
         options : str, optional
-            Global CLI options for Boltz (e.g., ``"--num_samples 8"``,
+            Global CLI options for Intellifold (e.g., ``"--num_samples 8"``,
             ``"--use_msa_server"``).
         pose_options : str or list of str, optional
             Pose-specific option template(s); if provided, disables batching.
-        params : BoltzParams, optional
+        params : IntellifoldParams, optional
             If given, used to *modify* or *extend* per-pose YAMLs (e.g.,
             sequences, ligands, constraints, templates, properties) before
-            running. Files are emitted under ``{prefix}/boltz_inputs/``.
+            running. Files are emitted under ``{prefix}/intellifold_inputs/``.
         overwrite : bool, optional
             If `True` (or if `--override` is present in `options`), re-run
             even if a scorefile already exists.
@@ -430,22 +430,22 @@ class Boltz(Runner):
         Raises
         ------
         RuntimeError
-            If Boltz finishes without producing any scores.
+            If Intellifold finishes without producing any scores.
         TypeError
-            If inputs cannot be converted to Boltz YAML (unsupported formats).
+            If inputs cannot be converted to Intellifold YAML (unsupported formats).
 
         Examples
         --------
         Convert PDBs to YAML, add a ligand, and run with 4 samples per pose:
 
-        >>> from protflow.runners.boltz import Boltz
-        >>> from protflow.runners.boltz import BoltzParams
-        >>> params = BoltzParams()
+        >>> from protflow.runners.intellifold import Intellifold
+        >>> from protflow.runners.intellifold import IntellifoldParams
+        >>> params = IntellifoldParams()
         >>> params.add_ligand(ligand="CC(=O)O", id="LIG", ligand_type="smiles")
-        >>> runner = Boltz()
+        >>> runner = Intellifold()
         >>> poses = runner.run(
         ...     poses=poses,
-        ...     prefix="boltz_with_ligand",
+        ...     prefix="intellifold_with_ligand",
         ...     params=params,
         ...     options="--num_samples 4",
         ...     overwrite=True
@@ -459,8 +459,8 @@ class Boltz(Runner):
         - Batching: when `pose_options` is absent, inputs are partitioned into
           at most `jobstarter.max_cores` batch folders to parallelize runs.
         - Artifacts: columns like ``plddt_location``, ``pae_location``, and
-          ``pde_location`` point to NPZ files produced by Boltz for each model.
-        - Override behavior: Boltz Runner sets overwrite=True if --override is specified in options (does not work for pose_options)!
+          ``pde_location`` point to NPZ files produced by Intellifold for each model.
+        - Override behavior: Intellifold Runner sets overwrite=True if --override is specified in options (does not work for pose_options)!
         '''
         # setup runner
         work_dir, jobstarter = self.generic_run_setup(
@@ -469,8 +469,8 @@ class Boltz(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
-        boltz_out_dir = os.path.join(work_dir, "outputs")
-        os.makedirs(boltz_out_dir, exist_ok=True)
+        intellifold_out_dir = os.path.join(work_dir, "outputs")
+        os.makedirs(intellifold_out_dir, exist_ok=True)
 
         # sanitize
         options = options or ""
@@ -482,21 +482,21 @@ class Boltz(Runner):
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
-        #### write boltz inputs
+        #### write intellifold inputs
         # parse msa_setting
         msa_setting = self._parse_msa_setting(options, msa_setting)
 
         # check if poses are in correct format (yaml) (unless bypass_poses_check)
         if not all(fp.endswith(".yaml") for fp in poses.poses_list()):
-            convert_poses_to_boltz_yaml(poses, prefix=f"{prefix}/poses_yaml", msa=msa_setting)
+            convert_poses_to_intellifold_yaml(poses, prefix=f"{prefix}/poses_yaml", msa=msa_setting)
 
-        # if BoltzParams are given, use BoltzParams to generate new poses based on params
+        # if IntellifoldParams are given, use IntellifoldParams to generate new poses based on params
         if params:
-            boltz_input_dir = os.path.join(work_dir, "boltz_inputs")
-            params.generate_yaml_files(poses, boltz_input_dir, default_msa=msa_setting)
+            intellifold_input_dir = os.path.join(work_dir, "intellifold_inputs")
+            params.generate_yaml_files(poses, intellifold_input_dir)
 
         # if pose_options are specified, run as is. Otherwise batch predictions
-        boltz_inputs = self._parse_poses(
+        intellifold_inputs = self._parse_poses(
             poses=poses,
             pose_options=pose_options,
             work_dir=work_dir,
@@ -508,14 +508,14 @@ class Boltz(Runner):
             options=options,
             pose_options=pose_options,
             max_cores=jobstarter.max_cores,
-            out_dir=boltz_out_dir,
+            out_dir=intellifold_out_dir,
             overwrite=overwrite
         )
 
         # compile commands# parse options and pose_options:
-        cmds = self._write_cmds(boltz_inputs, parsed_options)
+        cmds = self._write_cmds(intellifold_inputs, parsed_options)
 
-        # run boltz
+        # run intellifold
         jobstarter.start(
             cmds = cmds,
             jobname = f"{self.name}",
@@ -523,11 +523,11 @@ class Boltz(Runner):
         )
 
         # collect scores
-        scores = collect_boltz_scores(boltz_out_dir)
+        scores = collect_intellifold_scores(intellifold_out_dir)
 
         # output safety
         if len(scores) == 0:
-            raise RuntimeError(f"Boltz crashed. Check output logs and output directory for error logs: {work_dir}")
+            raise RuntimeError(f"Intellifold crashed. Check output logs and output directory for error logs: {work_dir}")
 
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -536,13 +536,13 @@ class Boltz(Runner):
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
 
-def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, overwrite: bool = True, reset_poses: bool = True) -> None:
+def convert_poses_to_intellifold_yaml(poses: Poses, prefix: str, msa: str = None, overwrite: bool = True, reset_poses: bool = True) -> None:
     """For now, this only reads the protein sequence, not anything else (no ligand support).
 
-    Convert input poses to Boltz-compatible YAMLs.
+    Convert input poses to Intellifold-compatible YAMLs.
 
     Creates one YAML per pose under ``{poses.work_dir}/{prefix}``, encoding chain
-    sequences (and MSA choice) for Boltz. Optionally updates ``poses.df["poses"]``
+    sequences (and MSA choice) for Intellifold. Optionally updates ``poses.df["poses"]``
     to point to the newly created YAMLs.
 
     Parameters
@@ -553,7 +553,7 @@ def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, over
         Subdirectory name under ``poses.work_dir`` where YAMLs are written.
     msa : str or None
         One of ``"server"``, ``"empty"``, or a path to a custom ``.a3m`` file.
-        ``"server"`` omits MSA entries and expects Boltz to fetch MSAs.
+        ``"server"`` writes empty MSA entries and expects Intellifold to fetch MSAs.
     overwrite : bool, optional
         If ``True``, existing YAMLs for the same prefix are replaced.
     reset_poses : bool, optional
@@ -572,12 +572,12 @@ def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, over
 
     Examples
     --------
-    >>> convert_poses_to_boltz_yaml(poses, prefix="boltz_inputs", msa="empty")
-    >>> convert_poses_to_boltz_yaml(poses, prefix="boltz_inputs_srv", msa="server", reset_poses=False)
+    >>> convert_poses_to_intellifold_yaml(poses, prefix="intellifold_inputs", msa="empty")
+    >>> convert_poses_to_intellifold_yaml(poses, prefix="intellifold_inputs_srv", msa="server", reset_poses=False)
 
     Notes
     -----
-    - The function is sequence-centric (ligands/templates/properties are handled later via :class:`BoltzParams`).
+    - The function is sequence-centric (ligands/templates/properties are handled later via :class:`IntellifoldParams`).
     """
     def _check_prefix(poses, prefix):
         if f"{prefix}_location" in poses.df.columns or f"{prefix}_description" in poses.df.columns:
@@ -597,7 +597,7 @@ def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, over
     ] # create new output names
 
     if all(os.path.isfile(out_fn) for out_fn in out_fn_list) and not overwrite:
-        logging.info(f"Boltz yaml files exist at {out_dir}. Skipping creation to save time.")
+        logging.info(f"Intellifold yaml files exist at {out_dir}. Skipping creation to save time.")
 
         # set new poses and exit
         if reset_poses:
@@ -618,44 +618,27 @@ def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, over
     elif all(pose.endswith((".pdb", "cif")) for pose in poses.poses_list()):
         sequence_dict_list = [get_sequence_from_pose(biopython_load_structure(pose), with_chains=True) for pose in poses.poses_list()]
     else:
-        raise TypeError("Boltz only supports files in .pdb, .cif, or .fa format!")
+        raise TypeError("Intellifold only supports files in .pdb, .cif, or .fa format!")
 
-    # now convert pose-level lists to valid boltz yamls. [{chain: seq, ...}, ...] -> [boltz-yaml-formatted-pose, ...]
+    # now convert pose-level lists to valid intellifold yamls. [{chain: seq, ...}, ...] -> [intellifold-yaml-formatted-pose, ...]
     pose_yamls_raw = [convert_chain_seq_dict_to_yaml_dict(pose_dict, msa=msa, ignore_nonexistent_msa_file=True) for pose_dict in sequence_dict_list]
 
-    # now create boltz pose_yamls
-    boltz_pose_yamls = [
+    # now create intellifold pose_yamls
+    intellifold_pose_yamls = [
         {"sequences": [{"protein": chain_dict} for chain_dict in pose_yaml]}
         for pose_yaml in pose_yamls_raw
     ]
 
     # store yamls
-    for pose_yaml, out_fn in zip(boltz_pose_yamls, out_fn_list):
-        boltz_yaml_writer(out_fn, pose_yaml)
+    for pose_yaml, out_fn in zip(intellifold_pose_yamls, out_fn_list):
+        intellifold_yaml_writer(out_fn, pose_yaml)
 
     # set new poses
     if reset_poses:
         poses.df["poses"] = out_fn_list
     return None
 
-def _normalize_boltz_msa_for_yaml(msa: str|bool|None, ignore_nonexistent_msa_file: bool = False, default_msa: str|None = None) -> str|None:
-    """Return the Boltz YAML value for an MSA setting, or None to omit it."""
-    if msa is False and default_msa is not None:
-        msa = default_msa
-
-    match msa:
-        case "server":
-            return None
-        case "empty" | "auto" | None | False | "":
-            return "empty"
-        case str():
-            if not os.path.isfile(msa) and not ignore_nonexistent_msa_file:
-                raise FileNotFoundError(f"Specified MSA file not found: {msa}")
-            return msa
-        case _:
-            raise ValueError(f"Not allowed: {msa}. Either provide a path to an existing MSA, None, 'server' (to get msa from msa-server), or 'empty'.")
-
-def edit_boltz_yaml(*args, **kwargs) -> None:
+def edit_intellifold_yaml(*args, **kwargs) -> None:
     """
     Placeholder for future YAML editing utilities.
 
@@ -666,9 +649,9 @@ def edit_boltz_yaml(*args, **kwargs) -> None:
     """
     raise NotImplementedError
 
-class BoltzParams:
+class IntellifoldParams:
     """
-    Builder for per-pose Boltz YAML content.
+    Builder for per-pose Intellifold YAML content.
 
     Collects entries for proteins, nucleic acids, ligands, constraints,
     templates, and arbitrary properties. Each field value can be provided
@@ -731,7 +714,7 @@ class BoltzParams:
                 raise KeyError(f'One of your modifications is missing a "ccd" or "position" key. :modifications: parameter has to be in format: [{"position": RES_IDX, "ccd": CCD}, ...]. culprit: {mod}')
         return modifications
 
-    def add_protein(self, sequence: str, id: str|list[str], msa: str|bool = False, modifications: list[dict]|str = None, cyclic: bool = False, poses_cols: list[str] = None) -> None: # pylint: disable=W0622 ## we adhere to Boltz naming convention here, so id overwrite will be ignored in the sake of user experience.
+    def add_protein(self, sequence: str, id: str|list[str], msa: str|bool = False, modifications: list[dict]|str = None, cyclic: bool = False, poses_cols: list[str] = None) -> None: # pylint: disable=W0622 ## we adhere to Intellifold naming convention here, so id overwrite will be ignored in the sake of user experience.
         '''Helper to add protein entry.
 
         Parameters
@@ -767,7 +750,7 @@ class BoltzParams:
         # instantiate default value
         poses_cols = poses_cols or []
 
-        # compile protein dict in BoltzParams representation.
+        # compile protein dict in IntellifoldParams representation.
         protein_dict = {
             "id": id,
             "sequence": sequence,
@@ -777,10 +760,10 @@ class BoltzParams:
         }
         protein_dict = {key: (val, key in poses_cols) for key, val in protein_dict.items()} # wrap in poses_cols flag!
 
-        # add proteins entry to BoltzParams instance.
+        # add proteins entry to IntellifoldParams instance.
         self.proteins.append(protein_dict)
 
-    def add_dna(self, sequence: str, id: str|list[str], modifications: list[dict] = None, cyclic: bool = False, poses_cols: list[str] = None) -> None: # pylint: disable=W0622 ## we adhere to Boltz naming convention here, so id overwrite will be ignored in the sake of user experience.
+    def add_dna(self, sequence: str, id: str|list[str], modifications: list[dict] = None, cyclic: bool = False, poses_cols: list[str] = None) -> None: # pylint: disable=W0622 ## we adhere to Intellifold naming convention here, so id overwrite will be ignored in the sake of user experience.
         """
         Add a DNA entry.
 
@@ -804,7 +787,7 @@ class BoltzParams:
         # instantiate default value
         poses_cols = poses_cols or []
 
-        # compile dna dict in BoltzParams representation
+        # compile dna dict in IntellifoldParams representation
         dna_dict = {
             "id": id,
             "sequence": sequence,
@@ -813,10 +796,10 @@ class BoltzParams:
         }
         dna_dict = {key: (val, key in poses_cols) for key, val in dna_dict.items()} # wrap in poses_cols!
 
-        # add dna entry to BoltzParams instance
+        # add dna entry to IntellifoldParams instance
         self.dna.append(dna_dict)
 
-    def add_rna(self, sequence: str, id: str|list[str], modifications: list[dict] = None, cyclic: bool = False, poses_cols: list[str] = None) -> None: # pylint: disable=W0622 ## we adhere to Boltz naming convention here, so id overwrite will be ignored in the sake of user experience.
+    def add_rna(self, sequence: str, id: str|list[str], modifications: list[dict] = None, cyclic: bool = False, poses_cols: list[str] = None) -> None: # pylint: disable=W0622 ## we adhere to Intellifold naming convention here, so id overwrite will be ignored in the sake of user experience.
         """
         Add an RNA entry.
 
@@ -840,7 +823,7 @@ class BoltzParams:
         # instantiate default value
         poses_cols = poses_cols or []
 
-        # compile dna dict in BoltzParams representation
+        # compile dna dict in IntellifoldParams representation
         rna_dict = {
             "id": id,
             "sequence": sequence,
@@ -849,10 +832,10 @@ class BoltzParams:
         }
         rna_dict = {key: (val, key in poses_cols) for key, val in rna_dict.items()} # wrap in poses_cols!
 
-        # add rna entry to BoltzParams instance
+        # add rna entry to IntellifoldParams instance
         self.rna.append(rna_dict)
 
-    def add_ligand(self, ligand: str, id: str|list[str], ligand_type: str = "smiles", poses_cols: list[str] = None) -> None: # pylint: disable=W0622 ## we adhere to Boltz naming convention here, so id overwrite will be ignored in the sake of user experience.
+    def add_ligand(self, ligand: str, id: str|list[str], ligand_type: str = "smiles", poses_cols: list[str] = None) -> None: # pylint: disable=W0622 ## we adhere to Intellifold naming convention here, so id overwrite will be ignored in the sake of user experience.
         """
         Add a ligand entry.
 
@@ -889,13 +872,13 @@ class BoltzParams:
         if ligand_type.lower() not in {"smiles", "ccd"}:
             raise ValueError(f"Parameter :ligand_type: can be only one of {{'smiles', 'ccd'}}. ligand_type: {ligand_type}")
 
-        # compile ligand dict in BoltzParams representation
+        # compile ligand dict in IntellifoldParams representation
         ligand_dict = {
             "id": (id, "id" in poses_cols),
             ligand_type.lower(): (ligand, "ligand" in poses_cols),
         }
 
-        # add ligands entry to BoltzParams instance
+        # add ligands entry to IntellifoldParams instance
         self.ligands.append(ligand_dict)
 
     def add_constraint(self, constraint_type: str, poses_cols: list[str] = None, **kwargs) -> None:
@@ -944,7 +927,7 @@ class BoltzParams:
         # create dictionary that stores constraints and their kwargs.
         constraint_dict = {constraint_type.lower(): dict(processed_kwargs)}
 
-        # add constraint entry to BoltzParams instance
+        # add constraint entry to IntellifoldParams instance
         self.constraints.append(constraint_dict)
 
     def add_template(self, template: str, template_type: str, poses_cols: list[str] = None, **kwargs) -> None:
@@ -962,14 +945,14 @@ class BoltzParams:
         poses_cols : list[str], optional
             Keys (including any in ``kwargs``) to be read from ``poses.df``.
         **kwargs
-            Additional template parameters supported by Boltz (e.g., chain
+            Additional template parameters supported by Intellifold (e.g., chain
             selection, residue ranges).
 
         Returns
         -------
         None
 
-        See the original Boltz documentation for details: https://github.com/jwohlwend/boltz/blob/main/docs/prediction.md      
+        See the original Intellifold documentation for details: https://github.com/jwohlwend/intellifold/blob/main/docs/prediction.md      
         '''
         if template_type.lower() not in {"cif", "pdb"}:
             raise ValueError(f"Parameter :template_type: can only be one of {{'cif', 'pdb'}}, your template_type: {template_type}")
@@ -1004,8 +987,8 @@ class BoltzParams:
 
         Examples
         --------
-        >>> BoltzParams.add_property('affinity', binder="binder_chain_col", poses_cols=["binder"])
-        >>> BoltzParams.add_property('affinity', binder="B")
+        >>> IntellifoldParams.add_property('affinity', binder="binder_chain_col", poses_cols=["binder"])
+        >>> IntellifoldParams.add_property('affinity', binder="B")
         """
         supported_properties = {"affinity"}
         if property_type not in supported_properties:
@@ -1020,7 +1003,7 @@ class BoltzParams:
         property_dict = {property_type: processed_kwargs}
         self.properties.append(property_dict)
 
-    def generate_yaml_files(self, poses: Poses, out_dir: str, reset_poses: bool = True, default_msa: str|None = None) -> None:
+    def generate_yaml_files(self, poses: Poses, out_dir: str, reset_poses: bool = True) -> None:
         '''Converts poses into new .yaml files at 'prefix' based on current paramters.
         or: render accumulated parameters into per-pose YAML files.
 
@@ -1036,9 +1019,6 @@ class BoltzParams:
             Output directory where YAML files are written.
         reset_poses : bool, optional
             If ``True``, replace the ``poses`` column with the new YAML paths.
-        default_msa : str, optional
-            MSA mode to use for added proteins whose ``msa`` value is left as
-            the ``add_protein`` default. ``"server"`` omits the YAML field.
 
         Returns
         -------
@@ -1055,13 +1035,6 @@ class BoltzParams:
                 key: pose[val] if is_pose_col else val # selects value from pose.df if pose_col was specified.
                 for key, (val, is_pose_col) in entity_dict.items()
             }
-            return {key: val for key, val in parsed_dict.items() if val is not None}
-
-        def _parse_protein_dict_for_pose(pose: pd.Series, entity_dict: dict) -> dict:
-            parsed_dict = _parse_dict_for_pose(pose, entity_dict)
-            msa_val = _normalize_boltz_msa_for_yaml(parsed_dict.pop("msa", False), default_msa=default_msa)
-            if msa_val is not None:
-                parsed_dict["msa"] = msa_val
             return parsed_dict
 
         def _add_key_if_not_there(input_dict, key, value) -> None:
@@ -1071,7 +1044,7 @@ class BoltzParams:
 
         # sanity
         if not all(fp.endswith(".yaml") for fp in poses.poses_list()):
-            raise TypeError("Poses must be in boltz-compatible .yaml format. Use the function 'protflow.tools.boltz.convert_poses_to_boltz_yaml()' for this!")
+            raise TypeError("Poses must be in intellifold-compatible .yaml format. Use the function 'protflow.tools.intellifold.convert_poses_to_intellifold_yaml()' for this!")
 
         # create output dir
         os.makedirs(out_dir, exist_ok=True)
@@ -1081,13 +1054,13 @@ class BoltzParams:
         new_poses = []
         for pose in poses:
             # read pose yaml
-            pose_yaml = boltz_yaml_reader(pose["poses"])
+            pose_yaml = intellifold_yaml_reader(pose["poses"])
             #print(pose_yaml)
 
             # add sequences
             for protein_dict in self.proteins:
                 _add_key_if_not_there(pose_yaml, "sequences", [])
-                pose_yaml["sequences"].append({"protein": _parse_protein_dict_for_pose(pose, protein_dict)})
+                pose_yaml["sequences"].append({"protein": _parse_dict_for_pose(pose, protein_dict)})
 
             for dna_dict in self.dna:
                 pose_yaml["sequences"].append({"dna": _parse_dict_for_pose(pose, dna_dict)})
@@ -1115,7 +1088,7 @@ class BoltzParams:
 
             # write output
             new_pose_fn = os.path.join(out_dir, os.path.basename(pose["poses"]))
-            boltz_yaml_writer(new_pose_fn, pose_yaml)
+            intellifold_yaml_writer(new_pose_fn, pose_yaml)
 
             # add new filename to new_poses list for integration into poses later
             new_poses.append(new_pose_fn)
@@ -1123,22 +1096,21 @@ class BoltzParams:
         # set new poses
         if reset_poses:
             poses.df["poses"] = new_poses
-        logging.info(f"Finished converting poses to .yaml files based on BoltzParams.\nAdded {len(self.proteins)} proteins, {len(self.ligands)} ligands, {len(self.dna)} DNA molecules, and {len(self.rna)} RNA molecules.\nAdded {len(self.constraints)} constraints, {len(self.templates)} templates, and {len(self.properties)} properties.")
+        logging.info(f"Finished converting poses to .yaml files based on IntellifoldParams.\nAdded {len(self.proteins)} proteins, {len(self.ligands)} ligands, {len(self.dna)} DNA molecules, and {len(self.rna)} RNA molecules.\nAdded {len(self.constraints)} constraints, {len(self.templates)} templates, and {len(self.properties)} properties.")
 
-def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str|None = None, ignore_nonexistent_msa_file: bool = False) -> list[dict[str,str]]:
+def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str = None, ignore_nonexistent_msa_file: bool = False) -> dict[str,str]:
     '''
-    Converts dictionary that contains {chain: seq, ...} into boltz-compatible protein entries {}.
-    When msa is set to 'server', the function omits the MSA field (use option --use_msa_server!).
+    Converts dictionary that contains {chain: seq, ...} into intellifold-compatible protein entries {}.
+    When msa is set to 'server', the function will set <msa: empty> (use option --use_msa_server!)
 
-    Convert a chain→sequence mapping into Boltz YAML "protein" entries.
+    Convert a chain→sequence mapping into Intellifold YAML "protein" entries.
 
     Parameters
     ----------
     chain_seq_dict : dict[str, str]
         Mapping from chain ID to amino-acid sequence.
     msa : {"server", "empty", "auto"} or str or None, optional
-        If ``"server"`` → omit ``msa`` per chain. If
-        ``"empty"/"auto"/None`` → write ``"msa": "empty"`` per chain.
+        If ``"server"/"empty"/"auto"/None`` → write ``"msa": "empty"`` per chain.
         If a string path → use it as the MSA file for all chains (exists unless
         ``ignore_nonexistent_msa_file=True``).
     ignore_nonexistent_msa_file : bool, optional
@@ -1147,8 +1119,7 @@ def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str|
     Returns
     -------
     list of dict
-        One dict per chain with keys ``id`` and ``sequence``; ``msa`` is included
-        unless server-side MSA generation is requested.
+        One dict per chain with keys ``id``, ``sequence``, and ``msa``.
 
     Raises
     ------
@@ -1162,17 +1133,26 @@ def convert_chain_seq_dict_to_yaml_dict(chain_seq_dict: dict[str,str], msa: str|
     >>> convert_chain_seq_dict_to_yaml_dict({"A": "ACDE", "B": "FGHI"}, msa="empty")
     [{'id': 'A', 'sequence': 'ACDE', 'msa': 'empty'}, {'id': 'B', 'sequence': 'FGHI', 'msa': 'empty'}]
     '''
+    # parse MSA option
+    match msa:
+        case "server" | "empty" | "auto" | None:
+            msa_val = "empty"
+        case str():
+            msa_val = msa
+            if not os.path.isfile(msa) and not ignore_nonexistent_msa_file:
+                raise FileNotFoundError(f"Specified MSA file not found: {msa}")
+        case _:
+            raise ValueError(f"Not allowed: {msa}. Either provide a path to an existing MSA, None, 'server' (to get msa from msa-server), or 'empty'.")
+
     # create protein yaml for each chain.
-    msa_val = _normalize_boltz_msa_for_yaml(msa, ignore_nonexistent_msa_file=ignore_nonexistent_msa_file)
-    protein_yaml = []
-    for chain, seq in chain_seq_dict.items():
-        chain_yaml = {
+    protein_yaml = [
+        {
             "id": chain,
             "sequence": seq,
+            "msa": msa_val
         }
-        if msa_val is not None:
-            chain_yaml["msa"] = msa_val
-        protein_yaml.append(chain_yaml)
+        for chain, seq in chain_seq_dict.items()
+    ]
     return protein_yaml
 
 def _folders_in_dir(dir_path: str) -> list:
@@ -1183,8 +1163,8 @@ def _folders_in_dir(dir_path: str) -> list:
     return_dirs = [p for p in dir_path.iterdir() if p.is_dir() and not p.name.startswith(".")] # exclude hidden folders
     return return_dirs
 
-def _read_boltz_confidence_file(fp: str) -> pd.Series:
-    '''Reads boltz confidence output file.'''
+def _read_intellifold_confidence_file(fp: str) -> pd.Series:
+    '''Reads intellifold confidence output file.'''
     with open(fp, 'r', encoding="UTF-8") as f:
         scores_dict = json.load(f)
     return pd.Series(scores_dict)
@@ -1196,12 +1176,12 @@ def _get_last_dir_name(path: str) -> str:
         return p.name
     return p.parent.name
 
-def collect_boltz_scores(boltz_output_dir: str) -> pd.DataFrame:
+def collect_intellifold_scores(intellifold_output_dir: str) -> pd.DataFrame:
     """
-    Aggregate per-model Boltz outputs into a Pandas DataFrame.
+    Aggregate per-model Intellifold outputs into a Pandas DataFrame.
 
-    Expects the Boltz output layout:
-    ``{boltz_output_dir}/{input}/predictions/{pose}/`` containing:
+    Expects the Intellifold output layout:
+    ``{intellifold_output_dir}/{input}/predictions/{pose}/`` containing:
     - structure files: ``{pose}_model_*.cif`` or ``.pdb``
     - confidence JSONs: ``confidence_{pose}_model_{i}.json``
     - optional affinity JSON: ``affinity_{pose}.json``
@@ -1209,8 +1189,8 @@ def collect_boltz_scores(boltz_output_dir: str) -> pd.DataFrame:
 
     Parameters
     ----------
-    boltz_output_dir : str
-        Top-level directory passed to Boltz via ``--out_dir``.
+    intellifold_output_dir : str
+        Top-level directory passed to Intellifold via ``--out_dir``.
 
     Returns
     -------
@@ -1225,7 +1205,7 @@ def collect_boltz_scores(boltz_output_dir: str) -> pd.DataFrame:
     to the corresponding ``.pdb/.cif`` model file. :contentReference[oaicite:3]{index=3}
     """
     # create list of output files
-    out_fl = _folders_in_dir(boltz_output_dir)
+    out_fl = _folders_in_dir(intellifold_output_dir)
     out_fl = [os.path.join(out_f, "predictions") for out_f in out_fl]
 
     # create output aggregation list
@@ -1233,41 +1213,26 @@ def collect_boltz_scores(boltz_output_dir: str) -> pd.DataFrame:
 
     # loop over output folders {input_dir/input_file}/{predictions}/{input_file}/{diffusion_samples} -> multiple input files and multiple diffusion samples
     for out_f in out_fl:
-        for input_file in _folders_in_dir(out_f): # input_file should be: /path/to/boltz_output_dir/{boltz_input}/predictions/{input_file}/
+        for input_file in _folders_in_dir(out_f): # input_file should be: /path/to/intellifold_output_dir/{intellifold_input}/predictions/{input_file}/
             # basename of pose
             description = _get_last_dir_name(input_file)
-
             # loop over output models
-            output_models = glob(f"{input_file}/{description}_model_*.cif") + glob(f"{input_file}/{description}_model_*.pdb")
-            for pose_fp in output_models:
-                # determine rank
-                rank = int(os.path.splitext(os.path.basename(pose_fp))[0].rsplit("_", maxsplit=1)[-1]) # takes the rank (1) from /path/to/confidence_{pose_description}_model_1.json
+            json_sums = glob(os.path.join(input_file, f"{description}_*_summary_confidences.json"))
 
-                ## collect scores
-                pose_confidence_file = f"{input_file}/confidence_{description}_model_{rank}.json"
-                confidence_scores = _read_boltz_confidence_file(pose_confidence_file)
-
-                # parse description
-                confidence_scores["description"] = f"{description}_model_{rank}"
-                confidence_scores["location"] = pose_fp
-
-                # read affinity scores
-                affinity_fn = f"{input_file}/affinity_{description}.json"
-                if os.path.isfile(affinity_fn):
-                    affinity_scores = _read_boltz_confidence_file(affinity_fn)
-                    confidence_scores = pd.concat([confidence_scores, affinity_scores])
-
-                # add .npz file-locations into the scores
-                npz_file_headers = ["plddt", "pae", "pde"]
-                npz_files = [f"{input_file}/{header}_{description}_model_{rank}.npz" for header in npz_file_headers]
-                for npz_file, header in zip(npz_files, npz_file_headers):
-                    confidence_scores[f"{header}_location"] = npz_file
-
-                # append model scores to global output list:
-                out_l.append(confidence_scores)
+            out_df = []
+            for json_sum in json_sums:
+                ser = pd.read_json(json_sum, typ="series")
+                ser["location"] = json_sum.replace("_summary_confidences.json", ".cif")
+                ser["description"] = description_from_path(ser["location"])
+                ser["confidence_path"] = json_sum.replace("_summary_confidences.json", "_confidences.json")
+                out_df.append(ser)
+            out_df = pd.DataFrame(out_df).sort_values("ranking_score", ascending=False)
+            out_df["rank"] = range(1, len(out_df) + 1)
+            out_l.append(out_df)
 
     # aggregate scores in DataFrame
-    scores = pd.DataFrame(out_l)
+    scores = pd.concat(out_l)
+    scores.reset_index(drop=True, inplace=True)
     return scores
 
 def idx_to_char(idx: int) -> str:
@@ -1294,7 +1259,7 @@ class FlowSeq(list):
 
     When dumped with :class:`MyDumper`, lists of this type are emitted as
     ``[a, b, c]`` on one line rather than block style. Used to keep compact
-    representations for IDs and token tuples in Boltz YAMLs. :contentReference[oaicite:4]{index=4}
+    representations for IDs and token tuples in Intellifold YAMLs. :contentReference[oaicite:4]{index=4}
     """
     pass # pylint: disable=W0107
 
@@ -1306,16 +1271,16 @@ class MyDumper(yaml.SafeDumper):
     pass # pylint: disable=W0107
 
 # write class that autodetects lists in yaml and converts them into flow stuff
-def _process_boltz_yaml_for_output(boltz_yaml: dict) -> dict:
+def _process_intellifold_yaml_for_output(intellifold_yaml: dict) -> dict:
     '''This is now a manually done function which is annoying. Try to convert this with patterns later.'''
     # fix id entries in the same line, e.g.: 'id: [A, B]'
-    for sequence_entry in boltz_yaml.get("sequences", []):
+    for sequence_entry in intellifold_yaml.get("sequences", []):
         (_, entity_dict), = sequence_entry.items()
         if "id" in entity_dict and isinstance(entity_dict["id"], list):
             entity_dict["id"] = FlowSeq(entity_dict["id"])
 
     # same for constraint entries
-    for constraint_entry in boltz_yaml.get("constraints", []):
+    for constraint_entry in intellifold_yaml.get("constraints", []):
         (constraint_type, constraint_dict), = constraint_entry.items()
         if constraint_type == "bond":
             constraint_dict["atom1"] = FlowSeq(constraint_dict["atom1"])
@@ -1327,22 +1292,22 @@ def _process_boltz_yaml_for_output(boltz_yaml: dict) -> dict:
             constraint_dict["token2"] = FlowSeq(constraint_dict["token2"])
 
     # same for template entries (specifying ID's usually happens in lists if multiple IDs are specified)
-    for template_entry in boltz_yaml.get("constraints", []):
+    for template_entry in intellifold_yaml.get("constraints", []):
         for template_key in template_entry:
             if isinstance(template_entry[template_key], list):
                 template_entry[template_key] = FlowSeq(template_entry[template_key])
 
-    return boltz_yaml
+    return intellifold_yaml
 
-def boltz_yaml_writer(out_path: str, boltz_yaml: dict) -> None:
+def intellifold_yaml_writer(out_path: str, intellifold_yaml: dict) -> None:
     """
-    Write a Boltz YAML document to disk (pretty, stable layout).
+    Write a Intellifold YAML document to disk (pretty, stable layout).
 
     Parameters
     ----------
     out_path : str
         Output ``.yaml`` path.
-    boltz_yaml : dict
+    intellifold_yaml : dict
         YAML document to write (will be processed for flow-style lists).
 
     Returns
@@ -1350,7 +1315,7 @@ def boltz_yaml_writer(out_path: str, boltz_yaml: dict) -> None:
     None
     """
     MyDumper.add_representer(FlowSeq, _flow_seq_representer)
-    processed_yaml = _process_boltz_yaml_for_output(boltz_yaml)
+    processed_yaml = _process_intellifold_yaml_for_output(intellifold_yaml)
     with open(out_path, 'w', encoding="UTF-8") as f:
         yaml.dump(
             processed_yaml, f, Dumper=MyDumper,
@@ -1360,9 +1325,9 @@ def boltz_yaml_writer(out_path: str, boltz_yaml: dict) -> None:
             allow_unicode=True
         )
 
-def boltz_yaml_reader(in_path: str) -> dict:
+def intellifold_yaml_reader(in_path: str) -> dict:
     """
-    Read a Boltz YAML file into a Python dictionary.
+    Read a Intellifold YAML file into a Python dictionary.
 
     Parameters
     ----------

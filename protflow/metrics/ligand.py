@@ -81,7 +81,7 @@ from protflow import require_config, load_config_path
 from protflow.runners import Runner, RunnerOutput
 from protflow.poses import Poses
 from protflow.jobstarters import JobStarter, split_list
-from protflow.utils.biopython_tools import load_structure_from_pdbfile
+from protflow.utils.biopython_tools import biopython_load_structure
 from protflow.utils.utils import vdw_radii
 
 class LigandClashes(Runner):
@@ -927,7 +927,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
     """
 
     # verify inputs
-    pose = load_structure_from_pdbfile(pose)
+    pose = biopython_load_structure(pose)
 
     if exclude_ligand_elements:
         if not isinstance(exclude_ligand_elements, list):
@@ -1027,7 +1027,7 @@ def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max
     """
 
     # verify inputs
-    pose = load_structure_from_pdbfile(pose)
+    pose = biopython_load_structure(pose)
 
     if exclude_elements:
         exclude_elements = [element.lower() for element in exclude_elements]

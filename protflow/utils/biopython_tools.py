@@ -61,7 +61,7 @@ Markus Braun, Adrian Tripp
 import copy
 import os
 import string
-from typing import Union
+from typing import Any, Union
 import Bio.PDB.Entity
 import numpy as np
 import pandas as pd
@@ -82,7 +82,7 @@ import Bio.PDB.Structure
 from openbabel import pybel # needed for sdf saving, could be moved entierly to runner if we want to keep this module strictly biopython related
 
 # customs
-from ..residues import ResidueSelection
+from ..residues import AtomSelection, AtomSelectionInput, ResidueSelection
 
 def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Union[Structure, Model]:
     """
@@ -132,8 +132,13 @@ def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int
     # sanity
     if not os.path.isfile(path_to_pdb):
         raise FileNotFoundError(f"PDB file {path_to_pdb} not found!")
+
+
+    # there are pdf-file formatted files with different ext, e.g. .ent --> removing
+    """
     if not path_to_pdb.endswith(".pdb"):
         raise ValueError(f"File must be .pdb file. File: {path_to_pdb}")
+    """
 
     # set description as structure name if no other name is provided
     if not handle:
@@ -364,6 +369,148 @@ def superimpose(mobile: Structure, target: Structure, mobile_atoms: list = None,
     super_imposer.apply(mobile)
     return mobile
 
+def _normalize_atom_spec_residue_id(residue_id: Any) -> tuple[str, int, str]:
+    """Normalize compact residue IDs to BioPython residue IDs."""
+    if isinstance(residue_id, (list, tuple)):
+        if len(residue_id) != 3:
+            raise ValueError(f"BioPython residue IDs must have three elements. Got: {residue_id}")
+        hetero_flag, residue_number, insertion_code = residue_id
+        return (hetero_flag or " ", int(residue_number), insertion_code or " ")
+    return (" ", int(residue_id), " ")
+
+def _normalize_atom_spec_atom_id(atom_id: Any) -> tuple[Any, Any]:
+    """Normalize BioPython atom IDs and optional altloc identifiers."""
+    if isinstance(atom_id, list):
+        atom_id = tuple(atom_id)
+    if isinstance(atom_id, tuple) and len(atom_id) == 2:
+        return atom_id[0], atom_id[1]
+    return atom_id, None
+
+def _normalize_atom_spec_model_id(model_id: Any) -> Any:
+    """Normalize JSON-loaded model IDs where possible."""
+    try:
+        return int(model_id)
+    except (TypeError, ValueError):
+        return model_id
+
+def _resolve_atom_from_entity(
+    biomolecule: Bio.PDB.Entity.Entity,
+    model_id: Any,
+    chain_id: str,
+    residue_id: tuple[str, int, str],
+    atom_name: str,
+):
+    """Resolve an atom from a BioPython Structure, Model, Chain, or Residue."""
+    level = biomolecule.get_level()
+    if level == "S":
+        return biomolecule[_normalize_atom_spec_model_id(model_id)][chain_id][residue_id][atom_name]
+    if level == "M":
+        return biomolecule[chain_id][residue_id][atom_name]
+    if level == "C":
+        return biomolecule[residue_id][atom_name]
+    if level == "R":
+        return biomolecule[atom_name]
+    raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
+
+def _resolve_atom_from_compact_residue_id(
+    biomolecule: Bio.PDB.Entity.Entity,
+    model_id: Any,
+    chain_id: str,
+    residue_id: tuple[str, int, str],
+    atom_name: str,
+):
+    """Resolve compact residue IDs against hetero residues when exact lookup fails."""
+    _, residue_number, insertion_code = residue_id
+    level = biomolecule.get_level()
+    if level == "S":
+        chain = biomolecule[_normalize_atom_spec_model_id(model_id)][chain_id]
+    elif level == "M":
+        chain = biomolecule[chain_id]
+    elif level == "C":
+        chain = biomolecule
+    elif level == "R":
+        if int(biomolecule.id[1]) == residue_number and biomolecule.id[2] == insertion_code:
+            return biomolecule[atom_name]
+        raise KeyError((chain_id, residue_id, atom_name))
+    else:
+        raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
+
+    matches = [
+        residue
+        for residue in chain.get_residues()
+        if int(residue.id[1]) == residue_number
+        and residue.id[2] == insertion_code
+        and atom_name in residue
+    ]
+    if len(matches) == 1:
+        return matches[0][atom_name]
+    if len(matches) > 1:
+        match_ids = [residue.id for residue in matches]
+        raise ValueError(
+            f"Ambiguous compact residue ID {chain_id}{residue_number}{insertion_code.strip()} "
+            f"for atom {atom_name}; matching BioPython residue IDs: {match_ids}"
+        )
+    raise KeyError((chain_id, residue_id, atom_name))
+
+def atom_from_selection_spec(
+    biomolecule: Bio.PDB.Entity.Entity,
+    atom_spec: Any,
+    default_model: int = 0,
+):
+    """
+    Resolve one atom from a compact or full BioPython atom specification.
+
+    Supported atom ID forms match :class:`protflow.residues.AtomSelection`.
+    """
+    if not isinstance(atom_spec, (list, tuple)):
+        raise TypeError(f"Atom specifications must be tuple/list-like. Got {type(atom_spec)}: {atom_spec}")
+
+    atom_spec = list(atom_spec)
+    if len(atom_spec) == 3:
+        model_id = default_model
+        chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 4:
+        model_id, chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 5:
+        _, model_id, chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 6:
+        _, model_id, chain_id, residue_id, atom_name, altloc = atom_spec
+        atom_id = (atom_name, altloc)
+    else:
+        raise ValueError(f"Atom specifications must have 3, 4, 5, or 6 elements. Got {len(atom_spec)}: {atom_spec}")
+
+    allow_compact_residue_lookup = not isinstance(residue_id, (list, tuple))
+    residue_id = _normalize_atom_spec_residue_id(residue_id)
+    atom_name, altloc = _normalize_atom_spec_atom_id(atom_id)
+
+    try:
+        atom = _resolve_atom_from_entity(biomolecule, model_id, chain_id, residue_id, atom_name)
+    except KeyError as exc:
+        if allow_compact_residue_lookup:
+            try:
+                atom = _resolve_atom_from_compact_residue_id(biomolecule, model_id, chain_id, residue_id, atom_name)
+            except KeyError:
+                pass
+            else:
+                if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
+                    atom.disordered_select(altloc)
+                    atom = atom.selected_child
+                return atom
+        raise KeyError(f"Could not resolve atom specification {atom_spec} in biomolecule {biomolecule.get_full_id()}") from exc
+
+    if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
+        atom.disordered_select(altloc)
+        atom = atom.selected_child
+    return atom
+
+def get_atoms_of_atom_selection(
+    pose: Bio.PDB.Entity.Entity,
+    atom_selection: AtomSelectionInput,
+) -> list:
+    """Resolve an ordered :class:`~protflow.residues.AtomSelection` to BioPython atoms."""
+    atom_specs = AtomSelection(atom_selection).to_list()
+    return [atom_from_selection_spec(pose, atom_spec) for atom_spec in atom_specs]
+
 def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None, include_het_atoms: bool = False) -> list:
     '''
     Extract specific atoms from one or more chains in a Biopython ``Structure``.
@@ -488,7 +635,7 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
         out_atoms += res_atoms
     return out_atoms
 
-def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = False) -> Structure:
+def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = False, new_chain_id: str = None) -> Structure:
     """
     Add a chain from a reference structure to a target structure, optionally translating it and handling ID conflicts.
 
@@ -500,11 +647,13 @@ def add_chain(target: Structure, reference: Structure, copy_chain: str, translat
         The structure from which the chain will be copied.
     copy_chain : str
         The chain ID in the reference structure to be copied.
+    new_chain_id : str, optional
+        The chain ID to assign to the copied chain in the target structure. Defaults to copy_chain.
     translate_x : float, optional
         The distance by which to translate the new chain along the x-axis (default is None).
     overwrite : bool, optional
         Whether to overwrite the chain in the target structure if a chain with the same ID already exists.
-        If False and a conflict occurs, a new unique chain ID will be generated (default is True).
+        If False and a conflict occurs, a new unique chain ID will be generated (default is False).
 
     Returns
     -------
@@ -512,11 +661,11 @@ def add_chain(target: Structure, reference: Structure, copy_chain: str, translat
         The updated target structure with the added chain.
     """
     existing_chain_ids = {chain.id for chain in target.get_chains()}
-    new_chain_id = copy_chain
+    new_chain_id = new_chain_id or copy_chain
 
-    if copy_chain in existing_chain_ids:
+    if new_chain_id in existing_chain_ids:
         if overwrite:
-            target.detach_child(copy_chain)
+            target.detach_child(new_chain_id)
         else:
             new_chain_id = get_next_chain_id(existing_chain_ids)
 
@@ -688,11 +837,11 @@ def renumber_pdb_by_residue_mapping(pose_path: str, residue_mapping: dict, out_p
         return path_to_output_structure
 
     # change numbering
-    pose = load_structure_from_pdbfile(pose_path)
+    pose = biopython_load_structure(pose_path)
     pose = renumber_pose_by_residue_mapping(pose=pose, residue_mapping=residue_mapping, keep_chain=keep_chain)
 
     # save pose
-    save_structure_to_pdbfile(pose, path_to_output_structure)
+    save_structure_to_file(pose, path_to_output_structure)
     return path_to_output_structure
 
 def renumber_pose_by_residue_mapping(pose: Bio.PDB.Structure.Structure, residue_mapping: dict, keep_chain: str = "") -> Bio.PDB.Structure.Structure:
@@ -1023,16 +1172,14 @@ def remove_non_residue_residues(model: Model, remove_hydrogens: bool = False) ->
 
     return model
 
-
-
-def biopython_load_protein(protein_path: str, model_id: int = None, handle: str = "structure", file_type: str = None) -> Structure|Model:
+def biopython_load_structure(path: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None, file_type: str = None) -> Union[Structure, Model]:
     """TODO: write proper docstring!
     Loads proteins into biopython Structure/Model objects, irrespective of .pdb or .cif format.
     :file_type: parameter allows to specify explicity which loader should be used. can be {'cif', 'pdb', None}
     """
     # sanitation
     if file_type is None:
-        file_type = os.path.splitext(protein_path)[-1]
+        file_type = os.path.splitext(path)[-1]
 
     match file_type.lower():
         case "pdb" | ".pdb":
@@ -1042,29 +1189,31 @@ def biopython_load_protein(protein_path: str, model_id: int = None, handle: str 
         case _:
             raise ValueError(f":file_type: must be either of {{'cif', 'pdb'}}. Your :file_type: {file_type}")            
 
-    if not os.path.isfile(protein_path):
-        raise FileNotFoundError(protein_path)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(path)
 
     # handle .pdb files
-    if (protein_path.endswith(".pdb") or file_type.lower() == "pdb") and not file_type.lower() == "cif":
+    if (path.endswith(".pdb") or file_type.lower() == "pdb") and not file_type.lower() == "cif":
         protein = load_structure_from_pdbfile(
-            path_to_pdb=protein_path,
-            all_models=model_id is None,
-            model=model_id,
+            path_to_pdb=path,
+            all_models=all_models,
+            model=model,
+            quiet=quiet,
             handle=handle
         )
         return protein
 
     # handle .cif files
-    if protein_path.endswith(".cif") or file_type.lower() == "cif":
-        # load mmcif
-        parser = MMCIFParser()
-        protein = parser.get_structure(handle, protein_path)
+    if path.endswith(".cif") or file_type.lower() == "cif":
+        protein = load_structure_from_ciffile(
+            path_to_cif=path,
+            all_models=all_models,
+            model=model,
+            quiet=quiet,
+            handle=handle
+        )
 
-        # extract model if specified
-        if model_id:
-            protein = protein[model_id]
-        return protein
+    return protein
 
 
 def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
@@ -1084,10 +1233,18 @@ def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
         Residue name of the ligand to extract (e.g. ``"COC"``).
     """
     stem = os.path.splitext(os.path.basename(path))[0]
-    out_pdb = os.path.join(work_dir, f"{stem}.pdb")
-    out_sdf = os.path.join(work_dir, f"{stem}_ligand.sdf")
+    out_pdb = os.path.join(work_dir, f"{stem}_{ligand_name}.pdb")
+    out_sdf = os.path.join(work_dir, f"{stem}_{ligand_name}.sdf")
 
-    structure = biopython_load_protein(path, handle=stem)
+    structure = biopython_load_structure(path, handle=stem)
+
+    # fail fast if the requested ligand is absent, instead of silently writing an empty SDF
+    if not any(residue.resname == ligand_name for residue in structure.get_residues()):
+        hetatms = sorted({residue.resname for residue in structure.get_residues() if residue.id[0] != " "})
+        raise ValueError(
+            f"No residue named '{ligand_name}' found in {path}. "
+            f"HETATM residues present: {hetatms or 'none'}. Check the ligand_name argument."
+        )
 
     class _ProteinSelect(Bio.PDB.Select): # inherit from Bio.PDB.Select to write only ATOM records
         def accept_residue(self, residue):
@@ -1111,3 +1268,179 @@ def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
     mol.title = ligand_name
     mol.write("sdf", out_sdf, overwrite=True)
     return None
+
+
+def load_structure_from_ciffile(path_to_cif: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Union[Structure, Model]:
+    """
+    Load a structure from a PDB file using BioPython's PDBParser.
+
+    This function parses a PDB file and returns a structure object. It allows
+    the option to load all models from the PDB file or a specific model.
+
+    Parameters:
+    -----------
+        path_to_pdb (str):
+            Path to the PDB file to be parsed.
+        all_models (bool, optional):
+            If True, all models from the PDB file are returned.
+            If False, only the specified model is returned. Defaults to False.
+        model (int, optional):
+            The index of the model to return. Only used if all_models is False.
+            Defaults to 0 (first model).
+        quiet (bool, optional):
+            If True, suppresses output from the PDBParser. Defaults to True.
+        handle (str, optional):
+            String handle that is passed to the PDBParser's get_structure()
+            method and sets the id of the structure.
+
+    Returns:
+    --------
+        Bio.PDB.Structure:
+            The parsed structure object from the PDB file. If all_models is True,
+            returns a Structure containing all models. Otherwise, returns a single
+            Model object at the specified index.
+
+    Raises:
+    -------
+        FileNotFoundError:
+            If the specified PDB file does not exist.
+        ValueError:
+            If the specified model index is out of range for the PDB file.
+
+    Example:
+    --------
+        To load the first model from a PDB file:
+        >>> structure = load_structure_from_pdbfile("example.pdb")
+
+        To load all models from a PDB file:
+        >>> all_structures = load_structure_from_pdbfile("example.pdb", all_models=True)
+    """
+    # sanity
+    if not os.path.isfile(path_to_cif):
+        raise FileNotFoundError(f"mmCIF file {path_to_cif} not found!")
+
+    # set description as structure name if no other name is provided
+    if not handle:
+        handle = os.path.splitext(os.path.basename(path_to_cif))[0]
+
+    # load poses
+    parser = MMCIFParser(QUIET=quiet)
+    if all_models:
+        return parser.get_structure(handle, path_to_cif)
+    return parser.get_structure(handle, path_to_cif)[model]
+
+
+def save_structure_to_ciffile(pose: Structure, save_path: str) -> None:
+    """
+    Save a BioPython structure object to a cif file.
+
+    This function takes a BioPython `Structure` object and writes it to a specified file in cif format. It is useful for saving modified structures or for converting structures into PDB files for further analysis or visualization.
+
+    Parameters:
+    -----------
+    pose : Bio.PDB.Structure
+        The BioPython `Structure` object to be saved.
+    save_path : str
+        The file path where the cif file will be written. The file will be created if it does not exist, or overwritten if it does.
+
+    Returns:
+    --------
+    None
+
+    Raises:
+    -------
+    IOError
+        If the file cannot be written to the specified path.
+
+    Example:
+    --------
+    Save a BioPython structure to a cif file:
+
+    .. code-block:: python
+
+        from biopython_tools import save_structure_to_ciffile
+
+        structure = biopython_load_structure("example", "example.pdb")
+
+        # Save the structure to a new PDB file
+        save_structure_to_ciffile(structure, "output.pdb")
+    """
+
+    io = Bio.PDB.mmcifio.MMCIFIO()
+    io.set_structure(pose)
+    io.save(save_path)
+
+
+def save_structure_to_file(pose: Structure, save_path: str, multimodel: bool = False, file_type: str = None) -> None:
+    """
+    Save a BioPython structure object to a file of the selected file type (will be determined automatically from save_path if not set).
+
+    This function takes a BioPython `Structure` object and writes it to a specified file. It is useful for saving modified structures or for converting structures into files for further analysis or visualization.
+
+    Parameters:
+    -----------
+    pose : Bio.PDB.Structure
+        The BioPython `Structure` object to be saved.
+    save_path : str
+        The file path where the PDB file will be written. The file will be created if it does not exist, or overwritten if it does.
+    multimodel : bool
+        If the structure to be saved is a multimodel PDB file, write all models. Only works if input is a Structure object, not a model!
+    file_type : str, optional
+        Determines the file type of the output file. Must be either 'cif' or 'pdb'. Is determined from save_path if not set. Defaults to None.
+    
+    Returns:
+    --------
+    None
+
+    Raises:
+    -------
+    IOError
+        If the file cannot be written to the specified path.
+
+    Example:
+    --------
+    Save a BioPython structure to a PDB file:
+
+    .. code-block:: python
+
+        from biopython_tools import save_structure_to_file, biopython_load_structure
+        structure = biopython_load_structure("example.pdb")
+
+        # Save the structure to a new cif file
+        save_structure_to_file(structure, "output.cif")
+    """
+
+    # sanitation
+    if file_type is None:
+        file_type = os.path.splitext(save_path)[-1]
+
+    match file_type.lower():
+        case "pdb" | ".pdb":
+            file_type = "pdb"
+        case "cif" | "mmcif" | ".cif" | ".mmcif":
+            file_type = "cif"
+        case _:
+            raise ValueError(f":file_type: must be either of {{'cif', 'pdb'}}. Your :file_type: {file_type}")
+        
+    if file_type == "pdb":
+        save_structure_to_pdbfile(pose=pose, save_path=save_path, multimodel=multimodel)
+    
+    if file_type == "cif":
+        if multimodel:
+            raise KeyError("Output format cif does not offer multimodel support!")
+        
+        save_structure_to_ciffile(pose=pose, save_path=save_path)
+
+
+def biopython_fileconverter(input_file: str, output_format: str, output_file: str = None, input_format: str = None) -> str:
+    """Convert PDB/CIF structure files with BioPython."""
+
+    file, ext = os.path.splitext(input_file)
+    if not input_format:
+        input_format = ext[1:]
+    if not output_file:
+        output_file = file + f".{output_format}"
+
+    pose = biopython_load_structure(input_file, file_type=input_format)
+    save_structure_to_file(pose=pose, save_path=output_file, file_type=output_format)
+    return output_file

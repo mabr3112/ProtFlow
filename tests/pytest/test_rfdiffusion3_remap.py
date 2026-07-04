@@ -16,7 +16,8 @@ def test_remap_rfd3_motifs_updates_residue_and_atom_selection_columns():
     poses = _Poses(
         pd.DataFrame(
             {
-                "rfd3_diffused_index_map": [{"A1": "B10", "A2": "B11", "Z9": "C12"}],
+                "rfd3_diffused_index_map": [{"A1": "B10", "A2": "B11"}],
+                "rfd3_ligand_renumbering_map": [{"Z9": "C12"}],
                 "residue_motif": [ResidueSelection(["A1", "A2"])],
                 "atom_motif": [AtomSelection([("A", 1, "N"), ("A", 2, "CA"), ("Z", ("H_LIG", 9, " "), "C1")])],
             }

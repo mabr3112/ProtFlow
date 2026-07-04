@@ -80,7 +80,7 @@ from protflow.poses import Poses
 from protflow.jobstarters import JobStarter
 from protflow.tools.protein_edits import ChainRemover
 from protflow.runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string
-from protflow.utils.biopython_tools import load_structure_from_pdbfile, save_structure_to_pdbfile
+from protflow.utils.biopython_tools import biopython_load_structure, save_structure_to_file
 from .. import require_config, load_config_path
 
 class GNINA(Runner):
@@ -290,10 +290,10 @@ class GNINA(Runner):
         ligands = glob(os.path.join(ligand_out_dir, "*.pdb"))
         descriptions, paths = [], []
         for ligand in ligands:
-            lig = load_structure_from_pdbfile(ligand, all_models=True)
+            lig = biopython_load_structure(ligand, all_models=True)
             for index, model in enumerate(lig):
                 filename = f"{os.path.splitext(os.path.basename(ligand))[0]}_{str(index).zfill(4)}.pdb"
-                save_structure_to_pdbfile(model, save_path=os.path.join(separate_ligands_dir, filename))
+                save_structure_to_file(model, save_path=os.path.join(separate_ligands_dir, filename))
                 paths.append(filename)
                 descriptions.append(os.path.splitext(os.path.basename(ligand))[0])
 
@@ -491,10 +491,10 @@ def collect_scores(work_dir:str, return_seq_threaded_pdbs_as_pose:bool, preserve
     ligands = glob(os.path.join(ligand_out_dir, "*.pdb"))
     descriptions, paths = [], []
     for ligand in ligands:
-        lig = load_structure_from_pdbfile(ligand, all_models=True)
+        lig = biopython_load_structure(ligand, all_models=True)
         for index, model in enumerate(lig):
             filename = f"{os.path.splitext(os.path.basename(ligand))[0]}_{str(index+1).zfill(4)}.pdb"
-            save_structure_to_pdbfile(model, save_path=os.path.join(separate_ligands_dir, filename))
+            save_structure_to_file(model, save_path=os.path.join(separate_ligands_dir, filename))
             paths.append(filename)
             descriptions.append(os.path.splitext(os.path.basename(ligand))[0])
     

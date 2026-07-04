@@ -10,6 +10,7 @@ if "protflow.config" not in sys.modules:
     cfg.__package__ = "protflow"
 
     cfg.PROTFLOW_DIR = "../"
+    cfg.PROTFLOW_ENV = "python3"
     cfg.AUXILIARY_RUNNER_SCRIPTS_DIR = os.path.join(
         os.getcwd(), "protflow", "tools", "runners_auxiliary_scripts"
     )
