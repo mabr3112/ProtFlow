@@ -19,6 +19,11 @@ LIGANDMPNN_SCRIPT_PATH = "" # "/path/to/LigandMPNN/run.py"
 LIGANDMPNN_PYTHON_PATH = "" # "/path/to/anaconda3/envs/ligandmpnn_env/bin/python3"
 LIGANDMPNN_PRE_CMD = "" # "echo 'this will be printed before running ligandmpnn'"
 
+# PottsMPNN
+POTTSMPNN_DIR = "" # "/path/to/PottsMPNN"
+POTTSMPNN_PYTHON = "" # "/path/to/anaconda3/envs/PottsMPNN/bin/python"
+POTTSMPNN_PRE_CMD = ""
+
 # rosetta.py
 ROSETTA_BIN_PATH = "" # "/path/to/Rosetta/main/source/bin/"
 ROSETTA_PRE_CMD = ""
