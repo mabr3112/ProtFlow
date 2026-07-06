@@ -1113,7 +1113,7 @@ class RFdiffusion3(Runner):
 
         if not multiplex_poses:
             multiplex_poses = 1
-        
+    
         if update_motifs:
             if not isinstance(update_motifs, list):
                 raise ValueError(f"Parameter update_motifs must contain list of pose_cols! update_motifs: {update_motifs}")
