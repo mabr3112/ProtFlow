@@ -1126,6 +1126,7 @@ def collect_scores_sample_seqs(work_dir: str, batched: bool, include_scores: lis
         if "_optimized_" not in os.path.splitext(os.path.basename(path))[0]
     ]
     optimized_seq_files = _glob_output_files(out_dirs, "*_optimized_*.fasta")
+    pdb_locations = _sample_pdb_locations(configs)
 
     if not raw_seq_files and not optimized_seq_files:
         raise FileNotFoundError(f"No PottsMPNN FASTA outputs found under {work_dir}.")
@@ -1145,6 +1146,9 @@ def collect_scores_sample_seqs(work_dir: str, batched: bool, include_scores: lis
 
     if not av_loss_df.empty:
         scores = scores.merge(av_loss_df, on=["raw_description", "description", "sample_idx"], how="left")
+
+    if pdb_locations:
+        scores = _add_sample_pdb_locations(scores=scores, pdb_locations=pdb_locations)
 
     # write per-sequence FASTA files for RunnerOutput locations
     fasta_output_dir = os.path.join(work_dir, "output_fastas")
@@ -1391,10 +1395,15 @@ def _load_run_configs(work_dir: str) -> list[dict[str, Any]]:
 
 def _read_input_descriptions(input_list: str | None) -> list[str]:
     """Read base pose descriptions from a PottsMPNN input list."""
+    return [entry.split("|", maxsplit=1)[0] for entry in _read_input_entries(input_list)]
+
+
+def _read_input_entries(input_list: str | None) -> list[str]:
+    """Read non-empty PottsMPNN input-list entries."""
     if not input_list:
         return []
     with open(input_list, "r", encoding="UTF-8") as handle:
-        return [line.strip().split("|", maxsplit=1)[0] for line in handle if line.strip()]
+        return [line.strip() for line in handle if line.strip()]
 
 
 def _output_dirs_from_configs(configs: list[dict[str, Any]], batched: bool) -> list[str]:
@@ -1407,6 +1416,69 @@ def _output_dirs_from_configs(configs: list[dict[str, Any]], batched: bool) -> l
 def _glob_output_files(out_dirs: list[str], pattern: str) -> list[str]:
     """Find output files matching a pattern across output directories."""
     return sorted(path for out_dir in out_dirs for path in glob(os.path.join(out_dir, pattern)))
+
+
+def _sample_pdb_locations(configs: list[dict[str, Any]]) -> dict[str, str]:
+    """Return existing ``sample_seqs.py`` PDB outputs keyed by input entry."""
+    # PottsMPNN writes redesigned PDBs beside FASTA outputs under <out_name>_pdbs.
+    locations = {}
+    for cfg in configs:
+        pdb_dir = os.path.join(cfg["out_dir"], f"{cfg['out_name']}_pdbs")
+        input_entries = _read_input_entries(cfg.get("input_list"))
+        base_counts = {}
+        for input_entry in input_entries:
+            base = input_entry.split("|", maxsplit=1)[0]
+            base_counts[base] = base_counts.get(base, 0) + 1
+        for input_entry in input_entries:
+            base = input_entry.split("|", maxsplit=1)[0]
+            use_chain_suffix = base_counts[base] > 1
+            pdb_filename = _sample_pdb_filename(input_entry, use_chain_suffix=use_chain_suffix)
+            pdb_path = os.path.join(pdb_dir, pdb_filename)
+            if os.path.isfile(pdb_path):
+                locations[input_entry if use_chain_suffix else base] = os.path.abspath(pdb_path)
+    return locations
+
+
+def _sample_pdb_filename(input_entry: str, use_chain_suffix: bool) -> str:
+    """Build the PDB filename used by upstream ``rewrite_pdb_sequences``."""
+    parts = input_entry.split("|")
+    if use_chain_suffix and len(parts) == 3:
+        pdb_name, designed_chains, visible_chains = parts
+        designed_suffix = designed_chains.replace(":", "-")
+        if visible_chains:
+            return f"{pdb_name}_{designed_suffix}_{visible_chains.replace(':', '-')}.pdb"
+        return f"{pdb_name}_{designed_suffix}.pdb"
+    return f"{parts[0]}.pdb"
+
+
+def _add_sample_pdb_locations(scores: pd.DataFrame, pdb_locations: dict[str, str]) -> pd.DataFrame:
+    """Attach collected sample PDB paths to the rows they represent."""
+    scores = scores.copy()
+    scores["pdb_location"] = pd.NA
+    seen = set()
+    for idx, row in scores.iterrows():
+        source = _sample_source_description(str(row["raw_description"]), pdb_locations)
+        if source not in pdb_locations or source in seen:
+            continue
+
+        # sample_seqs writes one best-sequence PDB per input entry.
+        scores.at[idx, "pdb_location"] = pdb_locations[source]
+        seen.add(source)
+    return scores
+
+
+def _sample_source_description(raw_description: str, pdb_locations: dict[str, str]) -> str:
+    """Map a sampled FASTA description back to its input-list entry."""
+    # Match the longest input entry first so names containing underscores remain intact.
+    for input_entry in sorted(pdb_locations, key=len, reverse=True):
+        if raw_description == input_entry:
+            return input_entry
+        prefix = f"{input_entry}_"
+        if raw_description.startswith(prefix) and raw_description[len(prefix):].isdigit():
+            return input_entry
+    if raw_description.rsplit("_", maxsplit=1)[-1].isdigit():
+        return raw_description.rsplit("_", maxsplit=1)[0]
+    return raw_description
 
 
 def _config_for_output_file(path: str, configs: list[dict[str, Any]]) -> dict[str, Any]:
