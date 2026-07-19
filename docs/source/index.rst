@@ -34,6 +34,12 @@ Key Features
    tools/index
 
 .. toctree::
+   :maxdepth: 1
+   :caption: ProtFlow Metrics:
+
+   metrics/index
+
+.. toctree::
    :maxdepth: 2
    :caption: ProtFlow API docs:
 

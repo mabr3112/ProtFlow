@@ -9,9 +9,10 @@ hbplus.py — ProtFlow Metric Module
 This module provides two public classes and a set of module-level utilities
 for running HBplus within ProtFlow and querying its output:
  
-* :class:`HBplus_query` — a :class:`~collections.UserDict` subclass that
-  builds per-pose H-bond filter specifications (target atoms/residues,
-  donor/acceptor type, backbone/sidechain category, and partner selections).
+* :class:`HBplus_query` — a query builder for per-pose H-bond filter
+  specifications (target atoms/residues, donor/acceptor type,
+  backbone/sidechain category, and partner selections). Category filters are
+  represented by the API but are not currently parsed successfully.
 * :class:`HBplus` — the ProtFlow :class:`~protflow.runners.Runner` subclass
   that executes HBplus on every pose, collects the resulting ``.hb2`` files,
   and optionally applies one or more :class:`HBplus_query` filters via
@@ -68,7 +69,6 @@ Dependencies
 * `pandas <https://pandas.pydata.org/>`_
 * `numpy <https://numpy.org/>`_ (:func:`~numpy.array_split`,
   :func:`~numpy.sort`)
-* :mod:`collections.UserDict`
 * :mod:`protflow.poses` (:class:`~protflow.poses.Poses`)
 * :mod:`protflow.residues` (:class:`~protflow.residues.ResidueSelection`,
   :class:`~protflow.residues.AtomSelection`)
@@ -82,17 +82,20 @@ Run HBplus and immediately query for active-site H-bonds::
  
     from protflow.poses import Poses
     from protflow.jobstarters import SbatchArrayJobstarter
-    from protflow.runners.hbplus import HBplus, HBplus_query
+    from protflow.metrics import HBplus, HBplus_query
     from protflow.residues import ResidueSelection
  
-    poses = Poses("structures/", prefix="design")
+    poses = Poses(
+        poses="structures/",
+        glob_suffix="*.pdb",
+        work_dir="/path/to/output_dir/",
+    )
     jobstarter = SbatchArrayJobstarter(max_cores=20)
  
-    # Build a query: all H-bonds donated by active-site residues (side-chain only)
-    query = HBplus_query(name="active_site", poses=poses)
+    # Build a query: all H-bonds donated by active-site residues
+    query = HBplus_query(name="active_site")
     query.set_target(target_res=ResidueSelection("A12,A57,A102"))
     query.set_target_type("donor")
-    query.set_target_category("S")
  
     runner = HBplus()
     poses = runner.run(
@@ -107,9 +110,8 @@ Run HBplus first, then query separately::
     runner = HBplus()
     poses = runner.run(poses=poses, prefix="hb")
  
-    query = HBplus_query(name="ligand_contacts", poses=poses)
+    query = HBplus_query(name="ligand_contacts")
     query.set_target(target_res=ResidueSelection("A200"))
-    query.set_target_category(["S", "H"])
  
     poses = runner.query(poses=poses, queries=[query], hbplus_prefix="hb")
 """
@@ -143,24 +145,25 @@ class HBplus_query:
     """
     Builder for H-bond filter queries on HBplus output.
  
-    :class:`HBplus_query` is a :class:`~collections.UserDict` subclass
-    whose underlying dictionary maps each pose description to a per-pose
-    query specification dict.  The query dict controls which H-bonds are
-    selected when :meth:`HBplus.query` processes the ``.hb2`` output files
-    produced by :meth:`HBplus.run`.
+    :class:`HBplus_query` stores a reusable query definition. When the query
+    is passed to :meth:`HBplus.query`, :meth:`parse_query` resolves fixed
+    values and ``poses.df`` column references into one filter dictionary per
+    pose. These dictionaries control which H-bonds are selected from the
+    ``.hb2`` files produced by :meth:`HBplus.run`.
  
     Filters can target specific atoms or residues (via
     :class:`~protflow.residues.AtomSelection` or
     :class:`~protflow.residues.ResidueSelection`), restrict the role of
-    those atoms (donor or acceptor), limit by bond category (main-chain
-    ``"M"``, side-chain ``"S"``, or heteroatom ``"H"``), and optionally
-    require that the other side of the bond also belongs to a specified
-    partner selection.
+    those atoms (donor or acceptor), and optionally require that a bond also
+    contains a specified partner selection. The query schema also represents
+    bond categories (main-chain ``"M"``, side-chain ``"S"``, or heteroatom
+    ``"H"``), although category parsing is not currently functional.
  
-    Each ``set_*`` method supports either a single value applied uniformly
-    to all poses or a ``poses.df`` column name from which a per-pose value
-    is extracted (controlled by the corresponding ``from_pose_col`` /
-    ``atms_from_pose_col`` / ``res_from_pose_col`` flag).
+    Each ``set_*`` method supports either a fixed value applied uniformly to
+    all poses or a ``poses.df`` column name from which a per-pose value is
+    extracted when the query is parsed (controlled by the corresponding
+    ``from_pose_col`` / ``atms_from_pose_col`` /
+    ``res_from_pose_col`` flag).
  
     Parameters
     ----------
@@ -169,19 +172,14 @@ class HBplus_query:
         column-name prefix when results are merged back into ``poses.df``
         by :meth:`HBplus.query`.  All query names within a single
         :meth:`~HBplus.query` call must be distinct.
-    poses : Poses
-        The current pose collection.  Used to initialise one empty
-        specification entry per pose and to resolve column-name lookups
-        in ``poses.df``.
- 
     Attributes
     ----------
     name : str
         The query identifier.
-    data : dict
-        The underlying query dictionary.  Keys are pose descriptions;
-        values are dicts mapping filter names to their values.  Populated
-        by the ``set_*`` methods and reset by :meth:`reset`.
+    target_atms, target_res, partner_atms, partner_res : tuple or None
+        Stored selection value and its ``from_pose_col`` flag.
+    target_type, target_category, partner_category : tuple or None
+        Stored filter value and its ``from_pose_col`` flag.
  
     Notes
     -----
@@ -196,32 +194,32 @@ class HBplus_query:
       so that any atom of those residues is matched.
     * The ``"partner"`` filter requires that ``"target"`` is also set;
       querying for partners alone is not supported.
+    * Partner filtering is reliable for disjoint target and partner
+      selections. It does not preserve endpoint orientation, so overlapping
+      selections cannot require that both endpoints are selected.
     * Category values can be combined: passing ``["S", "H"]`` to
-      :meth:`set_target_category` matches both side-chain and heteroatom
-      H-bonds.
+      :meth:`set_target_category` represents both side-chain and heteroatom
+      H-bonds, but category filters currently fail during :meth:`parse_query`.
  
     Examples
     --------
     Query for all donor H-bonds from a binding-site residue selection,
-    restricted to side-chain atoms, targeting any partner::
+    targeting any partner::
  
         query = HBplus_query(name="binding_site_donors")
         query.set_target(target_res=ResidueSelection("A12,A57"))
         query.set_target_type("donor")
-        query.set_target_category("S")
  
     Query using per-pose residue selections stored in a DataFrame column::
  
         query = HBplus_query(name="per_pose_target")
         query.set_target(target_res="active_site_col", res_from_pose_col=True)
-        query.set_target_category(["S", "H"])
  
     Query for H-bonds between a target residue and a ligand (heteroatom)::
  
         query = HBplus_query(name="target_ligand_hbonds")
         query.set_target(target_res=ResidueSelection("A57"))
         query.set_partner(partner_res=ResidueSelection("A200"))
-        query.set_partner_category("H")
     """
 
     def __init__(self, name: str):
@@ -295,10 +293,11 @@ class HBplus_query:
     def set_partner(self, partner_atms: AtomSelection = None, partner_res: ResidueSelection = None, atms_from_pose_col: bool = False, res_from_pose_col: bool = False):
         """Filter for H-bonds between the target and a specific partner selection.
  
-        Restricts results to H-bonds where the atom on the *other* side of the
-        bond (i.e. not the target) belongs to the partner selection.  Requires
-        that :meth:`set_target` has been called first.  Accepts the same
-        argument formats as :meth:`set_target`.
+        Restricts results to H-bonds containing both the target and partner
+        selections. Requires that :meth:`set_target` has been called first
+        and accepts the same argument formats as :meth:`set_target`. Target
+        and partner should be disjoint: the current second-pass filter does
+        not preserve which endpoint originally matched the target.
  
         Parameters
         ----------
@@ -374,7 +373,7 @@ class HBplus_query:
             query.set_target_type("role_col", from_pose_col=True)
         """
         self.target_type = (target_type, from_pose_col)
-        return
+        return self
     
     def set_target_category(self, target_cat: str | list, from_pose_col: bool = False):
         """Filter for H-bonds originating from main-chain, side-chain, or heteroatoms.
@@ -401,6 +400,11 @@ class HBplus_query:
         ------
         KeyError
             If any supplied category code is not in ``["M", "S", "H"]``.
+
+        Notes
+        -----
+        Category filters are stored by this method but currently fail during
+        :meth:`parse_query`; category query support is not yet functional.
  
         Examples
         --------
@@ -436,6 +440,11 @@ class HBplus_query:
         ------
         KeyError
             If any category code is not in ``["M", "S", "H"]``.
+
+        Notes
+        -----
+        Category filters are stored by this method but currently fail during
+        :meth:`parse_query`; category query support is not yet functional.
  
         Examples
         --------
@@ -461,14 +470,14 @@ class HBplus_query:
         if self.target_type:
             if self.target_type[1]:
                 col_in_df(poses.df, self.target_type[0])
-                target_type = poses.df[target_type[0]].to_list()
+                target_types = poses.df[self.target_type[0]].to_list()
             else:
-                target_type = [target_type for _ in poses.poses_list()]
+                target_types = [self.target_type[0] for _ in poses.poses_list()]
 
-            if not all(t_type in HBPLUS_QUERY_STYLE["target_type"] for t_type in target_type):
+            if not all(t_type in HBPLUS_QUERY_STYLE["target_type"] for t_type in target_types):
                 raise KeyError(f":target_type: must be one of {HBPLUS_QUERY_STYLE['target_type']}!")
             
-            query_dict = self._set_filter(query_dict, "target_type", target_type)
+            query_dict = self._set_filter(query_dict, "target_type", target_types)
         
         if self.target_category:
             query_dict = self._set_category(query_dict, "target_category", poses, self.target_category[0], self.target_category[1])
@@ -582,24 +591,27 @@ class HBplus(Runner):
  
     Notes
     -----
-    * HBplus must be run on PDB files.  CIF input is not supported.
+    * HBplus itself receives PDB files. Other pose formats are converted to
+      PDB through :meth:`~protflow.poses.Poses.convert_poses` before execution.
     * The ``__str__`` method returns ``"hbplus"`` for use in log messages
       and scorefile naming.
-    * :meth:`query` always overwrites its own scorefile (``overwrite=True``
-      is hard-coded internally) because query results are cheap to recompute
-      and depend on the query definition which may change between calls.
+    * :meth:`query` reuses its scorefile when ``overwrite=False``. Pass
+      ``overwrite=True`` whenever the query definitions have changed for an
+      existing *hbplus_prefix*.
  
     Examples
     --------
     ::
  
-        from protflow.runners.hbplus import HBplus, HBplus_query
+        from protflow.metrics import HBplus, HBplus_query
+        from protflow.residues import ResidueSelection
  
         runner = HBplus()
         poses = runner.run(poses=poses, prefix="hb")
  
-        query = HBplus_query(name="sc_hbonds", poses=poses)
-        query.set_target_category("S")
+        query = HBplus_query(name="active_site_donors")
+        query.set_target(target_res=ResidueSelection("A12,A57"))
+        query.set_target_type("donor")
         poses = runner.query(poses=poses, queries=[query], hbplus_prefix="hb")
     """
     index_layers = 0
@@ -635,7 +647,8 @@ class HBplus(Runner):
         Parameters
         ----------
         poses : Poses
-            Input pose collection.  All poses must be PDB files.
+            Input pose collection. Non-PDB poses are converted to PDB before
+            HBplus is executed.
         prefix : str
             Column prefix used to namespace new columns in ``poses.df`` and
             to name the working directory
@@ -686,10 +699,9 @@ class HBplus(Runner):
  
         Notes
         -----
-        * HBplus writes output to the *current working directory*.  The
-          runner changes ``os.getcwd()`` to ``<work_dir>/output/`` before
-          starting jobs and restores it immediately after, regardless of
-          job success or failure.
+        * HBplus writes output to the *current working directory*. The runner
+          changes ``os.getcwd()`` to ``<work_dir>/output/`` while starting
+          jobs and restores it after the jobstarter returns.
         * One HBplus command is generated per pose; no batching is applied
           at the :meth:`run` level (batching for query post-processing is
           handled inside :meth:`query`).
@@ -705,9 +717,9 @@ class HBplus(Runner):
  
         Run HBplus and immediately apply a donor query::
  
-            query = HBplus_query(name="donors", poses=poses)
+            query = HBplus_query(name="active_site_donors")
+            query.set_target(target_res=ResidueSelection("A12,A57"))
             query.set_target_type("donor")
-            query.set_target_category("S")
  
             poses = runner.run(
                 poses=poses,
@@ -808,8 +820,10 @@ class HBplus(Runner):
             dicts of dicts.  Useful for detailed inspection but increases
             memory usage.  Default is ``False``.
         overwrite : bool, optional
-            Currently unused; the query scorefile is always recomputed.
-            Retained for API consistency with other runners.
+            When ``True``, recompute the query even if its scorefile exists.
+            When ``False`` (default), reuse the existing query scorefile.
+            Use ``True`` after changing a query definition for the same
+            *hbplus_prefix*.
  
         Returns
         -------
@@ -820,27 +834,29 @@ class HBplus(Runner):
  
             ``query_num_hbonds`` : int
                 Number of unique H-bonds directly matching the query filter.
-            ``query_donor_hbonded_atoms`` : AtomSelection
-                Atoms acting as donors in the filtered H-bonds.
-            ``query_acceptor_hbonded_atoms`` : AtomSelection
-                Atoms acting as acceptors in the filtered H-bonds.
-            ``query_hbonded_atoms`` : AtomSelection
-                Union of donor and acceptor atoms in the filtered H-bonds.
+            ``query_donor_hbonded_atoms`` : dict
+                Scorefile representation of atoms acting as donors in the
+                filtered H-bonds (``{"atoms": [...]}``).
+            ``query_acceptor_hbonded_atoms`` : dict
+                Scorefile representation of atoms acting as acceptors.
+            ``query_hbonded_atoms`` : dict
+                Scorefile representation of the donor/acceptor atom union.
             ``network_num_hbonds`` : int
                 Total unique H-bonds in the extended H-bond network seeded
                 by the query matches (propagated through side-chain and
                 heteroatom bridges).
-            ``network_donor_hbonded_atoms`` : AtomSelection
-                All donor atoms in the extended network.
-            ``network_acceptor_hbonded_atoms`` : AtomSelection
-                All acceptor atoms in the extended network.
-            ``network_hbonded_atoms`` : AtomSelection
-                Union of all donor and acceptor atoms in the extended network.
-            ``network_sc_hbond_residues`` : ResidueSelection
-                Residues in the network that participate via side-chain H-bonds.
-            ``network_het_hbond_residues`` : ResidueSelection
-                Residues in the network that participate via heteroatom
-                (water, ligand) H-bonds.
+            ``network_donor_hbonded_atoms`` : dict
+                Scorefile representation of all donor atoms in the network.
+            ``network_acceptor_hbonded_atoms`` : dict
+                Scorefile representation of all acceptor atoms in the network.
+            ``network_hbonded_atoms`` : dict
+                Scorefile representation of all atoms in the network.
+            ``network_sc_hbond_residues`` : dict
+                Scorefile representation of residues participating via
+                side-chain H-bonds (``{"residues": [...]}``).
+            ``network_het_hbond_residues`` : dict
+                Scorefile representation of residues participating via
+                heteroatom (water, ligand) H-bonds.
  
             When *full_output* is ``True``, two additional columns are present:
  
@@ -879,13 +895,12 @@ class HBplus(Runner):
  
         Examples
         --------
-        Query for all H-bonds donated by active-site side-chains, plus
-        the extended network they seed::
+        Query for all H-bonds donated by active-site residues, plus the
+        extended network they seed::
  
-            query = HBplus_query(name="active_site", poses=poses)
+            query = HBplus_query(name="active_site")
             query.set_target(target_res=ResidueSelection("A12,A57,A102"))
             query.set_target_type("donor")
-            query.set_target_category("S")
  
             poses = runner.query(
                 poses=poses,
@@ -894,16 +909,15 @@ class HBplus(Runner):
                 full_output=True,
             )
             # poses.df["hb_query_active_site_query_num_hbonds"]  -> int per pose
-            # poses.df["hb_query_active_site_network_sc_hbond_residues"]  -> ResidueSelection per pose
+            # poses.df["hb_query_active_site_network_sc_hbond_residues"]  -> scorefile dict per pose
  
         Multiple queries in one call::
  
-            q1 = HBplus_query(name="donors", poses=poses)
+            q1 = HBplus_query(name="donors")
             q1.set_target_type("donor")
  
-            q2 = HBplus_query(name="ligand_contacts", poses=poses)
+            q2 = HBplus_query(name="ligand_contacts")
             q2.set_target(target_res=ResidueSelection("A200"))
-            q2.set_target_category("H")
  
             poses = runner.query(poses=poses, queries=[q1, q2], hbplus_prefix="hb")
         """
@@ -1050,8 +1064,6 @@ def _detect_networks(unfiltered_df: pd.DataFrame, filtered_df: pd.DataFrame) -> 
             # add empty selection
             target.append(AtomSelection(atoms=()))
             
-        non_bb.to_csv("test.csv")
-
         non_bb_atms = AtomSelection.from_list([_convert_hbplus_to_tuple(res, atm) for res, atm in zip(non_bb[f"{cat}_res"], non_bb[f"{cat}_atom"])])
         target.append(non_bb_atms)
 

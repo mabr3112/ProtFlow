@@ -808,8 +808,9 @@ class DistanceSelector(ResidueSelector):
                     raise KeyError(f"Residue {chain}{resnum} not found in pose {pose_path}!")
                 center_res.append(res[0])
 
-        # get all noncenter residues
-        noncenter_res = [res for res in pose.get_residues() if not res.id[1] == resnum or not res.parent.id == chain]
+        # Exclude every center using its full BioPython chain/residue identity.
+        center_ids = {(res.parent.id, res.id) for res in center_res}
+        noncenter_res = [res for res in pose.get_residues() if (res.parent.id, res.id) not in center_ids]
 
         selected_residues = self._determine_residues_in_distance(central_residues=center_res, noncentral_residues=noncenter_res, distance=distance, operator=operator, center_atoms=center_atoms, noncenter_atoms=noncenter_atoms)
 

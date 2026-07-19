@@ -111,7 +111,7 @@ SIGMADOCK_CKPT_PATH = "" # "/path/to/sigmadock/model/sample_checkpoint_0.ckpt"
 SIGMADOCK_PRE_CMD = "" # "export PATH=/path/to/package_manager/envs/sigmadock/bin:$PATH"
 
 # hbplus
-HPLUS_PATH = "" # "/path/to/hbplus/hbplus"
+HBPLUS_PATH = "" # "/path/to/hbplus/hbplus"
 
 # hydraprot
 HYDRAPROT_DIR_PATH = "" #"/path/to/HydraProt"
