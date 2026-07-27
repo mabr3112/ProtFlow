@@ -126,6 +126,8 @@ class PottsMPNN(Runner):
         Resolved PottsMPNN Python interpreter.
     pre_cmd : str
         Resolved shell prefix.
+    sample_seqs_path : str
+        ProtFlow-internal ``sample_seqs.py`` implementation.
 
     Notes
     -----
@@ -161,6 +163,10 @@ class PottsMPNN(Runner):
         self.pottsmpnn_dir = str(pottsmpnn_dir or load_config_path(config, "POTTSMPNN_DIR"))
         self.python_path = str(python_path or load_config_path(config, "POTTSMPNN_PYTHON"))
         self.pre_cmd = pre_cmd or load_config_path(config, "POTTSMPNN_PRE_CMD", is_pre_cmd=True)
+        self.sample_seqs_path = os.path.join(
+            load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"),
+            "pottsmpnn_sample_seqs.py",
+        )
 
         # setup runner state
         self.jobstarter = jobstarter
@@ -354,14 +360,17 @@ class PottsMPNN(Runner):
                 f"{sorted(SUPPORTED_CONFIG_SCRIPTS)}"
             )
 
-        # search direct path and checkout-relative path
-        candidates = [str(script)]
-        if not str(script).endswith(".py"):
-            candidates.append(f"{script}.py")
-        candidates.extend(
-            os.path.join(self.pottsmpnn_dir, candidate)
-            for candidate in list(candidates)
-        )
+        # Use ProtFlow's fixed sample script for the standard alias.
+        if str(script) in {"sample_seqs", "sample_seqs.py"}:
+            candidates = [self.sample_seqs_path]
+        else:
+            candidates = [str(script)]
+            if not str(script).endswith(".py"):
+                candidates.append(f"{script}.py")
+            candidates.extend(
+                os.path.join(self.pottsmpnn_dir, candidate)
+                for candidate in list(candidates)
+            )
 
         # return first valid script path.
         for candidate in candidates:
