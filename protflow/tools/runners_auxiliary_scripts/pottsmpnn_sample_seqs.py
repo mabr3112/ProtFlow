@@ -42,14 +42,43 @@ def str_split(string, tok):
         return []
     return string.split(tok)
 
-def sequence_key_belongs_to_pdb(sequence_key, pdb_name):
-    """Return whether a sampled sequence key belongs to one PDB."""
-    if sequence_key == pdb_name:
-        return True
-    if not sequence_key.startswith(pdb_name):
-        return False
-    suffix = sequence_key[len(pdb_name):]
-    return suffix.startswith("_") and suffix[1:].isdigit()
+def index_external_sequence_keys(sequence_keys, pdb_names):
+    """Group external sequence keys under the most specific input PDB key."""
+    unique_pdb_names = list(dict.fromkeys(pdb_names))
+    sequence_keys_by_pdb = {pdb_name: [] for pdb_name in unique_pdb_names}
+    pdb_name_set = set(unique_pdb_names)
+
+    # Exact PDB names take precedence over the optional numeric sample suffix.
+    for sequence_key in sequence_keys:
+        if sequence_key in pdb_name_set:
+            sequence_keys_by_pdb[sequence_key].append(sequence_key)
+            continue
+        pdb_name, separator, sample_key = sequence_key.rpartition("_")
+        if separator and sample_key.isdigit() and pdb_name in pdb_name_set:
+            sequence_keys_by_pdb[pdb_name].append(sequence_key)
+    return sequence_keys_by_pdb
+
+
+def get_decoding_order(decoding_orders, pdb_name, sample_key):
+    """Return a stored decoding order for one PDB and optional sample key."""
+    stored_orders = decoding_orders.get(pdb_name)
+    if sample_key is None:
+        return stored_orders if not isinstance(stored_orders, dict) else None
+    return stored_orders.get(sample_key) if isinstance(stored_orders, dict) else None
+
+
+def store_decoding_order(decoding_orders, pdb_name, sample_key, decoding_order):
+    """Store a decoding order with consistent string sample keys."""
+    if sample_key is None:
+        decoding_orders[pdb_name] = decoding_order
+        return
+
+    stored_orders = decoding_orders.get(pdb_name)
+    if not isinstance(stored_orders, dict):
+        stored_orders = {}
+        decoding_orders[pdb_name] = stored_orders
+    stored_orders[sample_key] = decoding_order
+
 
 def sample_seqs(args):
     
@@ -113,6 +142,10 @@ def sample_seqs(args):
             chain_dict[pdb_info[0] + chain_suffixes[-1]] = [str_split(pdb_info[1], ':'), str_split(pdb_info[2], ':')]
         else: # Set chain_dict to empty list, which means all chains are designed
             chain_dict[pdb_info[0] + chain_suffixes[-1]] = [[], []]
+    pdb_names_with_chain_suffixes = [
+        pdb + chain_suffix
+        for pdb, chain_suffix in zip(pdb_list, chain_suffixes)
+    ]
     if cfg.chain_dict_json is not None:
         with open(cfg.chain_dict_json, 'r') as f:
             chain_dict = json.load(f)
@@ -147,17 +180,29 @@ def sample_seqs(args):
 
     # Optimization check logic
     skip_calc = False
+    existing_sequence_keys_by_pdb = {}
 
     if cfg.inference.optimization_mode:
         optimized_filename = os.path.join(cfg.out_dir, cfg.out_name + f'_optimized_{cfg.inference.optimization_mode}.fasta')
         
         if cfg.inference.optimize_fasta:
-            assert os.path.exists(cfg.inference.optimize_fasta), f"Tried to optimize sequences in {cfg.inference.optimize_fasta}, but the file does not exist."
-            print(f"Found existing sequences at {filename}. Loading for optimization...")
-            with open(filename, 'r') as f:
+            if not os.path.isfile(cfg.inference.optimize_fasta):
+                raise FileNotFoundError(
+                    f"Tried to optimize sequences in {cfg.inference.optimize_fasta}, "
+                    "but the file does not exist."
+                )
+            print(
+                f"Found existing sequences at {cfg.inference.optimize_fasta}. "
+                "Loading for optimization..."
+            )
+            with open(cfg.inference.optimize_fasta, 'r') as f:
                 seqs_raw = f.readlines()
             # Parse .fasta
             existing_seqs = {pdb.strip('>').strip(): seq.strip() for pdb, seq in zip(seqs_raw[::2], seqs_raw[1::2])}
+            existing_sequence_keys_by_pdb = index_external_sequence_keys(
+                existing_seqs,
+                pdb_names_with_chain_suffixes,
+            )
             print(f'Saving optimized sequences to filename {optimized_filename}.')
             skip_calc = True
         elif cfg.inference.optimize_pdb:
@@ -171,9 +216,12 @@ def sample_seqs(args):
                     wt_seq = ""
                     for chain in chain_order:
                         if chain: wt_seq += wt_info[f'seq_chain_{chain}']
-                    existing_seqs[pdb + chain_info] = wt_seq
+                    pdb_name_with_chain_suffix = pdb + chain_info
+                    existing_seqs[pdb_name_with_chain_suffix] = wt_seq
+                    existing_sequence_keys_by_pdb[pdb_name_with_chain_suffix] = [pdb_name_with_chain_suffix]
                 else:
-                    existing_seqs[pdb ] = wt_info['seq']
+                    existing_seqs[pdb] = wt_info['seq']
+                    existing_sequence_keys_by_pdb[pdb] = [pdb]
             print(f'Saving optimized sequences to filename {optimized_filename}.')
             skip_calc = True
         else:
@@ -224,6 +272,7 @@ def sample_seqs(args):
         
         # Run Encoder
         h_V, E_idx, h_E, etab = model.run_encoder(X, mask, residue_idx, chain_encoding_all)
+        sampled_sequence_keys = []
         
         # Skip sampling if we are just optimizing existing sequences
         if not skip_calc:
@@ -290,22 +339,25 @@ def sample_seqs(args):
             for k, rec in enumerate(sample_records):
                 sidx = rec['sample_idx']
                 sample_suffix = f"_{sidx}" if cfg.inference.num_samples != 1 else ''
-                out_seqs[pdb_with_chain_suffix + sample_suffix] = ':'.join(rec['seq'][a:b] for a, b in zip(chain_cuts, chain_cuts[1:]))
+                sequence_key = pdb_with_chain_suffix + sample_suffix
+                sample_key = str(sidx) if sample_suffix else None
+                out_seqs[sequence_key] = ':'.join(rec['seq'][a:b] for a, b in zip(chain_cuts, chain_cuts[1:]))
+                sampled_sequence_keys.append(sequence_key)
 
-                if pdb not in decoding_orders:
-                    decoding_orders[pdb_with_chain_suffix] = {}
-                if cfg.inference.num_samples == 1:
-                    decoding_orders[pdb_with_chain_suffix] = rec['decoding_order'].squeeze().cpu().numpy().tolist()
-                else:
-                    decoding_orders[pdb_with_chain_suffix][sample_suffix.split('_')[1]] = rec['decoding_order'].squeeze().cpu().numpy().tolist()
+                store_decoding_order(
+                    decoding_orders,
+                    pdb_with_chain_suffix,
+                    sample_key,
+                    rec['decoding_order'].squeeze().cpu().numpy().tolist(),
+                )
 
-                av_losses['pdb'].append(pdb_with_chain_suffix + sample_suffix)
+                av_losses['pdb'].append(sequence_key)
                 av_losses['seq_loss'].append(sample_seq_loss[sidx])
                 av_losses['nsr'].append(sample_nsr[sidx])
                 av_losses['potts_loss'].append(sample_nlcpl[sidx])
 
                 if k == 0: # Save best sequence and sample number
-                    best_seqs[pdb_with_chain_suffix] = (out_seqs[pdb_with_chain_suffix + sample_suffix], sidx)
+                    best_seqs[pdb_with_chain_suffix] = (out_seqs[sequence_key], sidx)
 
         # Optimization Step (Optional)
         if cfg.inference.optimization_mode:
@@ -336,35 +388,34 @@ def sample_seqs(args):
             
             # Optimize sequences associated with this PDB
             source_seqs = existing_seqs if skip_calc else out_seqs
-            
-            current_pdb_keys = [
-                key for key in source_seqs
-                if sequence_key_belongs_to_pdb(key, pdb_with_chain_suffix)
-            ]
+            current_pdb_keys = (
+                existing_sequence_keys_by_pdb.get(pdb_with_chain_suffix, [])
+                if skip_calc
+                else sampled_sequence_keys
+            )
             
             for key in current_pdb_keys:
                 seq_to_opt = source_seqs[key].replace(':', '')
                 suffix_key = key[len(pdb_with_chain_suffix):] if len(key) > len(pdb_with_chain_suffix) else ''
-                
-                stored_decoding = None
-                if pdb in decoding_orders:
-                    if cfg.inference.num_samples == 1:
-                        decoding_order = decoding_orders[pdb_with_chain_suffix]
-                    else:
-                        decoding_order = decoding_orders[pdb_with_chain_suffix].get(suffix_key, None)
-                else:
+                sample_key = suffix_key[1:] if suffix_key.startswith("_") else None
+                decoding_order = get_decoding_order(
+                    decoding_orders,
+                    pdb_with_chain_suffix,
+                    sample_key,
+                )
+
+                if decoding_order is None:
                     if cfg.inference.fix_decoding_order:
-                        if cfg.inference.num_samples != 1:
-                            suffix_add = int(suffix_key.split('_')[1])
-                        else:
-                            suffix_add = 0
+                        suffix_add = int(sample_key) if sample_key is not None else 0
                         torch.manual_seed(string_to_int(pdb) + cfg.inference.decoding_order_offset + suffix_add)
                     randn = torch.randn(chain_mask.shape, device=X.device)
                     decoding_order = torch.argsort((chain_mask+0.0001)*(torch.abs(randn))).squeeze().cpu().numpy().tolist()
-                    if cfg.inference.num_samples == 1:
-                        decoding_orders[pdb_with_chain_suffix] = decoding_order
-                    else:
-                        decoding_orders[pdb_with_chain_suffix][suffix_key.split('_')[1]] = decoding_order
+                    store_decoding_order(
+                        decoding_orders,
+                        pdb_with_chain_suffix,
+                        sample_key,
+                        decoding_order,
+                    )
                 if tied_positions_dict is None or not tied_pos_list_of_lists_list[0]:
                     opt_seq = optimize_sequence(
                         seq_to_opt, etab, E_idx, mask*chain_M_pos, chain_mask, cfg.inference.optimization_mode, 
@@ -389,7 +440,7 @@ def sample_seqs(args):
                 opt_seq = ':'.join(opt_seq[a:b] for a, b in zip(chain_cuts, chain_cuts[1:]))
                 opt_seqs[key] = opt_seq
 
-                if cfg.inference.num_samples == 1 or (not skip_calc and int(suffix_key.split('_')[1]) == best_seqs[pdb_with_chain_suffix][1]): # Overwrite best sequence if on appropriate sample
+                if cfg.inference.num_samples == 1 or (not skip_calc and int(sample_key) == best_seqs[pdb_with_chain_suffix][1]): # Overwrite best sequence if on appropriate sample
                     if pdb_with_chain_suffix in best_seqs:
                         suffix = best_seqs[pdb_with_chain_suffix][1]
                     else:
