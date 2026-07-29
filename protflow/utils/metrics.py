@@ -309,6 +309,9 @@ def all_against_all_sequence_identity(input_seqs: list[str]) -> list:
 
     return list(np.max(similarity_matrix, axis=1))
 
+# INFO: DUPLICATED! There is a copy of this entropy function in
+# protflow/tools/runners_auxiliary_scripts/run_esm.py. If you change the math here, change it
+# there too. 
 def entropy(prob_distribution: np.ndarray, axis: int = -1) -> float:
     """
     Compute element-wise Shannon entropy H(p) = –∑ p·log₂ p along the given axis,
