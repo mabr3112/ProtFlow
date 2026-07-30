@@ -699,6 +699,8 @@ class BoltzParams:
         self.constraints = []
         self.templates = []
         self.properties = []
+        self.poses_msa = None
+        self.poses_modifications = []
 
     def _check_modifications_format(self, modifications) -> list[dict]|None:
         """
@@ -1020,6 +1022,57 @@ class BoltzParams:
         property_dict = {property_type: processed_kwargs}
         self.properties.append(property_dict)
 
+    def add_poses_MSA(self, msa: str, poses_cols: list = None):
+        """
+        Adds MSAs to Boltz input poses. The same MSA will be used for each chain in the input pose! If this is not desired,
+        use single chain poses as input and add additional chains (with separate MSAs) via :add_protein:!
+
+        Parameters
+        ----------
+        msa : str
+            Path to an MSA in a3m-format (literal or poses.df column name) (e.g., ``"mmseqs_a3m_path"``).
+        poses_cols : list[str], optional
+            Keys in that should be read from ``poses.df``.
+
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        >>> BoltzParams.add_poses_MSA(msa='mmseqs_a3m_path', poses_cols=['msa'])
+        >>> BoltzParams.add_poses_MSA(msa='path/to/single/msa.a3m')
+        """
+        poses_cols = poses_cols or []
+        self.poses_msa = (msa, "msa" in poses_cols)
+
+    def add_poses_modification(self, position: str, ccd: str, poses_cols: list = None):
+        """
+        Adds modifications to Boltz input poses. The same modification will be used for each chain in the input pose! If this is not desired,
+        use single chain poses as input and add additional chains (with separate modifications) via :add_protein:!
+
+        Parameters
+        ----------
+        position : str
+            Index of residue that should be modified (starting from 1). Literal or poses.df column name. (e.g., ``17``).
+        ccd : str
+            CCD code of the modified residue (currently supported only for CCD ligands). Literal or poses.df column name.
+        poses_cols : list[str], optional
+            Keys in that should be read from ``poses.df``.
+
+
+        Returns
+        -------
+        None
+
+        Examples
+        --------
+        >>> BoltzParams.add_poses_modification(position='modification_idx', ccd='SEP', poses_cols=['position'])
+        >>> BoltzParams.add_poses_modification(position='17', ccd='SEP')
+        """
+        self.poses_modifications.append({"position": (position, "position" in poses_cols), "ccd": (ccd, "ccd" in poses_cols)})
+
     def generate_yaml_files(self, poses: Poses, out_dir: str, reset_poses: bool = True, default_msa: str|None = None) -> None:
         '''Converts poses into new .yaml files at 'prefix' based on current paramters.
         or: render accumulated parameters into per-pose YAML files.
@@ -1083,6 +1136,19 @@ class BoltzParams:
             # read pose yaml
             pose_yaml = boltz_yaml_reader(pose["poses"])
             #print(pose_yaml)
+            
+            # add msas to input poses
+            if self.poses_msa:
+                for entity in pose_yaml["sequences"]:
+                    if "protein" in entity:
+                        entity["protein"]["msa"] = pose[self.poses_msa[0]] if self.poses_msa[1] else self.poses_msa[0]
+
+            # add modifications to input poses
+            for mod in self.poses_modifications:
+                for entity in pose_yaml["sequences"]:
+                    if "protein" in entity:
+                        _add_key_if_not_there(entity["protein"], "modifications", [])
+                        entity["protein"]["modifications"].append(_parse_dict_for_pose(pose, mod))
 
             # add sequences
             for protein_dict in self.proteins:
