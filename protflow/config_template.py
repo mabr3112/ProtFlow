@@ -116,3 +116,7 @@ HBPLUS_PATH = "" # "/path/to/hbplus/hbplus"
 # hydraprot
 HYDRAPROT_DIR_PATH = "" #"/path/to/HydraProt"
 HYDRAPROT_PYTHON_PATH = "" # "/path/to/miniconda3/envs/hydraprot/bin/python"
+
+# mmseqs
+MMSEQS_PATH = "" #/path/to/envs/mmseqs/bin/mmseqs"
+MMSEQS_PRE_CMD = ""

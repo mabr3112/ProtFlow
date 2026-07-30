@@ -15,3 +15,4 @@ from .rmsd import AtomRMSD, MotifRMSD, BackboneRMSD, MotifSeparateSuperpositionR
 from .selection_identity import SelectionIdentity
 from .tmscore import TMalign, TMscore
 from .hbplus import HBplus, HBplus_query
+from .mmseqs import MMseqs
