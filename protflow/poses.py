@@ -1232,7 +1232,7 @@ class Poses:
         if (save_method_name := FORMAT_STORAGE_DICT.get(out_format.lower())):
             getattr(temp_df, save_method_name)(out_path)
 
-    def save_poses(self, out_path: str, poses_col: str = "poses", overwrite: bool = True) -> None:
+    def save_poses(self, out_path: str, poses_col: str = "poses", overwrite: bool = True, update_poses: bool = False) -> None:
         """
         Saves the poses to a specified directory, with an option to overwrite existing files.
 
@@ -1269,13 +1269,15 @@ class Poses:
 
         """
         poses = self.df[poses_col].to_list()
-        new_poses = [os.path.join(out_path, os.path.basename(pose)) for pose in poses]
+        new_poses = [os.path.abspath(os.path.join(out_path, os.path.basename(pose))) for pose in poses]
         if not os.path.isdir(out_path):
             os.makedirs(out_path, exist_ok=True)
 
         # check if poses are already at out_path, skip if overwrite is set to False
         if all((os.path.isfile(pose) for pose in new_poses)) and not overwrite:
             logging.info(f"Poses already found at {out_path} and overwrite is set to 'False'. Skipping save_poses.")
+            if update_poses:
+                self.df["poses"] = new_poses
             return
 
         # save poses
@@ -1283,6 +1285,9 @@ class Poses:
         for pose, new_pose in zip(poses, new_poses):
             shutil.copy(pose, new_pose)
 
+        if update_poses:
+            self.df["poses"] = new_poses
+            
     def poses_list(self) -> list[str]:
         """
         Returns a list of pose file paths from the DataFrame.
@@ -1612,7 +1617,7 @@ class Poses:
         # set motif
         self.motifs.append(motif_col)
 
-    def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":") -> None:
+    def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":", overwrite: bool = False) -> None:
         """
         Converts PDB pose files to FASTA format and optionally updates the poses. Paths to fasta location are saved in poses dataframe under column <prefix>_fasta_location.
 
@@ -1664,8 +1669,9 @@ class Poses:
         for name, seq in zip(self.df['poses_description'].to_list(), seqs):
             fasta_path = os.path.join(fasta_dir, f'{name}.fasta')
             fasta_paths.append(fasta_path)
-            with open(fasta_path, 'w', encoding="UTF-8") as f:
-                f.write(f">{name}\n{seq}")
+            if overwrite or not os.path.isfile(fasta_path):
+                with open(fasta_path, 'w', encoding="UTF-8") as f:
+                    f.write(f">{name}\n{seq}")
 
         self.df[f'{prefix}_fasta_location'] = fasta_paths
         if update_poses:
