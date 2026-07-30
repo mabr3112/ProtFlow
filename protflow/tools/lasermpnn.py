@@ -1,71 +1,37 @@
-"""ProtFlow runner for PottsMPNN.
+"""LASErMPNN runner for ProtFlow.
 
-This module integrates the command-line PottsMPNN YAML workflows into
-ProtFlow. It supports the two upstream scripts that expose a ``--config``
-interface:
-
-- ``sample_seqs.py`` for sequence design from backbone structures.
-- ``energy_prediction.py`` for mutation-energy and deep-mutational-scan
-  scoring.
-
-The runner writes script-specific YAML files, dispatches one command per
-generated config through a :class:`~protflow.jobstarters.JobStarter`, and
-collects PottsMPNN FASTA or CSV outputs back into a
-:class:`~protflow.poses.Poses` dataframe.
+This module integrates LASErMPNN batch inference scripts into ProtFlow[cite: 1]. 
+The runner dynamically creates input batches, assigns fixed residues by adjusting 
+PDB B-factors, dispatches commands through a :class:`~protflow.jobstarters.JobStarter`, 
+and collects the resulting structures back into a :class:`~protflow.poses.Poses` dataframe[cite: 1].
 
 Configuration
 -------------
-The runner reads default executable paths from the ProtFlow config:
+The runner reads default executable paths from the ProtFlow config[cite: 1]:
 
-``POTTSMPNN_DIR``
-    Path to the local PottsMPNN checkout. Commands are executed from this
-    directory so relative checkpoint paths from upstream YAML examples work.
-``POTTSMPNN_PYTHON``
-    Python interpreter from the PottsMPNN environment.
-``POTTSMPNN_PRE_CMD``
+``LASERMPNN_SCRIPT_PATH``
+    Path to the LASErMPNN batch inference script[cite: 1].
+``LASERMPNN_PYTHON_PATH``
+    Python interpreter from the LASErMPNN environment[cite: 1].
+``LASERMPNN_PRE_CMD``
     Optional shell prefix used to activate modules or environments before each
-    command.
-
-Parameter Objects
------------------
-Use :class:`SampleSequencePottsMPNNParams` with ``sample_seqs.py`` and
-:class:`EnergyPredictionPottsMPNNParams` with ``energy_prediction.py``. These
-typed dataclasses expose PottsMPNN model and inference fields directly, so IDEs
-can autocomplete nested attributes such as ``params.model.check_path`` and
-``params.inference.num_samples``.
-
-Pose-specific Values
---------------------
-Wrap a dataframe column name in :class:`PoseCol` to fill a parameter from
-``Poses.df``. Parameters ending in ``*_custom`` are converted into temporary
-JSON files and can still be batched. Other pose-specific parameters require one
-config per input pose.
+    command[cite: 1].
 
 Examples
 --------
-Design two sequences per backbone:
+Design sequences with fixed residues:
 
 >>> from protflow.poses import Poses
->>> from protflow.tools import PottsMPNN, SampleSequencePottsMPNNParams
+>>> from protflow.tools import LASErMPNN
 >>> poses = Poses(poses=["backbone_a.pdb", "backbone_b.pdb"], work_dir="work")
->>> params = SampleSequencePottsMPNNParams()
->>> params.inference.num_samples = 2
->>> params.inference.temperature = 0.1
->>> params.inference.optimization_mode = "none"
->>> poses = PottsMPNN().run(poses=poses, prefix="potts_design", params=params)
-
-Score mutations from a CSV file:
-
->>> from protflow.tools import EnergyPredictionPottsMPNNParams
->>> params = EnergyPredictionPottsMPNNParams(mutant_csv="mutations.csv")
->>> poses = PottsMPNN().run(
-...     poses=poses,
-...     prefix="potts_energy",
-...     script="energy_prediction",
-...     params=params,
+>>> runner = LASErMPNN()
+>>> poses = runner.run(
+...     poses=poses, 
+...     prefix="laser_design", 
+...     nstruct=2,
+...     fixed_residues="fixed_res_column"
 ... )
 """
-
 from __future__ import annotations
 
 import logging
@@ -90,44 +56,35 @@ from protflow.utils.biopython_tools import biopython_load_structure, save_struct
 from protflow.residues import ResidueSelection
 
 class LASErMPNN(Runner):
-    """Run PottsMPNN command-line scripts from ProtFlow.
+    """Run LASErMPNN command-line scripts from ProtFlow[cite: 1].
 
-    Parameters
-    ----------
-    python_path : str, optional
-        Python interpreter used to execute PottsMPNN. If omitted, the value is
-        loaded from ``POTTSMPNN_PYTHON`` in the ProtFlow config.
-    pottsmpnn_dir : str, optional
-        Path to the PottsMPNN checkout. If omitted, the value is loaded from
-        ``POTTSMPNN_DIR``.
-    pre_cmd : str, optional
-        Shell prefix prepended to every command, commonly used to activate a
-        conda environment or cluster module. Defaults to ``POTTSMPNN_PRE_CMD``.
-    jobstarter : JobStarter, optional
-        Default jobstarter used when :meth:`run` is called without one.
+        Parameters
+        ----------
+        python_path : str, optional
+            Python interpreter used to execute LASErMPNN[cite: 1]. If omitted, the value is
+            loaded from ``LASERMPNN_PYTHON_PATH`` in the ProtFlow config[cite: 1].
+        script_path : str, optional
+            Path to the LASErMPNN batch inference script[cite: 1]. If omitted, the value is 
+            loaded from ``LASERMPNN_SCRIPT_PATH``[cite: 1].
+        pre_cmd : str, optional
+            Shell prefix prepended to every command, commonly used to activate a
+            conda environment or cluster module[cite: 1]. Defaults to ``LASERMPNN_PRE_CMD``[cite: 1].
+        jobstarter : JobStarter, optional
+            Default jobstarter used when :meth:`run` is called without one[cite: 1].
 
-    Attributes
-    ----------
-    name : str
-        Runner name used for job names and cached score files.
-    index_layers : int
-        Default merge index depth. The active value is selected per script in
-        :meth:`run` because ``sample_seqs.py`` appends sample indices while
-        ``energy_prediction.py`` keeps one row per input pose.
-    pottsmpnn_dir : str
-        Resolved PottsMPNN checkout path.
-    python_path : str
-        Resolved PottsMPNN Python interpreter.
-    pre_cmd : str
-        Resolved shell prefix.
-
-    Notes
-    -----
-    Only upstream scripts with a ``--config`` YAML interface are supported.
-    The runner currently supports ``sample_seqs.py`` and
-    ``energy_prediction.py``.
-    """
-
+        Attributes
+        ----------
+        name : str
+            Runner name used for job names and cached score files (set to ``"lasermpnn"``)[cite: 1].
+        index_layers : int
+            Default merge index depth, set to 1[cite: 1].
+        script_path : str
+            Resolved LASErMPNN script path[cite: 1].
+        python_path : str
+            Resolved LASErMPNN Python interpreter[cite: 1].
+        pre_cmd : str
+            Resolved shell prefix[cite: 1].
+        """
     def __init__(
         self,
         python_path: str | None = None,
@@ -135,19 +92,7 @@ class LASErMPNN(Runner):
         pre_cmd: str | None = None,
         jobstarter: JobStarter | None = None,
     ) -> None:
-        """Initialize the runner and resolve PottsMPNN configuration.
-
-        Parameters
-        ----------
-        python_path : str, optional
-            Python interpreter used to run PottsMPNN.
-        script_path : str, optional
-            Path to LASErMPNN batch inference script.
-        pre_cmd : str, optional
-            Optional shell prefix for environment activation.
-        jobstarter : JobStarter, optional
-            Default jobstarter for this runner instance.
-        """
+        """Initialize the runner and resolve LASErMPNN configuration[cite: 1]."""
         # config required
         config = require_config()
 
@@ -162,12 +107,12 @@ class LASErMPNN(Runner):
         self.index_layers = 1
 
     def __str__(self) -> str:
-        """Return the short runner name.
+        """Return the short runner name[cite: 1].
 
         Returns
         -------
         str
-            The literal runner name ``"pottsmpnn"``.
+            The literal runner name ``"lasermpnn"``[cite: 1].
         """
         return self.name
 
@@ -182,52 +127,43 @@ class LASErMPNN(Runner):
         omit_AAs: list | str = None,
         overwrite: bool = False,
     ) -> Poses:
-        """Run PottsMPNN and merge collected results into ``poses``.
+        """Run LASErMPNN and merge collected results into ``poses``[cite: 1].
 
         Parameters
         ----------
         poses : Poses
-            Input structures to pass to PottsMPNN. The ``poses`` column must
-            contain PDB paths and ``poses_description`` is used as the upstream
-            PottsMPNN structure identifier.
+            Input structures to pass to LASErMPNN[cite: 1].
         prefix : str
             Unique run prefix used to create the runner work directory and
-            prefixed output score columns.
+            prefixed output score columns[cite: 1].
         jobstarter : JobStarter, optional
-            Jobstarter for this call. If omitted, the runner falls back to the
-            instance jobstarter and then ``poses.default_jobstarter``.
-        script : str, optional
-            Script alias or path. Supported aliases are ``"sample_seqs"`` and
-            ``"energy_prediction"``.
-        params : SampleSequencePottsMPNNParams or EnergyPredictionPottsMPNNParams, optional
-            Typed parameter object used to generate YAML configs. If omitted,
-            defaults are created for the selected script.
+            Jobstarter for this call[cite: 1]. If omitted, the runner falls back to the
+            instance jobstarter and then ``poses.default_jobstarter``[cite: 1].
         options : str, optional
-            Extra command-line options passed to the upstream script. ``--config``
-            is ignored because config files are managed by the runner.
-        pose_options : str or list of str, optional
-            Unsupported for PottsMPNN. Use :class:`PoseCol` fields in ``params``
-            for pose-specific settings.
-        include_scores : list of str, optional
-            Reserved for API consistency with other runners. PottsMPNN collectors
-            currently load the standard output fields.
-        overwrite : bool, optional
-            If ``True``, remove previous runner-owned outputs and rerun jobs.
+            Extra command-line options passed to the upstream script[cite: 1].
+        nstruct : int, default=1
+            Number of structures to generate per input pose[cite: 1].
+        fixed_residues : str or ResidueSelection, optional
+            Residues to hold fixed during design[cite: 1]. If a string is provided, it is 
+            treated as a column name in ``poses.df`` containing the selections[cite: 1].
+        omit_AAs : list or str, optional
+            Amino acids to disable during design[cite: 1]. Can be a comma-separated string 
+            or a list of characters[cite: 1].
+        overwrite : bool, default=False
+            If ``True``, remove previous runner-owned outputs and rerun jobs[cite: 1].
 
         Returns
         -------
         Poses
-            The input ``Poses`` object with PottsMPNN score columns merged in.
+            The input ``Poses`` object with LASErMPNN generated PDBs and score columns merged in[cite: 1].
 
         Raises
         ------
-        ValueError
-            If ``pose_options`` are supplied or the params object does not match
-            the selected script.
-        NotImplementedError
-            If ``script`` is not one of the supported config-based scripts.
+        KeyError
+            If restricted parameters are set in options or flags (e.g., ``output_fasta_only``, 
+            ``designs_per_input``, ``input_pdb_directory``, ``output_pdb_directory``)[cite: 1].
         RuntimeError
-            If PottsMPNN runs but no score rows can be collected.
+            If LASErMPNN runs but no score rows can be collected[cite: 1].
         """
         # setup run directory and jobstarter
         work_dir, jobstarter = self.generic_run_setup(
@@ -297,6 +233,7 @@ class LASErMPNN(Runner):
         return outputs.return_poses()
     
     def _setup_batch_mode(self, poses:Poses, num_batches:int, work_dir:str, fixed_residues:str|ResidueSelection=None):
+        """Split inputs into batches and format structures for LASErMPNN[cite: 1]."""
         # parse fixed residues
         if fixed_residues:
             if isinstance(fixed_residues, str):
@@ -324,23 +261,28 @@ class LASErMPNN(Runner):
         return batch_dirs
 
     def _write_cmds(self, options: str, input_dirs: list, output_dir: str, nstruct:int, fixed_residues:str | ResidueSelection = None, omit_AAs: str | list = None) -> str:
-        """Format the shell command for a single PottsMPNN config.
+        """Format the shell commands for the LASErMPNN batches[cite: 1].
 
         Parameters
         ----------
-        script : str
-            Absolute path to the upstream PottsMPNN script.
-        config_path : str
-            YAML config passed as ``--config``.
-        cli_args : str, optional
-            Additional parsed command-line arguments.
+        options : str
+            Command line string of parameters to pass to the script[cite: 1].
+        input_dirs : list of str
+            List of generated batch directories containing input PDBs[cite: 1].
+        output_dir : str
+            Master output directory where the script will write outputs[cite: 1].
+        nstruct : int
+            Number of output structures to generate per input[cite: 1].
+        fixed_residues : str or ResidueSelection, optional
+            Passed residues to hold fixed, automatically appends the ``--fix_beta`` flag[cite: 1].
+        omit_AAs : str or list, optional
+            Amino acids to disable[cite: 1]. Translates to the ``--disabled_residues`` argument[cite: 1].
 
         Returns
         -------
-        str
-            Command that runs from the PottsMPNN checkout.
+        list of str
+            Commands formatted for job execution[cite: 1].
         """
-
         options, flags = parse_generic_options(options=options, pose_options=None, sep="--")
         if fixed_residues and "fix_beta" not in flags:
             flags.append("fix_beta")
@@ -368,13 +310,13 @@ class LASErMPNN(Runner):
         return cmds
     
     def _cleanup_previous_outputs(self, work_dir: str) -> None:
-        """Remove previous runner-owned outputs inside the work directory.
+        """Remove previous runner-owned outputs inside the work directory[cite: 1].
 
         Parameters
         ----------
         work_dir : str
-            Runner work directory created for this prefix.
-        """
+            Runner work directory created for this prefix[cite: 1].
+        """        
         # remove only files/directories inside runner work_dir
         if not os.path.isdir(work_dir):
             return
@@ -387,7 +329,11 @@ class LASErMPNN(Runner):
 
 
 def _update_pose_bfactors(input_path:str, output_dir:str, fixed_residues: ResidueSelection=None) -> str:
-    """LASErMPNN uses bfactor columns to define fixed residues. Bfactors of designable residues are set to 0, fixed positions to 1."""
+    """Modify PDB B-factors to define fixed residues for LASErMPNN[cite: 1].
+    
+    LASErMPNN uses bfactor columns to define fixed residues[cite: 1]. Bfactors of 
+    designable residues are set to 0, fixed positions to 1[cite: 1].
+    """
     pose = biopython_load_structure(input_path)
     for atom in pose.get_atoms():
         atom.bfactor = 0
@@ -401,6 +347,7 @@ def _update_pose_bfactors(input_path:str, output_dir:str, fixed_residues: Residu
     return out_path
 
 def collect_scores(work_dir: str):
+    """Collect outputs from the LASErMPNN batch directories and format them into a DataFrame[cite: 1]."""
     output_dir = os.path.join(work_dir, "output")
     scores = pd.DataFrame({"original_paths": glob(os.path.join(output_dir, "batch_*", "*", "*.pdb"))})
 
