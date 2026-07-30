@@ -72,12 +72,12 @@ import Bio
 import Bio.PDB
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
+from Bio.PDB.Chain import Chain
 from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from Bio.SeqUtils import seq1, seq3
 from Bio.PDB import Polypeptide, MMCIFParser
 from Bio.SeqRecord import SeqRecord
-import Bio.PDB.Model
 import Bio.PDB.Structure
 from openbabel import pybel # needed for sdf saving, could be moved entierly to runner if we want to keep this module strictly biopython related
 
@@ -1444,3 +1444,42 @@ def biopython_fileconverter(input_file: str, output_format: str, output_file: st
     pose = biopython_load_structure(input_file, file_type=input_format)
     save_structure_to_file(pose=pose, save_path=output_file, file_type=output_format)
     return output_file
+
+def select_biopython_residues(pose: Union[str, Structure, Model, Chain], selection: ResidueSelection = None, strict: bool = True) -> list:
+    """Extracts Biopython Residues from a pose based on a ResidueSelection, preserving order and multiplicity."""
+    if not selection:
+        # return empty list for empty ResidueSelection
+        return []
+
+    if isinstance(pose, str):
+        # Assuming biopython_load_structure is defined in your module
+        pose = biopython_load_structure(pose)
+        
+    if not isinstance(pose, (Structure, Model, Chain)):
+        raise TypeError(f"<pose> must be a Biopython Entity (Structure, Model, Chain), not {type(pose)}!")
+
+    # 1. Map available residues in the pose to a dictionary for O(1) lookup
+    # Key: (chain_id, sequence_number), Value: Bio.PDB.Residue object
+    pose_residues_map = {
+        (res.parent.id, res.id[1]): res 
+        for res in pose.get_residues()
+    }
+    
+    extracted = []
+    missing_residues = set()
+
+    # 2. Iterate through the selection to build the list
+    for target in selection.residues:
+        if target in pose_residues_map:
+            extracted.append(pose_residues_map[target])
+        else:
+            missing_residues.add(target)
+
+    # 3. Raise an error if any requested residues were missing
+    if missing_residues and strict:
+        raise KeyError(f"The following residues from the selection were not found in the pose: {missing_residues}")
+
+    return extracted
+    
+    
+    
