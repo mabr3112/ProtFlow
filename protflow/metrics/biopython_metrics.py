@@ -775,12 +775,13 @@ class ContactOrder(BiopythonMetric):
         return float(np.sum(sequence_separations[contact_mask]) / (protein_length * contact_count))
 
 class Sasa(BiopythonMetric):
-
+    "Calculate solvent accessible surface area (SASA) for input atoms"
     def __init__(self, name: str | None = None, target: AtomSelectionInput|str = None, probe_radius: float = 1.4, n_points: int = 100, radii_dict: dict = None) -> None:
-        '''Initialize a Clash detection metric.'''
+        '''Initialize SASA metric.'''
         super().__init__(name=name, target=target, probe_radius=probe_radius, n_points=n_points, radii_dict=radii_dict)
 
     def calc(self, biomolecule: Entity, target: AtomSelectionInput|str = None, probe_radius: float = 1.4, n_points: int = 100, radii_dict: dict = None) -> float: #pylint: disable=W0221
+        "Run solvent accessible surface area (SASA) calculation for input atoms"
 
         sasa_calc = SASA.ShrakeRupley(probe_radius=probe_radius, n_points=n_points, radii_dict=radii_dict)
 
@@ -789,3 +790,16 @@ class Sasa(BiopythonMetric):
         target_atoms = self._parse_atoms(biomolecule, target)
 
         return sum([atom.sasa for atom in target_atoms])
+
+class Bfactor(BiopythonMetric):
+    "Calculate mean B-factors for selected atoms"
+    def __init__(self, name: str | None = None, target: AtomSelectionInput|str = None) -> None:
+        '''Initialize Bfactor metric.'''
+        super().__init__(name=name, target=target)
+
+    def calc(self, biomolecule: Entity, target: AtomSelectionInput|str = None) -> float: #pylint: disable=W0221
+        "Run calculation of mean B-factors for selected atoms"
+
+        target_atoms = self._parse_atoms(biomolecule, target)
+
+        return sum([atom.bfactor for atom in target_atoms]) / len(target_atoms)
