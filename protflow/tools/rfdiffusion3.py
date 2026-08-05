@@ -2424,6 +2424,9 @@ def renumber_rfd3_input_pdb(
                 chain_id, residue_number = residue_mapping[residue_key]
                 line = _format_pdb_residue_line(line, chain_id=chain_id, residue_number=residue_number)
                 output_handle.write(line)
+            # keep non-ATOM lines
+            if not residue_key:
+                output_handle.write(line)
 
     return output_pdb
 
