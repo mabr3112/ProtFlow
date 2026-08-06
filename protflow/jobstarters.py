@@ -269,8 +269,8 @@ class SbatchArrayJobstarter(JobStarter):
         log_file = os.path.join(output_path, f"{jobname}_slurm.out")
         error_file = os.path.join(output_path, f"{jobname}_slurm.err")
 
-        self.options += f" -vvv -e {error_file} -o {log_file} --open-mode=append"
-        sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {self.options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
+        options = " ".join(filter(None, [self.options, f"-vvv -e {error_file} -o {log_file} --open-mode=append"]))
+        sbatch_cmd = f'sbatch -a 1-{str(len(cmds))}%{str(self.max_cores)} -J {jobname} {options} --wrap "eval {chr(92)}`sed -n {chr(92)}${{SLURM_ARRAY_TASK_ID}}p {cmdfile}{chr(92)}`"'
 
         # save last job name, e.g. for timer wrapper
         self.last_job_name = jobname
