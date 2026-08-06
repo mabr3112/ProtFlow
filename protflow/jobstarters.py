@@ -332,9 +332,10 @@ class SbatchArrayJobstarter(JobStarter):
         gpus : int
             Number of GPUs to be used per node.
         """
-        self.options = self.parse_options(options)
+        opts = [self.parse_options(options)]
         if gpus:
-            self.options += f"--gpus-per-node {gpus}"
+            opts.append(f"--gpus-per-node {gpus}")
+        self.options = " ".join(filter(None, opts))
 
     def wait_for_job(self, jobname: str, interval: float = 5) -> None:
         """
