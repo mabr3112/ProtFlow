@@ -1233,7 +1233,7 @@ class RFdiffusion3(Runner):
         if n_out_poses == 0:
             raise RuntimeError(f"{self}: collect_scores returned no rows. Check runner output logs and runner output directory ({work_dir})")
 
-        if fail_on_missing_output_poses and expected_outputs < n_out_poses:
+        if fail_on_missing_output_poses and expected_outputs > n_out_poses:
             raise RuntimeError(f"Number of output poses ({n_out_poses}) is smaller than expected number of output poses {expected_outputs}. Some runs might have crashed!")
 
         # save scorefile
