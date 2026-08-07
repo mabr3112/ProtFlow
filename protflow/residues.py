@@ -1751,6 +1751,50 @@ class ResidueSelection:
         else:
             return res_indices
 
+    def to_biopython_residues(self, pose_path: str, strict:bool=True) -> list:
+        """
+        Extract a list of Bio.PDB.Residue objects from a given structure file.
+
+        Parameters
+        ----------
+        pose_path : str
+            Path to the structure file.
+        strict : bool
+            If True, raises a KeyError if any selected residues are missing.
+
+        Returns
+        -------
+        list of Bio.PDB.Residue
+            The BioPython Residue objects corresponding to this selection, 
+            including non-amino acid residues.
+        """
+        pose = _load_biopython_structure(pose_path)
+        
+        selection = self.to_list()
+        selected_residues = []
+        
+        # Keep track of the string representations we successfully find
+        found_residue_strs = set()
+        
+        for pose_res in pose.get_residues():
+            chain_id, resnum = self._extract_bp_residue_data(pose_res)
+            pose_res_str = f"{chain_id}{resnum}"
+            
+            if pose_res_str in selection:
+                selected_residues.append(pose_res)
+                found_residue_strs.add(pose_res_str)
+
+        if strict and len(selected_residues) != len(selection):
+            # Find the difference between what we asked for and what we found
+            missing_residues = sorted(list(set(selection) - found_residue_strs))
+            
+            error_msg = (
+                f"Could not find all selected residues in pose {pose_path}. "
+                f"Missing residues: {', '.join(missing_residues)}"
+            )
+            raise KeyError(error_msg)
+
+        return selected_residues
 
     @classmethod
     def from_resname(cls, resname: str, pose: Any, strict: bool = True) -> "ResidueSelection":

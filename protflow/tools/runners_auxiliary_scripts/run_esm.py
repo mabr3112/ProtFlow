@@ -7,7 +7,27 @@ import pathlib
 import torch
 import numpy as np
 from esm import Alphabet, FastaBatchedDataset, ProteinBertModel, pretrained, MSATransformer # NOTE: esm must be installed to run this script
-from protflow.utils.metrics import entropy
+
+
+# NOTE: duplicated from protflow.utils.metrics.entropy on purpose. This script runs in the
+# ESM environment (ESM_PYTHON_PATH), where protflow is not installed, so it must not import
+# from protflow. Keep both copies in sync. See the TODO in protflow/utils/metrics.py.
+def entropy(prob_distribution: np.ndarray, axis: int = -1) -> np.ndarray:
+    """Compute element-wise Shannon entropy H(p) = -sum(p*log2(p)) along the given axis, ignoring p == 0 terms."""
+    prob_distribution = np.asarray(prob_distribution)
+
+    # Suppress log(0) warnings; log2(0)->-inf, but we zero it out next.
+    with np.errstate(divide='ignore', invalid='ignore'):
+        plogp = prob_distribution * np.log2(prob_distribution)
+
+    # Wherever p was zero, force p*log2p -> 0
+    plogp = np.where(prob_distribution > 0, plogp, 0.0)
+
+    # calculate entropy element wise
+    H = -np.sum(plogp, axis=axis)
+    return H
+
+
 
 
 def create_parser():
