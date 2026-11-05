@@ -583,3 +583,34 @@ def test_run_rejects_malformed_update_motifs(tmp_path, bad):
     params = RFD4Params(poses=poses)
     with pytest.raises(ValueError):
         _runner().run(poses=poses, prefix="x", params=params, update_motifs=bad)
+
+
+def test_add_source_maps_requires_input_map_when_renumbering(tmp_path):
+    scores = pd.DataFrame([{"description": "d0", "cif_location": "x.cif", "task": "d"}])
+    with pytest.raises(ValueError):
+        add_source_maps_to_scores(
+            scores=scores, work_dir=str(tmp_path), jobstarter=object(), renumber_input=True
+        )
+
+
+def test_add_source_maps_noop_check_accounts_for_the_renumber_column(tmp_path):
+    """Provenance columns alone must not short-circuit a renumbering request."""
+    row = {"description": "d0", "cif_location": "x.cif", "task": "d"}
+    row.update({column: {} for column in RFD4_REMAP_RESULT_COLUMNS})
+    with pytest.raises(ValueError):          # reaches the jobstarter check, i.e. not a no-op
+        add_source_maps_to_scores(
+            scores=pd.DataFrame([row]), work_dir=str(tmp_path), jobstarter=None, renumber_input=True
+        )
+    row["renumbered_input"] = "r.cif"        # now complete -> no-op, no jobstarter needed
+    out = add_source_maps_to_scores(
+        scores=pd.DataFrame([row]), work_dir=str(tmp_path), jobstarter=None, renumber_input=True
+    )
+    assert out.loc[0, "renumbered_input"] == "r.cif"
+
+
+def test_cleanup_removes_renumbered_and_remap_directories(tmp_path):
+    names = ("outputs", "inputs", "hydra_outputs", "renumbered_inputs", "motif_remap")
+    for name in names:
+        (tmp_path / name).mkdir()
+    _runner()._cleanup_previous_outputs(work_dir=str(tmp_path))
+    assert not any((tmp_path / name).exists() for name in names)

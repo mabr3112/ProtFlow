@@ -23,9 +23,15 @@ Annotations consumed (see the RFD4-Proteina output-format reference):
 ``SA_UII``
     Per-atom boolean marking unindexed insertion targets.
 
-Input JSON: ``[{"description": str, "cif_location": str}, ...]``
+A record may additionally ask for a *renumbered input*: given the design's own
+input structure and a destination path, the worker rewrites that structure's
+chain/residue numbering into the design's numbering and saves it, so the input
+can be compared against the design without reconstructing the mapping by hand.
+
+Input JSON: ``[{"description": str, "cif_location": str,
+"input_location": str | None, "renumbered_input_path": str | None}, ...]``
 Output JSON: one record per input, each carrying ``source_index_map`` plus the
-derived motif/unindexed residue lists.
+derived motif/unindexed residue lists and, when requested, ``renumbered_input``.
 """
 
 from __future__ import annotations
@@ -39,6 +45,64 @@ from collections import defaultdict
 def _residue_label(chain_id, res_id) -> str:
     """Format one output residue as the ``<chain><res_id>`` label ProtFlow uses."""
     return f"{chain_id}{int(res_id)}"
+
+
+def renumber_input_structure(input_location: str, source_index_map: dict, out_path: str) -> dict:
+    """
+    Rewrite an input structure into the numbering of one generated design.
+
+    Parameters
+    ----------
+    input_location : str
+        Path to the structure the design was generated from.
+    source_index_map : dict
+        ``{input_residue: output_residue}`` from :func:`build_provenance_record`.
+    out_path : str
+        Destination path. The suffix selects the format; ``.cif`` is written
+        plain, ``.cif.gz`` / ``.cif.zst`` compressed.
+
+    Returns
+    -------
+    dict
+        ``{"renumbered_input": path, "n_renumbered": int, "n_unmapped": int}``.
+        ``n_unmapped`` counts atoms whose residue had no map entry; those keep
+        their original numbering, which is expected for ligands and for any
+        residue the model did not carry over.
+    """
+    import numpy as np
+    from atomworks.io.parser import parse
+    from atomworks.io.utils.io_utils import to_cif_file
+    from rfproteina.utils.parse_presets import ANNOTATED_CIF
+
+    atom_array = parse(input_location, config=ANNOTATED_CIF)["assemblies"]["1"][0]
+
+    chain_ids = np.array(atom_array.chain_id, dtype=object)
+    res_ids = np.array(atom_array.res_id)
+
+    new_chain_ids = list(atom_array.chain_id)
+    new_res_ids = list(atom_array.res_id)
+    n_renumbered = 0
+    n_unmapped = 0
+
+    for index, (chain_id, res_id) in enumerate(zip(chain_ids, res_ids)):
+        target = source_index_map.get(f"{chain_id}{int(res_id)}")
+        if target is None:
+            n_unmapped += 1
+            continue
+        # output labels are "<chain><res_id>"; the chain id is the leading non-digit run
+        split_at = 0
+        while split_at < len(target) and not (target[split_at].isdigit() or target[split_at] == "-"):
+            split_at += 1
+        new_chain_ids[index] = target[:split_at]
+        new_res_ids[index] = int(target[split_at:])
+        n_renumbered += 1
+
+    atom_array.chain_id = np.array(new_chain_ids)
+    atom_array.res_id = np.array(new_res_ids, dtype=int)
+
+    os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+    to_cif_file(atom_array, out_path)
+    return {"renumbered_input": os.path.abspath(out_path), "n_renumbered": n_renumbered, "n_unmapped": n_unmapped}
 
 
 def build_provenance_record(description: str, cif_location: str) -> dict:
@@ -156,7 +220,16 @@ def main(args):
     results = []
     for record in records:
         try:
-            results.append(build_provenance_record(record["description"], record["cif_location"]))
+            result = build_provenance_record(record["description"], record["cif_location"])
+            if record.get("renumbered_input_path") and record.get("input_location"):
+                result.update(
+                    renumber_input_structure(
+                        input_location=record["input_location"],
+                        source_index_map=result["source_index_map"],
+                        out_path=record["renumbered_input_path"],
+                    )
+                )
+            results.append(result)
         except Exception as exc:  # pylint: disable=W0718 - one bad design must not sink the batch
             results.append({
                 "description": record["description"],
@@ -166,6 +239,7 @@ def main(args):
                 "unindexed_residues": [],
                 "index_group_map": {},
                 "n_source_atoms": 0,
+                "renumbered_input": None,
                 "error": f"{type(exc).__name__}: {exc}",
             })
 

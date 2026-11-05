@@ -52,6 +52,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--keep-cif", action="store_true", help="keep CIF poses instead of converting to PDB")
     parser.add_argument("--remap-motifs", action="store_true",
                         help="also exercise motif remapping (adds a motif column and passes update_motifs)")
+    parser.add_argument("--renumber-input", action="store_true",
+                        help="also write a renumbered copy of each design's input structure")
     parser.add_argument("--remap-cores", type=int, default=None,
                         help="cores for the CPU-only remapping jobstarter (default: same jobstarter as the run)")
     parser.add_argument("--slurm", action="store_true", help="submit via sbatch instead of running locally")
@@ -231,6 +233,7 @@ def main() -> int:
         metrics_tags=metrics_tags,
         options=options,
         update_motifs=update_motifs,
+        renumber_input=args.renumber_input,
         renumber_jobstarter=renumber_jobstarter,
         convert_cif_to_pdb=not args.keep_cif,
         overwrite=args.overwrite,
@@ -246,6 +249,15 @@ def main() -> int:
         print(f"remapped motif (row 0) : {poses.df['motif'][0]}")
         print("  (input was B45, B46, B82 - identical output means this input kept its numbering)")
 
+    if args.renumber_input:
+        col = f"{prefix}_renumbered_input"
+        paths = [path for path in poses.df[col] if path]
+        print(f"\n{'=' * 70}\nRENUMBERED INPUTS\n{'=' * 70}")
+        print(f"written : {len(paths)} / {len(poses.df)}")
+        print(f"exist   : {all(os.path.isfile(path) for path in paths)}")
+        if paths:
+            print(f"e.g.    : {paths[0]}")
+
     # --- second call must reuse the cached scorefile rather than regenerate
     print(f"\n{'=' * 70}\nCACHE REUSE (second run, overwrite=False)\n{'=' * 70}")
     poses_again = Poses(poses=input_cifs, work_dir=work_dir, storage_format="json")
@@ -257,7 +269,8 @@ def main() -> int:
         poses=poses_again, prefix=prefix, params=params_again,
         num_replicates=args.num_replicates, batch_size=args.batch_size,
         metrics_tags=metrics_tags, options=options,
-        update_motifs=update_motifs, renumber_jobstarter=renumber_jobstarter,
+        update_motifs=update_motifs, renumber_input=args.renumber_input,
+        renumber_jobstarter=renumber_jobstarter,
         convert_cif_to_pdb=not args.keep_cif, overwrite=False,
     )
     print(f"cached run returned : {len(poses_again.df)} poses (should equal the first run)")

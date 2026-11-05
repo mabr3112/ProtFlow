@@ -1981,6 +1981,7 @@ class RFD4Proteina(Runner):
         # --- general ProtFlow parameters ---
         options: str | None = None,
         update_motifs: list[str] | None = None,
+        renumber_input: bool = False,
         multiplex_poses: int | None = None,
         jobstarter: JobStarter | None = None,
         renumber_jobstarter: JobStarter | None = None,
@@ -2060,6 +2061,15 @@ class RFD4Proteina(Runner):
             ``SA_SRC`` standard annotation that RFD4-Proteina writes into every
             output CIF, extracted in parallel by an auxiliary worker.  When
             ``None`` (default), no remapping is performed and no worker runs.
+        renumber_input : bool, optional
+            When ``True``, write one copy of each design's input structure,
+            renumbered into that design's own numbering, to
+            ``<work_dir>/renumbered_inputs/<description>.cif``, and add a
+            ``<prefix>_renumbered_input`` column.  Useful for superimposing an
+            input motif onto the design without reconstructing the mapping by
+            hand.  Produces an identical copy when the design preserved the
+            input numbering.  Uses the same worker and *renumber_jobstarter* as
+            *update_motifs*, and can be enabled independently of it.
         multiplex_poses : int, optional
             If set to an integer > 1, each design key is duplicated this many
             times before submission to maximise GPU utilisation when the number
@@ -2115,6 +2125,9 @@ class RFD4Proteina(Runner):
                 Unique identifier derived from the RFD4 ``example_id``.
             ``<prefix>_cif_location``
                 Absolute path to the designed annotated CIF.
+            ``<prefix>_renumbered_input``
+                Present when *renumber_input* is ``True``.  Absolute path to the
+                input structure rewritten into this design's numbering.
             ``<prefix>_task``
                 The design key the output came from (RFD4's ``task`` column).
             All inline metric columns from ``per_example_metrics.csv``, with
@@ -2209,6 +2222,14 @@ class RFD4Proteina(Runner):
         else:
             design_keys = [(key, key) for key in params]
 
+        # design key -> the structure that design was generated from, so the worker
+        # can write a renumbered copy of it
+        input_by_task = {
+            str(output_key): os.path.abspath(str(params[str(params_key)].get("input", "")))
+            for output_key, params_key in design_keys
+            if params[str(params_key)].get("input")
+        }
+
         total_designs = num_replicates * multiplex_poses
         expected_outputs = num_replicates * len(design_keys)
         logging.info(
@@ -2221,13 +2242,15 @@ class RFD4Proteina(Runner):
         scorefile = os.path.join(work_dir, f"{self.name}_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info("Reusing existing scorefile: %s", scorefile)
-            if update_motifs:
+            if update_motifs or renumber_input:
                 scores = add_source_maps_to_scores(
                     scores=scores,
                     work_dir=work_dir,
                     jobstarter=renumber_jobstarter or jobstarter,
                     python_path=self.rfd4_python,
                     script_path=self._rfd4_remap_worker_script(),
+                    renumber_input=renumber_input,
+                    input_by_task=input_by_task,
                 )
                 self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -2295,13 +2318,15 @@ class RFD4Proteina(Runner):
                 f"({expected_outputs}). Some runs might have crashed!"
             )
 
-        if update_motifs:
+        if update_motifs or renumber_input:
             scores = add_source_maps_to_scores(
                 scores=scores,
                 work_dir=work_dir,
                 jobstarter=renumber_jobstarter or jobstarter,
                 python_path=self.rfd4_python,
                 script_path=self._rfd4_remap_worker_script(),
+                renumber_input=renumber_input,
+                input_by_task=input_by_task,
             )
 
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -2538,7 +2563,7 @@ class RFD4Proteina(Runner):
         work_dir : str
             Root working directory of the run.
         """
-        for subdir in ["outputs", "inputs", "hydra_outputs"]:
+        for subdir in ["outputs", "inputs", "hydra_outputs", "renumbered_inputs", "motif_remap"]:
             path = os.path.join(work_dir, subdir)
             if os.path.isdir(path):
                 shutil.rmtree(path)
@@ -2667,6 +2692,8 @@ def add_source_maps_to_scores(
     python_path: str | None = None,
     script_path: str | None = None,
     overwrite: bool = False,
+    renumber_input: bool = False,
+    input_by_task: dict | None = None,
 ) -> pd.DataFrame:
     """
     Add RFD4 provenance columns to a scores DataFrame.
@@ -2690,11 +2717,20 @@ def add_source_maps_to_scores(
         Explicit worker script path.
     overwrite : bool, optional
         Recompute even when the provenance columns are already present.
+    renumber_input : bool, optional
+        Also write one renumbered copy of each design's input structure under
+        ``<work_dir>/renumbered_inputs/``, in that design's own numbering, and
+        add a ``renumbered_input`` column. Requires *input_by_task*.
+    input_by_task : dict, optional
+        ``{design_key: input_structure_path}``, used to find the structure each
+        design came from. Rows whose ``task`` is absent are skipped with a
+        warning rather than failing the run.
 
     Returns
     -------
     pandas.DataFrame
-        Copy of *scores* with the :data:`RFD4_REMAP_RESULT_COLUMNS` added.
+        Copy of *scores* with the :data:`RFD4_REMAP_RESULT_COLUMNS` added, plus
+        ``renumbered_input`` when *renumber_input* is set.
 
     Raises
     ------
@@ -2705,7 +2741,8 @@ def add_source_maps_to_scores(
         for one of them.
     """
     scores = scores.copy()
-    if all(column in scores.columns for column in RFD4_REMAP_RESULT_COLUMNS) and not overwrite:
+    wanted_columns = RFD4_REMAP_RESULT_COLUMNS + (("renumbered_input",) if renumber_input else ())
+    if all(column in scores.columns for column in wanted_columns) and not overwrite:
         return scores
 
     if jobstarter is None:
@@ -2713,11 +2750,30 @@ def add_source_maps_to_scores(
     for column in ("description", "cif_location"):
         if column not in scores.columns:
             raise ValueError(f"Scores table needs a '{column}' column to extract RFD4 provenance.")
+    if renumber_input and not input_by_task:
+        raise ValueError("renumber_input needs input_by_task to locate each design's input structure.")
 
-    records = [
-        {"description": description, "cif_location": cif_location}
-        for description, cif_location in zip(scores["description"], scores["cif_location"])
-    ]
+    renumbered_dir = os.path.join(work_dir, "renumbered_inputs")
+    tasks = scores["task"] if "task" in scores.columns else [None] * len(scores.index)
+
+    records = []
+    unknown_tasks = []
+    for description, cif_location, task in zip(scores["description"], scores["cif_location"], tasks):
+        record = {"description": description, "cif_location": cif_location}
+        if renumber_input:
+            input_location = (input_by_task or {}).get(task)
+            if input_location is None:
+                unknown_tasks.append(task)
+            else:
+                record["input_location"] = input_location
+                record["renumbered_input_path"] = os.path.join(renumbered_dir, f"{description}.cif")
+        records.append(record)
+
+    if unknown_tasks:
+        logging.warning(
+            "No input structure known for design key(s) %s; their inputs will not be renumbered.",
+            sorted({str(task) for task in unknown_tasks}),
+        )
     results = _run_rfd4_remap_records_with_jobstarter(
         records=records,
         work_dir=work_dir,
@@ -2737,6 +2793,10 @@ def add_source_maps_to_scores(
 
     for column in RFD4_REMAP_RESULT_COLUMNS:
         scores[column] = scores["description"].map(lambda d, col=column: result_by_description[d][col])
+    if renumber_input:
+        scores["renumbered_input"] = scores["description"].map(
+            lambda d: result_by_description[d].get("renumbered_input")
+        )
     return scores
 
 
