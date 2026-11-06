@@ -86,6 +86,11 @@ RFDIFFUSION3_BIN_PATH = "" # "/path/to/mambaforge/envs/rfd3/bin/rfd3"
 RFDIFFUSION3_MODEL_DIR = "" # "/path/to/foundry/models/rfd3/checkpoints/"
 RFDIFFUSION3_PRE_CMD = ""
 
+# rfd4_proteina
+RFD4_PROTEINA_BIN_PATH = "" # "/path/to/RFD4-Proteina/.venv/bin/rfd4-generate"
+RFD4_PROTEINA_DATA_PATH = "" # "/path/to/rfd4_data" -- exported as DATA_PATH; only needed for native (non-HuggingFace) checkpoints
+RFD4_PROTEINA_PRE_CMD = "" # e.g. "source /path/to/RFD4-Proteina/.venv/bin/activate; export CLUSTER=local"
+
 # protein generator
 PROTEIN_GENERATOR_PYTHON_PATH = ""
 PROTEIN_GENERATOR_SCRIPT_PATH = ""

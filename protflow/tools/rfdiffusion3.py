@@ -107,7 +107,16 @@ from ..poses import Poses, col_in_df, description_from_path
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..utils.openbabel_tools import openbabel_fileconverter
 from ..utils.biopython_tools import load_structure_from_ciffile, load_structure_from_pdbfile
-from ..residues import AtomSelection, ResidueSelection, atom_id_to_residue, parse_residue
+from ..residues import (
+    AtomSelection,
+    ResidueSelection,
+    atom_id_to_residue,
+    parse_residue,
+    remap_atom_id,
+    remap_atom_selection,
+    remap_residue_selection,
+    warn_preserved_unmapped_residues,
+)
 
 class RFD3Params(UserDict):
     """
@@ -1728,221 +1737,31 @@ def _ensure_rfd3_index_map(diff_idx_map: dict | None, motif_col: str, strict: bo
     return {}
 
 
+# These remapping helpers are shared with other runners whose model renumbers the
+# output structure; the implementations live in protflow.residues, next to the
+# selection classes they operate on. The wrappers below pin tool_name="RFD3" so
+# warning messages keep naming this runner.
+
 def _warn_preserved_unmapped_residues(missing_residues: list[str], motif_col: str, selection_type: str) -> None:
-    """
-    Emit one warning for residues that were preserved without remapping.
-
-    Parameters
-    ----------
-    missing_residues : list of str
-        Residue identifiers that were requested during remapping but were not
-        present in the pose-specific ``diffused_index_map``.
-    motif_col : str
-        Name of the motif column being remapped.
-    selection_type : str
-        Human-readable selection type used to make the warning message more
-        specific, for example ``"ResidueSelection"`` or ``"AtomSelection"``.
-    """
-    if not missing_residues:
-        return
-
-    unique_missing = list(dict.fromkeys(missing_residues))
-    logging.warning(
-        "[remap_motifs] %s column '%s' contains residues absent from the effective RFD3 remapping map; "
-        "keeping their original identifiers unchanged: %s. This is expected for ligands "
-        "or other residues that keep their original numbering.",
-        selection_type,
-        motif_col,
-        ", ".join(unique_missing),
+    """Emit one warning for residues that were preserved without remapping."""
+    return warn_preserved_unmapped_residues(
+        missing_residues, motif_col=motif_col, selection_type=selection_type, tool_name="RFD3"
     )
 
 
 def _remap_residue_selection(selection: ResidueSelection, diff_idx_map: dict, motif_col: str, strict: bool) -> ResidueSelection:
-    """
-    Remap one ResidueSelection through an RFD3 ``diffused_index_map``.
-
-    Parameters
-    ----------
-    selection : ResidueSelection
-        Residue selection in input-structure numbering.
-    diff_idx_map : dict
-        Mapping from input residue identifiers to output residue identifiers.
-    motif_col : str
-        Name of the column being remapped. Used for error messages.
-    strict : bool
-        Included for API symmetry with atom remapping. Missing residues are
-        preserved unchanged regardless of this flag because RFD3 omits ligands
-        and other non-remapped residues from ``diffused_index_map``.
-
-    Returns
-    -------
-    ResidueSelection
-        New residue selection in output-structure numbering. Residues absent
-        from *diff_idx_map* are preserved unchanged.
-    """
-    residues = selection.to_list()
-    missing_residues = [residue for residue in residues if residue not in diff_idx_map]
-    _warn_preserved_unmapped_residues(missing_residues, motif_col=motif_col, selection_type="ResidueSelection")
-    return ResidueSelection([diff_idx_map.get(residue, residue) for residue in residues])
-
-
-def _atom_residue_number(residue_id) -> int:
-    """
-    Extract the numeric residue component from compact or BioPython atom IDs.
-
-    Parameters
-    ----------
-    residue_id : int, str, list, or tuple
-        Compact residue ID or BioPython residue ID tuple
-        ``(hetero_flag, residue_number, insertion_code)``.
-
-    Returns
-    -------
-    int
-        Numeric residue number used to look up ``diffused_index_map`` entries.
-    """
-    if isinstance(residue_id, (list, tuple)) and len(residue_id) == 3:
-        return int(residue_id[1])
-    return int(residue_id)
-
-
-def _format_remapped_atom_residue_id(original_residue_id, remapped_residue_number: int):
-    """
-    Format a remapped residue ID to match the original atom ID style.
-
-    Parameters
-    ----------
-    original_residue_id : int, str, list, or tuple
-        Residue ID component from the original AtomSelection atom ID.
-    remapped_residue_number : int
-        Residue number parsed from the RFD3 output residue identifier.
-
-    Returns
-    -------
-    int, str, or tuple
-        Residue ID with the same broad representation as
-        *original_residue_id*. BioPython hetero flags are preserved. Insertion
-        codes are reset to blank because RFD3 ``diffused_index_map`` values do
-        not encode insertion codes.
-
-    Raises
-    ------
-    ValueError
-        If *original_residue_id* is not a supported residue ID form.
-    """
-    if isinstance(original_residue_id, int):
-        return remapped_residue_number
-    if isinstance(original_residue_id, str):
-        return str(remapped_residue_number)
-    if isinstance(original_residue_id, (list, tuple)) and len(original_residue_id) == 3:
-        hetero_flag = original_residue_id[0] or " "
-        return (hetero_flag, remapped_residue_number, " ")
-    raise ValueError(f"Cannot remap unsupported atom residue ID: {original_residue_id}")
+    """Remap one ResidueSelection through an RFD3 ``diffused_index_map``."""
+    return remap_residue_selection(selection, index_map=diff_idx_map, motif_col=motif_col, strict=strict, tool_name="RFD3")
 
 
 def _remap_atom_id(atom_id, diff_idx_map: dict, motif_col: str, strict: bool) -> tuple[tuple, bool, str]:
-    """
-    Remap the chain/residue part of one AtomSelection atom ID.
-
-    Parameters
-    ----------
-    atom_id : tuple or list
-        Atom ID in one of the compact or BioPython-style formats supported by
-        :class:`protflow.residues.AtomSelection`.
-    diff_idx_map : dict
-        Mapping from input residue identifiers to output residue identifiers.
-    motif_col : str
-        Name of the column being remapped. Used for error messages.
-    strict : bool
-        Included for API symmetry with residue remapping. Missing residues are
-        preserved unchanged regardless of this flag because RFD3 omits ligands
-        and other non-remapped residues from ``diffused_index_map``.
-
-    Returns
-    -------
-    tuple
-        Three values packed into one tuple: the remapped atom ID (or original
-        atom ID when no map entry exists), a boolean indicating whether
-        remapping occurred, and the atom's source residue identifier.
-
-    Raises
-    ------
-    ValueError
-        If *atom_id* has an unsupported shape.
-    """
-    atom_id = tuple(atom_id)
-    # Decompose each supported atom ID shape into prefix, chain/residue, and
-    # suffix components so the final atom ID can be reconstructed losslessly.
-    if len(atom_id) == 3:
-        chain_id, residue_id, atom_name = atom_id
-        prefix_values = ()
-        suffix_values = (atom_name,)
-    elif len(atom_id) == 4:
-        model_id, chain_id, residue_id, atom_name = atom_id
-        prefix_values = (model_id,)
-        suffix_values = (atom_name,)
-    elif len(atom_id) == 5:
-        structure_id, model_id, chain_id, residue_id, atom_name = atom_id
-        prefix_values = (structure_id, model_id)
-        suffix_values = (atom_name,)
-    elif len(atom_id) == 6:
-        structure_id, model_id, chain_id, residue_id, atom_name, altloc = atom_id
-        prefix_values = (structure_id, model_id)
-        suffix_values = (atom_name, altloc)
-    else:
-        raise ValueError(f"Atom IDs must have 3, 4, 5, or 6 elements while remapping {motif_col}. Got: {atom_id}")
-
-    # RFD3 maps residue identifiers without atom names, so atom-level remapping
-    # first collapses each atom ID to the corresponding residue key.
-    source_residue = f"{chain_id}{_atom_residue_number(residue_id)}"
-    if source_residue not in diff_idx_map:
-        return atom_id, False, source_residue
-
-    remapped_chain, remapped_residue_number = parse_residue(diff_idx_map[source_residue])
-    remapped_residue_id = _format_remapped_atom_residue_id(residue_id, remapped_residue_number)
-    # Preserve atom names, altlocs, model IDs, and structure IDs exactly; only
-    # the chain and residue index come from RFD3.
-    return (*prefix_values, remapped_chain, remapped_residue_id, *suffix_values), True, source_residue
+    """Remap the chain/residue part of one AtomSelection atom ID."""
+    return remap_atom_id(atom_id, index_map=diff_idx_map, motif_col=motif_col, strict=strict, tool_name="RFD3")
 
 
 def _remap_atom_selection(selection: AtomSelection, diff_idx_map: dict, motif_col: str, strict: bool) -> AtomSelection:
-    """
-    Remap one AtomSelection through an RFD3 ``diffused_index_map``.
-
-    Parameters
-    ----------
-    selection : AtomSelection
-        Atom selection in input-structure numbering.
-    diff_idx_map : dict
-        Mapping from input residue identifiers to output residue identifiers.
-    motif_col : str
-        Name of the column being remapped. Used for error messages.
-    strict : bool
-        Included for API symmetry with residue remapping. Atoms whose residues
-        are absent from *diff_idx_map* are preserved unchanged regardless of
-        this flag.
-
-    Returns
-    -------
-    AtomSelection
-        New atom selection in output-structure numbering. Atom order and atom
-        names are preserved. Atoms whose residues are absent from
-        *diff_idx_map* keep their original IDs.
-    """
-    remapped_atoms = []
-    missing_residues = []
-    for atom_id in selection.to_tuple():
-        remapped_atom_id, was_remapped, source_residue = _remap_atom_id(
-            atom_id,
-            diff_idx_map=diff_idx_map,
-            motif_col=motif_col,
-            strict=strict,
-        )
-        if not was_remapped:
-            missing_residues.append(source_residue)
-        remapped_atoms.append(remapped_atom_id)
-    _warn_preserved_unmapped_residues(missing_residues, motif_col=motif_col, selection_type="AtomSelection")
-    return AtomSelection(remapped_atoms)
+    """Remap one AtomSelection through an RFD3 ``diffused_index_map``."""
+    return remap_atom_selection(selection, index_map=diff_idx_map, motif_col=motif_col, strict=strict, tool_name="RFD3")
 
 
 def remap_rfd3_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool = True) -> None:
@@ -2398,13 +2217,22 @@ def renumber_rfd3_input_pdb(
     overwrite: bool = False,
 ) -> str:
     """
-    Copy an RFDiffusion3 input PDB and renumber residues in ``diffused_index_map``.
+    Write the residues of an RFDiffusion3 input PDB that survive into the design.
 
-    The function preserves every line from *input_pdb*.  For PDB records with
-    residue fields (``ATOM``, ``HETATM``, ``ANISOU``, and ``TER``), only residues
-    present in *diffused_index_map* have their chain/residue fields replaced by
-    the mapped RFDiffusion3 output identifiers.  Unmapped residues, ligands, and
-    non-coordinate records are copied unchanged.
+    Only PDB records with residue fields (``ATOM``, ``HETATM``, ``ANISOU``, and
+    ``TER``) whose residue is present in *diffused_index_map* are written, with
+    their chain/residue fields replaced by the mapped RFDiffusion3 output
+    identifiers.  Every other line is dropped: residues outside the contig,
+    ligands absent from the design, and non-coordinate records such as
+    ``HEADER``, ``CONECT`` and ``END``.
+
+    The result is therefore a filtered structure, not a copy of *input_pdb*.
+    Residues that have no counterpart in the output are omitted rather than
+    retained with their input numbering, so the written file carries a single,
+    consistent numbering scheme -- the design's.  Ligands that do appear in the
+    design are preserved, because :func:`_merged_rfd3_renumbering_map` folds the
+    inferred ``ligand_renumbering_map`` into *diffused_index_map* before this
+    function is called.
     """
     input_pdb = os.path.abspath(input_pdb)
     output_pdb = os.path.abspath(output_pdb)
