@@ -2217,13 +2217,22 @@ def renumber_rfd3_input_pdb(
     overwrite: bool = False,
 ) -> str:
     """
-    Copy an RFDiffusion3 input PDB and renumber residues in ``diffused_index_map``.
+    Write the residues of an RFDiffusion3 input PDB that survive into the design.
 
-    The function preserves every line from *input_pdb*.  For PDB records with
-    residue fields (``ATOM``, ``HETATM``, ``ANISOU``, and ``TER``), only residues
-    present in *diffused_index_map* have their chain/residue fields replaced by
-    the mapped RFDiffusion3 output identifiers.  Unmapped residues, ligands, and
-    non-coordinate records are copied unchanged.
+    Only PDB records with residue fields (``ATOM``, ``HETATM``, ``ANISOU``, and
+    ``TER``) whose residue is present in *diffused_index_map* are written, with
+    their chain/residue fields replaced by the mapped RFDiffusion3 output
+    identifiers.  Every other line is dropped: residues outside the contig,
+    ligands absent from the design, and non-coordinate records such as
+    ``HEADER``, ``CONECT`` and ``END``.
+
+    The result is therefore a filtered structure, not a copy of *input_pdb*.
+    Residues that have no counterpart in the output are omitted rather than
+    retained with their input numbering, so the written file carries a single,
+    consistent numbering scheme -- the design's.  Ligands that do appear in the
+    design are preserved, because :func:`_merged_rfd3_renumbering_map` folds the
+    inferred ``ligand_renumbering_map`` into *diffused_index_map* before this
+    function is called.
     """
     input_pdb = os.path.abspath(input_pdb)
     output_pdb = os.path.abspath(output_pdb)

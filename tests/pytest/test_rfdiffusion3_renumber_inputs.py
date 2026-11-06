@@ -26,7 +26,7 @@ def _ter_line(serial: int, resname: str, chain: str, resseq: int) -> str:
     return f"TER   {serial:5d}      {resname:>3} {chain}{resseq:4d}\n"
 
 
-def test_renumber_rfd3_input_pdb_copies_whole_file_and_renumbers_indexed_residues(tmp_path):
+def test_renumber_rfd3_input_pdb_writes_only_mapped_residues(tmp_path):
     input_pdb = tmp_path / "input.pdb"
     output_pdb = tmp_path / "renumbered.pdb"
     input_pdb.write_text(
@@ -53,18 +53,24 @@ def test_renumber_rfd3_input_pdb_copies_whole_file_and_renumbers_indexed_residue
 
     assert result == str(output_pdb)
     lines = output_pdb.read_text(encoding="UTF-8").splitlines()
-    assert lines[0] == "HEADER    KEEP THIS HEADER"
-    assert lines[1][21] == "B"
-    assert lines[1][22:26] == "  10"
-    assert lines[2][21] == "B"
-    assert lines[2][22:26] == "  10"
-    assert lines[3][21] == "B"
-    assert lines[3][22:26] == "  11"
-    assert lines[4][21] == "B"
-    assert lines[4][22:26] == "  11"
-    assert lines[5][21] == "Z"
-    assert lines[5][22:26] == "   9"
-    assert lines[6] == "CONECT    4    1"
+
+    # Only the four records whose residue is in diffused_index_map survive:
+    # ATOM/ANISOU of A1 -> B10 and ATOM/TER of A2 -> B11.
+    assert len(lines) == 4
+    assert [line[:6].strip() for line in lines] == ["ATOM", "ANISOU", "ATOM", "TER"]
+    assert [(line[21], line[22:26]) for line in lines] == [
+        ("B", "  10"),
+        ("B", "  10"),
+        ("B", "  11"),
+        ("B", "  11"),
+    ]
+
+    # Non-coordinate records and residues outside the map are dropped, so the
+    # written file carries the design's numbering scheme and nothing else.
+    assert not any(line.startswith("HEADER") for line in lines)
+    assert not any(line.startswith("CONECT") for line in lines)
+    assert not any(line.startswith("END") for line in lines)
+    assert not any(line[21] == "Z" for line in lines)
 
 
 def test_collect_scores_adds_renumbered_inputs_column(tmp_path):
