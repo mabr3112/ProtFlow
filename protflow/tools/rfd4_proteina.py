@@ -2241,6 +2241,9 @@ class RFD4Proteina(Runner):
         # scorefile reuse shortcut
         scorefile = os.path.join(work_dir, f"{self.name}_scores.{poses.storage_format}")
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+            _check_rfd4_metric_coverage(
+                scores, _read_rfd4_metrics(os.path.join(work_dir, "outputs"), set())
+            )
             logging.info("Reusing existing scorefile: %s", scorefile)
             if update_motifs or renumber_input:
                 scores = add_source_maps_to_scores(
@@ -2391,7 +2394,7 @@ class RFD4Proteina(Runner):
         input_dir : str
             Directory for the per-batch condition specs (``batch0.yaml``, ...).
         output_dir : str
-            Directory passed to ``rfd4-generate`` as ``out_dir``.
+            Parent of the per-batch directories passed to ``rfd4-generate``.
         work_dir : str
             Runner working directory; per-job Hydra run directories are created
             beneath it so concurrent jobs do not clobber each other's config
@@ -2415,8 +2418,9 @@ class RFD4Proteina(Runner):
 
         Notes
         -----
-        Design keys are disjoint across batches, so a shared *output_dir* cannot
-        produce colliding example ids.
+        Disjoint design keys prevent structure filename collisions, but each
+        RFD4 process writes the same per-example and aggregate metric filenames.
+        Each batch therefore needs its own output directory to prevent overwrites.
         """
         batches = split_list(design_keys, n_sublists=n_jobs)
 
@@ -2435,7 +2439,7 @@ class RFD4Proteina(Runner):
             cmds.append(
                 self.write_cmd(
                     in_spec=spec_path,
-                    out_dir=output_dir,
+                    out_dir=os.path.join(output_dir, f"batch{i}"),
                     hydra_run_dir=os.path.join(work_dir, "hydra_outputs", f"batch{i}"),
                     num_replicates=num_replicates,
                     batch_size=batch_size,
@@ -2971,14 +2975,34 @@ def _decompress_structure(path: str) -> str:
     return path
 
 
-def _read_rfd4_metrics(metrics_dir: str, include_scores: set[str]) -> pd.DataFrame:
+def _rfd4_output_dirs(output_dir: str) -> list[str]:
+    """Find batch outputs, falling back to the flat layout used by older runs."""
+    return sorted(glob(os.path.join(output_dir, "batch[0-9]*"))) or [output_dir]
+
+
+def _check_rfd4_metric_coverage(scores: pd.DataFrame, metrics: pd.DataFrame) -> None:
+    """Allow runs without metrics, but reject partially collected metric rows."""
+    if metrics.empty:
+        return
+    missing = scores.loc[~scores["description"].isin(metrics["description"]), "description"]
+    if not missing.empty:
+        raise RuntimeError(
+            f"RFD4 metric coverage incomplete: {len(scores) - len(missing)}/{len(scores)} "
+            f"structures have metric rows. Missing {len(missing)} example IDs "
+            f"(first 5): {missing.head(5).tolist()}. "
+            "Recompute missing metrics before reusing these outputs."
+        )
+
+
+def _read_rfd4_metrics(output_dir: str, include_scores: set[str]) -> pd.DataFrame:
     """
     Read and concatenate RFD4 per-example metrics CSVs.
 
     Parameters
     ----------
-    metrics_dir : str
-        ``<out_dir>/inference_metrics`` directory.
+    output_dir : str
+        Runner's ``outputs/`` directory, containing batch directories or legacy
+        flat outputs.
     include_scores : set of str
         Opt-in score groups.  ``"generation"`` keeps the fully resolved
         ``generation.*`` config columns RFD4 embeds in every row.
@@ -2988,16 +3012,16 @@ def _read_rfd4_metrics(metrics_dir: str, include_scores: set[str]) -> pd.DataFra
     pandas.DataFrame
         One row per ``example_id``, with ``example_id`` renamed to
         ``description`` and ``.`` replaced by ``_`` in every metric column name.
-        Empty when no metrics were written (``metrics_tags`` unset).
+        Empty when no metrics were written.
     """
-    if not os.path.isdir(metrics_dir):
-        return pd.DataFrame()
-
-    csv_paths = sorted(
-        glob(os.path.join(metrics_dir, "per_example_metrics.csv"))
-        + glob(os.path.join(metrics_dir, "per_example_metrics_job*.csv"))
-        + glob(os.path.join(metrics_dir, "individual_job_results", "per_example_metrics_job*.csv"))
-    )
+    csv_paths = []
+    for directory in _rfd4_output_dirs(output_dir):
+        metrics_dir = os.path.join(directory, "inference_metrics")
+        csv_paths.extend(sorted(
+            glob(os.path.join(metrics_dir, "per_example_metrics.csv"))
+            + glob(os.path.join(metrics_dir, "per_example_metrics_job*.csv"))
+            + glob(os.path.join(metrics_dir, "individual_job_results", "per_example_metrics_job*.csv"))
+        ))
     if not csv_paths:
         return pd.DataFrame()
 
@@ -3005,7 +3029,7 @@ def _read_rfd4_metrics(metrics_dir: str, include_scores: set[str]) -> pd.DataFra
     metrics = pd.concat(frames, ignore_index=True)
 
     if "example_id" not in metrics.columns:
-        logging.warning("RFD4 metrics CSVs in %s carry no 'example_id' column; skipping metrics merge.", metrics_dir)
+        logging.warning("RFD4 metrics CSVs in %s carry no 'example_id' column; skipping metrics merge.", output_dir)
         return pd.DataFrame()
 
     metrics = metrics.drop_duplicates(subset="example_id", keep="last")
@@ -3029,10 +3053,11 @@ def collect_scores(
     """
     Parse RFD4-Proteina outputs and return the canonical scores dataframe.
 
-    Scans ``<work_dir>/outputs/inference_samples/`` for designed structures,
+    Scans ``<work_dir>/outputs/batch*/inference_samples/`` for designed structures,
     decompresses any compressed outputs, optionally converts them to PDB, and
-    merges the inline metrics written to
-    ``<work_dir>/outputs/inference_metrics/`` on the RFD4 ``example_id``.
+    merges each batch's inline metrics on the RFD4 ``example_id``. Also reads
+    older runs with flat ``outputs/inference_samples/`` directories.
+    If metrics exist, every collected structure must have a matching metric row.
 
     Parameters
     ----------
@@ -3097,13 +3122,13 @@ def collect_scores(
 
     include_set = set(include_scores or [])
     output_dir = os.path.join(work_dir, "outputs")
-    samples_dir = os.path.join(output_dir, "inference_samples")
     poses_dir = os.path.join(output_dir, "poses")
 
     structure_paths = sorted(
-        glob(os.path.join(samples_dir, "*", "*_generated.cif"))
-        + glob(os.path.join(samples_dir, "*", "*_generated.cif.gz"))
-        + glob(os.path.join(samples_dir, "*", "*_generated.cif.zst"))
+        path
+        for directory in _rfd4_output_dirs(output_dir)
+        for extension in ("cif", "cif.gz", "cif.zst")
+        for path in glob(os.path.join(directory, "inference_samples", "*", f"*_generated.{extension}"))
     )
     if not structure_paths:
         return pd.DataFrame()
@@ -3134,7 +3159,8 @@ def collect_scores(
 
     scores = pd.DataFrame(rows)
 
-    metrics = _read_rfd4_metrics(os.path.join(output_dir, "inference_metrics"), include_set)
+    metrics = _read_rfd4_metrics(output_dir, include_set)
+    _check_rfd4_metric_coverage(scores, metrics)
     if not metrics.empty:
         scores = scores.merge(metrics, how="left", on="description")
 

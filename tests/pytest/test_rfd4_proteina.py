@@ -3,6 +3,7 @@
 import ast
 import logging
 import os
+import shlex
 
 import pandas as pd
 import pytest
@@ -394,6 +395,11 @@ def test_setup_run_writes_one_spec_per_job_with_disjoint_design_keys(tmp_path):
     run_dirs = [cmd.split("hydra.run.dir=")[1].split()[0] for cmd in cmds]
     assert len(set(run_dirs)) == 2
 
+    # RFD4's metric filenames are fixed, so its output directories must differ too.
+    output_dirs = [next(arg.split("=", 1)[1] for arg in shlex.split(cmd)
+                        if arg.startswith("out_dir=")) for cmd in cmds]
+    assert output_dirs == [str(tmp_path / "outputs" / f"batch{i}") for i in range(2)]
+
     # design keys must be plain strings; split_list routes through numpy.array_split
     # and yaml.SafeDumper cannot represent numpy.str_
     assert all(type(key) is str for key in keys)  # noqa: E721 - exact type matters here
@@ -484,6 +490,25 @@ def test_collect_scores_keeps_generation_columns_on_request(tmp_path):
 
     scores = collect_scores(str(tmp_path), cif_to_pdb=False, include_scores=["generation"])
     assert scores.loc[0, "generation_args_nsteps"] == 60
+
+
+def test_collect_scores_merges_metrics_from_separate_batches(tmp_path):
+    for i in range(2):
+        directory = tmp_path / "outputs" / f"batch{i}"
+        _write_generated_cif(directory / "inference_samples", f"design_{i}_0")
+        metrics_dir = directory / "inference_metrics"
+        metrics_dir.mkdir()
+        pd.DataFrame([{
+            "example_id": f"design_{i}_0",
+            "sse_distribution.loop_fraction": 0.2 + i * 0.1,
+        }]).to_csv(metrics_dir / "per_example_metrics.csv", index=False)
+
+    scores = collect_scores(str(tmp_path), cif_to_pdb=False).set_index("description")
+
+    assert sorted(scores.index) == ["design_0_0", "design_1_0"]
+    assert scores["sse_distribution_loop_fraction"].tolist() == pytest.approx([0.2, 0.3])
+    assert all(os.path.isfile(path) for path in scores["location"])
+    assert all(os.path.isfile(path) for path in scores["cif_location"])
 
 
 def test_collect_scores_returns_empty_frame_without_outputs(tmp_path):
