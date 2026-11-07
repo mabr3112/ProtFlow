@@ -23,6 +23,10 @@ Annotations consumed (see the RFD4-Proteina output-format reference):
 ``SA_UII``
     Per-atom boolean marking unindexed insertion targets.
 
+For contig-based condition specs these source labels refer to the materialized
+pre-expansion input. They can differ from the raw CIF residue IDs; callers must
+compose the maps when retaining those original identifiers.
+
 A record may additionally ask for a *renumbered input*: given the design's own
 input structure and a destination path, the worker rewrites that structure's
 chain/residue numbering into the design's numbering and saves it, so the input
@@ -70,6 +74,7 @@ def renumber_input_structure(input_location: str, source_index_map: dict, out_pa
         residue the model did not carry over.
     """
     import numpy as np
+    import rfproteina.conditions  # noqa: F401 - register annotations before parsing
     from atomworks.io.parser import parse
     from atomworks.io.utils.io_utils import to_cif_file
     from rfproteina.utils.parse_presets import ANNOTATED_CIF
@@ -142,6 +147,7 @@ def build_provenance_record(description: str, cif_location: str) -> dict:
             Number of atoms carrying any source label, for sanity checking.
     """
     # imported here so --help works without the RFD4 environment loaded
+    import rfproteina.conditions  # noqa: F401 - register annotations before parsing
     from atomworks.io.parser import parse
     from rfproteina.utils.parse_presets import STANDARD_ANNOTATIONS_ONLY
     from rfproteina.utils.standard_annotations import SA_CRDSRC, SA_IDXGRPSRC, SA_SRC, SA_UII
@@ -166,12 +172,19 @@ def build_provenance_record(description: str, cif_location: str) -> dict:
     # input residue label -> set of output residues it landed on
     source_targets: dict[str, set] = defaultdict(set)
     n_source_atoms = 0
-    if src is not None:
-        for label, chain_id, res_id in zip(src, chain_ids, res_ids):
-            if label == ".":
-                continue
-            n_source_atoms += 1
-            source_targets[str(label)].add(_residue_label(chain_id, res_id))
+    # Unindexed motif atoms carry their source in SA_CRDSRC, while SA_SRC may
+    # be '.' for every protein atom. Both annotations use pre-expansion labels.
+    for labels in (src, crd_src):
+        if labels is None:
+            continue
+        for label, chain_id, res_id in zip(labels, chain_ids, res_ids):
+            if label != ".":
+                source_targets[str(label)].add(_residue_label(chain_id, res_id))
+    if src is not None or crd_src is not None:
+        n_source_atoms = int(sum(
+            (src is not None and src[i] != ".") or (crd_src is not None and crd_src[i] != ".")
+            for i in range(len(chain_ids))
+        ))
 
     source_index_map = {}
     ambiguous = []

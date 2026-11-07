@@ -2050,15 +2050,16 @@ class RFD4Proteina(Runner):
             every design; set ``True`` together with ``overwrite=False`` to
             resume an interrupted run from the outputs already on disk.
         options : str, optional
-            Additional ``rfd4-generate`` arguments in Hydra ``key=value``
-            format, forwarded verbatim.  Must not contain any of
+            Additional ``rfd4-generate`` arguments forwarded verbatim, including
+            Hydra ``key=value`` overrides and flags such as ``--config-path``.
+            Must not contain any of
             :data:`RFD4_RESERVED_OPTIONS`, which are set programmatically.
         update_motifs : list of str, optional
             Names of :class:`~protflow.residues.ResidueSelection` or
             :class:`~protflow.residues.AtomSelection` columns in ``poses.df``
             whose positions should be remapped from input numbering to the
             numbering of each generated structure.  The map is read from the
-            ``SA_SRC`` standard annotation that RFD4-Proteina writes into every
+            ``SA_SRC`` / ``SA_CRDSRC`` annotations that RFD4-Proteina writes into every
             output CIF, extracted in parallel by an auxiliary worker.  When
             ``None`` (default), no remapping is performed and no worker runs.
         renumber_input : bool, optional
@@ -2251,6 +2252,7 @@ class RFD4Proteina(Runner):
                     script_path=self._rfd4_remap_worker_script(),
                     renumber_input=renumber_input,
                     input_by_task=input_by_task,
+                    pre_cmd=self.pre_cmd,
                 )
                 self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -2327,6 +2329,7 @@ class RFD4Proteina(Runner):
                 script_path=self._rfd4_remap_worker_script(),
                 renumber_input=renumber_input,
                 input_by_task=input_by_task,
+                pre_cmd=self.pre_cmd,
             )
 
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -2494,7 +2497,8 @@ class RFD4Proteina(Runner):
         skip_existing : bool, optional
             ``skip_existing=`` value.  Default ``False``.
         options : str, optional
-            Additional Hydra ``key=value`` arguments appended verbatim.
+            Additional arguments forwarded verbatim before runner overrides,
+            including config-selection flags such as ``--config-path``.
 
         Returns
         -------
@@ -2508,16 +2512,9 @@ class RFD4Proteina(Runner):
         Raises
         ------
         ValueError
-            If *options* contains any of :data:`RFD4_RESERVED_OPTIONS`, or uses
-            ``--key value`` instead of Hydra's ``key=value`` syntax.
+            If *options* contains any of :data:`RFD4_RESERVED_OPTIONS`.
         """
         options = options or ""
-
-        if "--" in options:
-            raise ValueError(
-                "rfd4-generate is a Hydra application: every option is 'key=value', never '--key value'. "
-                f"Got options: {options}"
-            )
 
         for reserved in RFD4_RESERVED_OPTIONS:
             if re.search(rf"(^|\s){re.escape(reserved)}=", options):
@@ -2544,8 +2541,9 @@ class RFD4Proteina(Runner):
         if metrics_tags:
             tags = [metrics_tags] if isinstance(metrics_tags, str) else list(metrics_tags)
             args.append("metrics_tags='[" + ",".join(str(tag) for tag in tags) + "]'")
+        # Hydra config flags must precede the positional key=value overrides.
         if options:
-            args.append(options.strip())
+            args.insert(0, options.strip())
 
         env_prefix = f"DATA_PATH={self.data_path} " if self.data_path else ""
         return f"{env_prefix}{self.application_path} " + " ".join(args)
@@ -2596,6 +2594,7 @@ def _run_rfd4_remap_records_with_jobstarter(
     jobstarter: JobStarter,
     python_path: str | None = None,
     script_path: str | None = None,
+    pre_cmd: str | None = None,
 ) -> list[dict]:
     """
     Dispatch RFD4 provenance-extraction records through a ProtFlow jobstarter.
@@ -2620,6 +2619,8 @@ def _run_rfd4_remap_records_with_jobstarter(
     script_path : str, optional
         Explicit worker script path. Defaults to
         ``<AUXILIARY_RUNNER_SCRIPTS_DIR>/rfd4_remap_motifs.py``.
+    pre_cmd : str, optional
+        Environment setup prepended to each provenance-worker command.
 
     Returns
     -------
@@ -2667,6 +2668,8 @@ def _run_rfd4_remap_records_with_jobstarter(
         f"--output_json {shlex.quote(output_json)}"
         for input_json, output_json in zip(input_jsons, output_jsons)
     ]
+    if pre_cmd:
+        cmds = prepend_cmd(cmds=cmds, pre_cmd=pre_cmd)
     jobstarter.start(
         cmds=cmds,
         jobname="rfd4_remap_motifs",
@@ -2694,6 +2697,7 @@ def add_source_maps_to_scores(
     overwrite: bool = False,
     renumber_input: bool = False,
     input_by_task: dict | None = None,
+    pre_cmd: str | None = None,
 ) -> pd.DataFrame:
     """
     Add RFD4 provenance columns to a scores DataFrame.
@@ -2725,6 +2729,8 @@ def add_source_maps_to_scores(
         ``{design_key: input_structure_path}``, used to find the structure each
         design came from. Rows whose ``task`` is absent are skipped with a
         warning rather than failing the run.
+    pre_cmd : str, optional
+        Environment setup for the RFD4 interpreter, also used for workers.
 
     Returns
     -------
@@ -2780,6 +2786,7 @@ def add_source_maps_to_scores(
         jobstarter=jobstarter,
         python_path=python_path,
         script_path=script_path,
+        pre_cmd=pre_cmd,
     )
 
     result_by_description = {result["description"]: result for result in results}
@@ -2809,7 +2816,9 @@ def remap_rfd4_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
     :class:`~protflow.residues.AtomSelection` columns from their original
     input-structure numbering to the corresponding positions in each generated
     structure, using the per-pose ``<prefix>_source_index_map`` built from
-    RFD4's ``SA_SRC`` annotation.
+    RFD4's ``SA_SRC`` and ``SA_CRDSRC`` annotations. For a contig-based
+    condition specification these labels refer to the materialized input,
+    before expansion; compose a map from raw input IDs first if they differ.
 
     The motif columns are updated **in place**, matching the convention of the
     RFdiffusion and RFdiffusion3 runners.
