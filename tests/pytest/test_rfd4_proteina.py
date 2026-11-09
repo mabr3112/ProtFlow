@@ -12,6 +12,7 @@ from protflow.poses import Poses
 from protflow.residues import AtomSelection, ResidueSelection
 from protflow.tools.rfd4_proteina import (
     RFD4_REMAP_RESULT_COLUMNS,
+    _run_rfd4_remap_records_with_jobstarter,
     RFD4Params,
     RFD4Proteina,
     add_source_maps_to_scores,
@@ -614,3 +615,82 @@ def test_cleanup_removes_renumbered_and_remap_directories(tmp_path):
         (tmp_path / name).mkdir()
     _runner()._cleanup_previous_outputs(work_dir=str(tmp_path))
     assert not any((tmp_path / name).exists() for name in names)
+
+
+# --------------------------------------------------------------------------- #
+#                   provenance worker environment (pre_cmd)                    #
+# --------------------------------------------------------------------------- #
+
+class _RecordingJobStarter:
+    """Jobstarter stand-in: records the commands and fakes the worker output."""
+
+    def __init__(self, max_cores: int = 2):
+        self.max_cores = max_cores
+        self.cmds: list[str] = []
+
+    def start(self, cmds, jobname, wait, output_path):  # noqa: ARG002 - signature parity
+        import json
+        import shlex
+
+        self.cmds = list(cmds)
+        for cmd in cmds:
+            tokens = shlex.split(cmd.split(";")[-1])
+            with open(tokens[tokens.index("--input_json") + 1], encoding="UTF-8") as handle:
+                records = json.load(handle)
+            payload = [{**r, **{column: {} for column in RFD4_REMAP_RESULT_COLUMNS}} for r in records]
+            with open(tokens[tokens.index("--output_json") + 1], "w", encoding="UTF-8") as handle:
+                json.dump(payload, handle)
+
+
+def _dispatch_with(tmp_path, pre_cmd):
+    """Run the provenance dispatcher against a recording jobstarter."""
+    script = tmp_path / "rfd4_remap_motifs.py"
+    script.write_text("")
+    jobstarter = _RecordingJobStarter()
+    records = [{"description": f"d{i}", "cif_location": f"d{i}.cif"} for i in range(2)]
+    results = _run_rfd4_remap_records_with_jobstarter(
+        records=records,
+        work_dir=str(tmp_path),
+        jobstarter=jobstarter,
+        python_path="/venv/bin/python",
+        script_path=str(script),
+        pre_cmd=pre_cmd,
+    )
+    assert len(results) == 2
+    return jobstarter.cmds
+
+
+def test_pre_cmd_is_prepended_to_every_provenance_worker_command(tmp_path):
+    """The worker imports atomworks, so it needs the same environment as generation."""
+    pre_cmd = "export CCD_MIRROR_PATH=/mirror"
+    cmds = _dispatch_with(tmp_path, pre_cmd)
+    assert cmds and all(cmd.startswith(f"{pre_cmd}; /venv/bin/python ") for cmd in cmds)
+
+
+def test_provenance_worker_commands_are_unchanged_without_a_pre_cmd(tmp_path):
+    cmds = _dispatch_with(tmp_path, None)
+    assert cmds and all(cmd.startswith("/venv/bin/python ") for cmd in cmds)
+
+
+def test_add_source_maps_forwards_pre_cmd_to_the_worker_dispatcher(tmp_path, monkeypatch):
+    """RFD4Proteina.run() relies on this hand-off to reach the workers."""
+    seen = {}
+
+    def fake_dispatch(records, work_dir, jobstarter, python_path=None, script_path=None, pre_cmd=None):
+        seen["pre_cmd"] = pre_cmd
+        return [
+            {**record, **{column: {} for column in RFD4_REMAP_RESULT_COLUMNS}}
+            for record in records
+        ]
+
+    monkeypatch.setattr(
+        "protflow.tools.rfd4_proteina._run_rfd4_remap_records_with_jobstarter", fake_dispatch
+    )
+    scores = pd.DataFrame([{"description": "d0", "cif_location": "d0.cif"}])
+    add_source_maps_to_scores(
+        scores=scores,
+        work_dir=str(tmp_path),
+        jobstarter=object(),
+        pre_cmd="export CCD_MIRROR_PATH=/mirror",
+    )
+    assert seen["pre_cmd"] == "export CCD_MIRROR_PATH=/mirror"
