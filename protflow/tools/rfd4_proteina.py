@@ -2251,6 +2251,7 @@ class RFD4Proteina(Runner):
                     script_path=self._rfd4_remap_worker_script(),
                     renumber_input=renumber_input,
                     input_by_task=input_by_task,
+                    pre_cmd=self.pre_cmd,
                 )
                 self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
@@ -2327,6 +2328,7 @@ class RFD4Proteina(Runner):
                 script_path=self._rfd4_remap_worker_script(),
                 renumber_input=renumber_input,
                 input_by_task=input_by_task,
+                pre_cmd=self.pre_cmd,
             )
 
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -2596,6 +2598,7 @@ def _run_rfd4_remap_records_with_jobstarter(
     jobstarter: JobStarter,
     python_path: str | None = None,
     script_path: str | None = None,
+    pre_cmd: str | None = None,
 ) -> list[dict]:
     """
     Dispatch RFD4 provenance-extraction records through a ProtFlow jobstarter.
@@ -2620,6 +2623,12 @@ def _run_rfd4_remap_records_with_jobstarter(
     script_path : str, optional
         Explicit worker script path. Defaults to
         ``<AUXILIARY_RUNNER_SCRIPTS_DIR>/rfd4_remap_motifs.py``.
+    pre_cmd : str, optional
+        Command prepended to every worker command, exactly as for generation
+        jobs.  The worker imports ``atomworks``, which binds ``CCD_MIRROR_PATH``
+        and ``PDB_MIRROR_PATH`` at import time, so an environment that only the
+        pre-command sets up (custom CCD mirror, module loads) must be applied
+        here too, not only to ``rfd4-generate``.
 
     Returns
     -------
@@ -2667,6 +2676,8 @@ def _run_rfd4_remap_records_with_jobstarter(
         f"--output_json {shlex.quote(output_json)}"
         for input_json, output_json in zip(input_jsons, output_jsons)
     ]
+    if pre_cmd:
+        cmds = prepend_cmd(cmds=cmds, pre_cmd=pre_cmd)
     jobstarter.start(
         cmds=cmds,
         jobname="rfd4_remap_motifs",
@@ -2694,6 +2705,7 @@ def add_source_maps_to_scores(
     overwrite: bool = False,
     renumber_input: bool = False,
     input_by_task: dict | None = None,
+    pre_cmd: str | None = None,
 ) -> pd.DataFrame:
     """
     Add RFD4 provenance columns to a scores DataFrame.
@@ -2725,6 +2737,12 @@ def add_source_maps_to_scores(
         ``{design_key: input_structure_path}``, used to find the structure each
         design came from. Rows whose ``task`` is absent are skipped with a
         warning rather than failing the run.
+    pre_cmd : str, optional
+        Command prepended to every worker command. The workers parse the
+        designed CIFs with AtomWorks, which binds ``CCD_MIRROR_PATH`` and
+        ``PDB_MIRROR_PATH`` at import time, so a custom CCD mirror set up by
+        the pre-command must be applied here as well as to generation.
+        :meth:`RFD4Proteina.run` passes its own ``pre_cmd``.
 
     Returns
     -------
@@ -2780,6 +2798,7 @@ def add_source_maps_to_scores(
         jobstarter=jobstarter,
         python_path=python_path,
         script_path=script_path,
+        pre_cmd=pre_cmd,
     )
 
     result_by_description = {result["description"]: result for result in results}
