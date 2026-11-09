@@ -2223,12 +2223,16 @@ class RFD4Proteina(Runner):
         else:
             design_keys = [(key, key) for key in params]
 
-        # design key -> the structure that design was generated from, so the worker
-        # can write a renumbered copy of it
-        input_by_task = {
-            str(output_key): os.path.abspath(str(params[str(params_key)].get("input", "")))
+        # Workers need the actual condition spec to recover original numbering
+        # before composing it with provenance from the prepared RFD4 input.
+        spec_by_task = {
+            str(output_key): {**params.global_args, **params[str(params_key)]}
             for output_key, params_key in design_keys
-            if params[str(params_key)].get("input")
+        }
+        input_by_task = {
+            task: os.path.abspath(os.path.join(work_dir, "inputs", str(spec["input"])))
+            for task, spec in spec_by_task.items()
+            if spec.get("input")
         }
 
         total_designs = num_replicates * multiplex_poses
@@ -2252,6 +2256,7 @@ class RFD4Proteina(Runner):
                     script_path=self._rfd4_remap_worker_script(),
                     renumber_input=renumber_input,
                     input_by_task=input_by_task,
+                    spec_by_task=spec_by_task,
                     pre_cmd=self.pre_cmd,
                 )
                 self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -2329,6 +2334,7 @@ class RFD4Proteina(Runner):
                 script_path=self._rfd4_remap_worker_script(),
                 renumber_input=renumber_input,
                 input_by_task=input_by_task,
+                spec_by_task=spec_by_task,
                 pre_cmd=self.pre_cmd,
             )
 
@@ -2574,6 +2580,7 @@ class RFD4Proteina(Runner):
 #: Columns that :func:`add_source_maps_to_scores` adds to the scores table.
 RFD4_REMAP_RESULT_COLUMNS: tuple[str, ...] = (
     "source_index_map",
+    "source_index_map_version",
     "ambiguous_source_labels",
     "motif_residues",
     "unindexed_residues",
@@ -2698,6 +2705,7 @@ def add_source_maps_to_scores(
     renumber_input: bool = False,
     input_by_task: dict | None = None,
     pre_cmd: str | None = None,
+    spec_by_task: dict | None = None,
 ) -> pd.DataFrame:
     """
     Add RFD4 provenance columns to a scores DataFrame.
@@ -2731,6 +2739,11 @@ def add_source_maps_to_scores(
         warning rather than failing the run.
     pre_cmd : str, optional
         Environment setup for the RFD4 interpreter, also used for workers.
+    spec_by_task : dict, optional
+        ``{design_key: condition_spec}`` used to compose original-input to
+        prepared-input numbering with output provenance. The runner always
+        supplies this, including for multiplexed keys and cached runs. Without
+        it, this utility returns the raw prepared-input provenance labels.
 
     Returns
     -------
@@ -2748,7 +2761,11 @@ def add_source_maps_to_scores(
     """
     scores = scores.copy()
     wanted_columns = RFD4_REMAP_RESULT_COLUMNS + (("renumbered_input",) if renumber_input else ())
-    if all(column in scores.columns for column in wanted_columns) and not overwrite:
+    original_numbering = (
+        spec_by_task is None
+        or ("source_index_map_version" in scores.columns and scores["source_index_map_version"].eq(2).all())
+    )
+    if all(column in scores.columns for column in wanted_columns) and original_numbering and not overwrite:
         return scores
 
     if jobstarter is None:
@@ -2766,6 +2783,13 @@ def add_source_maps_to_scores(
     unknown_tasks = []
     for description, cif_location, task in zip(scores["description"], scores["cif_location"], tasks):
         record = {"description": description, "cif_location": cif_location}
+        if spec_by_task is not None:
+            if task not in spec_by_task:
+                raise ValueError(f"No RFD4 condition spec known for task {task!r}; cannot recover original numbering.")
+            record["input_spec"] = spec_by_task[task]
+            # setup_run writes all batch condition specs under inputs/; RFD4
+            # resolves any relative input paths against that directory.
+            record["spec_dir"] = os.path.abspath(os.path.join(work_dir, "inputs"))
         if renumber_input:
             input_location = (input_by_task or {}).get(task)
             if input_location is None:
@@ -2816,9 +2840,8 @@ def remap_rfd4_motifs(poses: Poses, motifs: list[str], prefix: str, strict: bool
     :class:`~protflow.residues.AtomSelection` columns from their original
     input-structure numbering to the corresponding positions in each generated
     structure, using the per-pose ``<prefix>_source_index_map`` built from
-    RFD4's ``SA_SRC`` and ``SA_CRDSRC`` annotations. For a contig-based
-    condition specification these labels refer to the materialized input,
-    before expansion; compose a map from raw input IDs first if they differ.
+    RFD4's ``SA_SRC`` and ``SA_CRDSRC`` annotations, composed with the original
+    to prepared-input correspondence recovered from the condition spec.
 
     The motif columns are updated **in place**, matching the convention of the
     RFdiffusion and RFdiffusion3 runners.

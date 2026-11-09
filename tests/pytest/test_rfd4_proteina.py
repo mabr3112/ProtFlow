@@ -629,7 +629,7 @@ def test_cleanup_removes_renumbered_and_remap_directories(tmp_path):
 
 
 class ProvenanceTests(TestCase):
-    def record(self, sources, conditioned, chains, residues):
+    def record(self, sources, conditioned, chains, residues, input_index_map=None):
         array = SimpleNamespace(chain_id=chains, res_id=residues)
         annotations = ModuleType("rfproteina.utils.standard_annotations")
         for name, value in {"SA_SRC": sources, "SA_CRDSRC": conditioned,
@@ -649,9 +649,32 @@ class ProvenanceTests(TestCase):
             "atomworks.io": ModuleType("atomworks.io"),
             "atomworks.io.parser": parser,
         }):
-            return build_provenance_record("design", "output.cif")
+            return build_provenance_record("design", "output.cif", input_index_map=input_index_map)
 
     def test_unindexed_motif_is_mapped_when_component_sources_only_identify_ligand(self):
         record = self.record([".", ".", "Z0"], ["A2", "A2", "Z0"], ["A", "A", "Z"], [40, 40, 0])
         self.assertEqual(record["source_index_map"], {"A2": "A40", "Z0": "Z0"})
         self.assertEqual(record["n_source_atoms"], 3)
+
+    def test_composes_both_annotation_sources_without_prepared_id_fallback(self):
+        record = self.record(
+            ["A1", ".", "Z0"], ["A1", "A2", "Z0"], ["B", "B", "Z"], [12, 13, 0],
+            {"A41": {"A1"}, "A42": {"A2"}, "A43": {"A3"}, "Z0": {"Z0"}},
+        )
+        self.assertEqual(record["source_index_map"], {"A41": "B12", "A42": "B13", "Z0": "Z0"})
+        self.assertEqual(record["source_index_map_version"], 2)
+        poses = _poses_with_map(
+            record["source_index_map"],
+            residue_motif=ResidueSelection(["A42"]),
+            atom_motif=AtomSelection([("A", 42, "CA")]),
+        )
+        remap_rfd4_motifs(poses, ["residue_motif", "atom_motif"], "rfd4", strict=True)
+        self.assertEqual(poses.df.loc[0, "residue_motif"].to_list(), ["B13"])
+        self.assertEqual(poses.df.loc[0, "atom_motif"].to_tuple(), (("B", 13, "CA"),))
+
+    def test_duplicated_original_residue_is_ambiguous_after_composition(self):
+        record = self.record(
+            ["A1", "A2"], None, ["B", "B"], [12, 13], {"A41": {"A1", "A2"}},
+        )
+        self.assertEqual(record["source_index_map"], {})
+        self.assertEqual(record["ambiguous_source_labels"], ["A41"])
