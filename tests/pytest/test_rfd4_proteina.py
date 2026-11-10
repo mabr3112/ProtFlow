@@ -425,6 +425,35 @@ def test_setup_run_offsets_the_seed_per_job(tmp_path):
     assert seeds == [1234, 1235]
 
 
+def test_setup_run_rejects_changed_assignments_before_rewriting_specs(tmp_path):
+    params = RFD4Params(poses=_poses(tmp_path, n=4))
+    design_keys = [(key, key) for key in params]
+    kwargs = dict(params=params, input_dir=str(tmp_path / "inputs"),
+                  output_dir=str(tmp_path / "outputs"), work_dir=str(tmp_path))
+    runner = _runner()
+    runner.setup_run(**kwargs, design_keys=design_keys, n_jobs=2)
+    # An interrupted job has already produced one design.
+    original = _write_generated_cif(tmp_path / "outputs/batch0/inference_samples", "target_0_0")
+    specs = {path.name: path.read_bytes() for path in (tmp_path / "inputs").glob("*.yaml")}
+
+    with pytest.raises(RuntimeError, match="batch assignments changed"):
+        runner.setup_run(**kwargs, design_keys=design_keys, n_jobs=1, skip_existing=True)
+
+    assert {path.name: path.read_bytes() for path in (tmp_path / "inputs").glob("*.yaml")} == specs
+    assert original.read_text() == "data_design\n#\n"
+
+
+def test_setup_run_allows_unchanged_assignments(tmp_path):
+    params = RFD4Params(poses=_poses(tmp_path, n=4))
+    kwargs = dict(params=params, design_keys=[(key, key) for key in params],
+                  input_dir=str(tmp_path / "inputs"), output_dir=str(tmp_path / "outputs"),
+                  work_dir=str(tmp_path), seed=1234)
+    runner = _runner()
+    original_cmds = runner.setup_run(**kwargs, n_jobs=2, skip_existing=True)
+    _write_generated_cif(tmp_path / "outputs/batch0/inference_samples", "target_0_0")
+    assert runner.setup_run(**kwargs, n_jobs=2, skip_existing=True) == original_cmds
+
+
 # --------------------------------------------------------------------------- #
 #                             score collection                                 #
 # --------------------------------------------------------------------------- #
@@ -509,6 +538,36 @@ def test_collect_scores_merges_metrics_from_separate_batches(tmp_path):
     assert scores["sse_distribution_loop_fraction"].tolist() == pytest.approx([0.2, 0.3])
     assert all(os.path.isfile(path) for path in scores["location"])
     assert all(os.path.isfile(path) for path in scores["cif_location"])
+
+
+def test_collect_scores_rejects_duplicate_structures_before_writing(tmp_path):
+    first = _write_generated_cif(tmp_path / "outputs/batch0/inference_samples", "design_0")
+    second = _write_generated_cif(tmp_path / "outputs/batch1/inference_samples", "design_0")
+    second.write_text("data_newer_design\n")
+    poses_dir = tmp_path / "outputs/poses"
+    poses_dir.mkdir()
+    normalized = poses_dir / "design_0.cif"
+    normalized.write_text("previous collection\n")
+
+    with pytest.raises(RuntimeError, match="duplicate design IDs.*design_0"):
+        collect_scores(str(tmp_path), cif_to_pdb=False)
+
+    assert normalized.read_text() == "previous collection\n"
+    assert first.read_text() == "data_design\n#\n"
+
+
+def test_collect_scores_rejects_duplicate_metrics_before_copying(tmp_path):
+    _write_generated_cif(tmp_path / "outputs/batch0/inference_samples", "design_0")
+    for i, score in enumerate([0.1, 0.9]):
+        metrics_dir = tmp_path / "outputs" / f"batch{i}" / "inference_metrics"
+        metrics_dir.mkdir(parents=True)
+        pd.DataFrame([{"example_id": "design_0", "score": score}]).to_csv(
+            metrics_dir / "per_example_metrics.csv", index=False
+        )
+
+    with pytest.raises(RuntimeError, match="duplicate design IDs.*design_0"):
+        collect_scores(str(tmp_path), cif_to_pdb=False)
+    assert not (tmp_path / "outputs/poses").exists()
 
 
 def test_collect_scores_returns_empty_frame_without_outputs(tmp_path):
