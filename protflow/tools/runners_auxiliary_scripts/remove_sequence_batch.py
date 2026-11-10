@@ -15,6 +15,24 @@ def remove_sequence(seq: str, chains: list[int], sep: str = ":") -> str:
     '''removes all idx of seq.split(sep).'''
     return sep.join([subseq for i, subseq in enumerate(seq.split(sep)) if i not in chains])
 
+def invert_chain_idx(idx_in: list[int], idx_ref: list[int]) -> list[int]:
+    '''Inverts chain indeces in list so that [0] becomes [1, 2, 3] in for list of [0, 1, 2, 3]'''
+    excluded = set(idx_in)
+    return [idx for idx in idx_ref if idx not in excluded]
+
+def seq_to_idx_list(seq: str, sep: str = ":") -> list[int]:
+    """
+    Converts a separated sequence string into chain indices.
+
+    Example:
+        "ASDF:ASDF:ASDF:ASDF" -> [0, 1, 2, 3]
+    """
+    if sep == "":
+        raise ValueError("sep must not be an empty string")
+
+    chains = seq.split(sep)
+    return list(range(len(chains)))
+
 def main(args) -> None:
     "removes sequences from .fa files in bulk."
     # parse inputs
@@ -34,6 +52,11 @@ def main(args) -> None:
 
         # prep separator
         sep = args.sep or find_sep(sequence)
+
+        # if keep was specified, invert chain idx:
+        if args.keep:
+            chain_idx_list = seq_to_idx_list(sequence, sep)
+            chains = invert_chain_idx(chains, chain_idx_list)
 
         # remove chains specified in input_json
         seq = remove_sequence(sequence, chains, sep=sep)
@@ -56,6 +79,7 @@ if __name__ == "__main__":
     argparser.add_argument("--inplace", action="store_true", help="Specify whether to modify the files inplace.")
     argparser.add_argument("--output_dir", type=str, required=True, help="Directory where to write the output .pdb files to.")
     argparser.add_argument("--sep", type=str, help="specify the charactor along which your sequences should be separated.")
+    argparser.add_argument("--keep", action="store_true", help="If set, keep the chains specified by 'chains' in the input_json and discard the rest.")
     arguments = argparser.parse_args()
 
     # arguments safetycheck:

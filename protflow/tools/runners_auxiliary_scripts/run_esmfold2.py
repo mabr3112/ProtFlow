@@ -9,13 +9,13 @@ from esm.models.esmfold2 import (
     ESMFold2InputBuilder,
     StructurePredictionInput)
 from esm.utils.structure.input_builder import (
-    PocketConditioning, 
-    CovalentBond, 
+    PocketConditioning,
+    CovalentBond,
     DistogramConditioning,
     ProteinInput,
-    RNAInput, 
-    LigandInput, 
-    DNAInput, 
+    RNAInput,
+    LigandInput,
+    DNAInput,
     Modification)
 from transformers.models.esmfold2.modeling_esmfold2 import ESMFold2Model
 
@@ -30,14 +30,14 @@ def parse_seq_entry(seq):
 
     # create modification class for each modification
     for value in seq.values():
-        if "modifications" in value:
+        if value.get("modifications") is not None:
             value["modifications"] = [Modification(**moddict) for moddict in value["modifications"]]
-            
+
     # Find the matching key and initialize the class
     for key, parser_class in PARSERS.items():
         if key in seq:
             return parser_class(**seq[key])
-            
+
     raise KeyError("Unknown sequence entry!")
 
 def parse_cst_entries(csts: list):
@@ -51,7 +51,7 @@ def parse_cst_entries(csts: list):
             cst_dict["covalent_bonds"].append(CovalentBond(**cst["covalentbond"]))
         else:
             raise KeyError("Unknown constraint entry!")
-    
+
     if len(cst_dict["pocket"]) > 1:
         raise KeyError("Only single Pocket constraint allowed!")
     elif len(cst_dict["pocket"]) == 1:
@@ -67,27 +67,27 @@ def add_occupancy_to_cif_string(cif_string: str) -> str:
     """
     Default version of ESMFold2 to_mmcif does not write occupancies,
     which prevents parsing of cif files with biopython.
-    Takes an mmCIF string, adds a default occupancy column (1.00) 
+    Takes an mmCIF string, adds a default occupancy column (1.00)
     to the atom_site loop, and returns the fixed mmCIF string.
     """
     # 1. Read the generated CIF string back into a Biotite CIFFile object
     cif_file = CIFFile.read(io.StringIO(cif_string))
-    
+
     # 2. Iterate through data blocks (usually just one)
     for block_name, block in cif_file.items():
         if "atom_site" in block:
             atom_site = block["atom_site"]
-            
+
             # 3. Find the number of atoms using an existing column
             if "id" in atom_site:
                 n_atoms = len(atom_site["id"].as_array())
-                
+
                 # 4. Create an array of "1.00" strings and append as the occupancy column
                 occupancies = np.full(n_atoms, "1.00", dtype=np.str_)
                 atom_site["occupancy"] = CIFColumn(
                     data=CIFData(array=occupancies, dtype=np.str_)
                 )
-                
+
     # 5. Export back to a string
     output = io.StringIO()
     cif_file.write(output)
@@ -160,9 +160,9 @@ def main(args):
 
     data = pd.DataFrame(data).reset_index()
     name = str(os.path.basename(args.input_json)).replace(".json", "_out.json")
-    
+
     data.to_json(os.path.join(args.output_dir, name))
-            
+
 
 if __name__ == "__main__":
 

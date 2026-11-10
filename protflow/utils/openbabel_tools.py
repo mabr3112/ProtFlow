@@ -82,7 +82,7 @@ def openbabel_fileconverter(input_file: str, output_format:str, output_file:str=
 
     # Read the PDB file
     obConversion = openbabel.OBConversion()
-    obConversion.SetInAndOutFormats(input_format,output_format)
+    obConversion.SetInAndOutFormats(input_format, output_format)
     obConversion.ReadFile(mol, input_file)
 
     # Convert the molecule to the desired output format

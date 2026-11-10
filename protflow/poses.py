@@ -87,7 +87,7 @@ from . import jobstarters, require_config, load_config_path
 from .jobstarters import JobStarter, split_list
 from .residues import ResidueSelection, AtomSelection
 from .utils.utils import parse_fasta_to_dict
-from .utils.biopython_tools import biopython_load_structure, get_sequence_from_pose
+from .utils.biopython_tools import biopython_fileconverter, biopython_load_structure, get_sequence_from_pose
 from .utils.openbabel_tools import openbabel_fileconverter
 from .utils import plotting as plots
 
@@ -1232,7 +1232,7 @@ class Poses:
         if (save_method_name := FORMAT_STORAGE_DICT.get(out_format.lower())):
             getattr(temp_df, save_method_name)(out_path)
 
-    def save_poses(self, out_path: str, poses_col: str = "poses", overwrite: bool = True) -> None:
+    def save_poses(self, out_path: str, poses_col: str = "poses", overwrite: bool = True, update_poses: bool = False) -> None:
         """
         Saves the poses to a specified directory, with an option to overwrite existing files.
 
@@ -1269,13 +1269,15 @@ class Poses:
 
         """
         poses = self.df[poses_col].to_list()
-        new_poses = [os.path.join(out_path, os.path.basename(pose)) for pose in poses]
+        new_poses = [os.path.abspath(os.path.join(out_path, os.path.basename(pose))) for pose in poses]
         if not os.path.isdir(out_path):
             os.makedirs(out_path, exist_ok=True)
 
         # check if poses are already at out_path, skip if overwrite is set to False
         if all((os.path.isfile(pose) for pose in new_poses)) and not overwrite:
             logging.info(f"Poses already found at {out_path} and overwrite is set to 'False'. Skipping save_poses.")
+            if update_poses:
+                self.df["poses"] = new_poses
             return
 
         # save poses
@@ -1283,6 +1285,9 @@ class Poses:
         for pose, new_pose in zip(poses, new_poses):
             shutil.copy(pose, new_pose)
 
+        if update_poses:
+            self.df["poses"] = new_poses
+            
     def poses_list(self) -> list[str]:
         """
         Returns a list of pose file paths from the DataFrame.
@@ -1612,7 +1617,7 @@ class Poses:
         # set motif
         self.motifs.append(motif_col)
 
-    def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":") -> None:
+    def convert_pdb_to_fasta(self, prefix: str, update_poses: bool = False, chain_sep: str = ":", overwrite: bool = False) -> None:
         """
         Converts PDB pose files to FASTA format and optionally updates the poses. Paths to fasta location are saved in poses dataframe under column <prefix>_fasta_location.
 
@@ -1664,8 +1669,9 @@ class Poses:
         for name, seq in zip(self.df['poses_description'].to_list(), seqs):
             fasta_path = os.path.join(fasta_dir, f'{name}.fasta')
             fasta_paths.append(fasta_path)
-            with open(fasta_path, 'w', encoding="UTF-8") as f:
-                f.write(f">{name}\n{seq}")
+            if overwrite or not os.path.isfile(fasta_path):
+                with open(fasta_path, 'w', encoding="UTF-8") as f:
+                    f.write(f">{name}\n{seq}")
 
         self.df[f'{prefix}_fasta_location'] = fasta_paths
         if update_poses:
@@ -1731,10 +1737,9 @@ class Poses:
         - Logs the filtering process, including any errors or warnings related to the ranking criteria.
 
         """
-
         if group_col and remove_layers:
             raise KeyError("<group_col> and <remove_layers> are mutually exclusive!")
-    
+
         # define filter output if <prefix> is provided, make sure output directory exists
         if prefix:
             if self.filter_dir is None:
@@ -1748,6 +1753,10 @@ class Poses:
 
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
+
+            # save prefiltered df
+            prefilter_output_name = os.path.join(self.filter_dir, f"{prefix}_prefilter.{storage_format}")
+            getattr(self.df, FORMAT_STORAGE_DICT.get(storage_format))(prefilter_output_name)
 
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
             if not overwrite and os.path.isfile(output_name):
@@ -1868,6 +1877,10 @@ class Poses:
 
             # set filter output name
             output_name = os.path.join(self.filter_dir, f"{prefix}_filter.{storage_format}")
+
+            # save prefiltered df
+            prefilter_output_name = os.path.join(self.filter_dir, f"{prefix}_prefilter.{storage_format}")
+            getattr(self.df, FORMAT_STORAGE_DICT.get(storage_format))(prefilter_output_name)
 
             # load previous filter output if it exists and <overwrite> = False, set poses_df as filtered dataframe and return filtered dataframe
             if not overwrite and os.path.isfile(output_name):
@@ -2353,20 +2366,22 @@ class Poses:
         self.df = self.df.merge(on='poses_description')
         return self
 
-    def convert_poses(self, prefix: str, out_format: str, jobstarter: JobStarter = None, overwrite: bool = False):
+    def convert_poses(self, prefix: str, out_format: str, jobstarter: JobStarter = None, overwrite: bool = False, conversion_engine: str = "biopython"):
         """
-        Converts input poses to the selected output format using Openbabel.
+        Converts input poses to the selected output format.
 
         Parameters
         ----------
         prefix : str
             Defines output folder and output column prefix.
         out_format : str
-            The target output format (see Openbabel documentation for possible formats).
+            The target output format. BioPython supports PDB and CIF/mmCIF; Open Babel supports additional chemistry formats.
         jobstarter : Jobstarter, optional
             If set, delegates conversion to a jobstarter instead of running conversions locally (useful if converting many poses in parallel). Default is None.
         overwrite : bool, optional
             Whether to overwrite previous outputs. Default is False.
+        conversion_engine : str, optional
+            Conversion backend. Must be either "biopython" or "openbabel". Default is "biopython".
 
         Returns
         -------
@@ -2385,15 +2400,26 @@ class Poses:
             """replaces file extensions"""
             return f"{os.path.splitext(path)[0]}.{ext}"
 
-        def convert(path: str, out_format: str, out_dir: str, overwrite: bool = False):
+        def parse_conversion_engine(conversion_engine: str) -> str:
+            """validates and normalizes conversion engine names"""
+            conversion_engine = conversion_engine.lower()
+            if conversion_engine not in {"biopython", "openbabel"}:
+                raise ValueError("conversion_engine must be either 'biopython' or 'openbabel'.")
+            return conversion_engine
+
+        def select_fileconverter(conversion_engine: str):
+            """selects the structure file conversion backend"""
+            return {"biopython": biopython_fileconverter, "openbabel": openbabel_fileconverter}[conversion_engine]
+
+        def convert(path: str, out_format: str, out_dir: str, overwrite: bool = False, conversion_engine: str = "biopython"):
             """converts poses to output format"""
             out_path = os.path.join(out_dir, replace_extension(os.path.basename(path), out_format))
             if not os.path.isfile(out_path) or overwrite is True:
-                openbabel_fileconverter(path, out_format, out_path)
+                select_fileconverter(conversion_engine)(path, out_format, out_path)
             return out_path
         
 
-        def write_obabel_batch_json(poses: list[str], out_path: str, out_format: str, out_dir: str, overwrite: bool = False):
+        def write_conversion_batch_json(poses: list[str], out_path: str, out_format: str, out_dir: str, overwrite: bool = False):
             """creates input jsons for batch conversion with a jobstarter"""
             in_dict = {"input_poses": poses, "out_dir": out_dir, "out_format": out_format, "overwrite": overwrite}
 
@@ -2402,9 +2428,14 @@ class Poses:
 
             return out_path
         
-        def write_conversion_cmd(json_path:str, env_path:str):
+        def write_conversion_cmd(json_path: str, env_path: str, script_path: str, conversion_engine: str):
             """creates cmds for batch conversion with a jobstarter"""
-            return f"{os.path.join(env_path, 'python')} {os.path.abspath(protflow.utils.openbabel_tools.__file__)} --input_json {json_path}"
+            python = os.path.join(env_path, 'python')
+            if conversion_engine == "openbabel":
+                script_path = os.path.abspath(protflow.utils.openbabel_tools.__file__)
+            return f"{python} {script_path} --input_json {json_path}"
+
+        conversion_engine = parse_conversion_engine(conversion_engine)
 
         if f"{prefix}_location" in self.df.columns or f"{prefix}_description" in self.df.columns:
             raise KeyError(f"Column {prefix} found in Poses DataFrame! Pick different Prefix!")
@@ -2423,7 +2454,7 @@ class Poses:
 
         if not jobstarter:
             # convert poses directly
-            self.df["poses"] = self.df.apply(lambda row: convert(row["poses"], out_format, out_dir, overwrite), axis=1)
+            self.df["poses"] = self.df.apply(lambda row: convert(row["poses"], out_format, out_dir, overwrite, conversion_engine), axis=1)
             self.df[f"{prefix}_location"] = self.df["poses"]
             self.df[f"{prefix}_description"] = self.df["poses_description"]
 
@@ -2431,6 +2462,7 @@ class Poses:
             # load config
             config = require_config()
             env = load_config_path(config, "PROTFLOW_ENV")
+            script_path = os.path.join(load_config_path(config, "AUXILIARY_RUNNER_SCRIPTS_DIR"), "biopython_fileconverter.py")
 
             # define number of batches
             n_batches = min([len(self.df.index), jobstarter.max_cores])
@@ -2439,10 +2471,10 @@ class Poses:
             poses_sublists = split_list(self.poses_list(), n_sublists=n_batches)
 
             # write input jsons
-            jsons = [write_obabel_batch_json(poses_sublist, os.path.join(out_dir, f"in_{i}.json"), out_format, out_dir, overwrite) for i, poses_sublist in enumerate(poses_sublists)]
+            jsons = [write_conversion_batch_json(poses_sublist, os.path.join(out_dir, f"in_{i}.json"), out_format, out_dir, overwrite) for i, poses_sublist in enumerate(poses_sublists)]
 
             # write cmds
-            cmds = [write_conversion_cmd(json_path, env) for json_path in jsons]
+            cmds = [write_conversion_cmd(json_path, env, script_path, conversion_engine) for json_path in jsons]
 
             # start conversion
             jobstarter.start(cmds, "convert_poses", wait=True, output_path=out_dir)
@@ -2462,6 +2494,9 @@ class Poses:
 
             # update pose locations
             self.df["poses"] = self.df[f"{prefix}_location"]
+
+            # save
+            self.save_scores()
         
         return self
 

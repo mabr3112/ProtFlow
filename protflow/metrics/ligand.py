@@ -1,69 +1,31 @@
-# TODO: Generate proper doc strings!!!
-"""
-Ligand Module
-===========
+"""Ligand interaction metrics for ProtFlow.
 
-This module provides the functionality to calculate Root Mean Square Deviation (RMSD) values for protein structures within the ProtFlow framework. It offers tools to run RMSD calculations, handle inputs and outputs, and process the resulting data in a structured and automated manner.
+This module provides runners for simple ligand-environment geometry checks. The
+metrics operate on a ligand chain and all other atoms in each pose:
 
-Detailed Description
---------------------
-The `BackboneRMSD` and `MotifRMSD` classes encapsulate the functionality necessary to execute RMSD calculations. These classes manage the configuration of paths to essential scripts and Python executables, set up the environment, and handle the execution of RMSD calculations. They also include methods for collecting and processing output data, ensuring that the results are organized and accessible for further analysis within the ProtFlow ecosystem.
+- :class:`LigandClashes` counts ligand-environment atom pairs that are closer
+  than a fixed distance or a scaled van der Waals cutoff.
+- :class:`LigandContacts` counts ligand-environment atom pairs within a selected
+  distance shell.
 
-The module is designed to streamline the integration of RMSD calculations into larger computational workflows. It supports the automatic setup of job parameters, execution of RMSD commands, and parsing of output files into a structured DataFrame format. This facilitates subsequent data analysis and visualization steps.
-
-Usage
------
-To use this module, create an instance of the `BackboneRMSD` or `MotifRMSD` class and invoke their `run` methods with appropriate parameters. The module will handle the configuration, execution, and result collection processes. Detailed control over the RMSD calculation process is provided through various parameters, allowing for customized runs tailored to specific research needs.
+The runners dispatch per-pose calculations through a
+:class:`~protflow.jobstarters.JobStarter`, collect JSON outputs, and merge the
+resulting score columns back into :class:`~protflow.poses.Poses`.
 
 Examples
 --------
-Here is an example of how to initialize and use the `BackboneRMSD` class within a ProtFlow pipeline:
+Count C-alpha contacts within 5 A of chain ``B``:
 
-.. code-block:: python
+>>> from protflow.metrics.ligand import LigandContacts
+>>> contacts = LigandContacts(ligand_chain="B", min_dist=0, max_dist=5, atoms=["CA"], jobstarter=jobstarter)
+>>> poses = contacts.run(poses=poses, prefix="lig_contacts")
 
-    from protflow.poses import Poses
-    from protflow.jobstarters import JobStarter
-    from rmsd import BackboneRMSD
+Count van der Waals clashes against chain ``B`` while ignoring ligand
+hydrogens:
 
-    # Create instances of necessary classes
-    poses = Poses()
-    jobstarter = JobStarter()
-
-    # Initialize the BackboneRMSD class
-    backbone_rmsd = BackboneRMSD()
-
-    # Run the RMSD calculation
-    results = backbone_rmsd.run(
-        poses=poses,
-        prefix="experiment_1",
-        jobstarter=jobstarter,
-        ref_col="reference",
-        chains=["A", "B"],
-        overwrite=True
-    )
-
-    # Access and process the results
-    print(results)
-
-Further Details
----------------
-    - Edge Cases: The module handles various edge cases, such as empty pose lists and the need to overwrite previous results. It ensures robust error handling and logging for easier debugging and verification of the RMSD calculation process.
-    - Customizability: Users can customize the RMSD calculation process through multiple parameters, including the specific atoms and chains to be used in the calculation, as well as jobstarter configurations.
-    - Integration: The module seamlessly integrates with other components of the ProtFlow framework, leveraging shared configurations and data structures to provide a cohesive user experience.
-
-This module is intended for researchers and developers who need to incorporate RMSD calculations into their protein design and analysis workflows. By automating many of the setup and execution steps, it allows users to focus on interpreting results and advancing their scientific inquiries.
-
-Notes
------
-This module is part of the ProtFlow package and is designed to work in tandem with other components of the package, especially those related to job management in HPC environments.
-
-Author
-------
-Markus Braun, Adrian Tripp
-
-Version
--------
-0.1.0
+>>> from protflow.metrics.ligand import LigandClashes
+>>> clashes = LigandClashes(ligand_chain="B", atoms=["CA"], exclude_ligand_elements=["H"], jobstarter=jobstarter)
+>>> poses = clashes.run(poses=poses, prefix="lig_clashes")
 """
 
 # import general
@@ -85,107 +47,58 @@ from protflow.utils.biopython_tools import biopython_load_structure
 from protflow.utils.utils import vdw_radii
 
 class LigandClashes(Runner):
-    """
-    BackboneRMSD Class
-    ==================
+    """Count ligand-environment atom clashes for each pose.
 
-    The `BackboneRMSD` class is a specialized class designed to facilitate the calculation of backbone RMSD values within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with RMSD calculations.
+    The runner treats all atoms in ``ligand_chain`` as ligand atoms and all atoms
+    in other chains as the environment. A clash is counted when a ligand atom and
+    environment atom are closer than either ``clash_distance`` or
+    ``factor * (vdw_ligand + vdw_environment)``.
 
-    Detailed Description
-    --------------------
-    The `BackboneRMSD` class manages all aspects of calculating RMSD for protein backbones. It handles the configuration of necessary scripts and executables, prepares the environment for RMSD calculations, and executes the commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
-
-    Key functionalities include:
-        - Setting up paths to RMSD calculation scripts and Python executables.
-        - Configuring job starter options, either automatically or manually.
-        - Handling the execution of RMSD commands with support for different atoms and chains.
-        - Collecting and processing output data into a pandas DataFrame.
-        - Managing overwrite options and handling existing score files.
-
-    Returns
-    -------
-    An instance of the `BackboneRMSD` class, configured to run RMSD calculations and handle outputs efficiently.
-
-    Raises
-    ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If atoms or chains are not of the expected type.
-
-    Examples
-    --------
-    Here is an example of how to initialize and use the `BackboneRMSD` class:
-
-    .. code-block:: python
-
-        from protflow.poses import Poses
-        from protflow.jobstarters import JobStarter
-        from rmsd import BackboneRMSD
-
-        # Create instances of necessary classes
-        poses = Poses()
-        jobstarter = LocalJobStarter(max_cores=4)
-
-        # Initialize the BackboneRMSD class
-        backbone_rmsd = BackboneRMSD()
-
-        # Run the RMSD calculation
-        results = backbone_rmsd.run(
-            poses=poses,
-            prefix="experiment_1",
-            jobstarter=jobstarter,
-            ref_col="reference_location",
-            chains=["A", "B"],
-            overwrite=True
-        )
-
-        # Access and process the results
-        print(results)
-
-    Further Details
-    ---------------
-        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.
-        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the RMSD calculation process to their specific needs.
-        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
-
-    The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+    Parameters
+    ----------
+    ligand_chain : str, optional
+        Chain ID containing the ligand atoms.
+    factor : float, optional
+        Multiplier for van der Waals clash thresholds. Ignored when
+        ``clash_distance`` is set.
+    atoms : list of str, optional
+        Environment atom names to include.
+    clash_distance : float, optional
+        Fixed Angstrom cutoff for clashes. If omitted, van der Waals radii are
+        used.
+    exclude_ligand_elements : list of str, optional
+        Ligand element symbols to ignore, commonly ``["H"]``.
+    jobstarter : JobStarter, optional
+        Default jobstarter used when :meth:`run` is called without one.
+    overwrite : bool, optional
+        Default cache-overwrite behavior for :meth:`run`.
     """
     def __init__(self, ligand_chain: str = None, factor: float = 1, atoms: list[str] = None, clash_distance: float = None, exclude_ligand_elements: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+        """Initialize ligand clash defaults for later :meth:`run` calls.
+
+        Parameters
+        ----------
+        ligand_chain : str, optional
+            Chain ID containing ligand atoms.
+        factor : float, optional
+            Multiplier applied to van der Waals clash cutoffs.
+        atoms : list of str, optional
+            Environment atom names to include. If omitted, all environment atoms
+            are considered.
+        clash_distance : float, optional
+            Fixed Angstrom cutoff for clashes.
+        exclude_ligand_elements : list of str, optional
+            Ligand element symbols to ignore.
+        jobstarter : JobStarter, optional
+            Default jobstarter for this runner instance.
+        overwrite : bool, optional
+            Whether to overwrite existing cached score files by default.
         """
-        Initialize the BackboneRMSD class.
 
-        This constructor sets up the BackboneRMSD instance with default or provided parameters. It configures the reference column, atoms, chains, jobstarter, and overwrite options for RMSD calculations.
-
-        Parameters:
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to ["CA"].
-            chains (list[str], optional): The list of chain names to calculate RMSD over. Defaults to None.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-            jobstarter (str, optional): The jobstarter configuration for running the RMSD calculations. Defaults to None.
-
-        Returns:
-            None
-
-        Examples:
-            Here is an example of how to initialize the BackboneRMSD class:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class with default parameters
-                backbone_rmsd = BackboneRMSD()
-
-                # Initialize the BackboneRMSD class with custom parameters
-                backbone_rmsd = BackboneRMSD(ref_col="reference", atoms=["CA", "CB"], chains=["A", "B"], overwrite=True, jobstarter="custom_starter")
-
-        Further Details:
-            - **Default Values:** If no parameters are provided, the class initializes with default values suitable for basic RMSD calculations.
-            - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
-            - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
-        """
-        # setup config
+        # Resolve the worker interpreter from the active ProtFlow config.
         self.python = os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "python")
+
+        # Store defaults that can be overridden per run call.
         self.set_ligand_chain(ligand_chain)
         self.set_atoms(atoms)
         self.set_factor(factor)
@@ -195,76 +108,39 @@ class LigandClashes(Runner):
         self.overwrite = overwrite
 
     def __str__(self):
+        """Return the short runner name.
+
+        Returns
+        -------
+        str
+            The literal runner name ``"LigandClashes"``.
+        """
         return "LigandClashes"
     
     ########################## Input ################################################
     def set_ligand_chain(self, ligand_chain: str) -> None:
-        """
-        Set the reference column for RMSD calculations.
+        """Set the default ligand chain ID.
 
-        This method sets the default reference column to be used in the RMSD calculation process.
-
-        Parameters:
-            ref_col (str): The reference column for RMSD calculations.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If ref_col is not of type string.
-
-        Examples:
-            Here is an example of how to use the `set_ref_col` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the reference column
-                backbone_rmsd.set_ref_col("reference")
-
-        Further Details:
-            - **Usage:** The reference column is used to identify which column in the input data contains the reference structures for RMSD calculation.
-            - **Validation:** The method includes validation to ensure that the reference column is of the correct type.
-            - **Integration:** The reference column set by this method is used by other methods in the class to perform RMSD calculations.
+        Parameters
+        ----------
+        ligand_chain : str
+            Chain ID containing ligand atoms.
         """
         self.ligand_chain = ligand_chain
 
     def set_atoms(self, atoms:list[str]) -> None:
-        """
-        Set the atoms for RMSD calculations.
+        """Set environment atom names used for clash calculations.
 
-        This method sets the list of atom names to calculate RMSD over. If "all" is provided, all atoms will be considered.
+        Parameters
+        ----------
+        atoms : list of str or "all" or None
+            Environment atom names to include. ``None`` and ``"all"`` both mean
+            all non-ligand atoms.
 
-        Parameters:
-            atoms (list[str]): The list of atom names to calculate RMSD over.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If atoms is not a list of strings.
-
-        Examples:
-            Here is an example of how to use the `set_atoms` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the atoms for RMSD calculation
-                backbone_rmsd.set_atoms(["CA", "CB"])
-
-        Further Details:
-            - **Usage:** The list of atoms specifies which atoms in the protein backbone will be considered during RMSD calculations.
-            - **Validation:** The method includes validation to ensure that the atoms parameter is a list of strings, representing valid atom names.
-            - **Flexibility:** Users can specify any set of atoms or choose to include all atoms by setting the parameter to "all".
+        Raises
+        ------
+        TypeError
+            If ``atoms`` is neither ``None``, ``"all"``, nor a list of strings.
         """
         if atoms == "all":
             self.atoms = "all"
@@ -273,75 +149,27 @@ class LigandClashes(Runner):
         self.atoms = atoms
 
     def set_factor(self, factor: float) -> None:
-        """
-        Set the chains for RMSD calculations.
+        """Set the van der Waals clash-threshold multiplier.
 
-        This method sets the list of chain names to calculate RMSD over. It ensures that the provided chains parameter is a list of strings or a single string representing chain names.
-
-        Parameters:
-            chains (list[str] or str): The list of chain names or a single chain name to calculate RMSD over.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If chains is not a list of strings or a single string.
-
-        Examples:
-            Here is an example of how to use the `set_chains` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the chains for RMSD calculation
-                backbone_rmsd.set_chains(["A", "B"])
-
-                # Alternatively, set a single chain
-                backbone_rmsd.set_chains("A")
-
-        Further Details:
-            - **Usage:** The chains parameter specifies which chains in the protein structure will be considered during RMSD calculations.
-            - **Validation:** The method includes validation to ensure that the chains parameter is either a list of strings or a single string, representing valid chain names.
-            - **Flexibility:** Users can specify multiple chains as a list or a single chain as a string, providing flexibility in how the RMSD calculations are configured.
+        Parameters
+        ----------
+        factor : float
+            Multiplier applied to summed atom-pair van der Waals radii.
         """
         self.factor = factor
 
     def set_jobstarter(self, jobstarter: JobStarter) -> None:
-        """
-        Set the jobstarter configuration for the BackboneRMSD runner.
+        """Set the default jobstarter for ligand clash jobs.
 
-        This method sets the jobstarter configuration to be used in the RMSD calculation process.
+        Parameters
+        ----------
+        jobstarter : JobStarter, optional
+            Default executor for this runner instance.
 
-        Parameters:
-            jobstarter (JobStarter): The jobstarter configuration for running the RMSD calculations.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If jobstarter is not of type JobStarter.
-
-        Examples:
-            Here is an example of how to use the `set_jobstarter` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the jobstarter configuration
-                backbone_rmsd.set_jobstarter("custom_starter")
-
-        Further Details:
-            - **Usage:** The jobstarter configuration specifies how the RMSD calculations will be managed and executed, particularly in HPC environments.
-            - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
-            - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
+        Raises
+        ------
+        ValueError
+            If ``jobstarter`` is neither ``None`` nor a :class:`JobStarter`.
         """
         if isinstance(jobstarter, JobStarter):
             self.jobstarter = jobstarter
@@ -349,74 +177,56 @@ class LigandClashes(Runner):
             raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
 
     def set_exclude_ligand_elements(self, exclude_ligand_elements: list[str]):
+        """Set ligand element symbols to exclude from clash calculations.
+
+        Parameters
+        ----------
+        exclude_ligand_elements : list of str, optional
+            Element symbols ignored on the ligand side.
+        """
         self.exclude_ligand_elements = exclude_ligand_elements
 
     def set_clash_distance(self, clash_distance: float):
+        """Set a fixed Angstrom cutoff for ligand clash calculations.
+
+        Parameters
+        ----------
+        clash_distance : float, optional
+            Fixed clash cutoff. If omitted, van der Waals radii are used.
+        """
         self.clash_distance = clash_distance
 
     ########################## Calculations ################################################
     def run(self, poses: Poses, prefix: str, ligand_chain: str = None, factor: float = 1, clash_distance: float = None, jobstarter: JobStarter = None, atoms: list[str] = None, exclude_ligand_elements: list[str] = None, overwrite: bool = False) -> Poses:
+        """Run ligand clash detection and merge scores into ``poses``.
+
+        Parameters
+        ----------
+        poses : Poses
+            Input structures. Each pose must contain ``ligand_chain``.
+        prefix : str
+            Unique run prefix used for the work directory and output columns.
+        ligand_chain : str, optional
+            Chain ID containing ligand atoms. Overrides the instance default.
+        factor : float, optional
+            Van der Waals clash-threshold multiplier.
+        clash_distance : float, optional
+            Fixed Angstrom cutoff. Overrides van der Waals-based thresholds.
+        jobstarter : JobStarter, optional
+            Jobstarter for this call.
+        atoms : list of str, optional
+            Environment atom names to include.
+        exclude_ligand_elements : list of str, optional
+            Ligand element symbols to ignore.
+        overwrite : bool, optional
+            If ``True``, rerun instead of using a cached score file.
+
+        Returns
+        -------
+        Poses
+            The input ``Poses`` object with ligand clash columns merged in.
         """
-        Calculate the backbone RMSD for given poses and jobstarter configuration.
-
-        This method sets up and runs the RMSD calculation process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.
-
-        Parameters:
-            poses (Poses): The Poses object containing the protein structures.
-            prefix (str): A prefix used to name and organize the output files.
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            chains (list[str], optional): A list of chain names to calculate RMSD over. Defaults to None.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-
-        Returns:
-            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.
-
-        Raises:
-            FileNotFoundError: If required files or directories are not found during the execution process.
-            ValueError: If invalid arguments are provided to the method.
-            TypeError: If chains are not of the expected type.
-
-        Examples:
-            Here is an example of how to use the `run` method:
-
-            .. code-block:: python
-
-                from protflow.poses import Poses
-                from protflow.jobstarters import JobStarter
-                from rmsd import BackboneRMSD
-
-                # Create instances of necessary classes
-                poses = Poses()
-                jobstarter = LocalJobStarter(max_cores=4)
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Run the RMSD calculation
-                results = backbone_rmsd.run(
-                    poses=poses,
-                    prefix="experiment_1",
-                    jobstarter=jobstarter,
-                    ref_col="reference",
-                    chains=["A", "B"],
-                    overwrite=True
-                )
-
-                # Access and process the results
-                print(results)
-
-        Further Details:
-            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It supports splitting poses into sublists for parallel processing.
-            - **Input Handling:** The method prepares input JSON files for each sublist of poses and constructs commands for running RMSD calculations using BioPython.
-            - **Output Management:** The method handles the collection and processing of output data from multiple score files, concatenating them into a single DataFrame and saving the results.
-            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the RMSD calculation process to their specific needs, including specifying atoms and chains for RMSD calculations.
-
-        This method is designed to streamline the execution of backbone RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze RMSD calculations.
-        """
-        # if self.atoms is all, calculate Allatom RMSD.
-
-        # prep variables
+        # Set up the runner directory and choose the effective jobstarter.
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
@@ -436,30 +246,28 @@ class LigandClashes(Runner):
 
         scorefile = os.path.join(work_dir, f"{prefix}_ligand_clashes.{poses.storage_format}")
 
-        # check if RMSD was calculated if overwrite was not set.
+        # Reuse cached clash scores unless overwrite was requested.
         overwrite = overwrite or self.overwrite
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=self.overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
 
-        # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
+        # Split pose paths into worker chunks while keeping command lines short.
         poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
         out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, _ in enumerate(poses_sublists)]
         cmds = [f"{self.python} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --mode clash_vdw --factor {factor} --ligand_chain {ligand_chain} {atoms_str} {exclude_ligand_elements_str} {clash_distance_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
 
-        # run command
+        # Execute one ligand-clash worker per pose chunk.
         jobstarter.start(
             cmds = cmds,
             jobname = "ligand_clash",
             output_path = work_dir
         )
 
-        # collect individual DataFrames into one
+        # Collect worker JSON outputs and merge them through RunnerOutput.
         scores = pd.concat([pd.read_json(output) for output in out_files]).reset_index(drop=True)
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
-
-        # create standardised output for poses class:
         output = RunnerOutput(
             poses = poses,
             results = scores,
@@ -469,107 +277,58 @@ class LigandClashes(Runner):
         return output.return_poses()
 
 class LigandContacts(Runner):
-    """
-    BackboneRMSD Class
-    ==================
+    """Count ligand-environment atom contacts for each pose.
 
-    The `BackboneRMSD` class is a specialized class designed to facilitate the calculation of backbone RMSD values within the ProtFlow framework. It extends the `Runner` class and incorporates specific methods to handle the setup, execution, and data collection associated with RMSD calculations.
+    The runner treats atoms in ``ligand_chain`` as ligand atoms and all atoms in
+    other chains as the environment. A contact is counted when an environment
+    atom and ligand atom are farther than ``min_dist`` and closer than
+    ``max_dist``. This provides a simple contact-density proxy for ligand burial
+    or pocket engagement.
 
-    Detailed Description
-    --------------------
-    The `BackboneRMSD` class manages all aspects of calculating RMSD for protein backbones. It handles the configuration of necessary scripts and executables, prepares the environment for RMSD calculations, and executes the commands. Additionally, it collects and processes the output data, organizing it into a structured format for further analysis.
-
-    Key functionalities include:
-        - Setting up paths to RMSD calculation scripts and Python executables.
-        - Configuring job starter options, either automatically or manually.
-        - Handling the execution of RMSD commands with support for different atoms and chains.
-        - Collecting and processing output data into a pandas DataFrame.
-        - Managing overwrite options and handling existing score files.
-
-    Returns
-    -------
-    An instance of the `BackboneRMSD` class, configured to run RMSD calculations and handle outputs efficiently.
-
-    Raises
-    ------
-        - FileNotFoundError: If required files or directories are not found during the execution process.
-        - ValueError: If invalid arguments are provided to the methods.
-        - TypeError: If atoms or chains are not of the expected type.
-
-    Examples
-    --------
-    Here is an example of how to initialize and use the `BackboneRMSD` class:
-
-    .. code-block:: python
-
-        from protflow.poses import Poses
-        from protflow.jobstarters import JobStarter
-        from rmsd import BackboneRMSD
-
-        # Create instances of necessary classes
-        poses = Poses()
-        jobstarter = LocalJobStarter(max_cores=4)
-
-        # Initialize the BackboneRMSD class
-        backbone_rmsd = BackboneRMSD()
-
-        # Run the RMSD calculation
-        results = backbone_rmsd.run(
-            poses=poses,
-            prefix="experiment_1",
-            jobstarter=jobstarter,
-            ref_col="reference_location",
-            chains=["A", "B"],
-            overwrite=True
-        )
-
-        # Access and process the results
-        print(results)
-
-    Further Details
-    ---------------
-        - Edge Cases: The class includes handling for various edge cases, such as empty pose lists, the need to overwrite previous results, and the presence of existing score files.
-        - Customization: The class provides extensive customization options through its parameters, allowing users to tailor the RMSD calculation process to their specific needs.
-        - Integration: Seamlessly integrates with other ProtFlow components, leveraging shared configurations and data structures for a unified workflow.
-
-    The BackboneRMSD class is intended for researchers and developers who need to perform backbone RMSD calculations as part of their protein design and analysis workflows. It simplifies the process, allowing users to focus on analyzing results and advancing their research.
+    Parameters
+    ----------
+    ligand_chain : str, optional
+        Chain ID containing ligand atoms.
+    min_dist : float, optional
+        Lower Angstrom bound for contact distances.
+    max_dist : float, optional
+        Upper Angstrom bound for contact distances.
+    atoms : list of str, optional
+        Environment atom names to include.
+    exclude_elements : list of str, optional
+        Element symbols to ignore in both ligand and environment atoms, commonly
+        ``["H"]``.
+    jobstarter : JobStarter, optional
+        Default jobstarter used when :meth:`run` is called without one.
+    overwrite : bool, optional
+        Default cache-overwrite behavior for :meth:`run`.
     """
     def __init__(self, ligand_chain: str = None, min_dist: float = 0, max_dist: float = 5, atoms: list[str] = None, exclude_elements: list[str] = None, jobstarter: JobStarter = None, overwrite: bool = False): # pylint: disable=W0102
+        """Initialize ligand contact defaults for later :meth:`run` calls.
+
+        Parameters
+        ----------
+        ligand_chain : str, optional
+            Chain ID containing ligand atoms.
+        min_dist : float, optional
+            Lower Angstrom bound for counted contacts.
+        max_dist : float, optional
+            Upper Angstrom bound for counted contacts.
+        atoms : list of str, optional
+            Environment atom names to include. If omitted, all environment atoms
+            are considered.
+        exclude_elements : list of str, optional
+            Element symbols to remove from both ligand and environment atoms.
+        jobstarter : JobStarter, optional
+            Default jobstarter for this runner instance.
+        overwrite : bool, optional
+            Whether to overwrite existing cached score files by default.
         """
-        Initialize the BackboneRMSD class.
 
-        This constructor sets up the BackboneRMSD instance with default or provided parameters. It configures the reference column, atoms, chains, jobstarter, and overwrite options for RMSD calculations.
-
-        Parameters:
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            atoms (list[str], optional): The list of atom names to calculate RMSD over. Defaults to ["CA"].
-            chains (list[str], optional): The list of chain names to calculate RMSD over. Defaults to None.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-            jobstarter (str, optional): The jobstarter configuration for running the RMSD calculations. Defaults to None.
-
-        Returns:
-            None
-
-        Examples:
-            Here is an example of how to initialize the BackboneRMSD class:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class with default parameters
-                backbone_rmsd = BackboneRMSD()
-
-                # Initialize the BackboneRMSD class with custom parameters
-                backbone_rmsd = BackboneRMSD(ref_col="reference", atoms=["CA", "CB"], chains=["A", "B"], overwrite=True, jobstarter="custom_starter")
-
-        Further Details:
-            - **Default Values:** If no parameters are provided, the class initializes with default values suitable for basic RMSD calculations.
-            - **Parameter Storage:** The parameters provided during initialization are stored as instance variables, which are used in subsequent method calls.
-            - **Custom Configuration:** Users can customize the RMSD calculation process by providing specific values for the reference column, atoms, chains, and jobstarter.
-        """
-        # setup config
+        # Resolve the worker interpreter from the active ProtFlow config.
         self.python = os.path.join(load_config_path(require_config(), "PROTFLOW_ENV"), "python")
+
+        # Store defaults that can be overridden per run call.
         self.set_ligand_chain(ligand_chain)
         self.set_atoms(atoms)
         self.set_min_dist(min_dist)
@@ -579,76 +338,39 @@ class LigandContacts(Runner):
         self.overwrite = overwrite
 
     def __str__(self):
+        """Return the short runner name.
+
+        Returns
+        -------
+        str
+            The literal runner name ``"LigandContacts"``.
+        """
         return "LigandContacts"
 
     ########################## Input ################################################
     def set_ligand_chain(self, ligand_chain: str) -> None:
-        """
-        Set the reference column for RMSD calculations.
+        """Set the default ligand chain ID.
 
-        This method sets the default reference column to be used in the RMSD calculation process.
-
-        Parameters:
-            ref_col (str): The reference column for RMSD calculations.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If ref_col is not of type string.
-
-        Examples:
-            Here is an example of how to use the `set_ref_col` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the reference column
-                backbone_rmsd.set_ref_col("reference")
-
-        Further Details:
-            - **Usage:** The reference column is used to identify which column in the input data contains the reference structures for RMSD calculation.
-            - **Validation:** The method includes validation to ensure that the reference column is of the correct type.
-            - **Integration:** The reference column set by this method is used by other methods in the class to perform RMSD calculations.
+        Parameters
+        ----------
+        ligand_chain : str
+            Chain ID containing ligand atoms.
         """
         self.ligand_chain = ligand_chain
 
     def set_atoms(self, atoms:list[str]) -> None:
-        """
-        Set the atoms for RMSD calculations.
+        """Set environment atom names used for contact calculations.
 
-        This method sets the list of atom names to calculate RMSD over. If "all" is provided, all atoms will be considered.
+        Parameters
+        ----------
+        atoms : list of str or "all" or None
+            Environment atom names to include. ``None`` and ``"all"`` both mean
+            all non-ligand atoms.
 
-        Parameters:
-            atoms (list[str]): The list of atom names to calculate RMSD over.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If atoms is not a list of strings.
-
-        Examples:
-            Here is an example of how to use the `set_atoms` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the atoms for RMSD calculation
-                backbone_rmsd.set_atoms(["CA", "CB"])
-
-        Further Details:
-            - **Usage:** The list of atoms specifies which atoms in the protein backbone will be considered during RMSD calculations.
-            - **Validation:** The method includes validation to ensure that the atoms parameter is a list of strings, representing valid atom names.
-            - **Flexibility:** Users can specify any set of atoms or choose to include all atoms by setting the parameter to "all".
+        Raises
+        ------
+        TypeError
+            If ``atoms`` is neither ``None``, ``"all"``, nor a list of strings.
         """
         if atoms == "all":
             self.atoms = "all"
@@ -657,113 +379,37 @@ class LigandContacts(Runner):
         self.atoms = atoms
 
     def set_min_dist(self, min_dist: float) -> None:
-        """
-        Set the chains for RMSD calculations.
+        """Set the lower Angstrom bound for contact distances.
 
-        This method sets the list of chain names to calculate RMSD over. It ensures that the provided chains parameter is a list of strings or a single string representing chain names.
-
-        Parameters:
-            chains (list[str] or str): The list of chain names or a single chain name to calculate RMSD over.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If chains is not a list of strings or a single string.
-
-        Examples:
-            Here is an example of how to use the `set_chains` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the chains for RMSD calculation
-                backbone_rmsd.set_chains(["A", "B"])
-
-                # Alternatively, set a single chain
-                backbone_rmsd.set_chains("A")
-
-        Further Details:
-            - **Usage:** The chains parameter specifies which chains in the protein structure will be considered during RMSD calculations.
-            - **Validation:** The method includes validation to ensure that the chains parameter is either a list of strings or a single string, representing valid chain names.
-            - **Flexibility:** Users can specify multiple chains as a list or a single chain as a string, providing flexibility in how the RMSD calculations are configured.
+        Parameters
+        ----------
+        min_dist : float
+            Minimum distance required for a counted contact.
         """
         self.min_dist = min_dist
 
     def set_max_dist(self, max_dist: float) -> None:
-        """
-        Set the chains for RMSD calculations.
+        """Set the upper Angstrom bound for contact distances.
 
-        This method sets the list of chain names to calculate RMSD over. It ensures that the provided chains parameter is a list of strings or a single string representing chain names.
-
-        Parameters:
-            chains (list[str] or str): The list of chain names or a single chain name to calculate RMSD over.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If chains is not a list of strings or a single string.
-
-        Examples:
-            Here is an example of how to use the `set_chains` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the chains for RMSD calculation
-                backbone_rmsd.set_chains(["A", "B"])
-
-                # Alternatively, set a single chain
-                backbone_rmsd.set_chains("A")
-
-        Further Details:
-            - **Usage:** The chains parameter specifies which chains in the protein structure will be considered during RMSD calculations.
-            - **Validation:** The method includes validation to ensure that the chains parameter is either a list of strings or a single string, representing valid chain names.
-            - **Flexibility:** Users can specify multiple chains as a list or a single chain as a string, providing flexibility in how the RMSD calculations are configured.
+        Parameters
+        ----------
+        max_dist : float
+            Maximum distance allowed for a counted contact.
         """
         self.max_dist = max_dist
 
     def set_jobstarter(self, jobstarter: JobStarter) -> None:
-        """
-        Set the jobstarter configuration for the BackboneRMSD runner.
+        """Set the default jobstarter for ligand contact jobs.
 
-        This method sets the jobstarter configuration to be used in the RMSD calculation process.
+        Parameters
+        ----------
+        jobstarter : JobStarter, optional
+            Default executor for this runner instance.
 
-        Parameters:
-            jobstarter (JobStarter): The jobstarter configuration for running the RMSD calculations.
-
-        Returns:
-            None
-
-        Raises:
-            TypeError: If jobstarter is not of type JobStarter.
-
-        Examples:
-            Here is an example of how to use the `set_jobstarter` method:
-
-            .. code-block:: python
-
-                from rmsd import BackboneRMSD
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Set the jobstarter configuration
-                backbone_rmsd.set_jobstarter("custom_starter")
-
-        Further Details:
-            - **Usage:** The jobstarter configuration specifies how the RMSD calculations will be managed and executed, particularly in HPC environments.
-            - **Validation:** The method includes validation to ensure that the jobstarter parameter is of the correct type.
-            - **Integration:** The jobstarter configuration set by this method is used by other methods in the class to manage the execution of RMSD calculations.
+        Raises
+        ------
+        ValueError
+            If ``jobstarter`` is neither ``None`` nor a :class:`JobStarter`.
         """
         if isinstance(jobstarter, JobStarter):
             self.jobstarter = jobstarter
@@ -771,69 +417,49 @@ class LigandContacts(Runner):
             raise ValueError(f"Parameter :jobstarter: must be of type JobStarter. type(jobstarter= = {type(jobstarter)})")
         
     def set_exclude_elements(self, exclude_elements: list[str]):
+        """Set element symbols to exclude from contact calculations.
+
+        Parameters
+        ----------
+        exclude_elements : list of str, optional
+            Element symbols ignored on both ligand and environment sides.
+        """
         self.exclude_elements = exclude_elements
 
     ########################## Calculations ################################################
     def run(self, poses: Poses, prefix: str, ligand_chain: str = None, jobstarter: JobStarter = None, min_dist: float = None, max_dist: float = None, atoms: list[str] = None, exclude_elements: list[str] = None, normalize_by_num_atoms: bool = True, overwrite: bool = False) -> Poses:
+        """Run ligand contact detection and merge scores into ``poses``.
+
+        Parameters
+        ----------
+        poses : Poses
+            Input structures. Each pose must contain ``ligand_chain``.
+        prefix : str
+            Unique run prefix used for the work directory and output columns.
+        ligand_chain : str, optional
+            Chain ID containing ligand atoms. Overrides the instance default.
+        jobstarter : JobStarter, optional
+            Jobstarter for this call.
+        min_dist : float, optional
+            Lower Angstrom bound for contact distances.
+        max_dist : float, optional
+            Upper Angstrom bound for contact distances.
+        atoms : list of str, optional
+            Environment atom names to include.
+        exclude_elements : list of str, optional
+            Element symbols to ignore in both ligand and environment atoms.
+        normalize_by_num_atoms : bool, optional
+            If ``True``, divide contact counts by the number of included ligand
+            atoms.
+        overwrite : bool, optional
+            If ``True``, rerun instead of using a cached score file.
+
+        Returns
+        -------
+        Poses
+            The input ``Poses`` object with ligand contact columns merged in.
         """
-        Calculate the backbone RMSD for given poses and jobstarter configuration.
-
-        This method sets up and runs the RMSD calculation process using the provided poses and jobstarter object. It handles the configuration, execution, and collection of output data, ensuring that the results are organized and accessible for further analysis.
-
-        Parameters:
-            poses (Poses): The Poses object containing the protein structures.
-            prefix (str): A prefix used to name and organize the output files.
-            ref_col (str, optional): The reference column for RMSD calculations. Defaults to None.
-            jobstarter (JobStarter, optional): An instance of the JobStarter class, which manages job execution. Defaults to None.
-            chains (list[str], optional): A list of chain names to calculate RMSD over. Defaults to None.
-            overwrite (bool, optional): If True, overwrite existing output files. Defaults to False.
-
-        Returns:
-            RunnerOutput: An instance of the RunnerOutput class, containing the processed poses and results of the RMSD calculation.
-
-        Raises:
-            FileNotFoundError: If required files or directories are not found during the execution process.
-            ValueError: If invalid arguments are provided to the method.
-            TypeError: If chains are not of the expected type.
-
-        Examples:
-            Here is an example of how to use the `run` method:
-
-            .. code-block:: python
-
-                from protflow.poses import Poses
-                from protflow.jobstarters import JobStarter
-                from rmsd import BackboneRMSD
-
-                # Create instances of necessary classes
-                poses = Poses()
-                jobstarter = LocalJobStarter(max_cores=4)
-
-                # Initialize the BackboneRMSD class
-                backbone_rmsd = BackboneRMSD()
-
-                # Run the RMSD calculation
-                results = backbone_rmsd.run(
-                    poses=poses,
-                    prefix="experiment_1",
-                    jobstarter=jobstarter,
-                    ref_col="reference",
-                    chains=["A", "B"],
-                    overwrite=True
-                )
-
-                # Access and process the results
-                print(results)
-
-        Further Details:
-            - **Setup and Execution:** The method ensures that the environment is correctly set up, directories are prepared, and necessary commands are constructed and executed. It supports splitting poses into sublists for parallel processing.
-            - **Input Handling:** The method prepares input JSON files for each sublist of poses and constructs commands for running RMSD calculations using BioPython.
-            - **Output Management:** The method handles the collection and processing of output data from multiple score files, concatenating them into a single DataFrame and saving the results.
-            - **Customization:** Extensive customization options are provided through parameters, allowing users to tailor the RMSD calculation process to their specific needs, including specifying atoms and chains for RMSD calculations.
-
-        This method is designed to streamline the execution of backbone RMSD calculations within the ProtFlow framework, making it easier for researchers and developers to perform and analyze RMSD calculations.
-        """
-        # prep variables
+        # Set up the runner directory and choose the effective jobstarter.
         work_dir, jobstarter = self.generic_run_setup(
             poses=poses,
             prefix=prefix,
@@ -842,6 +468,7 @@ class LigandContacts(Runner):
 
         logging.info(f"Running ligand contact detection in {work_dir} on {len(poses.df.index)} poses.")
 
+        # Runtime arguments override instance defaults.
         ligand_chain = ligand_chain or self.ligand_chain
         min_dist = min_dist or self.min_dist
         max_dist = max_dist or self.max_dist
@@ -856,30 +483,28 @@ class LigandContacts(Runner):
 
         scorefile = os.path.join(work_dir, f"{prefix}_ligand_contacts.{poses.storage_format}")
 
-        # check if RMSD was calculated if overwrite was not set.
+        # Reuse cached contact scores unless overwrite was requested.
         overwrite = overwrite or self.overwrite
         if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=self.overwrite)) is not None:
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             output = RunnerOutput(poses=poses, results=scores, prefix=prefix)
             return output.return_poses()
 
-        # split poses into number of max_cores lists, but not more than 100 poses per sublist (otherwise, argument list too long error occurs)
+        # Split pose paths into worker chunks while keeping command lines short.
         poses_sublists = split_list(poses.poses_list(), n_sublists=jobstarter.max_cores) if len(poses.df.index) / jobstarter.max_cores < 100 else split_list(poses.poses_list(), element_length=100)
         out_files = [os.path.join(poses.work_dir, prefix, f"out_{index}.json") for index, _ in enumerate(poses_sublists)]
         cmds = [f"{self.python} {__file__} --poses {','.join(poses_sublist)} --out {out_file} --min_dist {min_dist} --max_dist {max_dist} --mode contacts --ligand_chain {ligand_chain} {atoms_str} {exclude_elements_str} {normalize_by_num_atoms_str}" for out_file, poses_sublist in zip(out_files, poses_sublists)]
 
-        # run command
+        # Execute one ligand-contact worker per pose chunk.
         jobstarter.start(
             cmds = cmds,
             jobname = "ligand_contacts",
             output_path = work_dir
         )
 
-        # collect individual DataFrames into one
+        # Collect worker JSON outputs and merge them through RunnerOutput.
         scores = pd.concat([pd.read_json(output) for output in out_files]).reset_index(drop=True)
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
-
-        # create standardised output for poses class:
         output = RunnerOutput(
             poses = poses,
             results = scores,
@@ -889,44 +514,41 @@ class LigandContacts(Runner):
         return output.return_poses()
 
 def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, atoms: list[str] = None, exclude_ligand_elements: list[str] = None, clash_distance: float = None) -> int:
-    """
-    Calculate ligand clashes for a PDB file given a ligand chain.
+    """Calculate ligand-environment clashes for one structure.
 
-    This method calculates the number of clashes between a specified ligand chain and the rest of the structure in a PDB file or a Bio.PDB Structure object. A clash is defined as any pair of atoms (one from the ligand, one from the rest of the structure) that are within the sum of their Van der Waals radii multiplied by a factor.
+    Parameters
+    ----------
+    pose : str
+        Path to the structure file to score.
+    ligand_chain : str
+        Chain ID containing ligand atoms.
+    factor : float, optional
+        Multiplier applied to the summed van der Waals radii of each atom pair.
+    atoms : list of str, optional
+        Environment atom names to include. If omitted or set to ``"all"``, all
+        non-ligand atoms are considered.
+    exclude_ligand_elements : list of str, optional
+        Ligand element symbols to ignore, commonly ``["H"]``.
+    clash_distance : float, optional
+        Fixed Angstrom cutoff for clashes. If omitted, van der Waals cutoffs are
+        used.
 
-    Parameters:
-        pose (str | Bio.PDB.Structure.Structure): The pose representing the structure, which can be a path to a PDB file (str) or a Bio.PDB Structure object.
-        ligand_chain (str): The chain identifier for the ligand within the structure.
-        factor (float, optional): The multiplier for the VdW clash threshold for defining a clash. Lower numbers result in less stringent clash detection. Default is 1.0.
-        atoms (list[str], optional): A list of atom names to consider for clash calculations. If None, all atoms are considered. If specified, only these atoms will be included in the clash calculation.
-        exclude_ligand_elements (list[str], optional): A list of elements that should not be considered during clash detection (e.g. ['H']). Default is None
+    Returns
+    -------
+    int
+        Number of ligand-environment atom pairs that satisfy the clash cutoff.
 
-    Returns:
-        float: The number of clashes found between the ligand and the rest of the structure.
-
-    Examples:
-        Here is an example of how to use the `calc_ligand_clashes` method:
-
-        .. code-block:: python
-
-            from Bio.PDB import PDBParser
-
-            # Load structure from a PDB file
-            parser = PDBParser()
-            structure = parser.get_structure("example", "example.pdb")
-
-            # Calculate clashes
-            clashes = calc_ligand_clashes_vdw(structure, ligand_chain="A", factor=0.8, atoms=["N", "CA", "C"], exclude_ligand_atoms=["H"])
-            # clashes will be a float representing the number of clashes
-
-    Further Details:
-        - **Clash Calculation:** The method calculates the Euclidean distance between all specified atoms of the ligand chain and the rest of the structure. A clash is detected if the distance is less than the sum of their Van der Waals radii multiplied by a set factor.
-        - **Usage:** This function is useful for evaluating potential steric clashes in molecular docking studies or for validating the positioning of ligands in structural models.
-
-    This method is designed to facilitate the detection of steric clashes between ligands and the surrounding structure, providing a quantitative measure of potential conflicts.
+    Raises
+    ------
+    KeyError
+        If ``ligand_chain`` is not present in the structure.
+    RuntimeError
+        If van der Waals mode is used and an element radius is missing.
+    ValueError
+        If ``atoms`` or ``exclude_ligand_elements`` have invalid types.
     """
 
-    # verify inputs
+    # Load the structure before validating chain and atom-level options.
     pose = biopython_load_structure(pose)
 
     if exclude_ligand_elements:
@@ -934,15 +556,15 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
             raise ValueError(f"Parameter:exclude_ligand_atoms: has to be a list of str, not {type(exclude_ligand_elements)}!")
         exclude_ligand_elements = [element.lower() for element in exclude_ligand_elements]
 
-    # import VdW radii
+    # Import VdW radii only once per pose calculation.
     vdw_dict = vdw_radii()
 
-    # check for ligand chain
+    # The ligand chain defines which atoms are separated from the environment.
     pose_chains = list(chain.id for chain in pose.get_chains())
     if ligand_chain not in pose_chains:
         raise KeyError(f"Chain {ligand_chain} not found in pose. Available Chains: {pose_chains}")
 
-    # get atoms
+    # Select environment atoms and, when needed, their VdW radii.
     if not atoms or atoms == "all":
         pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain])
         if not clash_distance:
@@ -954,7 +576,7 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
     else:
         raise ValueError("Invalid Value for parameter :atoms:. For all atoms set to {{None, False, 'all'}} or specify list of atoms e.g. ['N', 'CA', 'CO']")
 
-    # get ligand atoms
+    # Select ligand atoms after applying optional ligand-side element filters.
     if exclude_ligand_elements:
         ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if not atom.element.lower() in exclude_ligand_elements])
         if not clash_distance:
@@ -968,104 +590,106 @@ def _calc_ligand_clashes_vdw(pose: str, ligand_chain: str, factor: float = 1, at
         if np.any(np.isnan(ligand_vdw)): #pylint: disable=E0601
             raise RuntimeError("Could not find Van der Waals radii for all elements in ligand. Check protflow.utils.vdw_radii and add it, if applicable!")
 
-    # calculate distances between all atoms of ligand and protein
+    # Calculate all environment-by-ligand distances in one vectorized matrix.
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
     if clash_distance:
         return int(np.sum((dgram < clash_distance)))
 
-    # calculate distance cutoff for each atom pair, considering VdW radii 
+    # Compare each distance to its atom-pair-specific VdW threshold.
     distance_cutoff = pose_vdw[:, np.newaxis] + ligand_vdw[np.newaxis, :] #pylint: disable=E0601
-    # multiply distance cutoffs with set parameter
     distance_cutoff = distance_cutoff * factor
-
-    # compare distances to distance_cutoff
     check = dgram - distance_cutoff
-
-    # count number of clashes (where distances are below distance cutoff)
     clashes = int(np.sum((check < 0)))
 
     return clashes
 
 
 def _calc_ligand_contacts(pose: str, ligand_chain: str, min_dist: float = 3, max_dist: float = 5, atoms: list[str] = None, exclude_elements: list[str] = None, normalize_by_num_atoms: bool = False) -> float:
-    """
-    Calculate contacts of a ligand within a structure.
+    """Calculate ligand-environment contacts for one structure.
 
-    This method calculates the number of contacts between a specified ligand chain and the rest of the structure within a specified distance range. Contacts are defined as any pair of atoms (one from the ligand, one from the rest of the structure) where the distance falls between the minimum and maximum specified distances.
+    Parameters
+    ----------
+    pose : str
+        Path to the structure file to score.
+    ligand_chain : str
+        Chain ID containing ligand atoms.
+    min_dist : float, optional
+        Lower Angstrom bound for counted contacts.
+    max_dist : float, optional
+        Upper Angstrom bound for counted contacts.
+    atoms : list of str, optional
+        Environment atom names to include. If omitted or set to ``"all"``, all
+        non-ligand atoms are considered.
+    exclude_elements : list of str, optional
+        Element symbols to remove from both ligand and environment atoms.
+    normalize_by_num_atoms : bool, optional
+        If ``True``, divide the contact count by the number of included ligand
+        atoms.
 
-    Parameters:
-        pose (str | Bio.PDB.Structure.Structure): The pose representing the structure, which can be a path to a PDB file (str) or a Bio.PDB Structure object.
-        ligand_chain (str): The chain identifier for the ligand within the structure.
-        min_dist (float, optional): The minimum distance threshold for defining a contact. Default is 3.0.
-        max_dist (float, optional): The maximum distance threshold for defining a contact. Default is 5.0.
-        atoms (list[str], optional): A list of atom names to consider for contact calculations. If None, all atoms are considered. If specified, only these atoms will be included in the contact calculation.
-        excluded_elements (list[str], optional): A list of element symbols to exclude from the contact calculations. Default is ["H"].
+    Returns
+    -------
+    float
+        Raw contact count, or normalized contacts per ligand atom.
 
-    Returns:
-        float: The number of contacts normalized by the number of ligand atoms.
-
-    Examples:
-        Here is an example of how to use the `calc_ligand_contacts` method:
-
-        .. code-block:: python
-
-            from Bio.PDB import PDBParser
-
-            # Load structure from a PDB file
-            parser = PDBParser()
-            structure = parser.get_structure("example", "example.pdb")
-
-            # Calculate contacts
-            contacts = calc_ligand_contacts(structure, ligand_chain="A", min_dist=3.0, max_dist=5.0, atoms=["N", "CA", "C"], excluded_elements=["H", "O"])
-            # contacts will be a float representing the number of contacts normalized by the number of ligand atoms
-
-    Further Details:
-        - **Contact Calculation:** The method calculates the Euclidean distance between all specified atoms of the ligand chain and the rest of the structure. A contact is counted if the distance is within the specified range (min_dist to max_dist).
-        - **Usage:** This function is useful for evaluating potential interactions between ligands and the surrounding structure, particularly in drug design and molecular docking studies.
-
-    This method is designed to facilitate the detection of relevant contacts between ligands and the surrounding structure, providing a quantitative measure of potential interactions.
+    Raises
+    ------
+    KeyError
+        If ``ligand_chain`` is not present in the structure.
+    ValueError
+        If ``atoms`` has an invalid type.
     """
 
-    # verify inputs
+    # Load the structure before validating chain and atom-level options.
     pose = biopython_load_structure(pose)
 
     if exclude_elements:
         exclude_elements = [element.lower() for element in exclude_elements]
 
-    # check for ligand chain
+    # The ligand chain defines which atoms are separated from the environment.
     pose_chains = list(chain.id for chain in pose.get_chains())
     if ligand_chain not in pose_chains:
         raise KeyError(f"Chain {ligand_chain} not found in pose. Available Chains: {pose_chains}")
 
-    # get pose atoms
+    # Select environment atoms after applying optional atom-name and element filters.
     if not atoms or atoms == "all":
         pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.element.lower() not in exclude_elements])
     elif isinstance(atoms, list) and all(isinstance(atom, str) for atom in atoms):
         pose_atoms = np.array([atom.get_coord() for atom in pose.get_atoms() if atom.full_id[2] != ligand_chain and atom.id in atoms and atom.element.lower() not in exclude_elements])
     else:
         raise ValueError("Invalid Value for parameter :atoms:. For all atoms set to one of {None, False, 'all'} or specify list of atoms e.g. ['N', 'CA', 'CO']")
+
+    # Ligand atoms are filtered by element only; atom-name filters apply to the environment.
     ligand_atoms = np.array([atom.get_coord() for atom in pose[ligand_chain].get_atoms() if atom.element.lower() not in exclude_elements])
 
-    # calculate complete dgram
+    # Calculate all environment-by-ligand distances in one vectorized matrix.
     dgram = np.linalg.norm(pose_atoms[:, np.newaxis] - ligand_atoms[np.newaxis, :], axis=-1)
 
-    # return number of contacts
+    # Keep the same open interval semantics used by the runner wrapper.
     if normalize_by_num_atoms:
         return round(np.sum((dgram > min_dist) & (dgram < max_dist)) / len(ligand_atoms), 2)
     else:
         return np.sum((dgram > min_dist) & (dgram < max_dist))
 
 def main(args):
+    """Run ligand metric worker calculations from CLI arguments.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed worker CLI arguments produced by the module-level argument
+        parser.
+    """
     input_poses = args.poses.split(",")
     if args.atoms:
         atoms = args.atoms.split(",")
     else:
         atoms = None
     if args.exclude_elements:
-        exclude_elements = args.exclude_elements.split(";")
+        exclude_elements = args.exclude_elements.split(",")
     else:
         exclude_elements = []
 
+    # Dispatch to the selected worker mode and write RunnerOutput-compatible rows.
     if args.mode == "clash_vdw":
         clashes = [_calc_ligand_clashes_vdw(pose, args.ligand_chain, args.factor, atoms, exclude_elements, args.clash_distance) for pose in input_poses]
         out_dict = {"description": [os.path.splitext(os.path.basename(pose))[0] for pose in input_poses], "location": input_poses, "clashes": clashes}
@@ -1080,17 +704,17 @@ def main(args):
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    argparser.add_argument("--poses", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--out", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--factor", type=float, default=None, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--ligand_chain", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--atoms", type=str, default=None, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--exclude_elements", type=str, default=None, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--mode", type=str, required=True, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--min_dist", type=float, default=0, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--max_dist", type=float, default=5, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--clash_distance", type=float, default=None, help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
-    argparser.add_argument("--normalize_by_num_atoms", action="store_true", help="input_directory that contains all ensemble *.pdb files to be hallucinated (max 1000 files).")
+    argparser.add_argument("--poses", type=str, required=True, help="Comma-separated PDB paths to score.")
+    argparser.add_argument("--out", type=str, required=True, help="Output JSON path for the ligand metric scores.")
+    argparser.add_argument("--factor", type=float, default=None, help="Multiplier for van der Waals clash cutoffs in clash_vdw mode.")
+    argparser.add_argument("--ligand_chain", type=str, required=True, help="Chain ID containing the ligand atoms.")
+    argparser.add_argument("--atoms", type=str, default=None, help="Comma-separated environment atom names to include, for example 'CA,CB'.")
+    argparser.add_argument("--exclude_elements", type=str, default=None, help="Comma-separated ligand/contact element symbols to exclude, for example 'H'.")
+    argparser.add_argument("--mode", type=str, required=True, help="Metric mode to run: 'clash_vdw' or 'contacts'.")
+    argparser.add_argument("--min_dist", type=float, default=0, help="Lower Angstrom bound for contact distances in contacts mode.")
+    argparser.add_argument("--max_dist", type=float, default=5, help="Upper Angstrom bound for contact distances in contacts mode.")
+    argparser.add_argument("--clash_distance", type=float, default=None, help="Fixed Angstrom clash cutoff; overrides van der Waals cutoffs when set.")
+    argparser.add_argument("--normalize_by_num_atoms", action="store_true", help="Divide contact counts by the number of included ligand atoms.")
 
     arguments = argparser.parse_args()
     main(arguments)

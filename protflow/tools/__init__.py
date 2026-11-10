@@ -2,7 +2,7 @@
 # import submodules
 from . import alphafold3, attnpacker, boltz, colabfold, esmfold, gnina
 from . import gromacs, ligandmpnn, placer, protein_edits, protein_generator
-from . import residue_selectors, rfdiffusion, rosetta, esm, rfdiffusion3, sigmadock
+from . import residue_selectors, rfdiffusion, rosetta, esm, rfdiffusion3, rfd4_proteina, sigmadock, pottsmpnn
 
 # import runners, so we don't have to get them through submodules all the time
 from .alphafold3 import AlphaFold3
@@ -18,11 +18,20 @@ from .placer import PLACER
 from .protein_generator import ProteinGenerator
 from .rfdiffusion import RFdiffusion
 from .rfdiffusion3 import RFdiffusion3, RFD3Params
+from .rfd4_proteina import RFD4Proteina, RFD4Params
 from .rosetta import Rosetta
 from .esm import ESM
 from .protenix import ProtenixPred
 from .sigmadock import SigmaDock
+from .pottsmpnn import (
+    EnergyPredictionPottsMPNNParams,
+    PottsMPNN,
+    PoseCol,
+    SampleSequencePottsMPNNParams,
+)
 from .protein_edits import ChainAdder, ChainRemover, SequenceAdder, SequenceRemover
 from .minifold import Minifold
 from .caliby import CalibySequenceDesign, CalibyEnsembleSeqDesign, CalibyEnsembleGenerator
+from .hydraprot import Hydraprot
+
 from .esmfold2 import ESMFold2, ESMFold2Params

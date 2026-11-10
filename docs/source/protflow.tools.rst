@@ -12,6 +12,15 @@ protflow.tools.boltz module
    :undoc-members:
    :show-inheritance:
 
+protflow.tools.pottsmpnn module
+-------------------------------
+
+.. automodule:: protflow.tools.pottsmpnn
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :no-index:
+
 protflow.tools.attnpacker module
 --------------------------------
 
@@ -91,3 +100,4 @@ Module contents
    :members:
    :undoc-members:
    :show-inheritance:
+   :exclude-members: PottsMPNN, PoseCol, SampleSequencePottsMPNNParams, EnergyPredictionPottsMPNNParams

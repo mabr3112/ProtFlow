@@ -93,12 +93,30 @@ pose-prediction accuracy.
         poses=my_poses,
         prefix="redock",
         ligand_name="LIG",   # residue name of the ligand in the input complex
-        num_seeds=1,        # number of independent samples per pose (see SigmaDock docs for details)
+        num_seeds=1,        # independent samples per pose; all run on ONE GPU — keep moderate (see note below)
         overwrite=False,
     )
 
     # scores are available as prefixed columns
     display(my_poses.df[["redock_affinity", "redock_rmsd", "redock_pb_pass_rate"]])
+
+.. note::
+
+    **Choosing ``num_seeds`` and scaling up.**
+    ``num_seeds`` sets how many independent docking samples are drawn per pose.
+    All draws for a pose run in a **single process on one GPU** (the runner
+    fixes ``hardware.devices=1``), so the effective batch is
+    ``batch_size × num_seeds`` — a large value can exhaust GPU memory (OOM).
+    ``num_seeds`` does **not** parallelise across GPUs; keep it moderate, sized
+    to fit a single GPU.
+
+    To dock **many poses** in parallel, scale out with the jobstarter rather
+    than ``num_seeds``.  ``SbatchArrayJobstarter(max_cores=N, gpus=1)`` runs one
+    pose per GPU and lets at most ``N`` run concurrently, so raising
+    ``max_cores`` (up to your available GPUs) is the lever for throughput.  For
+    large pose diversity, SigmaDock's authors recommend several runs / a SLURM
+    job array over a very large ``num_seeds``, which also gives cleaner
+    reproducibility.
 
 Crossdocking
 ------------

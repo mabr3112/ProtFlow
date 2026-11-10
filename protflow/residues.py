@@ -70,6 +70,7 @@ This module simplifies the process of handling residue selections in bioinformat
 from __future__ import annotations
 
 from collections import OrderedDict, defaultdict
+import logging
 import os
 import re
 from typing import Any, TypeAlias
@@ -495,8 +496,9 @@ def _unique_atom_ids(atom_ids: list[AtomID]) -> tuple[AtomID, ...]:
     return tuple(OrderedDict.fromkeys(_as_tuple_recursive(atom_id) for atom_id in atom_ids))
 
 
-def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
-    """Collapse one normalized atom ID to the `(chain, residue_number)` pair."""
+def atom_id_to_residue(atom_id: AtomID) -> tuple[str, int]:
+    """Collapse one AtomSelection atom ID to ``(chain, residue_number)``."""
+    atom_id = _as_tuple_recursive(atom_id)
     _validate_atom_id(atom_id)
 
     if len(atom_id) == 3:
@@ -512,6 +514,11 @@ def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
         residue_id = residue_id[1]
 
     return (chain_id, int(residue_id))
+
+
+def _residue_from_atom_id(atom_id: AtomID) -> tuple[str, int]:
+    """Collapse one normalized atom ID to the `(chain, residue_number)` pair."""
+    return atom_id_to_residue(atom_id)
 
 
 def _atom_name_from_atom_id(atom_id: AtomID) -> str:
@@ -530,6 +537,42 @@ def _atom_name_from_atom_id(atom_id: AtomID) -> str:
     if isinstance(atom_name, (list, tuple)):
         atom_name = atom_name[0]
     return str(atom_name).strip()
+
+
+def _compress_residue_numbers(res_ids: list[int]) -> str:
+    """
+    Compress residue numbers into AtomWorks bracket notation.
+
+    Parameters
+    ----------
+    res_ids : list of int
+        Residue numbers, in any order. Duplicates are collapsed.
+
+    Returns
+    -------
+    str
+        Bracket body such as ``"1-3, 10"``, without the enclosing brackets.
+
+    Examples
+    --------
+    ::
+
+        >>> _compress_residue_numbers([3, 1, 2, 10])
+        '1-3, 10'
+    """
+    res_ids = sorted(set(int(res_id) for res_id in res_ids))
+
+    parts: list[str] = []
+    start = prev = res_ids[0]
+    for res_id in res_ids[1:]:
+        if res_id == prev + 1:
+            prev = res_id
+            continue
+        parts.append(f"{start}" if start == prev else f"{start}-{prev}")
+        start = prev = res_id
+    parts.append(f"{start}" if start == prev else f"{start}-{prev}")
+
+    return ", ".join(parts)
 
 
 def _sidechain_atom_selection(atom_selection: "AtomSelection") -> "AtomSelection":
@@ -1472,6 +1515,64 @@ class AtomSelection:
         # Convert back to a regular dict and return
         return dict(rfd3_dict)
     
+    def to_atomworks_query(self) -> str:
+        """
+        Return the selection as an AtomWorks query string (atom-level path syntax).
+
+        AtomWorks path syntax is ``sel('<chain>/<res_name>/<res_id>/<atom_name>')``,
+        where brackets hold a value list or a ``res_id`` range. Residues that
+        share an identical atom set are collapsed into one term, and residue
+        numbers are compressed into ranges; terms for different chains or atom
+        sets are combined with ``or`` and parenthesised, so the result can be
+        combined further by the caller (e.g. ``f"{query} and is_protein_backbone"``).
+
+        Used by tools that consume AtomWorks selections, such as RFD4-Proteina
+        condition specs.
+
+        Returns
+        -------
+        str
+            One AtomWorks query string. AtomWorks evaluates a query with
+            ``ast.parse(query, mode="eval")``, so the returned string is always
+            a valid Python boolean expression.
+
+        Raises
+        ------
+        ValueError
+            If the selection is empty.
+
+        Examples
+        --------
+        ::
+
+            >>> AtomSelection([("A", 5, "CA"), ("A", 5, "N"),
+            ...                ("A", 6, "CA"), ("A", 6, "N")]).to_atomworks_query()
+            "sel('A/*/[5-6]/[CA,N]')"
+            >>> AtomSelection([("A", 5, "CA"), ("B", 9, "OD1")]).to_atomworks_query()
+            "(sel('A/*/[5]/[CA]') or sel('B/*/[9]/[OD1]'))"
+        """
+        if not len(self.atoms):
+            raise ValueError("Cannot convert an empty AtomSelection into an AtomWorks query!")
+
+        # collect the atom names selected per residue, preserving selection order
+        residue_atoms: dict[tuple[str, int], list[str]] = defaultdict(list)
+        for atom_id in self.atoms:
+            residue_key = atom_id_to_residue(atom_id)
+            atom_name = _atom_name_from_atom_id(atom_id)
+            if atom_name not in residue_atoms[residue_key]:
+                residue_atoms[residue_key].append(atom_name)
+
+        # group residues that share a chain and an identical atom set
+        grouped: dict[tuple[str, tuple[str, ...]], list[int]] = defaultdict(list)
+        for (chain, res_id), atom_names in residue_atoms.items():
+            grouped[(chain, tuple(atom_names))].append(res_id)
+
+        terms = [
+            f"sel('{chain}/*/[{_compress_residue_numbers(res_ids)}]/[{','.join(atom_names)}]')"
+            for (chain, atom_names), res_ids in sorted(grouped.items(), key=lambda item: (item[0][0], min(item[1])))
+        ]
+        return terms[0] if len(terms) == 1 else "(" + " or ".join(terms) + ")"
+
     def to_boltz_atom(self) -> list:
         """Return a list formatted like a Boltz input atom for bond constraints (e.g. ["A", 5, "CA"]). Only for single atoms."""
 
@@ -1559,7 +1660,7 @@ class ResidueSelection:
         collapse to one residue while preserving encounter order.
         """
         atom_selection = AtomSelection(atom_selection)
-        residues = reduce_to_unique(tuple(_residue_from_atom_id(atom_id) for atom_id in atom_selection))
+        residues = reduce_to_unique(tuple(atom_id_to_residue(atom_id) for atom_id in atom_selection))
         return cls(residues, fast=True)
 
     def from_selection(self, selection) -> "ResidueSelection":
@@ -1721,7 +1822,124 @@ class ResidueSelection:
         # Combine all parts into the final contig string
         contig_str = ",".join(contig_parts)
         return contig_str
-    
+
+    def to_atomworks_query(self) -> str:
+        """
+        Return the selection as an AtomWorks query string (residue-level path syntax).
+
+        AtomWorks path syntax is ``sel('<chain>/<res_name>/<res_id>/<atom_name>')``,
+        with trailing fields defaulting to ``*``; brackets hold a value list or a
+        ``res_id`` range. Residue numbers are compressed into ranges, and one
+        term per chain is emitted; several chains are combined with ``or`` and
+        parenthesised, so the result can be combined further by the caller
+        (e.g. ``f"{query} and not is_ligand"``).
+
+        Used by tools that consume AtomWorks selections, such as RFD4-Proteina
+        condition specs. Note that the query addresses whole residues: use
+        :meth:`AtomSelection.to_atomworks_query` for atom-level conditioning.
+
+        Returns
+        -------
+        str
+            One AtomWorks query string. AtomWorks evaluates a query with
+            ``ast.parse(query, mode="eval")``, so the returned string is always
+            a valid Python boolean expression.
+
+        Raises
+        ------
+        ValueError
+            If the selection is empty.
+
+        Examples
+        --------
+        ::
+
+            >>> ResidueSelection(["A1", "A2", "A3", "A10"]).to_atomworks_query()
+            "sel('A/*/[1-3, 10]')"
+            >>> ResidueSelection(["A1", "A2", "B7"]).to_atomworks_query()
+            "(sel('A/*/[1-2]') or sel('B/*/[7]'))"
+        """
+        if not len(self.residues):
+            raise ValueError("Cannot convert an empty ResidueSelection into an AtomWorks query!")
+
+        chain_residues = defaultdict(list)
+        for chain, res_id in self.residues:
+            chain_residues[chain].append(int(res_id))
+
+        terms = [
+            f"sel('{chain}/*/[{_compress_residue_numbers(res_ids)}]')"
+            for chain, res_ids in sorted(chain_residues.items())
+        ]
+        return terms[0] if len(terms) == 1 else "(" + " or ".join(terms) + ")"
+
+    def to_index(self, convert_to_zero_indexed:bool=False) -> int|list:
+        """
+        Parses ResidueSelection object to a list of residue indices (or a single index for selections containing a single residue).
+        Fails if multiple chains are present in the ResidueSelection. If convert_to_zero_indexed is set, 1 will be subtracted from
+        all residue indices.
+
+        Example:
+            If self.residues = (("A", 1), ("A", 2), ("A", 3)),
+            the output will be [1, 2, 3].
+            If self.residues = (("B", 4)),
+            the output will be 4.
+        """
+        resdict = self.to_dict()
+        if len(resdict) > 1:
+            raise KeyError("Multiple chains detected. Conversion to residue indices will not work.")
+        res_indices = list(resdict.values())
+        if convert_to_zero_indexed:
+            res_indices = [idx - 1 for idx in res_indices]
+        if len(res_indices) == 1:
+            return res_indices[0]
+        else:
+            return res_indices
+
+    def to_biopython_residues(self, pose_path: str, strict:bool=True) -> list:
+        """
+        Extract a list of Bio.PDB.Residue objects from a given structure file.
+
+        Parameters
+        ----------
+        pose_path : str
+            Path to the structure file.
+        strict : bool
+            If True, raises a KeyError if any selected residues are missing.
+
+        Returns
+        -------
+        list of Bio.PDB.Residue
+            The BioPython Residue objects corresponding to this selection, 
+            including non-amino acid residues.
+        """
+        pose = _load_biopython_structure(pose_path)
+        
+        selection = self.to_list()
+        selected_residues = []
+        
+        # Keep track of the string representations we successfully find
+        found_residue_strs = set()
+        
+        for pose_res in pose.get_residues():
+            chain_id, resnum = self._extract_bp_residue_data(pose_res)
+            pose_res_str = f"{chain_id}{resnum}"
+            
+            if pose_res_str in selection:
+                selected_residues.append(pose_res)
+                found_residue_strs.add(pose_res_str)
+
+        if strict and len(selected_residues) != len(selection):
+            # Find the difference between what we asked for and what we found
+            missing_residues = sorted(list(set(selection) - found_residue_strs))
+            
+            error_msg = (
+                f"Could not find all selected residues in pose {pose_path}. "
+                f"Missing residues: {', '.join(missing_residues)}"
+            )
+            raise KeyError(error_msg)
+
+        return selected_residues
+
     @classmethod
     def from_resname(cls, resname: str, pose: Any, strict: bool = True) -> "ResidueSelection":
         """Creates a selection by searching for a specific residue name."""
@@ -1990,6 +2208,9 @@ def from_contig(input_contig: str) -> ResidueSelection:
     sel = []
     elements = [x.strip() for x in input_contig.split(",") if x]
     for element in elements:
+        if not element[0].isalpha():
+            # skip diffused parts like 10-25
+            continue
         subsplit = element.split("-")
         if len(subsplit) > 1:
             sel += [element[0] + str(i) for i in range(int(subsplit[0][1:]), int(subsplit[-1])+1)]
@@ -2030,3 +2251,263 @@ def reduce_to_unique(input_array: list|tuple) -> list|tuple:
     - The returned collection is of the same type as the input (list or tuple).
     """
     return type(input_array)(OrderedDict.fromkeys(input_array))
+
+
+####################################### MOTIF REMAPPING #######################################
+# Shared by tool runners whose model renumbers the output structure (RFdiffusion3, RFD4-Proteina).
+# Each runner supplies its own {input_residue_id: output_residue_id} map; the logic of applying
+# that map to a Residue- or AtomSelection is identical and lives here rather than in the runners.
+
+
+def warn_preserved_unmapped_residues(
+    missing_residues: list[str],
+    motif_col: str,
+    selection_type: str,
+    tool_name: str = "",
+) -> None:
+    """
+    Emit one warning for residues that were preserved without remapping.
+
+    Parameters
+    ----------
+    missing_residues : list of str
+        Residue identifiers that were requested during remapping but were not
+        present in the index map.
+    motif_col : str
+        Name of the motif column being remapped.
+    selection_type : str
+        Human-readable selection type used to make the warning message more
+        specific, for example ``"ResidueSelection"`` or ``"AtomSelection"``.
+    tool_name : str, optional
+        Name of the tool whose map was used, used only in the message.
+    """
+    if not missing_residues:
+        return
+
+    unique_missing = list(dict.fromkeys(missing_residues))
+    logging.warning(
+        "[remap_motifs] %s column '%s' contains residues absent from the effective %s remapping map; "
+        "keeping their original identifiers unchanged: %s. This is expected for ligands "
+        "or other residues that keep their original numbering.",
+        selection_type,
+        motif_col,
+        tool_name,
+        ", ".join(unique_missing),
+    )
+
+
+def remap_residue_selection(
+    selection: "ResidueSelection",
+    index_map: dict,
+    motif_col: str,
+    strict: bool = True,
+    tool_name: str = "",
+) -> "ResidueSelection":
+    """
+    Remap one ResidueSelection through an input-to-output residue index map.
+
+    Parameters
+    ----------
+    selection : ResidueSelection
+        Residue selection in input-structure numbering.
+    index_map : dict
+        Mapping from input residue identifiers (``"A5"``) to output residue
+        identifiers (``"B12"``).
+    motif_col : str
+        Name of the column being remapped. Used for warning messages.
+    strict : bool, optional
+        Included for API symmetry with atom remapping. Missing residues are
+        preserved unchanged regardless of this flag, because a tool typically
+        omits ligands and other non-remapped residues from its index map.
+    tool_name : str, optional
+        Name of the tool whose map was used, used only in warning messages.
+
+    Returns
+    -------
+    ResidueSelection
+        New residue selection in output-structure numbering. Residues absent
+        from *index_map* are preserved unchanged.
+    """
+    residues = selection.to_list()
+    missing_residues = [residue for residue in residues if residue not in index_map]
+    warn_preserved_unmapped_residues(
+        missing_residues, motif_col=motif_col, selection_type="ResidueSelection", tool_name=tool_name
+    )
+    return ResidueSelection([index_map.get(residue, residue) for residue in residues])
+
+
+def _atom_residue_number(residue_id) -> int:
+    """
+    Extract the numeric residue component from compact or BioPython atom IDs.
+
+    Parameters
+    ----------
+    residue_id : int, str, list, or tuple
+        Compact residue ID or BioPython residue ID tuple
+        ``(hetero_flag, residue_number, insertion_code)``.
+
+    Returns
+    -------
+    int
+        Numeric residue number used to look up index-map entries.
+    """
+    if isinstance(residue_id, (list, tuple)) and len(residue_id) == 3:
+        return int(residue_id[1])
+    return int(residue_id)
+
+
+def format_remapped_atom_residue_id(original_residue_id, remapped_residue_number: int):
+    """
+    Format a remapped residue ID to match the original atom ID style.
+
+    Parameters
+    ----------
+    original_residue_id : int, str, list, or tuple
+        Residue ID component from the original AtomSelection atom ID.
+    remapped_residue_number : int
+        Residue number parsed from the output residue identifier.
+
+    Returns
+    -------
+    int, str, or tuple
+        Residue ID with the same broad representation as
+        *original_residue_id*. BioPython hetero flags are preserved. Insertion
+        codes are reset to blank because index-map values do not encode
+        insertion codes.
+
+    Raises
+    ------
+    ValueError
+        If *original_residue_id* is not a supported residue ID form.
+    """
+    if isinstance(original_residue_id, int):
+        return remapped_residue_number
+    if isinstance(original_residue_id, str):
+        return str(remapped_residue_number)
+    if isinstance(original_residue_id, (list, tuple)) and len(original_residue_id) == 3:
+        hetero_flag = original_residue_id[0] or " "
+        return (hetero_flag, remapped_residue_number, " ")
+    raise ValueError(f"Cannot remap unsupported atom residue ID: {original_residue_id}")
+
+
+def remap_atom_id(
+    atom_id,
+    index_map: dict,
+    motif_col: str,
+    strict: bool = True,
+    tool_name: str = "",
+) -> tuple[tuple, bool, str]:
+    """
+    Remap the chain/residue part of one AtomSelection atom ID.
+
+    Parameters
+    ----------
+    atom_id : tuple or list
+        Atom ID in one of the compact or BioPython-style formats supported by
+        :class:`AtomSelection`.
+    index_map : dict
+        Mapping from input residue identifiers to output residue identifiers.
+    motif_col : str
+        Name of the column being remapped. Used for error messages.
+    strict : bool, optional
+        Included for API symmetry with residue remapping. Missing residues are
+        preserved unchanged regardless of this flag.
+    tool_name : str, optional
+        Name of the tool whose map was used, used only in messages.
+
+    Returns
+    -------
+    tuple
+        Three values packed into one tuple: the remapped atom ID (or original
+        atom ID when no map entry exists), a boolean indicating whether
+        remapping occurred, and the atom's source residue identifier.
+
+    Raises
+    ------
+    ValueError
+        If *atom_id* has an unsupported shape.
+    """
+    atom_id = tuple(atom_id)
+    # Decompose each supported atom ID shape into prefix, chain/residue, and
+    # suffix components so the final atom ID can be reconstructed losslessly.
+    if len(atom_id) == 3:
+        chain_id, residue_id, atom_name = atom_id
+        prefix_values = ()
+        suffix_values = (atom_name,)
+    elif len(atom_id) == 4:
+        model_id, chain_id, residue_id, atom_name = atom_id
+        prefix_values = (model_id,)
+        suffix_values = (atom_name,)
+    elif len(atom_id) == 5:
+        structure_id, model_id, chain_id, residue_id, atom_name = atom_id
+        prefix_values = (structure_id, model_id)
+        suffix_values = (atom_name,)
+    elif len(atom_id) == 6:
+        structure_id, model_id, chain_id, residue_id, atom_name, altloc = atom_id
+        prefix_values = (structure_id, model_id)
+        suffix_values = (atom_name, altloc)
+    else:
+        raise ValueError(f"Atom IDs must have 3, 4, 5, or 6 elements while remapping {motif_col}. Got: {atom_id}")
+
+    # Index maps are keyed by residue identifier without atom names, so
+    # atom-level remapping first collapses each atom ID to its residue key.
+    source_residue = f"{chain_id}{_atom_residue_number(residue_id)}"
+    if source_residue not in index_map:
+        return atom_id, False, source_residue
+
+    remapped_chain, remapped_residue_number = parse_residue(index_map[source_residue])
+    remapped_residue_id = format_remapped_atom_residue_id(residue_id, remapped_residue_number)
+    # Preserve atom names, altlocs, model IDs, and structure IDs exactly; only
+    # the chain and residue index come from the index map.
+    return (*prefix_values, remapped_chain, remapped_residue_id, *suffix_values), True, source_residue
+
+
+def remap_atom_selection(
+    selection: "AtomSelection",
+    index_map: dict,
+    motif_col: str,
+    strict: bool = True,
+    tool_name: str = "",
+) -> "AtomSelection":
+    """
+    Remap one AtomSelection through an input-to-output residue index map.
+
+    Parameters
+    ----------
+    selection : AtomSelection
+        Atom selection in input-structure numbering.
+    index_map : dict
+        Mapping from input residue identifiers to output residue identifiers.
+    motif_col : str
+        Name of the column being remapped. Used for error messages.
+    strict : bool, optional
+        Included for API symmetry with residue remapping. Atoms whose residues
+        are absent from *index_map* are preserved unchanged regardless of this
+        flag.
+    tool_name : str, optional
+        Name of the tool whose map was used, used only in warning messages.
+
+    Returns
+    -------
+    AtomSelection
+        New atom selection in output-structure numbering. Atom order and atom
+        names are preserved. Atoms whose residues are absent from *index_map*
+        keep their original IDs.
+    """
+    remapped_atoms = []
+    missing_residues = []
+    for atom_id in selection.to_tuple():
+        remapped_atom_id, was_remapped, source_residue = remap_atom_id(
+            atom_id,
+            index_map=index_map,
+            motif_col=motif_col,
+            strict=strict,
+            tool_name=tool_name,
+        )
+        if not was_remapped:
+            missing_residues.append(source_residue)
+        remapped_atoms.append(remapped_atom_id)
+    warn_preserved_unmapped_residues(
+        missing_residues, motif_col=motif_col, selection_type="AtomSelection", tool_name=tool_name
+    )
+    return AtomSelection(remapped_atoms)

@@ -167,12 +167,10 @@ def test_output_stem_matches_input_filename(pdb_file, tmp_path):
 # Edge cases / breakers
 # ---------------------------------------------------------------------------
 
-def test_ligand_name_not_present_produces_empty_or_invalid_sdf(no_ligand_pdb, tmp_path):
-    # Missing ligand: function must not crash, but SDF should contain 0 atoms (silent failure, no exception).
-    split_complex(no_ligand_pdb, work_dir=str(tmp_path), ligand_name="LIG")
-    sdf_path = tmp_path / "no_lig_LIG.sdf"
-    assert sdf_path.exists()
-    assert _sdf_atom_count(sdf_path) == 0
+def test_ligand_name_not_present_raises(no_ligand_pdb, tmp_path):
+    # Missing ligand: function must fail fast with a clear error, not silently write an empty SDF.
+    with pytest.raises(ValueError):
+        split_complex(no_ligand_pdb, work_dir=str(tmp_path), ligand_name="LIG")
 
 
 def test_nonexistent_input_raises(tmp_path):
@@ -195,12 +193,10 @@ def test_wrong_extension_raises(tmp_path):
         split_complex(str(bad), work_dir=str(tmp_path), ligand_name="LIG")
 
 
-def test_empty_ligand_name_produces_no_atoms(pdb_file, tmp_path):
-    # Empty ligand_name matches no residue — must not crash, SDF should contain 0 atoms.
-    split_complex(pdb_file, work_dir=str(tmp_path), ligand_name="")
-    sdf_path = tmp_path / "complex_.sdf"
-    assert sdf_path.exists()
-    assert _sdf_atom_count(sdf_path) == 0
+def test_empty_ligand_name_raises(pdb_file, tmp_path):
+    # Empty ligand_name matches no residue — must fail fast rather than write a 0-atom SDF.
+    with pytest.raises(ValueError):
+        split_complex(pdb_file, work_dir=str(tmp_path), ligand_name="")
 
 
 def test_idempotent_overwrite(pdb_file, tmp_path):

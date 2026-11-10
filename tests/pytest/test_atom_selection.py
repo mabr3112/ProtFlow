@@ -1,3 +1,7 @@
+import ast
+
+import pytest
+
 from protflow.residues import AtomSelection, ResidueSelection
 
 
@@ -216,3 +220,61 @@ def test_from_rfd3_input_spec_derived_fixed_motif_atoms_respect_select_fixed_ato
         ("Z", ("H_LIG", 9, " "), "O1"),
     )
     assert selections["ligands_fixed_atoms"].to_tuple() == ()
+
+
+# --------------------------------------------------------------------------- #
+#                           AtomWorks query conversion                         #
+# --------------------------------------------------------------------------- #
+
+def test_residue_selection_to_atomworks_query_compresses_ranges():
+    assert ResidueSelection(["A1", "A2", "A3", "A10"]).to_atomworks_query() == "sel('A/*/[1-3, 10]')"
+
+
+def test_residue_selection_to_atomworks_query_combines_chains_with_or():
+    query = ResidueSelection(["A1", "A2", "B7"]).to_atomworks_query()
+    assert query == "(sel('A/*/[1-2]') or sel('B/*/[7]'))"
+
+
+def test_residue_selection_to_atomworks_query_is_order_independent():
+    assert (
+        ResidueSelection(["A10", "A2", "A1", "A3"]).to_atomworks_query()
+        == ResidueSelection(["A1", "A2", "A3", "A10"]).to_atomworks_query()
+    )
+
+
+def test_atom_selection_to_atomworks_query_groups_residues_sharing_an_atom_set():
+    selection = AtomSelection([("A", 5, "CA"), ("A", 5, "N"), ("A", 6, "CA"), ("A", 6, "N")])
+    assert selection.to_atomworks_query() == "sel('A/*/[5-6]/[CA,N]')"
+
+
+def test_atom_selection_to_atomworks_query_keeps_distinct_atom_sets_separate():
+    selection = AtomSelection([("A", 5, "CA"), ("B", 9, "OD1")])
+    assert selection.to_atomworks_query() == "(sel('A/*/[5]/[CA]') or sel('B/*/[9]/[OD1]'))"
+
+
+def test_atom_selection_to_atomworks_query_deduplicates_atom_names():
+    selection = AtomSelection([("A", 5, "CA"), ("A", 5, "CA"), ("A", 5, "N")])
+    assert selection.to_atomworks_query() == "sel('A/*/[5]/[CA,N]')"
+
+
+def test_atom_selection_to_atomworks_query_handles_biopython_style_ids():
+    """Full BioPython ids carry a hetero flag and insertion code."""
+    selection = AtomSelection([("Z", ("H_LIG", 9, " "), "C1"), ("Z", ("H_LIG", 9, " "), "O1")])
+    assert selection.to_atomworks_query() == "sel('Z/*/[9]/[C1,O1]')"
+
+
+@pytest.mark.parametrize("selection", [
+    ResidueSelection(["A1", "A2", "A3", "A10"]),
+    ResidueSelection(["A1", "B7"]),
+    AtomSelection([("A", 5, "CA"), ("B", 9, "OD1")]),
+    AtomSelection([("A", 5, "CA"), ("A", 5, "N")]),
+])
+def test_atomworks_queries_parse_as_python_expressions(selection):
+    """AtomWorks evaluates a query with ast.parse(query, mode='eval')."""
+    ast.parse(selection.to_atomworks_query(), mode="eval")
+
+
+@pytest.mark.parametrize("selection", [ResidueSelection([]), AtomSelection([])])
+def test_empty_selections_cannot_be_converted(selection):
+    with pytest.raises(ValueError):
+        selection.to_atomworks_query()

@@ -61,7 +61,7 @@ Markus Braun, Adrian Tripp
 import copy
 import os
 import string
-from typing import Union
+from typing import Any, Union
 import Bio.PDB.Entity
 import numpy as np
 import pandas as pd
@@ -72,17 +72,17 @@ import Bio
 import Bio.PDB
 from Bio.PDB.Structure import Structure
 from Bio.PDB.Model import Model
+from Bio.PDB.Chain import Chain
 from Bio import SeqIO
 from Bio.SeqUtils.ProtParam import ProteinAnalysis
 from Bio.SeqUtils import seq1, seq3
 from Bio.PDB import Polypeptide, MMCIFParser
 from Bio.SeqRecord import SeqRecord
-import Bio.PDB.Model
 import Bio.PDB.Structure
 from openbabel import pybel # needed for sdf saving, could be moved entierly to runner if we want to keep this module strictly biopython related
 
 # customs
-from ..residues import ResidueSelection
+from ..residues import AtomSelection, AtomSelectionInput, ResidueSelection
 
 def load_structure_from_pdbfile(path_to_pdb: str, all_models = False, model: int = 0, quiet: bool = True, handle: str = None) -> Union[Structure, Model]:
     """
@@ -369,6 +369,148 @@ def superimpose(mobile: Structure, target: Structure, mobile_atoms: list = None,
     super_imposer.apply(mobile)
     return mobile
 
+def _normalize_atom_spec_residue_id(residue_id: Any) -> tuple[str, int, str]:
+    """Normalize compact residue IDs to BioPython residue IDs."""
+    if isinstance(residue_id, (list, tuple)):
+        if len(residue_id) != 3:
+            raise ValueError(f"BioPython residue IDs must have three elements. Got: {residue_id}")
+        hetero_flag, residue_number, insertion_code = residue_id
+        return (hetero_flag or " ", int(residue_number), insertion_code or " ")
+    return (" ", int(residue_id), " ")
+
+def _normalize_atom_spec_atom_id(atom_id: Any) -> tuple[Any, Any]:
+    """Normalize BioPython atom IDs and optional altloc identifiers."""
+    if isinstance(atom_id, list):
+        atom_id = tuple(atom_id)
+    if isinstance(atom_id, tuple) and len(atom_id) == 2:
+        return atom_id[0], atom_id[1]
+    return atom_id, None
+
+def _normalize_atom_spec_model_id(model_id: Any) -> Any:
+    """Normalize JSON-loaded model IDs where possible."""
+    try:
+        return int(model_id)
+    except (TypeError, ValueError):
+        return model_id
+
+def _resolve_atom_from_entity(
+    biomolecule: Bio.PDB.Entity.Entity,
+    model_id: Any,
+    chain_id: str,
+    residue_id: tuple[str, int, str],
+    atom_name: str,
+):
+    """Resolve an atom from a BioPython Structure, Model, Chain, or Residue."""
+    level = biomolecule.get_level()
+    if level == "S":
+        return biomolecule[_normalize_atom_spec_model_id(model_id)][chain_id][residue_id][atom_name]
+    if level == "M":
+        return biomolecule[chain_id][residue_id][atom_name]
+    if level == "C":
+        return biomolecule[residue_id][atom_name]
+    if level == "R":
+        return biomolecule[atom_name]
+    raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
+
+def _resolve_atom_from_compact_residue_id(
+    biomolecule: Bio.PDB.Entity.Entity,
+    model_id: Any,
+    chain_id: str,
+    residue_id: tuple[str, int, str],
+    atom_name: str,
+):
+    """Resolve compact residue IDs against hetero residues when exact lookup fails."""
+    _, residue_number, insertion_code = residue_id
+    level = biomolecule.get_level()
+    if level == "S":
+        chain = biomolecule[_normalize_atom_spec_model_id(model_id)][chain_id]
+    elif level == "M":
+        chain = biomolecule[chain_id]
+    elif level == "C":
+        chain = biomolecule
+    elif level == "R":
+        if int(biomolecule.id[1]) == residue_number and biomolecule.id[2] == insertion_code:
+            return biomolecule[atom_name]
+        raise KeyError((chain_id, residue_id, atom_name))
+    else:
+        raise ValueError(f"Cannot resolve atom specs from BioPython entity level '{level}'.")
+
+    matches = [
+        residue
+        for residue in chain.get_residues()
+        if int(residue.id[1]) == residue_number
+        and residue.id[2] == insertion_code
+        and atom_name in residue
+    ]
+    if len(matches) == 1:
+        return matches[0][atom_name]
+    if len(matches) > 1:
+        match_ids = [residue.id for residue in matches]
+        raise ValueError(
+            f"Ambiguous compact residue ID {chain_id}{residue_number}{insertion_code.strip()} "
+            f"for atom {atom_name}; matching BioPython residue IDs: {match_ids}"
+        )
+    raise KeyError((chain_id, residue_id, atom_name))
+
+def atom_from_selection_spec(
+    biomolecule: Bio.PDB.Entity.Entity,
+    atom_spec: Any,
+    default_model: int = 0,
+):
+    """
+    Resolve one atom from a compact or full BioPython atom specification.
+
+    Supported atom ID forms match :class:`protflow.residues.AtomSelection`.
+    """
+    if not isinstance(atom_spec, (list, tuple)):
+        raise TypeError(f"Atom specifications must be tuple/list-like. Got {type(atom_spec)}: {atom_spec}")
+
+    atom_spec = list(atom_spec)
+    if len(atom_spec) == 3:
+        model_id = default_model
+        chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 4:
+        model_id, chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 5:
+        _, model_id, chain_id, residue_id, atom_id = atom_spec
+    elif len(atom_spec) == 6:
+        _, model_id, chain_id, residue_id, atom_name, altloc = atom_spec
+        atom_id = (atom_name, altloc)
+    else:
+        raise ValueError(f"Atom specifications must have 3, 4, 5, or 6 elements. Got {len(atom_spec)}: {atom_spec}")
+
+    allow_compact_residue_lookup = not isinstance(residue_id, (list, tuple))
+    residue_id = _normalize_atom_spec_residue_id(residue_id)
+    atom_name, altloc = _normalize_atom_spec_atom_id(atom_id)
+
+    try:
+        atom = _resolve_atom_from_entity(biomolecule, model_id, chain_id, residue_id, atom_name)
+    except KeyError as exc:
+        if allow_compact_residue_lookup:
+            try:
+                atom = _resolve_atom_from_compact_residue_id(biomolecule, model_id, chain_id, residue_id, atom_name)
+            except KeyError:
+                pass
+            else:
+                if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
+                    atom.disordered_select(altloc)
+                    atom = atom.selected_child
+                return atom
+        raise KeyError(f"Could not resolve atom specification {atom_spec} in biomolecule {biomolecule.get_full_id()}") from exc
+
+    if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
+        atom.disordered_select(altloc)
+        atom = atom.selected_child
+    return atom
+
+def get_atoms_of_atom_selection(
+    pose: Bio.PDB.Entity.Entity,
+    atom_selection: AtomSelectionInput,
+) -> list:
+    """Resolve an ordered :class:`~protflow.residues.AtomSelection` to BioPython atoms."""
+    atom_specs = AtomSelection(atom_selection).to_list()
+    return [atom_from_selection_spec(pose, atom_spec) for atom_spec in atom_specs]
+
 def get_atoms(structure: Structure, atoms: list[str], chains: list[str] = None, include_het_atoms: bool = False) -> list:
     '''
     Extract specific atoms from one or more chains in a Biopython ``Structure``.
@@ -493,7 +635,7 @@ def get_atoms_of_motif(pose: Structure, motif: ResidueSelection, atoms: list[str
         out_atoms += res_atoms
     return out_atoms
 
-def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = False) -> Structure:
+def add_chain(target: Structure, reference: Structure, copy_chain: str, translate_x: float = None, overwrite: bool = False, new_chain_id: str = None) -> Structure:
     """
     Add a chain from a reference structure to a target structure, optionally translating it and handling ID conflicts.
 
@@ -505,11 +647,13 @@ def add_chain(target: Structure, reference: Structure, copy_chain: str, translat
         The structure from which the chain will be copied.
     copy_chain : str
         The chain ID in the reference structure to be copied.
+    new_chain_id : str, optional
+        The chain ID to assign to the copied chain in the target structure. Defaults to copy_chain.
     translate_x : float, optional
         The distance by which to translate the new chain along the x-axis (default is None).
     overwrite : bool, optional
         Whether to overwrite the chain in the target structure if a chain with the same ID already exists.
-        If False and a conflict occurs, a new unique chain ID will be generated (default is True).
+        If False and a conflict occurs, a new unique chain ID will be generated (default is False).
 
     Returns
     -------
@@ -517,11 +661,11 @@ def add_chain(target: Structure, reference: Structure, copy_chain: str, translat
         The updated target structure with the added chain.
     """
     existing_chain_ids = {chain.id for chain in target.get_chains()}
-    new_chain_id = copy_chain
+    new_chain_id = new_chain_id or copy_chain
 
-    if copy_chain in existing_chain_ids:
+    if new_chain_id in existing_chain_ids:
         if overwrite:
-            target.detach_child(copy_chain)
+            target.detach_child(new_chain_id)
         else:
             new_chain_id = get_next_chain_id(existing_chain_ids)
 
@@ -1094,6 +1238,14 @@ def split_complex(path: str, work_dir: str, ligand_name: str) -> None:
 
     structure = biopython_load_structure(path, handle=stem)
 
+    # fail fast if the requested ligand is absent, instead of silently writing an empty SDF
+    if not any(residue.resname == ligand_name for residue in structure.get_residues()):
+        hetatms = sorted({residue.resname for residue in structure.get_residues() if residue.id[0] != " "})
+        raise ValueError(
+            f"No residue named '{ligand_name}' found in {path}. "
+            f"HETATM residues present: {hetatms or 'none'}. Check the ligand_name argument."
+        )
+
     class _ProteinSelect(Bio.PDB.Select): # inherit from Bio.PDB.Select to write only ATOM records
         def accept_residue(self, residue):
             return residue.id[0] == " "
@@ -1278,3 +1430,56 @@ def save_structure_to_file(pose: Structure, save_path: str, multimodel: bool = F
             raise KeyError("Output format cif does not offer multimodel support!")
         
         save_structure_to_ciffile(pose=pose, save_path=save_path)
+
+
+def biopython_fileconverter(input_file: str, output_format: str, output_file: str = None, input_format: str = None) -> str:
+    """Convert PDB/CIF structure files with BioPython."""
+
+    file, ext = os.path.splitext(input_file)
+    if not input_format:
+        input_format = ext[1:]
+    if not output_file:
+        output_file = file + f".{output_format}"
+
+    pose = biopython_load_structure(input_file, file_type=input_format)
+    save_structure_to_file(pose=pose, save_path=output_file, file_type=output_format)
+    return output_file
+
+def select_biopython_residues(pose: Union[str, Structure, Model, Chain], selection: ResidueSelection = None, strict: bool = True) -> list:
+    """Extracts Biopython Residues from a pose based on a ResidueSelection, preserving order and multiplicity."""
+    if not selection:
+        # return empty list for empty ResidueSelection
+        return []
+
+    if isinstance(pose, str):
+        # Assuming biopython_load_structure is defined in your module
+        pose = biopython_load_structure(pose)
+        
+    if not isinstance(pose, (Structure, Model, Chain)):
+        raise TypeError(f"<pose> must be a Biopython Entity (Structure, Model, Chain), not {type(pose)}!")
+
+    # 1. Map available residues in the pose to a dictionary for O(1) lookup
+    # Key: (chain_id, sequence_number), Value: Bio.PDB.Residue object
+    pose_residues_map = {
+        (res.parent.id, res.id[1]): res 
+        for res in pose.get_residues()
+    }
+    
+    extracted = []
+    missing_residues = set()
+
+    # 2. Iterate through the selection to build the list
+    for target in selection.residues:
+        if target in pose_residues_map:
+            extracted.append(pose_residues_map[target])
+        else:
+            missing_residues.add(target)
+
+    # 3. Raise an error if any requested residues were missing
+    if missing_residues and strict:
+        raise KeyError(f"The following residues from the selection were not found in the pose: {missing_residues}")
+
+    return extracted
+    
+    
+    

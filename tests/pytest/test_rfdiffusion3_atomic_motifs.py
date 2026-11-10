@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 
 from protflow.poses import Poses
@@ -12,14 +14,14 @@ def _pdb_line(record, serial, atom_name, resname, chain, resseq, x, y, z, elemen
     )
 
 
-def _write_test_pdb(path):
+def _write_test_pdb(path, ligand_chain="Z", ligand_resseq=9):
     lines = [
         _pdb_line("ATOM", 1, "N", "ALA", "A", 1, 0.0, 0.0, 0.0, "N"),
         _pdb_line("ATOM", 2, "CA", "ALA", "A", 1, 1.0, 0.0, 0.0, "C"),
         _pdb_line("ATOM", 3, "C", "ALA", "A", 1, 2.0, 0.0, 0.0, "C"),
         _pdb_line("ATOM", 4, "O", "ALA", "A", 1, 3.0, 0.0, 0.0, "O"),
-        _pdb_line("HETATM", 5, "C1", "LIG", "Z", 9, 0.0, 2.0, 0.0, "C"),
-        _pdb_line("HETATM", 6, "O1", "LIG", "Z", 9, 1.0, 2.0, 0.0, "O"),
+        _pdb_line("HETATM", 5, "C1", "LIG", ligand_chain, ligand_resseq, 0.0, 2.0, 0.0, "C"),
+        _pdb_line("HETATM", 6, "O1", "LIG", ligand_chain, ligand_resseq, 1.0, 2.0, 0.0, "O"),
         "TER",
         "END",
     ]
@@ -40,7 +42,7 @@ def _runner_without_config(model_dir):
 
 def test_run_parse_atomic_motifs_adds_input_spec_atom_selection_columns_from_cached_scores(tmp_path):
     input_pdb = _write_test_pdb(tmp_path / "input.pdb")
-    output_pdb = _write_test_pdb(tmp_path / "input_0001_0001_0001.pdb")
+    output_pdb = _write_test_pdb(tmp_path / "input_0001_0001_0001.pdb", ligand_chain="C", ligand_resseq=12)
     ckpt_path = tmp_path / "rfd3_latest.ckpt"
     ckpt_path.write_text("checkpoint placeholder\n", encoding="UTF-8")
 
@@ -50,6 +52,17 @@ def test_run_parse_atomic_motifs_adds_input_spec_atom_selection_columns_from_cac
 
     work_dir = tmp_path / "rfd3"
     work_dir.mkdir()
+    output_dir = work_dir / "outputs"
+    output_dir.mkdir()
+    (output_dir / f"{output_pdb.stem}.json").write_text(
+        json.dumps(
+            {
+                "diffused_index_map": {"A1": "B10"},
+                "specification": {"input": str(input_pdb), "ligand": "LIG"},
+            }
+        ),
+        encoding="UTF-8",
+    )
     pd.DataFrame(
         {
             "description": [output_pdb.stem],
@@ -81,12 +94,17 @@ def test_run_parse_atomic_motifs_adds_input_spec_atom_selection_columns_from_cac
         ("A", 1, "O"),
     )
     assert poses.df.at[0, "rfd3_ligands"].to_tuple() == (
+        ("C", ("H_LIG", 12, " "), "C1"),
+        ("C", ("H_LIG", 12, " "), "O1"),
+    )
+    assert poses.df.at[0, "rfd3_ligands_original"].to_tuple() == (
         ("Z", ("H_LIG", 9, " "), "C1"),
         ("Z", ("H_LIG", 9, " "), "O1"),
     )
-    assert poses.df.at[0, "rfd3_ligands_original"].to_tuple() == poses.df.at[0, "rfd3_ligands"].to_tuple()
     assert poses.df.at[0, "rfd3_ligands_fixed_atoms"].to_tuple() == (
+        ("C", ("H_LIG", 12, " "), "C1"),
+    )
+    assert poses.df.at[0, "rfd3_ligands_fixed_atoms_original"].to_tuple() == (
         ("Z", ("H_LIG", 9, " "), "C1"),
     )
-    assert poses.df.at[0, "rfd3_ligands_fixed_atoms_original"].to_tuple() == poses.df.at[0, "rfd3_ligands_fixed_atoms"].to_tuple()
     assert poses.df.at[0, "rfd3_ligand"].to_tuple() == poses.df.at[0, "rfd3_ligands"].to_tuple()
