@@ -2627,7 +2627,11 @@ def _run_rfd4_remap_records_with_jobstarter(
         Explicit worker script path. Defaults to
         ``<AUXILIARY_RUNNER_SCRIPTS_DIR>/rfd4_remap_motifs.py``.
     pre_cmd : str, optional
-        Environment setup prepended to each provenance-worker command.
+        Command prepended to every worker command, exactly as for generation
+        jobs.  The worker imports ``atomworks``, which binds ``CCD_MIRROR_PATH``
+        and ``PDB_MIRROR_PATH`` at import time, so an environment that only the
+        pre-command sets up (custom CCD mirror, module loads) must be applied
+        here too, not only to ``rfd4-generate``.
 
     Returns
     -------
@@ -2738,7 +2742,11 @@ def add_source_maps_to_scores(
         design came from. Rows whose ``task`` is absent are skipped with a
         warning rather than failing the run.
     pre_cmd : str, optional
-        Environment setup for the RFD4 interpreter, also used for workers.
+        Command prepended to every worker command. The workers parse the
+        designed CIFs with AtomWorks, which binds ``CCD_MIRROR_PATH`` and
+        ``PDB_MIRROR_PATH`` at import time, so a custom CCD mirror set up by
+        the pre-command must be applied here as well as to generation.
+        :meth:`RFD4Proteina.run` passes its own ``pre_cmd``.
     spec_by_task : dict, optional
         ``{design_key: condition_spec}`` used to compose original-input to
         prepared-input numbering with output provenance. The runner always
