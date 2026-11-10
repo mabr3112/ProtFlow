@@ -2049,6 +2049,9 @@ class RFD4Proteina(Runner):
             Forwarded to ``skip_existing``.  ``False`` (default) regenerates
             every design; set ``True`` together with ``overwrite=False`` to
             resume an interrupted run from the outputs already on disk.
+            Resuming requires the original design-to-batch assignments; changes
+            to parallel job counts or design ordering that move designs between
+            batches are rejected. Use ``overwrite=True`` for a fresh run.
         options : str, optional
             Additional ``rfd4-generate`` arguments forwarded verbatim, including
             Hydra ``key=value`` overrides and flags such as ``--config-path``.
@@ -2141,7 +2144,9 @@ class RFD4Proteina(Runner):
             If *poses* and *params* have different lengths or mismatched design
             keys, or if *options* contains a reserved Hydra key.
         RuntimeError
-            If :func:`collect_scores` returns an empty DataFrame (all jobs
+            If batch assignments change when reusing a working directory,
+            duplicate design IDs are found in structures or metrics,
+            :func:`collect_scores` returns an empty DataFrame (all jobs
             crashed or produced no output), or if
             *fail_on_missing_output_poses* is ``True`` and fewer outputs than
             expected were collected.
@@ -2430,8 +2435,33 @@ class RFD4Proteina(Runner):
         Disjoint design keys prevent structure filename collisions, but each
         RFD4 process writes the same per-example and aggregate metric filenames.
         Each batch therefore needs its own output directory to prevent overwrites.
+        Existing batch assignments must match before any specs are rewritten.
         """
         batches = split_list(design_keys, n_sublists=n_jobs)
+        _check_rfd4_duplicate_ids(pd.Series([str(key) for key, _ in design_keys]), "requested design keys")
+        assignments = {
+            f"batch{i}": {str(key) for key, _ in batch}
+            for i, batch in enumerate(batches) if batch
+        }
+        previous_assignments = {}
+        for path in glob(os.path.join(input_dir, "batch[0-9]*.yaml")):
+            with open(path, encoding="UTF-8") as handle:
+                spec = yaml.safe_load(handle)
+            previous_assignments[os.path.basename(path).removesuffix(".yaml")] = {
+                str(key) for key in spec if key != "global_args"
+            }
+        output_batches = {
+            os.path.basename(path) for path in glob(os.path.join(output_dir, "batch[0-9]*"))
+            if os.path.isdir(path)
+        }
+        if (previous_assignments and previous_assignments != assignments) or (
+            output_batches - previous_assignments.keys()
+        ):
+            raise RuntimeError(
+                "RFD4 batch assignments changed or original batch specs are missing. "
+                "Resuming could duplicate designs across batch folders. Restore the original "
+                "design keys, ordering and parallel job count, or use overwrite=True for a fresh run."
+            )
 
         cmds: list[str] = []
         for i, batch in enumerate(batches):
@@ -3010,8 +3040,19 @@ def _decompress_structure(path: str) -> str:
     return path
 
 
+def _check_rfd4_duplicate_ids(ids: pd.Series, source: str) -> None:
+    """Reject ambiguous design IDs before structures or metrics can be combined."""
+    duplicates = ids[ids.duplicated(keep=False)].drop_duplicates()
+    if not duplicates.empty:
+        raise RuntimeError(
+            f"RFD4 duplicate design IDs in {source} (first 5): {duplicates.head(5).tolist()}. "
+            "Resolve the duplicate outputs or use overwrite=True for a fresh run."
+        )
+
+
 def _check_rfd4_metric_coverage(scores: pd.DataFrame, metrics: pd.DataFrame) -> None:
     """Allow runs without metrics, but reject partially collected metric rows."""
+    _check_rfd4_duplicate_ids(scores["description"], "collected scores")
     if metrics.empty:
         return
     missing = scores.loc[~scores["description"].isin(metrics["description"]), "description"]
@@ -3059,7 +3100,7 @@ def _read_rfd4_metrics(output_dir: str, include_scores: set[str]) -> pd.DataFram
         logging.warning("RFD4 metrics CSVs in %s carry no 'example_id' column; skipping metrics merge.", output_dir)
         return pd.DataFrame()
 
-    metrics = metrics.drop_duplicates(subset="example_id", keep="last")
+    _check_rfd4_duplicate_ids(metrics["example_id"], f"metrics CSVs under {output_dir}")
 
     drop = [col for col in _RFD4_METRICS_DROP_COLUMNS if col in metrics.columns]
     if "generation" not in include_scores:
@@ -3084,6 +3125,7 @@ def collect_scores(
     decompresses any compressed outputs, optionally converts them to PDB, and
     merges each batch's inline metrics on the RFD4 ``example_id``.
     If metrics exist, every collected structure must have a matching metric row.
+    Duplicate structure or metric IDs are rejected before writing pose files.
 
     Parameters
     ----------
@@ -3159,16 +3201,24 @@ def collect_scores(
     if not structure_paths:
         return pd.DataFrame()
 
+    descriptions = pd.Series([
+        os.path.basename(path).removesuffix(".gz").removesuffix(".zst")
+        .removesuffix(".cif").removesuffix("_generated")
+        for path in structure_paths
+    ])
+    _check_rfd4_duplicate_ids(descriptions, f"structures under {output_dir}")
+    scores = pd.DataFrame({"description": descriptions})
+    metrics = _read_rfd4_metrics(output_dir, include_set)
+    _check_rfd4_metric_coverage(scores, metrics)
+
     os.makedirs(poses_dir, exist_ok=True)
 
     rows: list[dict] = []
     intermediates: list[str] = []
-    for path in structure_paths:
+    for path, description in zip(structure_paths, descriptions):
         cif_path = _decompress_structure(path)
         if cif_path != path:
             intermediates.append(cif_path)
-
-        description = re.sub(r"_generated$", "", os.path.basename(cif_path).removesuffix(".cif"))
 
         if cif_to_pdb:
             pose_path = os.path.join(poses_dir, f"{description}.pdb")
@@ -3185,10 +3235,8 @@ def collect_scores(
 
     scores = pd.DataFrame(rows)
 
-    metrics = _read_rfd4_metrics(output_dir, include_set)
-    _check_rfd4_metric_coverage(scores, metrics)
     if not metrics.empty:
-        scores = scores.merge(metrics, how="left", on="description")
+        scores = scores.merge(metrics, how="left", on="description", validate="one_to_one")
 
     # 'task' is the design key; RFD4 reports it in the metrics CSV, otherwise derive it
     derived_task = scores["description"].apply(lambda desc: "_".join(desc.split("_")[:-1]))
