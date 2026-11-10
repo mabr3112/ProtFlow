@@ -11,8 +11,8 @@ MMseqs
 
 Functions
 ---------
-collect_scores(output_dir: str) -> pd.DataFrame
-    Collects the A3M MSA outputs from a specified directory, returning a pandas DataFrame with the structured results containing the paths to the alignments.
+collect_scores(work_dir: str) -> pd.DataFrame
+    Collects the A3M MSA outputs from a specified directory, returning a pandas DataFrame with the structured results containing the paths to the alignments, MSA depth, and mean sequence coverage.
 
 Notes
 -----
@@ -57,11 +57,11 @@ class MMseqs(Runner):
         Returns a string representation of the MMseqs instance.
     _check_install(application_path: str) -> str
         Verifies the installation of MMseqs2 by checking if the executable exists at the provided path.
-    run(poses: Poses, prefix: str, target_db: str, overwrite: bool = False, jobstarter: JobStarter = None) -> Poses
+    run(poses: Poses, prefix: str, target_db: str, options: str = None, overwrite: bool = False, jobstarter: JobStarter = None) -> Poses
         Executes the batched MMseqs searches on the provided poses against a target database.
     create_batch_fasta(fasta_paths: list[str], out_path: str) -> None
         Concatenates multiple single-sequence FASTA files into one multi-sequence FASTA for batched processing.
-    write_cmd(batch_fasta: str, target_db: str, tmp_dir: str) -> str
+    write_cmd(batch_fasta: str, target_db: str, tmp_dir: str, options: str = None) -> str
         Constructs the command line instruction to run MMseqs on a given batch FASTA.
     """
 
@@ -97,7 +97,7 @@ class MMseqs(Runner):
         return application_path
 
     ########################## Calculations ################################################
-    def run(self, poses: Poses, prefix: str, target_db: str, overwrite: bool = False, # pylint: disable=W0237
+    def run(self, poses: Poses, prefix: str, target_db: str, options: str = None, overwrite: bool = False, # pylint: disable=W0237
             jobstarter: JobStarter = None) -> Poses:
         """
         Execute the batched MMseqs2 calculation on the given protein poses.
@@ -114,6 +114,8 @@ class MMseqs(Runner):
             A prefix for naming the output files generated during the run.
         target_db : str
             The path to the pre-compiled MMseqs target database (e.g. `ache_db_rep`).
+        options : str, optional
+            Options for mmseqs search (e.g. `-s 7.5 -a --num-iterations 3 -e 0.1`).
         overwrite : bool, optional
             If True, existing output files will be overwritten. Default is False.
         jobstarter : JobStarter, optional
@@ -158,6 +160,10 @@ class MMseqs(Runner):
 
         batch_dir = os.path.join(work_dir, "batches")
         os.makedirs(batch_dir, exist_ok=True)
+        
+        # Create the dedicated output directory for the final A3M files
+        a3m_dir = os.path.join(work_dir, "a3m_files")
+        os.makedirs(a3m_dir, exist_ok=True)
 
         # Compile commands for each batch
         cmds = []
@@ -172,8 +178,8 @@ class MMseqs(Runner):
             # Concatenate fastas into a single batched query file
             self.create_batch_fasta(fasta_paths=sublist, out_path=batch_fasta)
             
-            # Add command pipeline for this batch
-            cmds.append(self.write_cmd(batch_fasta=batch_fasta, target_db=target_db, tmp_dir=tmp_dir))
+            # Add command pipeline for this batch (passing the new options parameter)
+            cmds.append(self.write_cmd(batch_fasta=batch_fasta, target_db=target_db, tmp_dir=tmp_dir, options=options))
 
         # Run batched commands in parallel
         jobstarter.start(
@@ -182,7 +188,7 @@ class MMseqs(Runner):
             output_path=work_dir
         )
 
-        # collect_scores natively disentangles the tmp_dirs using python
+        # collect_scores disentangles the tmp_dirs and routes files to the hardcoded a3m_files dir
         scores = collect_scores(work_dir=work_dir)
         
         # Merge scores back into poses df to grab the ORIGINAL poses paths
@@ -190,9 +196,6 @@ class MMseqs(Runner):
                               right_on="poses_description").drop('poses_description', axis=1)
 
         # Rename 'poses' to 'location' to satisfy RunnerOutput.
-        # Because we are feeding the original pose paths into 'location', 
-        # ProtFlow will retain the original .pdb files as the primary poses 
-        # for downstream tools, while appending the new 'a3m_path' column!
         scores.rename(columns={"poses": "location"}, inplace=True)
 
         # Write output scorefile
@@ -225,37 +228,111 @@ class MMseqs(Runner):
                     if not content.endswith("\n"):
                         outfile.write("\n")
 
-    def write_cmd(self, batch_fasta: str, target_db: str, tmp_dir: str) -> str:
-            """
-            Generate the command line string to run MMseqs on a batch FASTA.
+    def write_cmd(self, batch_fasta: str, target_db: str, tmp_dir: str, options: str = None) -> str:
+        """
+        Generate the command line string to run MMseqs on a batch FASTA.
 
-            Constructs a chained bash command that creates a temporary MMseqs database for 
-            the batch, searches the target database, converts the alignments to an A3M 
-            database, and unpacks them. (Folder creation and cleanup are handled in Python).
-            """
-            run_string = (
-                f"{self.application} createdb {batch_fasta} {tmp_dir}/qdb && "
-                f"{self.application} search {tmp_dir}/qdb {target_db} {tmp_dir}/res {tmp_dir}/tmp && "
-                f"{self.application} result2msa {tmp_dir}/qdb {target_db} {tmp_dir}/res {tmp_dir}/msa --msa-format-mode 2 && "
-                f"cp {tmp_dir}/qdb.lookup {tmp_dir}/msa.lookup && "
-                f"{self.application} unpackdb {tmp_dir}/msa {tmp_dir}/unpack"
-            )
+        Constructs a chained bash command that creates a temporary MMseqs database for 
+        the batch, searches the target database, converts the alignments to an A3M 
+        database, and unpacks them.
 
-            return run_string
+        Parameters
+        ----------
+        batch_fasta : str
+            The file path to the concatenated multi-sequence FASTA to be processed.
+        target_db : str
+            The path to the pre-compiled target MMseqs database.
+        tmp_dir : str
+            The isolated temporary directory where this batch's mmseqs files will be generated.
+        options : str, optional
+            Additional search options to pass to the `mmseqs search` module.
+
+        Returns
+        -------
+        str
+            The full chained command string ready for shell execution via the JobStarter.
+        """
+        opts = f" {options}" if options else ""
+        
+        run_string = (
+            f"{self.application} createdb {batch_fasta} {tmp_dir}/qdb && "
+            f"{self.application} search {tmp_dir}/qdb {target_db} {tmp_dir}/res {tmp_dir}/tmp{opts} && "
+            f"{self.application} result2msa {tmp_dir}/qdb {target_db} {tmp_dir}/res {tmp_dir}/msa --msa-format-mode 2 && "
+            f"cp {tmp_dir}/qdb.lookup {tmp_dir}/msa.lookup && "
+            f"{self.application} unpackdb {tmp_dir}/msa {tmp_dir}/unpack"
+        )
+
+        return run_string
+
+
+def get_a3m_stats(a3m_path: str) -> tuple[int, float]:
+    """
+    Stream an A3M file to calculate MSA depth and mean sequence coverage.
+    
+    In A3M format:
+    - Match states (aligned residues) are uppercase letters or '-'.
+    - Insertions are lowercase letters.
+    The coverage per sequence is the number of its uppercase letters divided 
+    by the query's total match states.
+    """
+    depth = 0
+    query_length = 0
+    total_aligned_residues = 0
+    
+    try:
+        with open(a3m_path, "r", encoding="utf-8") as f:
+            is_query = True
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                if line.startswith(">"):
+                    depth += 1
+                    is_query = (depth == 1)
+                else:
+                    if is_query:
+                        # Count the length of the query ignoring lowercase insertions
+                        query_length += sum(1 for c in line if not c.islower())
+                        total_aligned_residues += sum(1 for c in line if c.isupper())
+                    else:
+                        # Count aligned residues for the hit
+                        total_aligned_residues += sum(1 for c in line if c.isupper())
+                        
+    except Exception:
+        return 0, 0.0
+
+    if depth == 0 or query_length == 0:
+        return depth, 0.0
+        
+    mean_coverage = total_aligned_residues / (depth * query_length)
+    return depth, round(mean_coverage, 4)
 
 
 def collect_scores(work_dir: str) -> pd.DataFrame:
     """
-    Collect and disentangle A3M output files from the specified directory.
+    Collect and disentangle A3M output files from the specified working directory.
 
     This function scans for temporary batch directories created by the JobStarter. 
     It parses the internal MMseqs `qdb.lookup` mapping to identify the output files, 
     renames them to match their original FASTA headers, and moves them to the 
-    root `output_dir`. It then cleans up the temporary directories and compiles the 
-    paths into a DataFrame.
-    """
+    hardcoded `a3m_files` directory inside the `work_dir`. It then cleans up the 
+    temporary directories, calculates MSA depth and coverage, and compiles everything 
+    into a DataFrame.
 
-    os.makedirs(a3m_dir := os.path.join(work_dir, "a3m_files"), exist_ok=True)
+    Parameters
+    ----------
+    work_dir : str
+        The working directory containing the temporary `*_tmp` batch folders.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the A3M paths and stats mapped to their pose descriptions. 
+        Columns include `description`, `a3m_path`, `msa_depth`, and `mean_coverage`.
+    """
+    a3m_dir = os.path.join(work_dir, "a3m_files")
+    os.makedirs(a3m_dir, exist_ok=True)
 
     # 1. Process any temporary batch directories to disentangle the A3Ms in Python
     tmp_dirs = glob.glob(os.path.join(work_dir, "*_tmp"))
@@ -276,10 +353,10 @@ def collect_scores(work_dir: str) -> pd.DataFrame:
                         num_id = parts[0].strip()
                         description = parts[1].strip()
                         
-                        # Fallback check depending on whether the local MMseqs 
-                        # version extracts by numerical ID or string description
                         unpacked_num = os.path.join(unpack_dir, num_id)
                         unpacked_desc = os.path.join(unpack_dir, description)
+                        
+                        # Target the dedicated A3M directory
                         final_a3m = os.path.join(a3m_dir, f"{description}.a3m")
                         
                         # Move and rename the flat file if it was successfully generated
@@ -291,20 +368,24 @@ def collect_scores(work_dir: str) -> pd.DataFrame:
         # Clean up the temporary batch directory using Python
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    # 2. Collect all A3M files now present in the output directory
+    # 2. Collect all A3M files now present in the dedicated output directory
     a3m_files = glob.glob(os.path.join(a3m_dir, "*.a3m"))
 
     results = []
     for file_path in a3m_files:
+        depth, coverage = get_a3m_stats(file_path)
+        
         results.append({
             "description": description_from_path(file_path),
-            "a3m_path": file_path
+            "a3m_path": file_path,
+            "msa_depth": depth,
+            "mean_coverage": coverage
         })
 
     scores = pd.DataFrame(results)
     
     # Ensure empty df behaves gracefully
     if scores.empty:
-        return pd.DataFrame(columns=["description", "a3m_path"])
+        return pd.DataFrame(columns=["description", "a3m_path", "msa_depth", "mean_coverage"])
 
     return scores
