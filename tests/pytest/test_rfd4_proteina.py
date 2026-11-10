@@ -4,6 +4,10 @@ import ast
 import logging
 import os
 import shlex
+import sys
+from types import ModuleType, SimpleNamespace
+from unittest import TestCase
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -23,6 +27,8 @@ from protflow.tools.rfd4_proteina import (
     selection_to_contig,
     selection_to_query,
 )
+
+from protflow.tools.runners_auxiliary_scripts.rfd4_remap_motifs import build_provenance_record
 
 
 # --------------------------------------------------------------------------- #
@@ -360,9 +366,14 @@ def test_write_cmd_rejects_reserved_options():
         _runner().write_cmd(in_spec="/s.yaml", out_dir="/o", options="num_replicates=5")
 
 
-def test_write_cmd_rejects_argparse_style_options():
-    with pytest.raises(ValueError):
-        _runner().write_cmd(in_spec="/s.yaml", out_dir="/o", options="--inputs x")
+def test_write_cmd_passes_hydra_config_flags_and_overrides_verbatim():
+    options = "--config-path '/path with spaces/ts1' --config-name run hydra.verbose=true"
+    cmd = _runner().write_cmd(in_spec="/s.yaml", out_dir="/o", options=options)
+
+    assert cmd.startswith(f"rfd4-generate {options} inputs=")
+    assert shlex.split(cmd)[1:6] == [
+        "--config-path", "/path with spaces/ts1", "--config-name", "run", "hydra.verbose=true",
+    ]
 
 
 def test_setup_run_writes_one_spec_per_job_with_disjoint_design_keys(tmp_path):
@@ -640,6 +651,57 @@ def test_cleanup_removes_renumbered_and_remap_directories(tmp_path):
         (tmp_path / name).mkdir()
     _runner()._cleanup_previous_outputs(work_dir=str(tmp_path))
     assert not any((tmp_path / name).exists() for name in names)
+
+
+class ProvenanceTests(TestCase):
+    def record(self, sources, conditioned, chains, residues, input_index_map=None):
+        array = SimpleNamespace(chain_id=chains, res_id=residues)
+        annotations = ModuleType("rfproteina.utils.standard_annotations")
+        for name, value in {"SA_SRC": sources, "SA_CRDSRC": conditioned,
+                            "SA_IDXGRPSRC": None, "SA_UII": None}.items():
+            setattr(annotations, name, SimpleNamespace(annotation=lambda _, value=value: value))
+        parser = ModuleType("atomworks.io.parser")
+        parser.parse = lambda *_, **kwargs: {"assemblies": {"1": [array]}}
+        presets = ModuleType("rfproteina.utils.parse_presets")
+        presets.STANDARD_ANNOTATIONS_ONLY = object()
+        with patch.dict(sys.modules, {
+            "rfproteina": ModuleType("rfproteina"),
+            "rfproteina.conditions": ModuleType("rfproteina.conditions"),
+            "rfproteina.utils": ModuleType("rfproteina.utils"),
+            "rfproteina.utils.standard_annotations": annotations,
+            "rfproteina.utils.parse_presets": presets,
+            "atomworks": ModuleType("atomworks"),
+            "atomworks.io": ModuleType("atomworks.io"),
+            "atomworks.io.parser": parser,
+        }):
+            return build_provenance_record("design", "output.cif", input_index_map=input_index_map)
+
+    def test_unindexed_motif_is_mapped_when_component_sources_only_identify_ligand(self):
+        record = self.record([".", ".", "Z0"], ["A2", "A2", "Z0"], ["A", "A", "Z"], [40, 40, 0])
+        self.assertEqual(record["source_index_map"], {"A2": "A40", "Z0": "Z0"})
+        self.assertEqual(record["n_source_atoms"], 3)
+
+    def test_composes_both_annotation_sources_without_prepared_id_fallback(self):
+        record = self.record(
+            ["A1", ".", "Z0"], ["A1", "A2", "Z0"], ["B", "B", "Z"], [12, 13, 0],
+            {"A41": {"A1"}, "A42": {"A2"}, "A43": {"A3"}, "Z0": {"Z0"}},
+        )
+        self.assertEqual(record["source_index_map"], {"A41": "B12", "A42": "B13", "Z0": "Z0"})
+        poses = _poses_with_map(
+            record["source_index_map"],
+            residue_motif=ResidueSelection(["A42"]),
+            atom_motif=AtomSelection([("A", 42, "CA")]),
+        )
+        remap_rfd4_motifs(poses, ["residue_motif", "atom_motif"], "rfd4", strict=True)
+        self.assertEqual(poses.df.loc[0, "residue_motif"].to_list(), ["B13"])
+        self.assertEqual(poses.df.loc[0, "atom_motif"].to_tuple(), (("B", 13, "CA"),))
+
+    def test_duplicated_original_residue_is_ambiguous_after_composition(self):
+        record = self.record(
+            ["A1", "A2"], None, ["B", "B"], [12, 13], {"A41": {"A1", "A2"}},
+        )
+        self.assertEqual(record["source_index_map"], {})
+        self.assertEqual(record["ambiguous_source_labels"], ["A41"])
 
 
 # --------------------------------------------------------------------------- #
