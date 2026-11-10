@@ -441,7 +441,7 @@ def _write_generated_cif(samples_dir, example_id):
 
 
 def test_collect_scores_picks_up_designs_and_normalises_descriptions(tmp_path):
-    samples = tmp_path / "outputs" / "inference_samples"
+    samples = tmp_path / "outputs" / "batch0" / "inference_samples"
     for example_id in ("target_0_0", "target_0_1"):
         _write_generated_cif(samples, example_id)
 
@@ -456,10 +456,10 @@ def test_collect_scores_picks_up_designs_and_normalises_descriptions(tmp_path):
 
 
 def test_collect_scores_merges_inline_metrics(tmp_path):
-    samples = tmp_path / "outputs" / "inference_samples"
+    samples = tmp_path / "outputs" / "batch0" / "inference_samples"
     _write_generated_cif(samples, "design_0")
 
-    metrics_dir = tmp_path / "outputs" / "inference_metrics"
+    metrics_dir = tmp_path / "outputs" / "batch0" / "inference_metrics"
     metrics_dir.mkdir(parents=True)
     pd.DataFrame([{
         "example_id": "design_0",
@@ -479,10 +479,10 @@ def test_collect_scores_merges_inline_metrics(tmp_path):
 
 
 def test_collect_scores_keeps_generation_columns_on_request(tmp_path):
-    samples = tmp_path / "outputs" / "inference_samples"
+    samples = tmp_path / "outputs" / "batch0" / "inference_samples"
     _write_generated_cif(samples, "design_0")
 
-    metrics_dir = tmp_path / "outputs" / "inference_metrics"
+    metrics_dir = tmp_path / "outputs" / "batch0" / "inference_metrics"
     metrics_dir.mkdir(parents=True)
     pd.DataFrame([{"example_id": "design_0", "generation.args.nsteps": 60}]).to_csv(
         metrics_dir / "per_example_metrics.csv", index=False

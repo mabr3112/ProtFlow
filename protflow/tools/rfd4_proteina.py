@@ -2975,11 +2975,6 @@ def _decompress_structure(path: str) -> str:
     return path
 
 
-def _rfd4_output_dirs(output_dir: str) -> list[str]:
-    """Find batch outputs, falling back to the flat layout used by older runs."""
-    return sorted(glob(os.path.join(output_dir, "batch[0-9]*"))) or [output_dir]
-
-
 def _check_rfd4_metric_coverage(scores: pd.DataFrame, metrics: pd.DataFrame) -> None:
     """Allow runs without metrics, but reject partially collected metric rows."""
     if metrics.empty:
@@ -3001,8 +2996,7 @@ def _read_rfd4_metrics(output_dir: str, include_scores: set[str]) -> pd.DataFram
     Parameters
     ----------
     output_dir : str
-        Runner's ``outputs/`` directory, containing batch directories or legacy
-        flat outputs.
+        Runner's ``outputs/`` directory, containing per-batch directories.
     include_scores : set of str
         Opt-in score groups.  ``"generation"`` keeps the fully resolved
         ``generation.*`` config columns RFD4 embeds in every row.
@@ -3014,14 +3008,12 @@ def _read_rfd4_metrics(output_dir: str, include_scores: set[str]) -> pd.DataFram
         ``description`` and ``.`` replaced by ``_`` in every metric column name.
         Empty when no metrics were written.
     """
-    csv_paths = []
-    for directory in _rfd4_output_dirs(output_dir):
-        metrics_dir = os.path.join(directory, "inference_metrics")
-        csv_paths.extend(sorted(
-            glob(os.path.join(metrics_dir, "per_example_metrics.csv"))
-            + glob(os.path.join(metrics_dir, "per_example_metrics_job*.csv"))
-            + glob(os.path.join(metrics_dir, "individual_job_results", "per_example_metrics_job*.csv"))
-        ))
+    metrics_dir = os.path.join(output_dir, "batch[0-9]*", "inference_metrics")
+    csv_paths = sorted(
+        glob(os.path.join(metrics_dir, "per_example_metrics.csv"))
+        + glob(os.path.join(metrics_dir, "per_example_metrics_job*.csv"))
+        + glob(os.path.join(metrics_dir, "individual_job_results", "per_example_metrics_job*.csv"))
+    )
     if not csv_paths:
         return pd.DataFrame()
 
@@ -3055,8 +3047,7 @@ def collect_scores(
 
     Scans ``<work_dir>/outputs/batch*/inference_samples/`` for designed structures,
     decompresses any compressed outputs, optionally converts them to PDB, and
-    merges each batch's inline metrics on the RFD4 ``example_id``. Also reads
-    older runs with flat ``outputs/inference_samples/`` directories.
+    merges each batch's inline metrics on the RFD4 ``example_id``.
     If metrics exist, every collected structure must have a matching metric row.
 
     Parameters
@@ -3122,13 +3113,13 @@ def collect_scores(
 
     include_set = set(include_scores or [])
     output_dir = os.path.join(work_dir, "outputs")
+    samples_dir = os.path.join(output_dir, "batch[0-9]*", "inference_samples")
     poses_dir = os.path.join(output_dir, "poses")
 
     structure_paths = sorted(
-        path
-        for directory in _rfd4_output_dirs(output_dir)
-        for extension in ("cif", "cif.gz", "cif.zst")
-        for path in glob(os.path.join(directory, "inference_samples", "*", f"*_generated.{extension}"))
+        glob(os.path.join(samples_dir, "*", "*_generated.cif"))
+        + glob(os.path.join(samples_dir, "*", "*_generated.cif.gz"))
+        + glob(os.path.join(samples_dir, "*", "*_generated.cif.zst"))
     )
     if not structure_paths:
         return pd.DataFrame()
