@@ -177,9 +177,6 @@ def build_provenance_record(
             ``{input_residue: output_residue}``, e.g. ``{"B45": "B45"}``. Only
             source labels that resolve to exactly one output residue appear
             here, so the map is always safe to apply one-to-one.
-        ``source_index_map_version``
-            ``2`` for maps composed with original input numbering, ``1`` for
-            raw prepared-input labels. Used to invalidate older cached maps.
         ``ambiguous_source_labels``
             Source labels that spanned more than one output residue and were
             therefore left out of ``source_index_map``.
@@ -271,7 +268,6 @@ def build_provenance_record(
     return {
         "description": description,
         "source_index_map": source_index_map,
-        "source_index_map_version": 2 if input_index_map is not None else 1,
         "ambiguous_source_labels": sorted(ambiguous),
         "motif_residues": motif_residues,
         "unindexed_residues": unindexed_residues,
@@ -312,7 +308,6 @@ def main(args):
             results.append({
                 "description": record["description"],
                 "source_index_map": {},
-                "source_index_map_version": 0,
                 "ambiguous_source_labels": [],
                 "motif_residues": [],
                 "unindexed_residues": [],

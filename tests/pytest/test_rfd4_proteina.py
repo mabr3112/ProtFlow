@@ -663,7 +663,6 @@ class ProvenanceTests(TestCase):
             {"A41": {"A1"}, "A42": {"A2"}, "A43": {"A3"}, "Z0": {"Z0"}},
         )
         self.assertEqual(record["source_index_map"], {"A41": "B12", "A42": "B13", "Z0": "Z0"})
-        self.assertEqual(record["source_index_map_version"], 2)
         poses = _poses_with_map(
             record["source_index_map"],
             residue_motif=ResidueSelection(["A42"]),

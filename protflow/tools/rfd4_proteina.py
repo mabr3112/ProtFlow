@@ -2580,7 +2580,6 @@ class RFD4Proteina(Runner):
 #: Columns that :func:`add_source_maps_to_scores` adds to the scores table.
 RFD4_REMAP_RESULT_COLUMNS: tuple[str, ...] = (
     "source_index_map",
-    "source_index_map_version",
     "ambiguous_source_labels",
     "motif_residues",
     "unindexed_residues",
@@ -2769,11 +2768,7 @@ def add_source_maps_to_scores(
     """
     scores = scores.copy()
     wanted_columns = RFD4_REMAP_RESULT_COLUMNS + (("renumbered_input",) if renumber_input else ())
-    original_numbering = (
-        spec_by_task is None
-        or ("source_index_map_version" in scores.columns and scores["source_index_map_version"].eq(2).all())
-    )
-    if all(column in scores.columns for column in wanted_columns) and original_numbering and not overwrite:
+    if all(column in scores.columns for column in wanted_columns) and not overwrite:
         return scores
 
     if jobstarter is None:
