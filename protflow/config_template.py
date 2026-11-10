@@ -125,3 +125,7 @@ HYDRAPROT_PYTHON_PATH = "" # "/path/to/miniconda3/envs/hydraprot/bin/python"
 # mmseqs
 MMSEQS_PATH = "" #/path/to/envs/mmseqs/bin/mmseqs"
 MMSEQS_PRE_CMD = ""
+
+# esmfold2
+ESMFOLD2_PYTHON = "" # "/path/to/env/bin/python"
+ESMFOLD2_PRE_CMD = ""
