@@ -2269,6 +2269,7 @@ class RFD4Proteina(Runner):
                 )
                 self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
+            index_layers = self._resolve_index_layers(poses=poses, scores=scores, default=index_layers)
             poses = self._merge_scores_into_poses(poses=poses, scores=scores, prefix=prefix, index_layers=index_layers)
             if update_motifs:
                 remap_rfd4_motifs(poses=poses, motifs=update_motifs, prefix=prefix, strict=strict_remap)
@@ -2348,6 +2349,7 @@ class RFD4Proteina(Runner):
 
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
 
+        index_layers = self._resolve_index_layers(poses=poses, scores=scores, default=index_layers)
         poses = self._merge_scores_into_poses(poses=poses, scores=scores, prefix=prefix, index_layers=index_layers)
         if update_motifs:
             logging.info("Remapping residue motifs %s after RFD4 run.", update_motifs)
@@ -2360,6 +2362,52 @@ class RFD4Proteina(Runner):
     def _rfd4_remap_worker_script(self) -> str:
         """Return the configured RFD4 provenance worker script path."""
         return os.path.join(str(self.script_dir), "rfd4_remap_motifs.py")
+
+    def _resolve_index_layers(self, poses: Poses, scores: pd.DataFrame, default: int) -> int:
+        """Count the index layers RFD4 actually appended to the input pose descriptions.
+
+        Plain generation appends ``_<replicate>`` (one layer), so the configured default is
+        correct. Reward-guided beam search appends ``_<replicate>_bsc<checkpoint>_<member>``
+        (three layers; the final checkpoint is named ``bsfinal``), and multiplexing adds one
+        more. Counting the layers from the collected descriptions covers every combination
+        without the caller having to declare which search settings were used.
+
+        Returns ``default`` when the descriptions cannot be matched against the poses, so a
+        naming scheme this function does not know about fails in the merge with its own
+        message rather than here.
+        """
+        if not poses or "description" not in scores.columns:
+            return default
+
+        known = set(poses.df["poses_description"])
+        layers = set()
+        for description in scores["description"]:
+            parts = str(description).split("_")
+            for n_layers in range(1, len(parts)):
+                if "_".join(parts[:-n_layers]) in known:
+                    layers.add(n_layers)
+                    break
+            else:
+                logging.warning(
+                    "Could not match RFD4 output description %r against any pose description; "
+                    "falling back to index_layers=%d.", description, default,
+                )
+                return default
+
+        if len(layers) > 1:
+            raise RuntimeError(
+                f"RFD4 output descriptions carry inconsistent numbers of index layers ({sorted(layers)}). "
+                "Merging them into poses would mix design levels."
+            )
+
+        resolved = layers.pop()
+        if resolved != default:
+            logging.info(
+                "RFD4 output descriptions carry %d index layer(s) instead of the expected %d "
+                "(beam search appends '_bsc<checkpoint>_<member>'). Using %d.",
+                resolved, default, resolved,
+            )
+        return resolved
 
     def _merge_scores_into_poses(self, poses: Poses, scores: pd.DataFrame, prefix: str, index_layers: int) -> Poses:
         """Merge collected RFD4 scores back into the active Poses object."""

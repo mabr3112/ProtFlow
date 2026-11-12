@@ -840,3 +840,44 @@ def test_add_source_maps_forwards_pre_cmd_to_the_worker_dispatcher(tmp_path, mon
         pre_cmd="export CCD_MIRROR_PATH=/mirror",
     )
     assert seen["pre_cmd"] == "export CCD_MIRROR_PATH=/mirror"
+
+
+# --------------------------------------------------------------------------- #
+#                           index layer resolution                             #
+# --------------------------------------------------------------------------- #
+
+def _poses_named(tmp_path, names):
+    poses = Poses(work_dir=str(tmp_path))
+    poses.df = pd.DataFrame({
+        "poses_description": list(names),
+        "poses": [str(tmp_path / f"{n}.cif") for n in names],
+        "input_poses": [None] * len(names),
+    })
+    return poses
+
+
+@pytest.mark.parametrize("descriptions,expected", [
+    (["t_0", "t_199"], 1),                              # plain generation
+    (["t_0_bsc1_0", "t_24_bsc1_4"], 3),                 # reward-guided beam search
+    (["t_0_bsfinal_0"], 3),                             # final-checkpoint naming
+])
+def test_index_layers_are_counted_from_the_output_descriptions(tmp_path, descriptions, expected):
+    runner = _runner()
+    poses = _poses_named(tmp_path, ["t"])
+    scores = pd.DataFrame({"description": descriptions})
+    assert runner._resolve_index_layers(poses=poses, scores=scores, default=1) == expected
+
+
+def test_unmatched_descriptions_fall_back_to_the_configured_index_layers(tmp_path):
+    runner = _runner()
+    poses = _poses_named(tmp_path, ["t"])
+    scores = pd.DataFrame({"description": ["unrelated_0"]})
+    assert runner._resolve_index_layers(poses=poses, scores=scores, default=2) == 2
+
+
+def test_mixed_index_layers_are_rejected(tmp_path):
+    runner = _runner()
+    poses = _poses_named(tmp_path, ["t"])
+    scores = pd.DataFrame({"description": ["t_0", "t_0_bsc1_0"]})
+    with pytest.raises(RuntimeError):
+        runner._resolve_index_layers(poses=poses, scores=scores, default=1)
