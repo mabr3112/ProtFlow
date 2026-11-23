@@ -67,17 +67,21 @@ Version
 # general imports
 import os
 import logging
+import math
+import warnings
 from glob import glob
 import numpy as np
 
 # dependencies
 import pandas as pd
+from Bio.PDB.PDBExceptions import PDBException, PDBConstructionWarning
 
 # custom
 from protflow import require_config, load_config_path, runners
 from protflow.poses import Poses, description_from_path
 from ..runners import Runner, RunnerOutput, prepend_cmd
 from ..jobstarters import JobStarter
+from ..utils.biopython_tools import biopython_load_structure
 
 class Minifold(Runner):
     """
@@ -425,60 +429,85 @@ class Minifold(Runner):
 
         return f"{self.python_path} {self.script_path} {pose_path} --out_dir {output_dir} --cache {self.cache_dir} {runners.options_flags_to_string(opts, flags, sep='--')}"
 
-def collect_scores(work_dir:str) -> pd.DataFrame:
-    """
-    Collect and process the scores from Minifold output.
+def _read_ca_plddt(pdb_path: str) -> list[float]:
+    """Read per-residue pLDDT from the first model of a Minifold PDB.
 
-    This method collects the PDB output files from Minifold predictions, processes the data, and organizes it into a pandas DataFrame.
+    Standard Minifold records store one C-alpha B-factor per residue in
+    columns 61–66. Use ProtFlow's structure loader for other layouts, including
+    alternate locations where BioPython selects the representative atom.
 
     Parameters:
-        work_dir (str): The working directory where Minifold output files are stored.
+        pdb_path (str): Path to the prediction PDB.
 
     Returns:
-        pd.DataFrame: A DataFrame containing the collected scores and corresponding file locations.
+        list[float]: C-alpha B-factors in residue order.
 
-    Examples:
-        Here is an example of how to use the `collect_minifold_scores` method:
-
-        .. code-block:: python
-
-            from minifold import Minifold
-
-            # Initialize the Minifold class
-            minifold = Minifold()
-
-            # Collect scores from Minifold output
-            scores_df = collect_minifold_scores(
-                work_dir="/path/to/work_dir",
-                scorefile="/path/to/scorefile.json"
-            )
-
-            # Access the collected scores
-            print(scores_df)
-
-    Further Details:
-        - **Output Collection:** The method scans the working directory for JSON and PDB output files, reads the JSON files into a DataFrame, and merges it with the locations of the PDB files.
-        - **Data Organization:** The method organizes the collected data into a structured DataFrame, making it accessible for further analysis and ensuring that the scores are saved to the specified JSON file.
-        - **Output Management:** The method also ensures that the temporary directories and files used during the prediction process are cleaned up, maintaining a tidy working environment.
-
-    This method is designed to streamline the collection and processing of Minifold output data, ensuring that the results are organized and accessible for further analysis.
+    Raises:
+        ValueError: If the structure cannot supply finite C-alpha B-factors.
     """
+    scores = []
+    try:
+        with open(pdb_path, "rb") as handle:
+            for line in handle:
+                if line.startswith(b"ENDMDL"):
+                    break
+                if line[12:16].strip() != b"CA" or not line.startswith((b"ATOM  ", b"HETATM")):
+                    continue
+                if line[12:17] != b" CA  " or line.startswith(b"HETATM"):
+                    raise ValueError("nonstandard C-alpha record")
+                value = float(line[60:66])
+                if not math.isfinite(value):
+                    raise ValueError("non-finite C-alpha B-factor")
+                scores.append(value)
+        if scores:
+            return scores
+    except ValueError as exc:
+        logging.debug("Reading %s with BioPython: %s", pdb_path, exc)
 
-    def extract_plddt_from_pdb(pdb_path:str, ca_only:bool=True) -> list: 
-        headers = ["record", "atom_num", "atom_name", "res_name", "chain", "res_num", "x", "y", "z", "occupancy", "bfactor", "element"]
-        df = pd.read_csv(pdb_path, skiprows=1, names=headers, sep=r"\s+")
-        df = df[df['record'].isin(['ATOM', 'HETATM'])]
-        if ca_only: # minifold assigns per-residue plddts --> extract plddt once per res 
-            df = df[df['atom_name'] == "CA"]
-        return df["bfactor"].to_list()
+    # BioPython substitutes zero for an unreadable B-factor in permissive mode.
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", PDBConstructionWarning)
+            warnings.filterwarnings("error", message=r".*Invalid or missing B factor", category=PDBConstructionWarning)
+            model = biopython_load_structure(pdb_path, quiet=False)
+        scores = []
+        for residue in model.get_residues():
+            if "CA" in residue and residue["CA"].element == "C":
+                value = residue["CA"].get_bfactor()
+                if not math.isfinite(value):
+                    raise ValueError(f"non-finite C-alpha B-factor in residue {residue.get_full_id()}")
+                scores.append(value)
+        if not scores:
+            raise ValueError("no C-alpha atoms found")
+    except (KeyError, ValueError, PDBException, PDBConstructionWarning) as exc:
+        raise ValueError(f"Cannot read Minifold pLDDT from {pdb_path}: {exc}") from exc
+    return scores
 
+
+def collect_scores(work_dir:str) -> pd.DataFrame:
+    """Collect per-residue and mean pLDDT from Minifold prediction PDBs.
+
+    Scores come from C-alpha B-factors in residue order. Standard predictions
+    are read directly from PDB columns 61–66. Other layouts are read with
+    ProtFlow's BioPython structure loader.
+
+    Parameters:
+        work_dir (str): Runner working directory containing the Minifold predictions.
+
+    Returns:
+        pd.DataFrame: One row per prediction with its location, description,
+        per_res_plddt and mean_per_res_plddt.
+
+    Raises:
+        ValueError: If a prediction has no readable C-alpha confidence scores.
+    """
     # collect all .pdb files
     pl = glob(os.path.join(work_dir, "minifold_preds", "minifold_results_*", "*.pdb"))
 
     # extract plddts from pdbs, create score table
     data = []
     for pdb in pl:
-        plddt_list = extract_plddt_from_pdb(pdb)
+        plddt_list = _read_ca_plddt(pdb)
         data.append(pd.Series({"location": os.path.abspath(pdb),
                                "description": description_from_path(pdb),
                                "mean_per_res_plddt": sum(plddt_list) / len(plddt_list),
