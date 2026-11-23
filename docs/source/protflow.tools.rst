@@ -45,6 +45,11 @@ protflow.tools.esmfold module
    :undoc-members:
    :show-inheritance:
 
+protflow.tools.minifold module
+------------------------------
+
+.. autofunction:: protflow.tools.minifold.collect_scores
+
 protflow.tools.ligandmpnn module
 --------------------------------
 
