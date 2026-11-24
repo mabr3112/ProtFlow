@@ -7,7 +7,7 @@ from . import residue_selectors, rfdiffusion, rosetta, esm, rfdiffusion3, rfd4_p
 # import runners, so we don't have to get them through submodules all the time
 from .alphafold3 import AlphaFold3
 from .attnpacker import AttnPacker
-from .boltz import Boltz, BoltzParams
+from .boltz import Boltz, Boltz2Anthropic, BoltzParams
 from .intellifold import Intellifold, IntellifoldParams
 from .colabfold import Colabfold
 from .esmfold import ESMFold

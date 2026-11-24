@@ -64,6 +64,10 @@ BOLTZ_PATH = "" # /path/to/CONDA/envs/boltz_env/bin/boltz
 BOLTZ_PYTHON = "" # /path/to/conda/envs/boltz_env/bin/python
 BOLTZ_PRE_CMD = ""
 
+# Uplifting Boltz-2 kit (Boltz2Anthropic)
+BOLTZ2_ANTHROPIC_PATH = "" # /path/to/uplifting-biomolecular-modeling/boltz2/run.sh or /path/to/env/bin/boltz2-opt
+BOLTZ2_ANTHROPIC_PRE_CMD = "" # e.g. "source /path/to/kit-env/bin/activate && export BOLTZ_CACHE=/path/to/weights"
+
 # gromacs
 GROMACS_PATH = "" #/path/to/gromacs/bin/
 

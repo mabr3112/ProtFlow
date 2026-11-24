@@ -48,6 +48,29 @@ You are now ready to use the Boltz runner in your ProtFlow pipelines!
 
         protflow-check-config
 
+Uplifting Boltz-2
+-----------------
+
+``Boltz2Anthropic`` accepts the same poses, ``BoltzParams``, per-pose options,
+and jobstarters as ``Boltz``. Set ``BOLTZ2_ANTHROPIC_PATH`` in your ProtFlow
+config to the kit's executable ``boltz2/run.sh`` or the installed
+``boltz2-opt`` command. Use ``BOLTZ2_ANTHROPIC_PRE_CMD`` if jobs need to
+activate the kit environment or export ``BOLTZ_CACHE``. The shell launcher
+uses the Python interpreter on the job's ``PATH``.
+
+.. code-block:: python
+
+    from protflow.tools import Boltz2Anthropic
+
+    runner = Boltz2Anthropic(jobstarter=gpu_jobstarter)
+    poses = runner.run(poses, prefix="fold", options="--mode fast --seeds 1,2")
+
+Kit modes ``fast``, ``exact``, and ``big`` return one row per input, seed,
+and model. For example, seed 2 and model rank 0 for input ``pose_A`` produce
+the pose name ``pose_A_s2_0``. The ``fold_seed`` and ``fold_model_rank``
+columns identify each sample. With ``--mode off``, the runner collects stock
+Boltz output and uses its usual ``pose_A_model_0`` naming.
+
 Predicting structures
 ---------------------
 
