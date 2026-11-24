@@ -62,7 +62,8 @@ import os
 import json
 import shutil
 import logging
-from glob import glob
+import shlex
+from tempfile import mkdtemp
 from pathlib import Path
 
 # dependencies
@@ -73,7 +74,7 @@ import pandas as pd
 from ..poses import Poses, get_format
 from .. import load_config_path, require_config
 from ..jobstarters import JobStarter, split_list
-from ..runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string
+from ..runners import Runner, RunnerOutput, parse_generic_options, options_flags_to_string, prepend_cmd
 from ..utils.biopython_tools import load_sequence_from_fasta, get_sequence_from_pose, biopython_load_structure
 
 class Boltz(Runner):
@@ -172,7 +173,7 @@ class Boltz(Runner):
         str
             The literal string ``"Boltz"``.
         """
-        return "Boltz"
+        return self.name
 
     def _parse_msa_setting(self, options: str, msa_setting: str) -> str:
         """
@@ -271,36 +272,30 @@ class Boltz(Runner):
         ValueError
             If `pose_options` expansion fails or options cannot be parsed.
         '''
-        if pose_options:
-            # parse pose-specific options
-            pose_options = self.prep_pose_options(poses, pose_options)
-            parsed_options_raw = [parse_generic_options(options, pose_option) for pose_option in pose_options]
-
-            # add out_dir to opts
-            for opts_dict, flags in parsed_options_raw:
-                opts_dict["out_dir"] = out_dir
-                if overwrite and "override" not in flags:
-                    flags.append("override")
-
-            # recompile options strings.
-            parsed_options = [options_flags_to_string(opts, flags, sep="--", no_quotes=False) for opts, flags in parsed_options_raw]
-
-        # if no pose_options were given, predictions can be batched for faster inference.
-        else:
-            # create options for batched inputs
-            options_raw = parse_generic_options(options=options, pose_options=None, sep="--") # keep cmd-opts in quotes (if needed)
-
-            # add out_dir to opts
-            options_raw[0]["out_dir"] = out_dir
-            if overwrite and "override" not in options_raw[1]:
-                options_raw[1].append("override")
-            options_raw = options_flags_to_string(*options_raw, sep="--", no_quotes=False)
-
-            # one options string per input batch
-            parsed_options = [options_raw for _ in range(max_cores)]
-
-        # output
+        per_job_options = self.prep_pose_options(poses, pose_options) if pose_options else [None] * max_cores
+        parsed_options = []
+        for index, pose_option in enumerate(per_job_options, start=1):
+            opts, flags = parse_generic_options(options, pose_option)
+            if overwrite and "override" not in flags:
+                flags.append("override")
+            # Quote the runner-owned path independently of caller-supplied CLI values.
+            opts.pop("out_dir", None)
+            cli_options = options_flags_to_string(opts, flags, sep="--")
+            output_path = self._job_output_dir(out_dir, index)
+            parsed_options.append(f"{cli_options} --out_dir={shlex.quote(output_path)}")
         return parsed_options
+
+    @staticmethod
+    def _job_output_dir(out_dir: str, index: int) -> str:
+        return out_dir
+
+    @staticmethod
+    def _prediction_work_dir(work_dir: str) -> str:
+        return work_dir
+
+    @staticmethod
+    def _collect_scores(out_dir: str) -> pd.DataFrame:
+        return collect_boltz_scores(out_dir)
 
     def _parse_poses(self, poses: Poses, pose_options: str|list[str], work_dir: str, max_cores: int) -> list[str]:
         '''helper function to parse poses for batch processing.
@@ -469,9 +464,6 @@ class Boltz(Runner):
             jobstarters=[jobstarter, self.jobstarter, poses.default_jobstarter]
         )
 
-        boltz_out_dir = os.path.join(work_dir, "outputs")
-        os.makedirs(boltz_out_dir, exist_ok=True)
-
         # sanitize
         options = options or ""
 
@@ -481,6 +473,10 @@ class Boltz(Runner):
             scores = get_format(scorefile)(scorefile) # loads scorefile DF with correct loading function
             logging.info(f"Found existing scorefile at {scorefile}. Returning {len(scores.index)} poses from previous run without running calculations.")
             return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+
+        prediction_dir = self._prediction_work_dir(work_dir)
+        boltz_out_dir = os.path.join(prediction_dir, "outputs")
+        os.makedirs(boltz_out_dir, exist_ok=True)
 
         #### write boltz inputs
         # parse msa_setting
@@ -499,7 +495,7 @@ class Boltz(Runner):
         boltz_inputs = self._parse_poses(
             poses=poses,
             pose_options=pose_options,
-            work_dir=work_dir,
+            work_dir=prediction_dir,
             max_cores=jobstarter.max_cores
         )
 
@@ -507,7 +503,7 @@ class Boltz(Runner):
             poses=poses,
             options=options,
             pose_options=pose_options,
-            max_cores=jobstarter.max_cores,
+            max_cores=len(boltz_inputs),
             out_dir=boltz_out_dir,
             overwrite=overwrite
         )
@@ -523,11 +519,11 @@ class Boltz(Runner):
         )
 
         # collect scores
-        scores = collect_boltz_scores(boltz_out_dir)
+        scores = self._collect_scores(boltz_out_dir)
 
         # output safety
         if len(scores) == 0:
-            raise RuntimeError(f"Boltz crashed. Check output logs and output directory for error logs: {work_dir}")
+            raise RuntimeError(f"{self.name} produced no predictions. Check output logs and output directory for error logs: {work_dir}")
 
         logging.info(f"Saving scores of {self} at {scorefile}")
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
@@ -535,6 +531,48 @@ class Boltz(Runner):
         # return outputs
         logging.info(f"{self} finished. Returning {len(scores.index)} poses.")
         return RunnerOutput(poses=poses, results=scores, prefix=prefix, index_layers=self.index_layers).return_poses()
+
+
+class Boltz2Anthropic(Boltz):
+    """Run the uplifting Boltz-2 kit with the same inputs and run options as Boltz.
+
+    Set ``BOLTZ2_ANTHROPIC_PATH`` to the executable ``boltz2/run.sh`` or
+    installed ``boltz2-opt``. Use ``BOLTZ2_ANTHROPIC_PRE_CMD`` for environment
+    setup. Both settings can also be supplied as constructor arguments.
+    Pass kit settings such as ``--mode exact --seeds 1,2`` via ``run(options=...)``.
+    """
+
+    def __init__(self, boltz_path: str = None, pre_cmd: str = None, jobstarter: JobStarter = None):
+        config = require_config()
+        self.boltz_path = boltz_path or load_config_path(config, "BOLTZ2_ANTHROPIC_PATH")
+        self.pre_cmd = load_config_path(config, "BOLTZ2_ANTHROPIC_PRE_CMD", is_pre_cmd=True) if pre_cmd is None else pre_cmd
+        self.name = "Boltz2Anthropic"
+        self.index_layers = 2
+        self.jobstarter = jobstarter
+
+    @staticmethod
+    def _prediction_work_dir(work_dir: str) -> str:
+        # A retry can change the batches, seeds or sample count. Keep its inputs
+        # and outputs separate from earlier predictions and their cached paths.
+        return mkdtemp(prefix="prediction_", dir=work_dir)
+
+    @staticmethod
+    def _job_output_dir(out_dir: str, index: int) -> str:
+        # Each kit process writes fixed-name worker logs and manifests.
+        return os.path.join(out_dir, f"job_{index:04d}")
+
+    def _write_cmds(self, boltz_inputs: list[str], parsed_options: list[str]) -> list[str]:
+        launcher = shlex.quote(str(self.boltz_path))
+        cmds = [
+            f"{launcher} pred {options} --input {shlex.quote(input_path)}"
+            for input_path, options in zip(boltz_inputs, parsed_options)
+        ]
+        return prepend_cmd(cmds, self.pre_cmd) if self.pre_cmd else cmds
+
+    @staticmethod
+    def _collect_scores(out_dir: str) -> pd.DataFrame:
+        return collect_boltz2_anthropic_scores(out_dir)
+
 
 def convert_poses_to_boltz_yaml(poses: Poses, prefix: str, msa: str = None, overwrite: bool = True, reset_poses: bool = True) -> None:
     """For now, this only reads the protein sequence, not anything else (no ligand support).
@@ -1255,12 +1293,22 @@ def _read_boltz_confidence_file(fp: str) -> pd.Series:
         scores_dict = json.load(f)
     return pd.Series(scores_dict)
 
-def _get_last_dir_name(path: str) -> str:
-    '''returns name of last directory in path.'''
-    p = Path(path)
-    if p.is_dir() or str(path).endswith("/"):
-        return p.name
-    return p.parent.name
+def _boltz_model_scores(model_dir: Path, name: str):
+    """Yield the stock model, confidence, affinity and artifact fields for one input."""
+    for model in sorted(model_dir.iterdir()):
+        if model.suffix not in (".cif", ".pdb") or not model.stem.startswith(f"{name}_model_"):
+            continue
+        rank = int(model.stem.removeprefix(f"{name}_model_"))
+        scores = _read_boltz_confidence_file(model_dir / f"confidence_{name}_model_{rank}.json")
+        scores["description"] = model.stem
+        scores["location"] = str(model)
+        affinity = model_dir / f"affinity_{name}.json"
+        if affinity.is_file():
+            scores = pd.concat([scores, _read_boltz_confidence_file(affinity)])
+        for header in ("plddt", "pae", "pde"):
+            scores[f"{header}_location"] = str(model_dir / f"{header}_{name}_model_{rank}.npz")
+        yield model, rank, scores
+
 
 def collect_boltz_scores(boltz_output_dir: str) -> pd.DataFrame:
     """
@@ -1290,51 +1338,40 @@ def collect_boltz_scores(boltz_output_dir: str) -> pd.DataFrame:
     The ``description`` column is ``{pose}_model_{rank}`` and ``location`` points
     to the corresponding ``.pdb/.cif`` model file. :contentReference[oaicite:3]{index=3}
     """
-    # create list of output files
-    out_fl = _folders_in_dir(boltz_output_dir)
-    out_fl = [os.path.join(out_f, "predictions") for out_f in out_fl]
+    return pd.DataFrame([
+        scores
+        for batch in _folders_in_dir(boltz_output_dir)
+        for model_dir in _folders_in_dir(batch / "predictions")
+        for _, _, scores in _boltz_model_scores(model_dir, model_dir.name)
+    ])
 
-    # create output aggregation list
-    out_l = []
 
-    # loop over output folders {input_dir/input_file}/{predictions}/{input_file}/{diffusion_samples} -> multiple input files and multiple diffusion samples
-    for out_f in out_fl:
-        for input_file in _folders_in_dir(out_f): # input_file should be: /path/to/boltz_output_dir/{boltz_input}/predictions/{input_file}/
-            # basename of pose
-            description = _get_last_dir_name(input_file)
+def collect_boltz2_anthropic_scores(boltz_output_dir: str) -> pd.DataFrame:
+    """Collect optimized and stock-mode predictions from the kit's per-job directories.
 
-            # loop over output models
-            output_models = glob(f"{input_file}/{description}_model_*.cif") + glob(f"{input_file}/{description}_model_*.pdb")
-            for pose_fp in output_models:
-                # determine rank
-                rank = int(os.path.splitext(os.path.basename(pose_fp))[0].rsplit("_", maxsplit=1)[-1]) # takes the rank (1) from /path/to/confidence_{pose_description}_model_1.json
+    Optimized model paths point to seed-qualified sibling links. Their basenames
+    are unique across seeds and strip back to the input pose in two index layers.
+    """
+    rows = []
+    for job_dir in sorted(Path(boltz_output_dir).glob("job_*")):
+        for seed_dir in sorted(job_dir.glob("by_seed/*/s*")):
+            name = seed_dir.parent.name
+            seed = int(seed_dir.name[1:])
+            for model, rank, scores in _boltz_model_scores(seed_dir, name):
+                location = seed_dir / f"{name}_s{seed}_{rank}{model.suffix}"
+                if not location.is_symlink() or location.readlink() != Path(model.name):
+                    location.symlink_to(model.name)
+                scores["seed"] = seed
+                scores["model_rank"] = rank
+                scores["description"] = location.stem
+                scores["location"] = str(location)
+                rows.append(scores)
 
-                ## collect scores
-                pose_confidence_file = f"{input_file}/confidence_{description}_model_{rank}.json"
-                confidence_scores = _read_boltz_confidence_file(pose_confidence_file)
+        for model_dir in sorted(job_dir.glob("boltz_results_*/predictions/*")):
+            if model_dir.is_dir():
+                rows.extend(scores for _, _, scores in _boltz_model_scores(model_dir, model_dir.name))
+    return pd.DataFrame(rows)
 
-                # parse description
-                confidence_scores["description"] = f"{description}_model_{rank}"
-                confidence_scores["location"] = pose_fp
-
-                # read affinity scores
-                affinity_fn = f"{input_file}/affinity_{description}.json"
-                if os.path.isfile(affinity_fn):
-                    affinity_scores = _read_boltz_confidence_file(affinity_fn)
-                    confidence_scores = pd.concat([confidence_scores, affinity_scores])
-
-                # add .npz file-locations into the scores
-                npz_file_headers = ["plddt", "pae", "pde"]
-                npz_files = [f"{input_file}/{header}_{description}_model_{rank}.npz" for header in npz_file_headers]
-                for npz_file, header in zip(npz_files, npz_file_headers):
-                    confidence_scores[f"{header}_location"] = npz_file
-
-                # append model scores to global output list:
-                out_l.append(confidence_scores)
-
-    # aggregate scores in DataFrame
-    scores = pd.DataFrame(out_l)
-    return scores
 
 def idx_to_char(idx: int) -> str:
     """
