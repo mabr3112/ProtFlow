@@ -3,7 +3,7 @@ from . import atomselection_contacts, biopython_metrics, dssp, fpocket, generic_
 
 # import runners directly
 from .atomselection_contacts import AtomSelectionContacts
-from .biopython_metrics import Angle, BiopythonMetric, BiopythonMetricRunner, ContactOrder, Dihedral, Distance, PlaneAngle
+from .biopython_metrics import Angle, BiopythonMetric, BiopythonMetricRunner, ContactOrder, Dihedral, Distance, PlaneAngle, SymmetryAwareMetric
 from .dssp import DSSP
 from .fpocket import FPocket
 from .generic_metric_runner import GenericMetric

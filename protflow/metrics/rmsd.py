@@ -82,18 +82,28 @@ from ..runners import Runner, RunnerOutput, col_in_df
 from .. import jobstarters, load_config_path, require_config
 
 
+RMSDSelection = AtomSelectionInput | ResidueSelection
+
+
 def _setup_atom_selection_list(
     poses: Poses,
-    selection: AtomSelectionInput,
+    selection: RMSDSelection,
     parameter_name: str,
     allow_none: bool = False,
-) -> list[list[Any] | None]:
+) -> list[list[Any] | dict | None]:
     """Expand static or dataframe-column atom selections into one JSON-ready list per pose."""
     # None is valid only for optional superimposition selections.
     if selection is None:
         if allow_none:
             return [None for _ in poses]
         raise ValueError(f"{parameter_name} must be specified.")
+
+    def serialize(value):
+        if isinstance(value, ResidueSelection):
+            return {"residues": list(value)}
+        if isinstance(value, dict) and "residues" in value:
+            return {"residues": value["residues"]}
+        return AtomSelection(value).to_list()
 
     # Strings point to dataframe columns with one ordered selection per pose.
     if isinstance(selection, str):
@@ -105,11 +115,11 @@ def _setup_atom_selection_list(
                     out.append(None)
                     continue
                 raise ValueError(f"{parameter_name} column '{selection}' contains None at row {idx}.")
-            out.append(AtomSelection(row_selection).to_list())
+            out.append(serialize(row_selection))
         return out
 
     # Non-column selections are static and reused for every pose.
-    atom_selection = AtomSelection(selection).to_list()
+    atom_selection = serialize(selection)
     return [atom_selection for _ in poses]
 
 
@@ -145,13 +155,16 @@ class AtomRMSD(Runner):
         self,
         ref_col: str | None = None,
         ref_path: str | None = None,
-        ref_atoms: AtomSelectionInput = None,
-        ref_superimpose_atoms: AtomSelectionInput = None,
-        target_atoms: AtomSelectionInput = None,
-        target_superimpose_atoms: AtomSelectionInput = None,
+        ref_atoms: RMSDSelection = None,
+        ref_superimpose_atoms: RMSDSelection = None,
+        target_atoms: RMSDSelection = None,
+        target_superimpose_atoms: RMSDSelection = None,
         return_superimposed: bool = False,
         jobstarter: JobStarter | None = None,
         overwrite: bool = False,
+        symmetry: str = "none",
+        his_ring_flip: bool = False,
+        amide_flip: bool = False,
     ) -> None:
         """Initialize an atom-level RMSD runner."""
         # setup config
@@ -169,6 +182,9 @@ class AtomRMSD(Runner):
         self.return_superimposed = return_superimposed
         self.jobstarter = jobstarter
         self.overwrite = overwrite
+        self.symmetry = symmetry
+        self.his_ring_flip = his_ring_flip
+        self.amide_flip = amide_flip
         self.name = "atom_rmsd"
 
     def __str__(self) -> str:
@@ -176,9 +192,10 @@ class AtomRMSD(Runner):
 
     def run(
         self, poses: Poses, prefix: str, jobstarter: JobStarter | None = None, overwrite: bool = False,
-        ref_col: str | None = None, ref_path: str | None = None, ref_atoms: AtomSelectionInput = None,
-        ref_superimpose_atoms: AtomSelectionInput = None, target_atoms: AtomSelectionInput = None, 
-        target_superimpose_atoms: AtomSelectionInput = None, return_superimposed: bool | None = None,
+        ref_col: str | None = None, ref_path: str | None = None, ref_atoms: RMSDSelection = None,
+        ref_superimpose_atoms: RMSDSelection = None, target_atoms: RMSDSelection = None,
+        target_superimpose_atoms: RMSDSelection = None, return_superimposed: bool | None = None,
+        symmetry: str | None = None, his_ring_flip: bool | None = None, amide_flip: bool | None = None,
     ) -> Poses:
         """Run atom-level RMSD calculation and merge the resulting scores into ``poses``."""
         # prep inputs
@@ -189,7 +206,19 @@ class AtomRMSD(Runner):
         target_atoms = target_atoms or self.target_atoms
         target_superimpose_atoms = target_superimpose_atoms or self.target_superimpose_atoms
         overwrite = overwrite or self.overwrite
-        return_superimposed = return_superimposed or self.return_superimposed
+        return_superimposed = self.return_superimposed if return_superimposed is None else return_superimposed
+        symmetry = self.symmetry if symmetry is None else symmetry
+        his_ring_flip = self.his_ring_flip if his_ring_flip is None else his_ring_flip
+        amide_flip = self.amide_flip if amide_flip is None else amide_flip
+        if symmetry not in ("none", "exact", "backbone"):
+            raise ValueError("symmetry must be 'none', 'exact' or 'backbone'.")
+        if symmetry == "none" and (his_ring_flip or amide_flip):
+            raise ValueError("Side-chain orientation options require exact or backbone symmetry.")
+        variant = "" if symmetry == "none" else f"_{symmetry}"
+        if his_ring_flip:
+            variant += "_his"
+        if amide_flip:
+            variant += "_amide"
 
         # sanity
         if not isinstance(return_superimposed, bool):
@@ -210,7 +239,7 @@ class AtomRMSD(Runner):
         )
 
         # check if outputs are present
-        scorefile = os.path.join(work_dir, f"{prefix}_rmsds.{poses.storage_format}")
+        scorefile = os.path.join(work_dir, f"{prefix}_rmsds{variant}.{poses.storage_format}")
         if (rmsd_df := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             return RunnerOutput(poses=poses, results=rmsd_df, prefix=prefix).return_poses()
 
@@ -225,6 +254,9 @@ class AtomRMSD(Runner):
             target_superimpose_atoms=target_superimpose_atoms,
             return_superimposed=return_superimposed,
         )
+
+        for options in input_dict.values():
+            options.update(symmetry=symmetry, his_ring_flip=his_ring_flip, amide_flip=amide_flip)
 
         if not input_dict:
             raise ValueError("No poses were provided for atom-level RMSD calculation.")
@@ -275,9 +307,9 @@ class AtomRMSD(Runner):
         return RunnerOutput(poses=poses, results=rmsd_df, prefix=prefix).return_poses()
 
     def setup_input_dict(
-        self, poses: Poses, ref_col: str | None, ref_path: str | None, ref_atoms: AtomSelectionInput,
-        ref_superimpose_atoms: AtomSelectionInput, target_atoms: AtomSelectionInput,
-        target_superimpose_atoms: AtomSelectionInput, return_superimposed: bool,
+        self, poses: Poses, ref_col: str | None, ref_path: str | None, ref_atoms: RMSDSelection,
+        ref_superimpose_atoms: RMSDSelection, target_atoms: RMSDSelection,
+        target_superimpose_atoms: RMSDSelection, return_superimposed: bool,
     ) -> dict[str, dict[str, Any]]:
         """Set up the JSON input dictionary for ``calc_atom_rmsd.py``."""
 

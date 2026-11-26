@@ -235,3 +235,63 @@ For the example above, the output columns include:
 
 If you run the same prefix again with ``overwrite=False``, ProtFlow reuses the
 cached scorefile instead of recalculating the BioPython metrics.
+
+Side-chain atom assignments
+---------------------------
+
+Use a symmetry-aware metric when its score depends on which side-chain atom
+represents a contact. Each metric measures all allowed assignments, then
+minimizes the supplied scalar potential. The potential runs on the submitting
+process, so ordinary Python callables and objects with a ``calc(value)`` method
+work without installing the potential on the workers.
+
+.. code-block:: python
+
+    from protflow.metrics import AtomRMSD, Distance, SymmetryAwareMetric
+
+    contact = SymmetryAwareMetric(
+        Distance(name="his_asp", atoms="his_asp_atoms"),
+        potential=lambda d: (d - 2.5) ** 2,
+        expected_value=2.5,
+        his_nitrogens=True,
+    )
+    runner.run(poses, prefix="catalysis", metrics=[contact])
+
+The output columns are ``catalysis_his_asp`` (measured distance),
+``catalysis_his_asp_potential`` (winning score) and ``catalysis_his_asp_atoms``
+(ordered Bio.PDB full IDs). Equal potentials favor the geometry closest to
+``expected_value``, using circular differences for dihedrals, then the first
+assignment, with literal names tested first. Use the metric's units for both
+the potential and the expected value. Distance, Angle, Dihedral and PlaneAngle
+are supported. Each metric chooses independently, including when two contacts
+use the same His nitrogen. Set ``his_nitrogens=False`` to preserve His roles.
+Changing the potential can reuse measured candidates. Use ``overwrite=True``
+after changing coordinates in place.
+
+``AtomRMSD`` accepts ordered AtomSelection or ResidueSelection pairs and
+per-pose selection columns. Residue selections expand to matching heavy atoms
+by name. For example, fit each motif's N, CA, C and O before choosing side-chain
+assignments with
+
+.. code-block:: python
+
+    rms = AtomRMSD(ref_col="input_poses", ref_atoms="original_motif",
+                   target_atoms="remapped_motif", symmetry="backbone")
+    rms.run(poses, prefix="motif_backbone_fit")
+
+With ``symmetry="exact"``, the default fit uses the scored atoms and tests the
+joint residue permutations. With explicit paired superposition selections, each
+assignment on the fit atoms defines a rigid fit and the lowest **measured** RMSD
+wins. Exact fitting grows exponentially with the number of ambiguous residues
+in the fit. A backbone fit chooses each residue independently and scales linearly.
+Returned structures use the winning rigid transform and retain their atom names.
+The default ``symmetry="none"`` uses literal labels and the existing fit behavior.
+
+Both interfaces support Asp/Glu carboxylates, Arg terminal nitrogens, Leu/Val
+methyl branches and coupled Phe/Tyr ring swaps. An explicitly named acid proton
+fixes the carboxylate oxygen identities. A partial atom selection can use
+a partner elsewhere in the same residue. The requested literal atoms must exist.
+An incomplete alternative is skipped. Use ``amide_flip=True`` to test the
+alternative Asn/Gln amide orientation. RMSD separately accepts
+``his_ring_flip=True`` for the coupled imidazole orientation change
+(ND1/CD2 and CE1/NE2). These orientation options operate on heavy atoms.
