@@ -15,6 +15,7 @@ import pandas as pd
 
 # customs
 from protflow.poses import description_from_path
+from protflow.utils.atom_symmetry import atom_assignments
 
 
 def load_biopython_structure(path: str, quiet: bool = True) -> Bio.PDB.Structure.Structure:
@@ -130,6 +131,15 @@ def unique_metric_signatures(input_dict: dict[str, list[dict[str, Any]]]) -> lis
 
 def calculate_metric(metric: Any, entity: Bio.PDB.Entity.Entity, metric_spec: dict[str, Any]) -> Any:
     '''Calculate one metric for a loaded BioPython entity.'''
+    if "symmetry" in metric_spec:
+        kwargs = metric_spec["kwargs"]
+        atoms = metric._parse_atoms(entity, kwargs["atoms"])
+        candidates = []
+        for assignment in atom_assignments(atoms, **metric_spec["symmetry"]):
+            ids = [atom.get_full_id() for atom in assignment]
+            value = metric.calc(entity, **{**kwargs, "atoms": ids})
+            candidates.append((value, ids))
+        return candidates
     return metric_callable(metric)(entity, *metric_spec["args"], **metric_spec["kwargs"])
 
 
@@ -166,7 +176,7 @@ def main(args):
 
     # save out_scores
     os.makedirs(os.path.dirname(args.output_path) or ".", exist_ok=True)
-    out_scores.to_json(args.output_path)
+    out_scores.to_json(args.output_path, double_precision=15)
 
 
 if __name__ == "__main__":

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 # imports
+import hashlib
 import json
 import logging
 import math
 import os
 import shlex
+import tempfile
 from typing import Any
 
 # dependencies
@@ -169,7 +171,9 @@ class BiopythonMetricRunner(Runner):
 
         # Reuse cached scores unless overwrite is requested.
         scorefile = os.path.join(work_dir, f"{prefix}_{self.name}.{poses.storage_format}")
-        if (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
+        configured = metrics if isinstance(metrics, (tuple, list)) else [metrics]
+        symmetric = [m for m in configured if isinstance(m, SymmetryAwareMetric)]
+        if not symmetric and (scores := self.check_for_existing_scorefile(scorefile=scorefile, overwrite=overwrite)) is not None:
             logging.info("Found existing Biopython metrics scorefile at %s. Returning cached scores.", scorefile)
             return RunnerOutput(
                 poses=poses,
@@ -192,26 +196,55 @@ class BiopythonMetricRunner(Runner):
         # Build the pose-to-metric-spec dictionary consumed by the worker.
         input_dict = self.setup_input_dict(poses=poses, metrics=metrics)
 
-        # Split the large input dictionary into one JSON file per worker.
-        input_jsons, output_jsons = self.write_input_jsons(input_dict=input_dict, work_dir=work_dir, jobstarter=jobstarter)
+        if symmetric:
+            digest = hashlib.sha256(json.dumps([biopython_level, input_dict], sort_keys=True).encode()).hexdigest()
+            geometry_file = os.path.join(work_dir, f"metric_candidates_{digest}.json")
+            scores = self.check_for_existing_scorefile(geometry_file, overwrite)
+            scorefile = os.path.join(work_dir, f"{prefix}_{self.name}_symmetry.{poses.storage_format}")
+        else:
+            scores = None
 
-        # Create one shell command per worker JSON file.
-        cmds = self.write_cmds(
-            input_jsons=input_jsons,
-            output_jsons=output_jsons,
-            biopython_level=biopython_level,
-        )
+        if scores is None:
+            # Split the large input dictionary into one JSON file per worker.
+            input_jsons, output_jsons = self.write_input_jsons(input_dict=input_dict, work_dir=work_dir, jobstarter=jobstarter)
 
-        # Start all worker jobs and wait until they finish.
-        jobstarter.start(
-            cmds=cmds,
-            jobname=f"{prefix}_{self.name}",
-            wait=True,
-            output_path=work_dir,
-        )
+            # Create one shell command per worker JSON file.
+            cmds = self.write_cmds(
+                input_jsons=input_jsons,
+                output_jsons=output_jsons,
+                biopython_level=biopython_level,
+            )
 
-        # Merge worker outputs, save a scorefile, and update poses.df.
-        scores = collect_scores(output_files=output_jsons, expected_rows=len(poses))
+            # Start all worker jobs and wait until they finish.
+            jobstarter.start(
+                cmds=cmds,
+                jobname=f"{prefix}_{self.name}",
+                wait=True,
+                output_path=work_dir,
+            )
+
+            # Merge worker outputs, save a scorefile, and update poses.df.
+            scores = collect_scores(output_files=output_jsons, expected_rows=len(poses))
+            if symmetric:
+                # A retry can safely reuse only a fully written candidate table.
+                with tempfile.NamedTemporaryFile(dir=work_dir, mode="w", delete=False) as cache:
+                    try:
+                        scores.to_json(cache, double_precision=15)
+                        cache.close()
+                        os.replace(cache.name, geometry_file)
+                    finally:
+                        if os.path.exists(cache.name):
+                            os.unlink(cache.name)
+
+        for metric in symmetric:
+            selected = [metric.choose(candidates) for candidates in scores[metric.name]]
+            values, potentials, atoms = zip(*selected)
+            for suffix, column in (("_potential", potentials), ("_atoms", atoms)):
+                key = metric.name + suffix
+                if key in scores:
+                    raise ValueError(f"Duplicate metric output column {key!r}.")
+                scores[key] = list(column)
+            scores[metric.name] = values
         self.save_runner_scorefile(scores=scores, scorefile=scorefile)
         return RunnerOutput(
             poses=poses,
@@ -389,15 +422,13 @@ class BiopythonMetric:
                 except KeyError:
                     pass
                 else:
-                    if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
-                        atom.disordered_select(altloc)
-                        atom = atom.selected_child
+                    if altloc not in (None, "", " ") and atom.is_disordered() == 2:
+                        return atom.child_dict[altloc]
                     return atom
             raise KeyError(f"Could not resolve atom specification {atom_spec} in biomolecule {biomolecule.get_full_id()}") from exc
 
-        if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
-            atom.disordered_select(altloc)
-            atom = atom.selected_child
+        if altloc not in (None, "", " ") and atom.is_disordered() == 2:
+            return atom.child_dict[altloc]
         return atom
 
     def _resolve_atom_from_entity(self, biomolecule: Entity, model_id: Any, chain_id: str, residue_id: tuple[str, int, str], atom_name: str) -> Atom:
@@ -803,3 +834,49 @@ class Bfactor(BiopythonMetric):
         target_atoms = self._parse_atoms(biomolecule, target)
 
         return sum([atom.bfactor for atom in target_atoms]) / len(target_atoms)
+
+
+class SymmetryAwareMetric(BiopythonMetric):
+    """Score all residue-consistent geometries using a caller-supplied scalar potential.
+
+    Wrap Distance, Angle, Dihedral or PlaneAngle. The potential is minimized on
+    the submitting process and can be a callable or an object with calc(value).
+    expected_value breaks ties on flat potentials. Dihedrals use circular error.
+    Each metric chooses its His nitrogen independently when his_nitrogens is True.
+    """
+    def __init__(self, metric, potential, expected_value, *, his_nitrogens=True, amide_flip=False):
+        if not isinstance(metric, (Distance, Angle, Dihedral, PlaneAngle)):
+            raise TypeError("Wrap a Distance, Angle, Dihedral or PlaneAngle metric.")
+        super().__init__(name=metric.name)
+        self.metric = metric
+        self.potential = getattr(potential, "calc", potential)
+        if not callable(self.potential):
+            raise TypeError("potential must be callable or supply calc(value).")
+        self.expected_value = float(expected_value)
+        if not math.isfinite(self.expected_value):
+            raise ValueError("expected_value must be finite.")
+        self.options = {"histidine": "nitrogens" if his_nitrogens else None, "amide_flip": amide_flip}
+
+    def parse(self, pose):
+        spec = self.metric.parse(pose)
+        spec["symmetry"] = self.options
+        return spec
+
+    def choose(self, candidates):
+        """Return the value, potential and full ordered Bio.PDB atom IDs."""
+        best = None
+        for value, atoms in candidates:
+            value = float(value)
+            score = float(self.potential(value))
+            if not math.isfinite(value) or not math.isfinite(score):
+                raise ValueError(f"Nonfinite geometry or potential for {self.name}.")
+            delta = value - self.expected_value
+            if isinstance(self.metric, Dihedral):
+                period = 360 if self.metric.kwargs["degrees"] else 2 * math.pi
+                delta = (delta + period / 2) % period - period / 2
+            key = (score, abs(delta))
+            if best is None or key < best:
+                best, result = key, (value, score, atoms)
+        if best is None:
+            raise ValueError(f"No atom assignments for {self.name}.")
+        return result

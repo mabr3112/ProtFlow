@@ -1,6 +1,8 @@
 """Auxiliary script to calculate atom-level RMSDs from PDB or mmCIF inputs."""
 # imports
 import json
+from itertools import product
+from functools import lru_cache
 import math
 import os
 from typing import Any
@@ -8,11 +10,13 @@ from typing import Any
 # dependencies
 import Bio.PDB
 import Bio.PDB.PDBExceptions
+import numpy as np
 import pandas as pd
 from Bio.PDB.Structure import Structure
 
 # customs
 from protflow.poses import description_from_path
+from protflow.utils.atom_symmetry import protonated_carboxylate, swap_groups
 
 
 def load_structure(path: str, quiet: bool = True) -> Structure:
@@ -119,9 +123,8 @@ def atom_from_spec(structure: Structure, atom_spec: Any, default_model: int = 0)
     except KeyError as exc:
         raise KeyError(f"Could not resolve atom specification {atom_spec}") from exc
 
-    if altloc not in (None, "", " ") and hasattr(atom, "disordered_select"):
-        atom.disordered_select(altloc)
-        atom = atom.selected_child
+    if altloc not in (None, "", " ") and atom.is_disordered() == 2:
+        return atom.child_dict[altloc]
 
     return atom
 
@@ -168,6 +171,92 @@ def apply_superposition(
     super_imposer.apply(target.get_atoms())
 
 
+def paired_atoms(reference, target, ref_specs, target_specs):
+    """Expand paired residues by heavy-atom name or honor the given ordered atom pairs."""
+    if isinstance(ref_specs, dict) or isinstance(target_specs, dict):
+        if not all(isinstance(s, dict) and "residues" in s for s in (ref_specs, target_specs)):
+            raise ValueError("Pair a ResidueSelection with another ResidueSelection.")
+        left, right = [], []
+        for (rc, rn), (tc, tn) in zip(ref_specs["residues"], target_specs["residues"], strict=True):
+            r, t = reference[0][rc][rn], target[0][tc][tn]
+            names = {a.name for a in r if a.element not in {"H", "D"}}
+            if names != {a.name for a in t if a.element not in {"H", "D"}}:
+                raise ValueError(f"Heavy-atom sets differ at {r.full_id} and {t.full_id}.")
+            for name in sorted(names):
+                left.append(r[name])
+                right.append(t[name])
+    else:
+        left = collect_atoms(reference, ref_specs, "ref_atoms")
+        right = collect_atoms(target, target_specs, "target_atoms")
+    if not left or len(left) != len(right):
+        raise ValueError("RMSD requires nonempty selections of equal length.")
+    return left, right
+
+
+def motif_backbones(ref_atoms, target_atoms):
+    pairs = dict.fromkeys((r.get_parent(), t.get_parent()) for r, t in zip(ref_atoms, target_atoms))
+    ref_fit, target_fit = [], []
+    for reference, target in pairs:
+        for name in ("N", "CA", "C", "O"):
+            ref_fit.append(reference[name])
+            target_fit.append(target[name])
+    return ref_fit, target_fit
+
+
+def symmetry_rmsd(ref_atoms, target_atoms, ref_fit, target_fit, mode, his_ring_flip, amide_flip):
+    """Minimize measured RMSD using a proper rigid fit and one assignment per residue."""
+    if mode not in ("exact", "backbone"):
+        raise ValueError(f"Unknown symmetry fit mode {mode!r}")
+    if ref_fit is None:
+        ref_fit, target_fit = (motif_backbones(ref_atoms, target_atoms) if mode == "backbone"
+                               else (ref_atoms, target_atoms))
+    if mode == "backbone" and any(a.name not in {"N", "CA", "C", "O"} for a in ref_fit + target_fit):
+        raise ValueError("Explicit fit selections in backbone mode must contain only backbone atoms.")
+
+    targets = target_atoms + target_fit
+    if any(a.element in {"H", "D"} for a in targets + ref_atoms + ref_fit):
+        raise ValueError("Symmetry-aware RMSD requires heavy-atom selections.")
+    n = len(target_atoms)
+    coords = np.array([a.coord for a in targets], dtype=float)
+    ref = np.array([a.coord for a in ref_atoms], dtype=float)
+    fixed = np.array([a.coord for a in ref_fit], dtype=float)
+    center = fixed.mean(axis=0)
+    fixed -= center
+
+    # Only permutations touching the fit need global enumeration. At a fixed
+    # transform, score-only residues minimize independent sums of squared errors.
+    fit_groups, score_groups = [], []
+    residue_pairs = {(r.get_parent(), t.get_parent()) for r, t in zip(ref_atoms + ref_fit, targets)}
+    locked = {t for r, t in residue_pairs if protonated_carboxylate(r)}
+    groups = swap_groups(targets, histidine="ring" if his_ring_flip else None, amide_flip=amide_flip, locked=locked)
+    for group in groups:
+        idx = np.array([i for i, _ in group])
+        alt = np.array([a.coord for _, a in group], dtype=float)
+        (fit_groups if np.any(idx >= n) else score_groups).append((idx, alt))
+    best = np.inf
+    for flags in product((False, True), repeat=len(fit_groups)):
+        candidate = coords.copy()
+        for use, (idx, alt) in zip(flags, fit_groups):
+            if use:
+                candidate[idx] = alt
+        mobile = candidate[n:]
+        centroid = mobile.mean(axis=0)
+        u, _, vt = np.linalg.svd((mobile - centroid).T @ fixed)
+        if np.linalg.det(u @ vt) < 0:
+            u[:, -1] *= -1
+        rotation = u @ vt
+        translation = center - centroid @ rotation
+        sq_error = ((candidate[:n] @ rotation + translation - ref) ** 2).sum(axis=1)
+        for idx, alt in score_groups:
+            alternative = ((alt @ rotation + translation - ref[idx]) ** 2).sum(axis=1)
+            if alternative.sum() < sq_error[idx].sum():
+                sq_error[idx] = alternative
+        error = sq_error.mean()
+        if error < best:
+            best, transform = error, (rotation, translation)
+    return float(np.sqrt(best)), transform
+
+
 def calc_atom_rmsd(
     target: Structure,
     reference: Structure,
@@ -175,20 +264,25 @@ def calc_atom_rmsd(
     ref_atom_specs: list[Any],
     target_superimpose_atom_specs: list[Any] = None,
     ref_superimpose_atom_specs: list[Any] = None,
+    symmetry: str = "none", his_ring_flip: bool = False, amide_flip: bool = False,
+    apply_transform: bool = True,
 ) -> float:
     """Optionally superimpose target onto reference, then calculate atom-level RMSD."""
-    if target_superimpose_atom_specs is not None or ref_superimpose_atom_specs is not None:
-        if target_superimpose_atom_specs is None or ref_superimpose_atom_specs is None:
-            raise ValueError("Both target_superimpose_atoms and ref_superimpose_atoms must be specified for superimposition.")
-        apply_superposition(
-            target=target,
-            reference=reference,
-            target_atom_specs=target_superimpose_atom_specs,
-            ref_atom_specs=ref_superimpose_atom_specs,
-        )
-
-    target_atoms = collect_atoms(target, target_atom_specs, "target_atoms")
-    ref_atoms = collect_atoms(reference, ref_atom_specs, "ref_atoms")
+    if (target_superimpose_atom_specs is None) != (ref_superimpose_atom_specs is None):
+        raise ValueError("Both target_superimpose_atoms and ref_superimpose_atoms are required for a fit.")
+    ref_atoms, target_atoms = paired_atoms(reference, target, ref_atom_specs, target_atom_specs)
+    ref_fit = target_fit = None
+    if ref_superimpose_atom_specs is not None:
+        ref_fit, target_fit = paired_atoms(reference, target, ref_superimpose_atom_specs, target_superimpose_atom_specs)
+    if symmetry != "none":
+        rmsd, transform = symmetry_rmsd(ref_atoms, target_atoms, ref_fit, target_fit, symmetry, his_ring_flip, amide_flip)
+        if apply_transform:
+            target.transform(*transform)
+        return rmsd
+    if ref_fit is not None:
+        fitter = Bio.PDB.Superimposer()
+        fitter.set_atoms(ref_fit, target_fit)
+        fitter.apply(target.get_atoms())
     return calc_rmsd_without_superposition(ref_atoms=ref_atoms, target_atoms=target_atoms)
 
 
@@ -243,12 +337,17 @@ def main(args) -> None:
     """Calculate atom-level RMSDs for every target in the input JSON."""
     target_dict = parse_input_json(args.input_json)
 
+    load_reference = lru_cache(maxsize=4)(load_structure)
     df_dict = {"location": [], "description": [], "rmsd": []}
     for target_path, opts in target_dict.items():
         try:
             target = load_structure(target_path)
-            reference = load_structure(opts["ref_path"])
+            reference = load_reference(opts["ref_path"])
             rmsd = calc_atom_rmsd(
+                symmetry=opts.get("symmetry", "none"),
+                his_ring_flip=opts.get("his_ring_flip", False),
+                amide_flip=opts.get("amide_flip", False),
+                apply_transform=opts["return_superimposed"],
                 target=target,
                 reference=reference,
                 target_atom_specs=opts["target_atoms"],
